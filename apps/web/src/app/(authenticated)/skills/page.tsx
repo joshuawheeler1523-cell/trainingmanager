@@ -1,16 +1,138 @@
 import PageHeader from "@/components/ui/page-header";
-import EmptyState from "@/components/ui/empty-state";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentOrgId } from "@/lib/auth/current-org";
+import SkillsView, { type CoverageCount, type ClassGap, type ExpiringCert } from "./skills-view";
+import type { Skill, Proficiency } from "@arbor/shared";
 
-export default function SkillsPage() {
+export default async function SkillsPage() {
+  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  if (!orgId) {
+    return (
+      <div>
+        <PageHeader title="Skills" description="Skill library, certifications, and gap analysis." />
+        <div className="text-muted-foreground p-6 text-sm">No active organization.</div>
+      </div>
+    );
+  }
+
+  // ── Library data ───────────────────────────────────────────────────────────
+  const { data: skillsData } = await supabase
+    .from("skills")
+    .select("*")
+    .eq("org_id", orgId)
+    .order("name");
+  const skills = (skillsData ?? []) as Skill[];
+
+  // ── Coverage: counts per (skill_id, proficiency) ───────────────────────────
+  const { data: instructorSkillRows } = await supabase
+    .from("instructor_skills")
+    .select("skill_id, proficiency, instructor_id, instructors!inner(deleted_at,status,org_id)")
+    .eq("org_id", orgId);
+
+  const coverageMap = new Map<string, number>();
+  const skillsWithAnyInstructor = new Set<string>();
+  for (const row of instructorSkillRows ?? []) {
+    const isk = row as unknown as {
+      skill_id: string;
+      proficiency: Proficiency;
+      instructor_id: string;
+      instructors: { deleted_at: string | null; status: string };
+    };
+    if (isk.instructors.deleted_at !== null) continue;
+    if (isk.instructors.status !== "active") continue;
+    skillsWithAnyInstructor.add(isk.skill_id);
+    const key = `${isk.skill_id}::${isk.proficiency}`;
+    coverageMap.set(key, (coverageMap.get(key) ?? 0) + 1);
+  }
+  const coverage: CoverageCount[] = Array.from(coverageMap.entries()).map(([key, count]) => {
+    const [skill_id, proficiency] = key.split("::") as [string, Proficiency];
+    return { skill_id, proficiency, count };
+  });
+
+  // ── Gap A: Classes lacking enough qualified instructors ────────────────────
+  const { data: classesWithReqsRaw } = await supabase
+    .from("classes")
+    .select("id,name,class_skill_requirements!inner(requirement)")
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .eq("class_skill_requirements.requirement", "required");
+
+  const seenClassIds = new Set<string>();
+  const candidateClasses: { id: string; name: string; required_count: number }[] = [];
+  for (const row of classesWithReqsRaw ?? []) {
+    if (seenClassIds.has(row.id)) continue;
+    seenClassIds.add(row.id);
+    candidateClasses.push({
+      id: row.id,
+      name: row.name,
+      required_count: row.class_skill_requirements.length,
+    });
+  }
+
+  const classGaps: ClassGap[] = [];
+  for (const c of candidateClasses) {
+    const { data: qualified } = await supabase.rpc("qualified_instructors_for_class", {
+      p_class_id: c.id,
+    });
+    const qualifiedCount = qualified?.length ?? 0;
+    if (qualifiedCount === 0) {
+      classGaps.push({
+        class_id: c.id,
+        class_name: c.name,
+        required_count: c.required_count,
+        qualified_count: qualifiedCount,
+      });
+    }
+  }
+
+  // ── Gap B: Skills with zero qualified instructors ──────────────────────────
+  const uncoveredSkillIds = skills
+    .filter((s) => !s.is_archived && !skillsWithAnyInstructor.has(s.id))
+    .map((s) => s.id);
+
+  // ── Gap C: Expiring certifications (next 90 days) ──────────────────────────
+  const today = new Date();
+  const ninetyDays = new Date(today);
+  ninetyDays.setDate(ninetyDays.getDate() + 90);
+  const todayStr = today.toISOString().slice(0, 10);
+  const ninetyStr = ninetyDays.toISOString().slice(0, 10);
+
+  const { data: expiringRaw } = await supabase
+    .from("instructor_skills")
+    .select("id,instructor_id,skill_id,expires_at,instructors!inner(full_name),skills!inner(name)")
+    .eq("org_id", orgId)
+    .eq("is_certified", true)
+    .not("expires_at", "is", null)
+    .gte("expires_at", todayStr)
+    .lte("expires_at", ninetyStr)
+    .order("expires_at");
+
+  const expiringCerts: ExpiringCert[] = (expiringRaw ?? []).map((row) => {
+    const days = Math.max(
+      0,
+      Math.ceil((new Date(row.expires_at).getTime() - today.getTime()) / 86400000),
+    );
+    return {
+      instructor_skill_id: row.id,
+      instructor_id: row.instructor_id,
+      instructor_name: row.instructors.full_name,
+      skill_id: row.skill_id,
+      skill_name: row.skills.name,
+      expires_at: row.expires_at,
+      days_until: days,
+    };
+  });
+
   return (
     <div>
       <PageHeader title="Skills" description="Skill library, certifications, and gap analysis." />
-      <div className="p-6">
-        <EmptyState
-          title="Coming soon"
-          description="Skills management is being built in Phase 1."
-        />
-      </div>
+      <SkillsView
+        skills={skills}
+        coverage={coverage}
+        classGaps={classGaps}
+        uncoveredSkillIds={uncoveredSkillIds}
+        expiringCerts={expiringCerts}
+      />
     </div>
   );
 }

@@ -4,7 +4,13 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { PencilSquareIcon, ArchiveBoxIcon, ArrowUturnLeftIcon } from "@heroicons/react/20/solid";
+import {
+  PencilSquareIcon,
+  ArchiveBoxIcon,
+  ArrowUturnLeftIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@heroicons/react/20/solid";
 import ClassFormDialog from "@/app/(authenticated)/classes/class-form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
@@ -14,8 +20,14 @@ import {
   unassignInstructorFromClass,
   updateAssignment,
 } from "@/app/(authenticated)/classes/actions";
-import type { ClassWithHours, Instructor } from "@arbor/shared";
-import type { Assignment } from "./page";
+import {
+  addClassSkillRequirement,
+  updateClassSkillRequirement,
+  removeClassSkillRequirement,
+} from "@/app/(authenticated)/skills/actions";
+import { PROFICIENCY_VALUES, REQUIREMENT_VALUES } from "@arbor/shared";
+import type { ClassWithHours, Instructor, Skill, Proficiency, Requirement } from "@arbor/shared";
+import type { Assignment, RequirementRow } from "./page";
 
 type AuditEntry = {
   id: number;
@@ -32,6 +44,9 @@ type Props = {
   assignments: Assignment[];
   allInstructors: Instructor[];
   auditEntries: AuditEntry[];
+  requirements: RequirementRow[];
+  allSkills: Skill[];
+  qualifiedInstructorCount: number;
 };
 
 type Tab = "overview" | "instructors" | "skills" | "audit";
@@ -357,13 +372,360 @@ function InstructorsTab({
   );
 }
 
-function SkillsTab() {
+function SkillRequirementsTab({
+  classId,
+  requirements,
+  allSkills,
+  qualifiedInstructorCount,
+}: {
+  classId: string;
+  requirements: RequirementRow[];
+  allSkills: Skill[];
+  qualifiedInstructorCount: number;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [adding, setAdding] = useState(false);
+  const [draftSkillId, setDraftSkillId] = useState("");
+  const [draftMin, setDraftMin] = useState<Proficiency>("intermediate");
+  const [draftReq, setDraftReq] = useState<Requirement>("required");
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editMin, setEditMin] = useState<Proficiency>("intermediate");
+  const [editReq, setEditReq] = useState<Requirement>("required");
+
+  const assignedIds = new Set(requirements.map((r) => r.skill_id));
+  const available = allSkills.filter((s) => !assignedIds.has(s.id));
+
+  const requiredCount = requirements.filter((r) => r.requirement === "required").length;
+
+  function resetDraft() {
+    setDraftSkillId("");
+    setDraftMin("intermediate");
+    setDraftReq("required");
+    setAdding(false);
+  }
+
+  function handleAdd() {
+    if (!draftSkillId) {
+      toast.error("Pick a skill to require");
+      return;
+    }
+    startTransition(async () => {
+      const result = await addClassSkillRequirement(classId, {
+        skill_id: draftSkillId,
+        min_proficiency: draftMin,
+        requirement: draftReq,
+      });
+      if (result.ok) {
+        toast.success("Requirement added");
+        resetDraft();
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function startEdit(row: RequirementRow) {
+    setEditingId(row.id);
+    setEditMin(row.min_proficiency);
+    setEditReq(row.requirement);
+  }
+
+  function saveEdit(rowId: string) {
+    startTransition(async () => {
+      const result = await updateClassSkillRequirement(rowId, classId, {
+        min_proficiency: editMin,
+        requirement: editReq,
+      });
+      if (result.ok) {
+        toast.success("Requirement updated");
+        setEditingId(null);
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function handleRemove(rowId: string) {
+    startTransition(async () => {
+      const result = await removeClassSkillRequirement(rowId, classId);
+      if (result.ok) {
+        toast.success("Requirement removed");
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  const inputCls =
+    "border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring";
+
   return (
-    <div className="border-border bg-surface rounded-xl border border-dashed p-12 text-center">
-      <p className="text-foreground text-sm font-medium">Skill Requirements</p>
-      <p className="text-muted-foreground mt-1 text-xs">
-        Skill requirement tracking will be available in Phase 1.3.
-      </p>
+    <div className="space-y-4">
+      {/* Qualified-instructor summary */}
+      <div className="border-border bg-background rounded-xl border p-4">
+        <div className="flex items-baseline gap-3">
+          <span className="text-foreground text-2xl font-semibold">{qualifiedInstructorCount}</span>
+          <span className="text-muted-foreground text-sm">
+            qualified instructor{qualifiedInstructorCount === 1 ? "" : "s"}
+          </span>
+          {requiredCount > 0 && (
+            <span className="text-muted-foreground text-xs">
+              ({requiredCount} required skill{requiredCount === 1 ? "" : "s"})
+            </span>
+          )}
+        </div>
+        {qualifiedInstructorCount === 0 && requiredCount > 0 && (
+          <p className="text-destructive mt-1 text-xs">
+            No active instructors meet all required skills at the minimum proficiency.
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center justify-end">
+        {!adding && available.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(true);
+            }}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Add requirement
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="border-border bg-background space-y-3 rounded-xl border p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label
+                htmlFor="add-req-skill"
+                className="text-muted-foreground mb-1 block text-xs font-medium"
+              >
+                Skill *
+              </label>
+              <select
+                id="add-req-skill"
+                value={draftSkillId}
+                onChange={(e) => {
+                  setDraftSkillId(e.target.value);
+                }}
+                className={`${inputCls} w-full`}
+              >
+                <option value="">Select skill…</option>
+                {available.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="add-req-min"
+                className="text-muted-foreground mb-1 block text-xs font-medium"
+              >
+                Min. proficiency
+              </label>
+              <select
+                id="add-req-min"
+                value={draftMin}
+                onChange={(e) => {
+                  setDraftMin(e.target.value as Proficiency);
+                }}
+                className={`${inputCls} w-full capitalize`}
+              >
+                {PROFICIENCY_VALUES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="add-req-type"
+                className="text-muted-foreground mb-1 block text-xs font-medium"
+              >
+                Requirement
+              </label>
+              <select
+                id="add-req-type"
+                value={draftReq}
+                onChange={(e) => {
+                  setDraftReq(e.target.value as Requirement);
+                }}
+                className={`${inputCls} w-full capitalize`}
+              >
+                {REQUIREMENT_VALUES.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={resetDraft}
+              className="text-muted-foreground hover:text-foreground text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={pending || !draftSkillId}
+              onClick={handleAdd}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1 text-xs font-medium disabled:opacity-50"
+            >
+              {pending ? "Adding…" : "Add"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {requirements.length === 0 ? (
+        <div className="border-border bg-surface rounded-xl border border-dashed p-10 text-center">
+          <p className="text-muted-foreground text-sm">
+            {available.length === 0
+              ? "No skills exist in the library yet."
+              : "No skill requirements yet — add one to surface qualified instructors."}
+          </p>
+        </div>
+      ) : (
+        <div className="border-border bg-background overflow-hidden rounded-xl border">
+          <table className="w-full text-sm">
+            <thead className="border-border bg-surface border-b">
+              <tr>
+                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
+                  Skill
+                </th>
+                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
+                  Min. proficiency
+                </th>
+                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
+                  Requirement
+                </th>
+                <th className="px-4 py-2.5" />
+              </tr>
+            </thead>
+            <tbody className="divide-border divide-y">
+              {requirements.map((row) => (
+                <tr key={row.id} className="hover:bg-surface">
+                  <td className="text-foreground px-4 py-3 text-sm font-medium">
+                    {row.skill.name}
+                  </td>
+                  <td className="px-4 py-3">
+                    {editingId === row.id ? (
+                      <select
+                        value={editMin}
+                        onChange={(e) => {
+                          setEditMin(e.target.value as Proficiency);
+                        }}
+                        className={`${inputCls} capitalize`}
+                      >
+                        {PROFICIENCY_VALUES.map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-foreground capitalize">{row.min_proficiency}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {editingId === row.id ? (
+                      <select
+                        value={editReq}
+                        onChange={(e) => {
+                          setEditReq(e.target.value as Requirement);
+                        }}
+                        className={`${inputCls} capitalize`}
+                      >
+                        {REQUIREMENT_VALUES.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+                          row.requirement === "required"
+                            ? "bg-primary/10 text-primary"
+                            : "bg-surface text-muted-foreground"
+                        }`}
+                      >
+                        {row.requirement}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {editingId === row.id ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingId(null);
+                            }}
+                            className="text-muted-foreground hover:text-foreground text-xs"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() => {
+                              saveEdit(row.id);
+                            }}
+                            className="text-primary hover:text-primary/80 text-xs font-medium disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              startEdit(row);
+                            }}
+                            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
+                          >
+                            <PencilSquareIcon className="h-3.5 w-3.5" />
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() => {
+                              handleRemove(row.id);
+                            }}
+                            className="text-destructive hover:text-destructive/80 inline-flex items-center gap-1 text-xs disabled:opacity-50"
+                          >
+                            <TrashIcon className="h-3.5 w-3.5" />
+                            Remove
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -416,6 +778,9 @@ export default function ClassDetailClient({
   assignments,
   allInstructors,
   auditEntries,
+  requirements,
+  allSkills,
+  qualifiedInstructorCount,
 }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
@@ -550,7 +915,14 @@ export default function ClassDetailClient({
             allInstructors={allInstructors}
           />
         )}
-        {activeTab === "skills" && <SkillsTab />}
+        {activeTab === "skills" && (
+          <SkillRequirementsTab
+            classId={cls.id}
+            requirements={requirements}
+            allSkills={allSkills}
+            qualifiedInstructorCount={qualifiedInstructorCount}
+          />
+        )}
         {activeTab === "audit" && <AuditTab entries={auditEntries} />}
       </div>
     </div>

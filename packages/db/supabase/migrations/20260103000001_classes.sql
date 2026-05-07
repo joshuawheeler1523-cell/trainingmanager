@@ -73,10 +73,6 @@ create policy "cia_select" on public.class_instructor_assignments
 create policy "cia_modify" on public.class_instructor_assignments
   for all using (org_id in (select public.user_org_ids()));
 
-create trigger set_updated_at
-  before update on public.class_instructor_assignments
-  for each row execute function public.set_updated_at();
-
 select public.apply_standard_triggers('class_instructor_assignments');
 
 -- ── Offering assignment validation trigger ──────────────────────────────────────

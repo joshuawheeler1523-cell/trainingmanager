@@ -63,7 +63,16 @@
       "mcp__claude_ai_Supabase__execute_sql",
       "Bash(pnpm *)",
       "mcp__claude_ai_Supabase__get_project",
-      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); deps={**d.get\\('dependencies',{}\\),**d.get\\('devDependencies',{}\\)}; [print\\(k,v\\) for k,v in sorted\\(deps.items\\(\\)\\)]\")"
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); deps={**d.get\\('dependencies',{}\\),**d.get\\('devDependencies',{}\\)}; [print\\(k,v\\) for k,v in sorted\\(deps.items\\(\\)\\)]\")",
+      "Bash(npx vitest *)",
+      "Bash(xargs cat *)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\joshu\\\\Documents\\\\my-arbor\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "mcp__supabase__list_tables",
+      "mcp__claude_ai_Supabase__list_migrations",
+      "mcp__claude_ai_Supabase__list_tables",
+      "mcp__supabase__generate_typescript_types"
     ]
   }
 }

@@ -8,120 +8,6 @@ export type Database = {
   };
   public: {
     Tables: {
-      class_instructor_assignments: {
-        Row: {
-          id: string;
-          org_id: string;
-          class_id: string;
-          instructor_id: string;
-          role: string;
-          assigned_offerings: number;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          org_id: string;
-          class_id: string;
-          instructor_id: string;
-          role?: string;
-          assigned_offerings?: number;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          org_id?: string;
-          class_id?: string;
-          instructor_id?: string;
-          role?: string;
-          assigned_offerings?: number;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "class_instructor_assignments_class_id_fkey";
-            columns: ["class_id"];
-            isOneToOne: false;
-            referencedRelation: "classes";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "class_instructor_assignments_instructor_id_fkey";
-            columns: ["instructor_id"];
-            isOneToOne: false;
-            referencedRelation: "instructors";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      classes: {
-        Row: {
-          id: string;
-          org_id: string;
-          name: string;
-          description: string | null;
-          allocation_bucket_id: string | null;
-          is_multi_day: boolean;
-          total_days: number;
-          hours_per_day: number | null;
-          custom_day_hours: number[] | null;
-          offerings_per_year: number;
-          prep_hours_per_offering: number;
-          logistics_hours_per_offering: number;
-          status: string;
-          deleted_at: string | null;
-          created_at: string;
-          updated_at: string;
-          created_by: string | null;
-          updated_by: string | null;
-          version: number;
-        };
-        Insert: {
-          id?: string;
-          org_id: string;
-          name: string;
-          description?: string | null;
-          allocation_bucket_id?: string | null;
-          is_multi_day?: boolean;
-          total_days?: number;
-          hours_per_day?: number | null;
-          custom_day_hours?: number[] | null;
-          offerings_per_year?: number;
-          prep_hours_per_offering?: number;
-          logistics_hours_per_offering?: number;
-          status?: string;
-          deleted_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-          created_by?: string | null;
-          updated_by?: string | null;
-          version?: number;
-        };
-        Update: {
-          id?: string;
-          org_id?: string;
-          name?: string;
-          description?: string | null;
-          allocation_bucket_id?: string | null;
-          is_multi_day?: boolean;
-          total_days?: number;
-          hours_per_day?: number | null;
-          custom_day_hours?: number[] | null;
-          offerings_per_year?: number;
-          prep_hours_per_offering?: number;
-          logistics_hours_per_offering?: number;
-          status?: string;
-          deleted_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-          created_by?: string | null;
-          updated_by?: string | null;
-          version?: number;
-        };
-        Relationships: [];
-      };
       audit_log: {
         Row: {
           actor_id: string | null;
@@ -161,6 +47,210 @@ export type Database = {
         };
         Relationships: [];
       };
+      class_instructor_assignments: {
+        Row: {
+          assigned_offerings: number;
+          class_id: string;
+          created_at: string;
+          id: string;
+          instructor_id: string;
+          org_id: string;
+          role: string;
+          updated_at: string;
+        };
+        Insert: {
+          assigned_offerings?: number;
+          class_id: string;
+          created_at?: string;
+          id?: string;
+          instructor_id: string;
+          org_id: string;
+          role?: string;
+          updated_at?: string;
+        };
+        Update: {
+          assigned_offerings?: number;
+          class_id?: string;
+          created_at?: string;
+          id?: string;
+          instructor_id?: string;
+          org_id?: string;
+          role?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "class_instructor_assignments_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_instructor_assignments_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes_with_hours";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_instructor_assignments_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_instructor_assignments_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      class_skill_requirements: {
+        Row: {
+          class_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          min_proficiency: string;
+          org_id: string;
+          requirement: string;
+          skill_id: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          class_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          min_proficiency: string;
+          org_id: string;
+          requirement?: string;
+          skill_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          class_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          min_proficiency?: string;
+          org_id?: string;
+          requirement?: string;
+          skill_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "class_skill_requirements_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_skill_requirements_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes_with_hours";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_skill_requirements_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_skill_requirements_skill_id_fkey";
+            columns: ["skill_id"];
+            isOneToOne: false;
+            referencedRelation: "skills";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      classes: {
+        Row: {
+          allocation_bucket_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          custom_day_hours: number[] | null;
+          deleted_at: string | null;
+          description: string | null;
+          hours_per_day: number | null;
+          id: string;
+          is_multi_day: boolean;
+          logistics_hours_per_offering: number;
+          name: string;
+          offerings_per_year: number;
+          org_id: string;
+          prep_hours_per_offering: number;
+          status: string;
+          total_days: number;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          allocation_bucket_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          custom_day_hours?: number[] | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          hours_per_day?: number | null;
+          id?: string;
+          is_multi_day?: boolean;
+          logistics_hours_per_offering?: number;
+          name: string;
+          offerings_per_year?: number;
+          org_id: string;
+          prep_hours_per_offering?: number;
+          status?: string;
+          total_days?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          allocation_bucket_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          custom_day_hours?: number[] | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          hours_per_day?: number | null;
+          id?: string;
+          is_multi_day?: boolean;
+          logistics_hours_per_offering?: number;
+          name?: string;
+          offerings_per_year?: number;
+          org_id?: string;
+          prep_hours_per_offering?: number;
+          status?: string;
+          total_days?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "classes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       feature_flags: {
         Row: {
           created_at: string;
@@ -192,6 +282,197 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "feature_flags_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      instructor_skills: {
+        Row: {
+          certificate_url: string | null;
+          certified_at: string | null;
+          created_at: string;
+          created_by: string | null;
+          expires_at: string | null;
+          id: string;
+          instructor_id: string;
+          is_certified: boolean;
+          notes: string | null;
+          org_id: string;
+          proficiency: string;
+          skill_id: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          certificate_url?: string | null;
+          certified_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          instructor_id: string;
+          is_certified?: boolean;
+          notes?: string | null;
+          org_id: string;
+          proficiency: string;
+          skill_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          certificate_url?: string | null;
+          certified_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          instructor_id?: string;
+          is_certified?: boolean;
+          notes?: string | null;
+          org_id?: string;
+          proficiency?: string;
+          skill_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instructor_skills_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_skills_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_skills_skill_id_fkey";
+            columns: ["skill_id"];
+            isOneToOne: false;
+            referencedRelation: "skills";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      instructors: {
+        Row: {
+          annual_hours: number;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          department: string | null;
+          email: string | null;
+          full_name: string;
+          id: string;
+          job_title: string | null;
+          location: string | null;
+          notes: string | null;
+          org_id: string;
+          phone: string | null;
+          start_date: string | null;
+          status: string;
+          updated_at: string;
+          updated_by: string | null;
+          user_id: string | null;
+          version: number;
+        };
+        Insert: {
+          annual_hours?: number;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          department?: string | null;
+          email?: string | null;
+          full_name: string;
+          id?: string;
+          job_title?: string | null;
+          location?: string | null;
+          notes?: string | null;
+          org_id: string;
+          phone?: string | null;
+          start_date?: string | null;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          user_id?: string | null;
+          version?: number;
+        };
+        Update: {
+          annual_hours?: number;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          department?: string | null;
+          email?: string | null;
+          full_name?: string;
+          id?: string;
+          job_title?: string | null;
+          location?: string | null;
+          notes?: string | null;
+          org_id?: string;
+          phone?: string | null;
+          start_date?: string | null;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          user_id?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instructors_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      notifications: {
+        Row: {
+          body: string | null;
+          created_at: string;
+          id: string;
+          kind: string;
+          link: string | null;
+          org_id: string;
+          read_at: string | null;
+          recipient_id: string;
+          title: string;
+        };
+        Insert: {
+          body?: string | null;
+          created_at?: string;
+          id?: string;
+          kind: string;
+          link?: string | null;
+          org_id: string;
+          read_at?: string | null;
+          recipient_id: string;
+          title: string;
+        };
+        Update: {
+          body?: string | null;
+          created_at?: string;
+          id?: string;
+          kind?: string;
+          link?: string | null;
+          org_id?: string;
+          read_at?: string | null;
+          recipient_id?: string;
+          title?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -293,80 +574,6 @@ export type Database = {
           },
         ];
       };
-      instructors: {
-        Row: {
-          id: string;
-          org_id: string;
-          user_id: string | null;
-          full_name: string;
-          email: string | null;
-          phone: string | null;
-          department: string | null;
-          location: string | null;
-          job_title: string | null;
-          start_date: string | null;
-          annual_hours: number;
-          status: string;
-          notes: string | null;
-          deleted_at: string | null;
-          created_at: string;
-          updated_at: string;
-          created_by: string | null;
-          updated_by: string | null;
-          version: number;
-        };
-        Insert: {
-          id?: string;
-          org_id: string;
-          user_id?: string | null;
-          full_name: string;
-          email?: string | null;
-          phone?: string | null;
-          department?: string | null;
-          location?: string | null;
-          job_title?: string | null;
-          start_date?: string | null;
-          annual_hours?: number;
-          status?: string;
-          notes?: string | null;
-          deleted_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-          created_by?: string | null;
-          updated_by?: string | null;
-          version?: number;
-        };
-        Update: {
-          id?: string;
-          org_id?: string;
-          user_id?: string | null;
-          full_name?: string;
-          email?: string | null;
-          phone?: string | null;
-          department?: string | null;
-          location?: string | null;
-          job_title?: string | null;
-          start_date?: string | null;
-          annual_hours?: number;
-          status?: string;
-          notes?: string | null;
-          deleted_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-          created_by?: string | null;
-          updated_by?: string | null;
-          version?: number;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "instructors_org_id_fkey";
-            columns: ["org_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       organizations: {
         Row: {
           billing_tier: string | null;
@@ -415,34 +622,143 @@ export type Database = {
         };
         Relationships: [];
       };
+      skills: {
+        Row: {
+          category: string | null;
+          certifying_authority: string | null;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          id: string;
+          is_archived: boolean;
+          is_certification: boolean;
+          name: string;
+          org_id: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          category?: string | null;
+          certifying_authority?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          is_archived?: boolean;
+          is_certification?: boolean;
+          name: string;
+          org_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          category?: string | null;
+          certifying_authority?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          is_archived?: boolean;
+          is_certification?: boolean;
+          name?: string;
+          org_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "skills_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       classes_with_hours: {
         Row: {
-          id: string;
-          org_id: string;
-          name: string;
-          description: string | null;
           allocation_bucket_id: string | null;
-          is_multi_day: boolean;
-          total_days: number;
-          hours_per_day: number | null;
-          custom_day_hours: number[] | null;
-          offerings_per_year: number;
-          prep_hours_per_offering: number;
-          logistics_hours_per_offering: number;
-          status: string;
-          deleted_at: string | null;
-          created_at: string;
-          updated_at: string;
-          created_by: string | null;
-          updated_by: string | null;
-          version: number;
-          instruction_hours_per_offering: number | null;
-          total_hours_per_offering: number | null;
           annual_class_hours: number | null;
+          created_at: string | null;
+          created_by: string | null;
+          custom_day_hours: number[] | null;
+          deleted_at: string | null;
+          description: string | null;
+          hours_per_day: number | null;
+          id: string | null;
+          instruction_hours_per_offering: number | null;
+          is_multi_day: boolean | null;
+          logistics_hours_per_offering: number | null;
+          name: string | null;
+          offerings_per_year: number | null;
+          org_id: string | null;
+          prep_hours_per_offering: number | null;
+          status: string | null;
+          total_days: number | null;
+          total_hours_per_offering: number | null;
+          updated_at: string | null;
+          updated_by: string | null;
+          version: number | null;
         };
-        Relationships: [];
+        Insert: {
+          allocation_bucket_id?: string | null;
+          annual_class_hours?: never;
+          created_at?: string | null;
+          created_by?: string | null;
+          custom_day_hours?: number[] | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          hours_per_day?: number | null;
+          id?: string | null;
+          instruction_hours_per_offering?: never;
+          is_multi_day?: boolean | null;
+          logistics_hours_per_offering?: number | null;
+          name?: string | null;
+          offerings_per_year?: number | null;
+          org_id?: string | null;
+          prep_hours_per_offering?: number | null;
+          status?: string | null;
+          total_days?: number | null;
+          total_hours_per_offering?: never;
+          updated_at?: string | null;
+          updated_by?: string | null;
+          version?: number | null;
+        };
+        Update: {
+          allocation_bucket_id?: string | null;
+          annual_class_hours?: never;
+          created_at?: string | null;
+          created_by?: string | null;
+          custom_day_hours?: number[] | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          hours_per_day?: number | null;
+          id?: string | null;
+          instruction_hours_per_offering?: never;
+          is_multi_day?: boolean | null;
+          logistics_hours_per_offering?: number | null;
+          name?: string | null;
+          offerings_per_year?: number | null;
+          org_id?: string | null;
+          prep_hours_per_offering?: number | null;
+          status?: string | null;
+          total_days?: number | null;
+          total_hours_per_offering?: never;
+          updated_at?: string | null;
+          updated_by?: string | null;
+          version?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "classes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Functions: {
@@ -452,6 +768,14 @@ export type Database = {
       };
       current_user_id: { Args: never; Returns: string };
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean };
+      notify_expiring_certifications: { Args: never; Returns: undefined };
+      proficiency_rank: { Args: { p_proficiency: string }; Returns: number };
+      qualified_instructors_for_class: {
+        Args: { p_class_id: string };
+        Returns: {
+          instructor_id: string;
+        }[];
+      };
       user_org_ids: { Args: never; Returns: string[] };
     };
     Enums: {

@@ -3,11 +3,24 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { PencilSquareIcon, ArchiveBoxIcon, ArrowUturnLeftIcon } from "@heroicons/react/20/solid";
+import {
+  PencilSquareIcon,
+  ArchiveBoxIcon,
+  ArrowUturnLeftIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@heroicons/react/20/solid";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import InstructorFormDialog from "@/app/(authenticated)/instructors/instructor-form-dialog";
 import { softDeleteInstructor, restoreInstructor } from "@/app/(authenticated)/instructors/actions";
-import type { Instructor } from "@arbor/shared";
+import {
+  addInstructorSkill,
+  updateInstructorSkill,
+  removeInstructorSkill,
+} from "@/app/(authenticated)/skills/actions";
+import { PROFICIENCY_VALUES } from "@arbor/shared";
+import type { Instructor, Skill, Proficiency } from "@arbor/shared";
+import type { InstructorSkillRow } from "./page";
 
 type AuditEntry = {
   id: number;
@@ -22,6 +35,8 @@ type AuditEntry = {
 type Props = {
   instructor: Instructor;
   auditEntries: AuditEntry[];
+  instructorSkills: InstructorSkillRow[];
+  allSkills: Skill[];
 };
 
 type Tab = "overview" | "skills" | "workload" | "audit";
@@ -82,13 +97,444 @@ function OverviewTab({ instructor }: { instructor: Instructor }) {
   );
 }
 
-function SkillsTab() {
+function SkillsTab({
+  instructorId,
+  instructorSkills,
+  allSkills,
+}: {
+  instructorId: string;
+  instructorSkills: InstructorSkillRow[];
+  allSkills: Skill[];
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [adding, setAdding] = useState(false);
+  const [draftSkillId, setDraftSkillId] = useState("");
+  const [draftProf, setDraftProf] = useState<Proficiency>("intermediate");
+  const [draftIsCert, setDraftIsCert] = useState(false);
+  const [draftCertifiedAt, setDraftCertifiedAt] = useState("");
+  const [draftExpiresAt, setDraftExpiresAt] = useState("");
+  const [draftCertUrl, setDraftCertUrl] = useState("");
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editProf, setEditProf] = useState<Proficiency>("intermediate");
+  const [editIsCert, setEditIsCert] = useState(false);
+  const [editCertifiedAt, setEditCertifiedAt] = useState("");
+  const [editExpiresAt, setEditExpiresAt] = useState("");
+  const [editCertUrl, setEditCertUrl] = useState("");
+
+  const assignedSkillIds = new Set(instructorSkills.map((is) => is.skill_id));
+  const available = allSkills.filter((s) => !assignedSkillIds.has(s.id));
+
+  function resetDraft() {
+    setDraftSkillId("");
+    setDraftProf("intermediate");
+    setDraftIsCert(false);
+    setDraftCertifiedAt("");
+    setDraftExpiresAt("");
+    setDraftCertUrl("");
+    setAdding(false);
+  }
+
+  function handleAdd() {
+    if (!draftSkillId) {
+      toast.error("Pick a skill to add");
+      return;
+    }
+    startTransition(async () => {
+      const result = await addInstructorSkill(instructorId, {
+        skill_id: draftSkillId,
+        proficiency: draftProf,
+        is_certified: draftIsCert,
+        certified_at: draftCertifiedAt || null,
+        expires_at: draftExpiresAt || null,
+        certificate_url: draftCertUrl || null,
+      });
+      if (result.ok) {
+        toast.success("Skill added");
+        resetDraft();
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function startEdit(row: InstructorSkillRow) {
+    setEditingId(row.id);
+    setEditProf(row.proficiency);
+    setEditIsCert(row.is_certified);
+    setEditCertifiedAt(row.certified_at ?? "");
+    setEditExpiresAt(row.expires_at ?? "");
+    setEditCertUrl(row.certificate_url ?? "");
+  }
+
+  function saveEdit(rowId: string) {
+    startTransition(async () => {
+      const result = await updateInstructorSkill(rowId, instructorId, {
+        proficiency: editProf,
+        is_certified: editIsCert,
+        certified_at: editCertifiedAt || null,
+        expires_at: editExpiresAt || null,
+        certificate_url: editCertUrl || null,
+      });
+      if (result.ok) {
+        toast.success("Skill updated");
+        setEditingId(null);
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function handleRemove(rowId: string) {
+    startTransition(async () => {
+      const result = await removeInstructorSkill(rowId, instructorId);
+      if (result.ok) {
+        toast.success("Skill removed");
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  const inputCls =
+    "border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring";
+
+  function expiringSoon(date: string | null): boolean {
+    if (!date) return false;
+    const days = Math.ceil((new Date(date).getTime() - Date.now()) / 86400000);
+    return days >= 0 && days <= 30;
+  }
+
   return (
-    <div className="border-border bg-surface rounded-xl border border-dashed p-12 text-center">
-      <p className="text-foreground text-sm font-medium">Skills</p>
-      <p className="text-muted-foreground mt-1 text-xs">
-        Skill tracking will be available in Phase 1.3.
-      </p>
+    <div className="space-y-4">
+      <div className="flex items-center justify-end">
+        {!adding && available.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(true);
+            }}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Add skill
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="border-border bg-background space-y-3 rounded-xl border p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor="add-skill"
+                className="text-muted-foreground mb-1 block text-xs font-medium"
+              >
+                Skill *
+              </label>
+              <select
+                id="add-skill"
+                value={draftSkillId}
+                onChange={(e) => {
+                  setDraftSkillId(e.target.value);
+                }}
+                className={`${inputCls} w-full`}
+              >
+                <option value="">Select skill…</option>
+                {available.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="add-prof"
+                className="text-muted-foreground mb-1 block text-xs font-medium"
+              >
+                Proficiency
+              </label>
+              <select
+                id="add-prof"
+                value={draftProf}
+                onChange={(e) => {
+                  setDraftProf(e.target.value as Proficiency);
+                }}
+                className={`${inputCls} w-full capitalize`}
+              >
+                {PROFICIENCY_VALUES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={draftIsCert}
+              onChange={(e) => {
+                setDraftIsCert(e.target.checked);
+              }}
+              className="border-border h-3.5 w-3.5 rounded"
+            />
+            <span className="text-foreground text-xs font-medium">
+              This is a certification (track expiry)
+            </span>
+          </label>
+
+          {draftIsCert && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label
+                  htmlFor="add-cert-at"
+                  className="text-muted-foreground mb-1 block text-xs font-medium"
+                >
+                  Certified on
+                </label>
+                <input
+                  id="add-cert-at"
+                  type="date"
+                  value={draftCertifiedAt}
+                  onChange={(e) => {
+                    setDraftCertifiedAt(e.target.value);
+                  }}
+                  className={`${inputCls} w-full`}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="add-exp"
+                  className="text-muted-foreground mb-1 block text-xs font-medium"
+                >
+                  Expires
+                </label>
+                <input
+                  id="add-exp"
+                  type="date"
+                  value={draftExpiresAt}
+                  onChange={(e) => {
+                    setDraftExpiresAt(e.target.value);
+                  }}
+                  className={`${inputCls} w-full`}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="add-url"
+                  className="text-muted-foreground mb-1 block text-xs font-medium"
+                >
+                  Certificate URL
+                </label>
+                <input
+                  id="add-url"
+                  type="url"
+                  value={draftCertUrl}
+                  onChange={(e) => {
+                    setDraftCertUrl(e.target.value);
+                  }}
+                  placeholder="https://…"
+                  className={`${inputCls} w-full`}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={resetDraft}
+              className="text-muted-foreground hover:text-foreground text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={pending || !draftSkillId}
+              onClick={handleAdd}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1 text-xs font-medium disabled:opacity-50"
+            >
+              {pending ? "Adding…" : "Add"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {instructorSkills.length === 0 ? (
+        <div className="border-border bg-surface rounded-xl border border-dashed p-10 text-center">
+          <p className="text-muted-foreground text-sm">
+            {available.length === 0
+              ? "No skills exist in the library yet."
+              : "No skills assigned. Click “Add skill” to start."}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {instructorSkills.map((row) => {
+            const isEditing = editingId === row.id;
+            const expiring = expiringSoon(row.expires_at);
+            return (
+              <div
+                key={row.id}
+                className={`bg-background rounded-xl border p-4 ${
+                  expiring ? "border-destructive" : "border-border"
+                }`}
+              >
+                {isEditing ? (
+                  <div className="space-y-3">
+                    <div className="text-foreground text-sm font-semibold">{row.skill.name}</div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <select
+                        value={editProf}
+                        onChange={(e) => {
+                          setEditProf(e.target.value as Proficiency);
+                        }}
+                        className={`${inputCls} w-full capitalize`}
+                      >
+                        {PROFICIENCY_VALUES.map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={editIsCert}
+                          onChange={(e) => {
+                            setEditIsCert(e.target.checked);
+                          }}
+                          className="border-border h-3.5 w-3.5 rounded"
+                        />
+                        <span className="text-foreground text-xs font-medium">Certification</span>
+                      </label>
+                    </div>
+                    {editIsCert && (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <input
+                          type="date"
+                          value={editCertifiedAt}
+                          onChange={(e) => {
+                            setEditCertifiedAt(e.target.value);
+                          }}
+                          className={`${inputCls} w-full`}
+                        />
+                        <input
+                          type="date"
+                          value={editExpiresAt}
+                          onChange={(e) => {
+                            setEditExpiresAt(e.target.value);
+                          }}
+                          className={`${inputCls} w-full`}
+                        />
+                        <input
+                          type="url"
+                          placeholder="https://…"
+                          value={editCertUrl}
+                          onChange={(e) => {
+                            setEditCertUrl(e.target.value);
+                          }}
+                          className={`${inputCls} w-full`}
+                        />
+                      </div>
+                    )}
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingId(null);
+                        }}
+                        className="text-muted-foreground hover:text-foreground text-xs"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => {
+                          saveEdit(row.id);
+                        }}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1 text-xs font-medium disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-foreground text-sm font-semibold">
+                          {row.skill.name}
+                        </span>
+                        <span className="bg-surface text-foreground inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize">
+                          {row.proficiency}
+                        </span>
+                        {row.is_certified && (
+                          <span className="bg-primary/10 text-primary inline-flex rounded-full px-2 py-0.5 text-xs font-medium">
+                            Certified
+                          </span>
+                        )}
+                        {expiring && (
+                          <span className="bg-destructive/10 text-destructive inline-flex rounded-full px-2 py-0.5 text-xs font-medium">
+                            Expiring soon
+                          </span>
+                        )}
+                      </div>
+                      {row.is_certified && (
+                        <div className="text-muted-foreground mt-1 flex flex-wrap gap-x-4 text-xs">
+                          {row.certified_at && <span>Certified: {row.certified_at}</span>}
+                          {row.expires_at && <span>Expires: {row.expires_at}</span>}
+                          {row.certificate_url && (
+                            <a
+                              href={row.certificate_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              View certificate ↗
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          startEdit(row);
+                        }}
+                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
+                      >
+                        <PencilSquareIcon className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => {
+                          handleRemove(row.id);
+                        }}
+                        className="text-destructive hover:text-destructive/80 inline-flex items-center gap-1 text-xs disabled:opacity-50"
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -147,7 +593,12 @@ function AuditTab({ entries }: { entries: AuditEntry[] }) {
   );
 }
 
-export default function InstructorDetailClient({ instructor, auditEntries }: Props) {
+export default function InstructorDetailClient({
+  instructor,
+  auditEntries,
+  instructorSkills,
+  allSkills,
+}: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [pending, startTransition] = useTransition();
@@ -273,7 +724,13 @@ export default function InstructorDetailClient({ instructor, auditEntries }: Pro
       {/* Tab content */}
       <div className="p-6">
         {activeTab === "overview" && <OverviewTab instructor={instructor} />}
-        {activeTab === "skills" && <SkillsTab />}
+        {activeTab === "skills" && (
+          <SkillsTab
+            instructorId={instructor.id}
+            instructorSkills={instructorSkills}
+            allSkills={allSkills}
+          />
+        )}
         {activeTab === "workload" && <WorkloadTab />}
         {activeTab === "audit" && <AuditTab entries={auditEntries} />}
       </div>
