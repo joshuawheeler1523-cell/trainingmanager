@@ -122,3 +122,63 @@ export function adHocHoursForWeek(args: {
 export function weeklyCapacity(annualHours: number): number {
   return annualHours / 52;
 }
+
+// ── Bucket breakdown (for donut charts) ─────────────────────────────────────
+
+export type BucketSlice = {
+  bucket_id: string | null;
+  bucket_label: string;
+  bucket_color: string;
+  hours: number;
+  percent: number; // 0-100
+};
+
+// Aggregates workload rows by bucket_id and returns slices sorted descending
+// by hours. Rows with no bucket_id are bundled under "Unbucketed" (gray).
+// The lookup map provides a label + color per bucket; missing bucket ids
+// fall back to the bucket id as label and a neutral gray.
+export function bucketBreakdown(
+  rows: WorkloadRow[],
+  buckets: { id: string; name: string; color: string }[],
+): BucketSlice[] {
+  const byBucket = new Map<string | null, number>();
+  for (const r of rows) {
+    const key = r.bucket_id;
+    byBucket.set(key, (byBucket.get(key) ?? 0) + (r.annual_hours || 0));
+  }
+
+  const total = Array.from(byBucket.values()).reduce((a, b) => a + b, 0);
+  const lookup = new Map(buckets.map((b) => [b.id, b]));
+
+  const slices: BucketSlice[] = Array.from(byBucket.entries()).map(([id, hours]) => {
+    const meta = id ? lookup.get(id) : null;
+    return {
+      bucket_id: id,
+      bucket_label: meta?.name ?? (id == null ? "Unbucketed" : id),
+      bucket_color: meta?.color ?? "#94a3b8",
+      hours,
+      percent: total > 0 ? (hours / total) * 100 : 0,
+    };
+  });
+
+  return slices.sort((a, b) => b.hours - a.hours);
+}
+
+// Compares the per-week forecast against each row's weekly_capacity and
+// returns a tier per week. Used by the forecast bar chart to color bars.
+export type ForecastTier = "ok" | "near" | "over";
+export function forecastTier(week: ForecastWeek): ForecastTier {
+  if (week.utilization_pct == null) return "ok";
+  if (week.utilization_pct >= 95) return "over";
+  if (week.utilization_pct >= 80) return "near";
+  return "ok";
+}
+
+// "Projected" annualized: sum of weekly projected hours across the forecast
+// window, scaled to a full year by 52 / weeks. Lets us compare a short-window
+// forecast to the annualized assigned_hours.
+export function projectedAnnualized(weeks: ForecastWeek[]): number {
+  if (weeks.length === 0) return 0;
+  const sum = weeks.reduce((acc, w) => acc + (w.projected_hours || 0), 0);
+  return (sum * 52) / weeks.length;
+}

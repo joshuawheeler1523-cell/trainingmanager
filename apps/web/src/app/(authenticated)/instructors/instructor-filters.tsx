@@ -30,6 +30,7 @@ export default function InstructorFilters({ departments }: Props) {
 
   const search = sp.get("search") ?? "";
   const department = sp.get("department") ?? "";
+  const utilization = sp.get("utilization") ?? "";
   const showDeleted = sp.get("deleted") === "1";
 
   return (
@@ -66,15 +67,21 @@ export default function InstructorFilters({ departments }: Props) {
         </select>
       )}
 
-      {/* Utilization filter - available after Phase 3 */}
-      <button
-        type="button"
-        disabled
-        title="Utilization filter available after workload sources are configured (Phase 3)"
-        className="border-border text-muted-foreground cursor-not-allowed rounded-md border px-3 py-1.5 text-sm opacity-50"
+      {/* Utilization status filter */}
+      <select
+        value={utilization}
+        onChange={(e) => {
+          push("utilization", e.target.value);
+        }}
+        className="border-input bg-background text-foreground focus:ring-ring rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2"
+        aria-label="Utilization status"
       >
-        Utilization status
-      </button>
+        <option value="">All utilizations</option>
+        <option value="under_utilized">Under-utilized (&lt; 40%)</option>
+        <option value="balanced">Balanced (40–79%)</option>
+        <option value="at_risk">At risk (80–94%)</option>
+        <option value="over_allocated">Over-allocated (95%+)</option>
+      </select>
 
       {/* Show deleted toggle */}
       <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-sm">

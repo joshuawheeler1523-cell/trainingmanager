@@ -18,9 +18,26 @@ import {
   updateInstructorSkill,
   removeInstructorSkill,
 } from "@/app/(authenticated)/skills/actions";
-import { PROFICIENCY_VALUES } from "@arbor/shared";
-import type { Instructor, Skill, Proficiency } from "@arbor/shared";
+import {
+  PROFICIENCY_VALUES,
+  bucketBreakdown,
+  groupWorkloadBySource,
+  totalAnnualHours,
+} from "@arbor/shared";
+import type {
+  AllocationBucket,
+  CapacityRow,
+  ForecastWeek,
+  Instructor,
+  Proficiency,
+  Skill,
+  WorkloadRow,
+  WorkloadSource,
+} from "@arbor/shared";
 import type { InstructorSkillRow } from "./page";
+import CapacityBar from "@/components/charts/capacity-bar";
+import BucketDonut from "@/components/charts/bucket-donut";
+import ForecastBars from "@/components/charts/forecast-bars";
 
 type AuditEntry = {
   id: number;
@@ -37,6 +54,10 @@ type Props = {
   auditEntries: AuditEntry[];
   instructorSkills: InstructorSkillRow[];
   allSkills: Skill[];
+  capacity: CapacityRow | null;
+  workloadRows: WorkloadRow[];
+  forecast: ForecastWeek[];
+  buckets: AllocationBucket[];
 };
 
 type Tab = "overview" | "skills" | "workload" | "audit";
@@ -539,14 +560,164 @@ function SkillsTab({
   );
 }
 
-function WorkloadTab() {
+function WorkloadTab({
+  capacity,
+  workloadRows,
+  forecast,
+  buckets,
+  annualHours,
+}: {
+  capacity: CapacityRow | null;
+  workloadRows: WorkloadRow[];
+  forecast: ForecastWeek[];
+  buckets: AllocationBucket[];
+  annualHours: number;
+}) {
+  const grouped = groupWorkloadBySource(workloadRows);
+  const slices = bucketBreakdown(workloadRows, buckets);
+  const assigned = capacity?.assigned_hours ?? totalAnnualHours(workloadRows);
+  const totalSourceHours = (k: WorkloadSource) =>
+    grouped[k].reduce((acc, r) => acc + (r.annual_hours || 0), 0);
+
   return (
-    <div className="border-border bg-surface rounded-xl border border-dashed p-12 text-center">
-      <p className="text-foreground text-sm font-medium">Workload</p>
-      <p className="text-muted-foreground mt-1 text-xs">
-        Workload view requires allocation data from Phase 2 and 3.
-      </p>
+    <div className="space-y-6">
+      {/* Top: capacity bar + bucket donut */}
+      <div className="border-border bg-background grid grid-cols-1 gap-6 rounded-xl border p-6 lg:grid-cols-[1fr_auto]">
+        <div className="space-y-3">
+          <h3 className="text-foreground text-sm font-semibold">Annual capacity</h3>
+          <CapacityBar assigned={assigned} capacity={annualHours} />
+          <p className="text-muted-foreground text-xs">
+            {capacity?.utilization_status === "over_allocated" &&
+              "This instructor is over-allocated. Consider redistributing hours."}
+            {capacity?.utilization_status === "at_risk" &&
+              "Approaching capacity — limited room for new assignments."}
+            {capacity?.utilization_status === "balanced" &&
+              "Healthy utilization with room for new work."}
+            {capacity?.utilization_status === "under_utilized" &&
+              "Significant room for additional assignments."}
+          </p>
+        </div>
+        <div className="flex justify-center lg:justify-end">
+          <BucketDonut
+            slices={slices}
+            centerLabel={`${assigned.toFixed(0)}h`}
+            centerSubLabel="assigned"
+          />
+        </div>
+      </div>
+
+      {/* Forecast */}
+      <div className="border-border bg-background rounded-xl border p-6">
+        <h3 className="text-foreground mb-3 text-sm font-semibold">8-week capacity forecast</h3>
+        <ForecastBars weeks={forecast} />
+      </div>
+
+      {/* Per-source sections */}
+      <SourceSection
+        title="Classes"
+        total={totalSourceHours("class")}
+        rows={grouped.class}
+        emptyMessage="No class assignments. Add this instructor to a class via /classes."
+      />
+      <SourceSection
+        title="Recurring tasks"
+        total={totalSourceHours("recurring_task")}
+        rows={grouped.recurring_task}
+        emptyMessage="No recurring tasks. Configure them in Allocations → Recurring."
+      />
+      <SourceSection
+        title="Ad-hoc tasks"
+        total={totalSourceHours("ad_hoc_task")}
+        rows={grouped.ad_hoc_task}
+        emptyMessage="No active ad-hoc tasks. (Done/cancelled tasks are excluded from workload.)"
+      />
+
+      {/* Placeholders for sources that ship in later phases */}
+      <DeferredSourceSection
+        title="Special projects"
+        message="Project commitments will appear here once the projects module ships."
+      />
+      <DeferredSourceSection
+        title="Project tasks"
+        message="Project task assignments will appear here once the projects module ships."
+      />
+      <DeferredSourceSection
+        title="Education requests"
+        message="Education request assignments will appear here once that module ships."
+      />
     </div>
+  );
+}
+
+function SourceSection({
+  title,
+  total,
+  rows,
+  emptyMessage,
+}: {
+  title: string;
+  total: number;
+  rows: WorkloadRow[];
+  emptyMessage: string;
+}) {
+  const [open, setOpen] = useState(rows.length > 0);
+  return (
+    <section className="border-border bg-background rounded-xl border">
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(!open);
+        }}
+        className="hover:bg-surface flex w-full items-center justify-between rounded-xl px-4 py-3"
+      >
+        <span className="text-foreground text-sm font-semibold">
+          {title} ({rows.length})
+        </span>
+        <span className="text-foreground text-sm font-semibold tabular-nums">
+          {total.toFixed(0)} h
+        </span>
+      </button>
+      {open && (
+        <>
+          {rows.length === 0 ? (
+            <p className="text-muted-foreground border-border border-t px-4 py-3 text-xs">
+              {emptyMessage}
+            </p>
+          ) : (
+            <ul className="divide-border border-border divide-y border-t">
+              {rows.map((r) => (
+                <li
+                  key={`${r.source}-${r.source_id}`}
+                  className="flex items-center justify-between px-4 py-2 text-sm"
+                >
+                  <span className="text-foreground">{r.source_label}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {(r.annual_hours || 0).toFixed(1)} h/yr
+                    {r.quantity != null && (
+                      <span className="text-muted-foreground ml-2 text-xs">
+                        × {r.quantity.toString()}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function DeferredSourceSection({ title, message }: { title: string; message: string }) {
+  return (
+    <section className="border-border bg-surface rounded-xl border border-dashed p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground text-sm font-medium">{title}</span>
+        <span className="text-muted-foreground text-xs">— pending</span>
+      </div>
+      <p className="text-muted-foreground mt-1 text-xs">{message}</p>
+    </section>
   );
 }
 
@@ -598,6 +769,10 @@ export default function InstructorDetailClient({
   auditEntries,
   instructorSkills,
   allSkills,
+  capacity,
+  workloadRows,
+  forecast,
+  buckets,
 }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
@@ -731,7 +906,15 @@ export default function InstructorDetailClient({
             allSkills={allSkills}
           />
         )}
-        {activeTab === "workload" && <WorkloadTab />}
+        {activeTab === "workload" && (
+          <WorkloadTab
+            capacity={capacity}
+            workloadRows={workloadRows}
+            forecast={forecast}
+            buckets={buckets}
+            annualHours={instructor.annual_hours}
+          />
+        )}
         {activeTab === "audit" && <AuditTab entries={auditEntries} />}
       </div>
     </div>

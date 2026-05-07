@@ -5,5 +5,6 @@ export * from "./schemas/skill";
 export * from "./schemas/allocation";
 export * from "./schemas/task";
 export * from "./queries/workload";
+export * from "./queries/recommendations";
 export * from "./types";
 export * from "./utils/slug";

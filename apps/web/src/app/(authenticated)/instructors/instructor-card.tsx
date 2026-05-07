@@ -12,10 +12,23 @@ type CapacityRow = {
   utilization_status: string | null;
 };
 
+type SourceBreakdown = {
+  class: number;
+  recurring_task: number;
+  ad_hoc_task: number;
+};
+
 type Props = {
   instructor: Instructor;
   capacity?: CapacityRow | null;
+  sourceBreakdown?: SourceBreakdown | null;
 };
+
+const SOURCE_LABELS = {
+  class: "Classes",
+  recurring_task: "Recurring",
+  ad_hoc_task: "Ad-hoc",
+} as const;
 
 const STATUS_STYLES: Record<string, string> = {
   active: "bg-capacity-green-bg text-capacity-green",
@@ -29,8 +42,18 @@ const STATUS_LABELS: Record<string, string> = {
   on_leave: "On leave",
 };
 
-export default function InstructorCard({ instructor, capacity }: Props) {
+export default function InstructorCard({ instructor, capacity, sourceBreakdown }: Props) {
   const utilizationPct = capacity?.utilization_pct != null ? capacity.utilization_pct / 100 : null;
+
+  const tooltipText = (() => {
+    if (!sourceBreakdown) return undefined;
+    const parts: string[] = [];
+    for (const k of ["class", "recurring_task", "ad_hoc_task"] as const) {
+      const v = sourceBreakdown[k];
+      if (v > 0) parts.push(`${SOURCE_LABELS[k]}: ${v.toFixed(0)}h`);
+    }
+    return parts.length > 0 ? parts.join(" · ") : "No assigned hours";
+  })();
 
   return (
     <Link
@@ -89,12 +112,11 @@ export default function InstructorCard({ instructor, capacity }: Props) {
           )}
         </div>
         {utilizationPct != null ? (
-          <UtilizationBadge value={utilizationPct} />
+          <span title={tooltipText}>
+            <UtilizationBadge value={utilizationPct} />
+          </span>
         ) : (
-          <span
-            className="text-muted-foreground text-xs"
-            title="Utilization requires workload sources (Phase 3)"
-          >
+          <span className="text-muted-foreground text-xs" title="No workload assigned yet">
             —
           </span>
         )}
