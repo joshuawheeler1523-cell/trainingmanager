@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { isOrgAdmin } from "@/lib/auth/org-admin";
 import OrgSwitcherClient from "./org-switcher-client";
 
 export default async function OrgSwitcher() {
@@ -7,10 +8,14 @@ export default async function OrgSwitcher() {
 
   if (!currentOrgId) return null;
 
-  const { data: memberships } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .not("accepted_at", "is", null);
+  const [memberships, admin] = await Promise.all([
+    supabase
+      .from("org_memberships")
+      .select("org_id")
+      .not("accepted_at", "is", null)
+      .then((r) => r.data),
+    isOrgAdmin(currentOrgId),
+  ]);
 
   if (!memberships?.length) return null;
 
@@ -23,5 +28,5 @@ export default async function OrgSwitcher() {
 
   if (!orgs?.length) return null;
 
-  return <OrgSwitcherClient orgs={orgs} currentOrgId={currentOrgId} />;
+  return <OrgSwitcherClient orgs={orgs} currentOrgId={currentOrgId} isAdmin={admin} />;
 }
