@@ -102,6 +102,32 @@ describe("createInstructor", () => {
     if (!result.ok) expect(result.error.code).toBe("VALIDATION");
   });
 
+  // Regression: zodResolver on the client transforms "" → null on optional string fields,
+  // then this server action re-parses the same payload. Schema must accept null on the
+  // second parse.
+  it("accepts null for all optional string fields (idempotent re-parse)", async () => {
+    const row = {
+      id: INSTRUCTOR_ID,
+      org_id: ORG_ID,
+      full_name: "Null Tester",
+      annual_hours: 1880,
+      status: "active",
+    };
+    mockFrom.mockReturnValue(makeChain({ data: row, error: null }));
+
+    const result = await createInstructor({
+      full_name: "Null Tester",
+      email: null,
+      phone: null,
+      department: null,
+      location: null,
+      job_title: null,
+      start_date: null,
+      notes: null,
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("returns NO_ORG error when org context is missing", async () => {
     mockGetCurrentOrgId.mockResolvedValue(null);
     const result = await createInstructor({ full_name: "Test" });

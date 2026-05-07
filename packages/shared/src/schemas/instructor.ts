@@ -1,16 +1,19 @@
 import { z } from "zod";
 
+// Idempotent: accepts string | null | undefined, normalizes "" / null / undefined → null.
+// Must accept null on the server because zodResolver runs this schema on the client first
+// (turning "" → null), then the server action re-runs the same schema on the parsed payload.
 const emptyToNull = z
   .string()
-  .optional()
-  .transform((v) => (v === "" || v === undefined ? null : v));
+  .nullish()
+  .transform((v) => (v === "" || v == null ? null : v));
 
 export const instructorInsertSchema = z.object({
   full_name: z.string().min(1, "Name is required").max(200),
   email: z
     .string()
-    .optional()
-    .transform((v) => (v === "" || v === undefined ? null : v))
+    .nullish()
+    .transform((v) => (v === "" || v == null ? null : v))
     .pipe(z.string().email("Must be a valid email address").nullable()),
   phone: emptyToNull,
   department: emptyToNull,
@@ -26,8 +29,8 @@ export const instructorUpdateSchema = z.object({
   full_name: z.string().min(1).max(200).optional(),
   email: z
     .string()
-    .optional()
-    .transform((v) => (v === "" || v === undefined ? null : v))
+    .nullish()
+    .transform((v) => (v === "" || v == null ? null : v))
     .pipe(z.string().email("Must be a valid email address").nullable().optional()),
   phone: emptyToNull.optional(),
   department: emptyToNull.optional(),

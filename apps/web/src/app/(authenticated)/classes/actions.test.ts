@@ -116,6 +116,29 @@ describe("createClass", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("NO_ORG");
   });
+
+  // Regression: zodResolver on the client normalizes "" → null on optional fields,
+  // then this server action re-parses the same payload. Schema must accept null.
+  it("accepts null for all optional fields (idempotent re-parse)", async () => {
+    const row = {
+      id: CLASS_ID,
+      org_id: ORG_ID,
+      name: "Null Tester",
+      status: "active",
+      is_multi_day: false,
+      total_days: 1,
+    };
+    mockFrom.mockReturnValue(makeInsertChain({ data: row, error: null }));
+
+    const result = await createClass({
+      name: "Null Tester",
+      description: null,
+      allocation_bucket_id: null,
+      hours_per_day: null,
+      custom_day_hours: null,
+    });
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe("softDeleteClass", () => {

@@ -1,9 +1,12 @@
 import { z } from "zod";
 
+// Idempotent: accepts string | null | undefined, normalizes "" / null / undefined → null.
+// Must accept null because zodResolver runs this schema on the client (turning "" → null),
+// then the server action re-runs the same schema on the parsed payload.
 const emptyToNull = z
   .string()
-  .optional()
-  .transform((v) => (v === "" || v === undefined ? null : v));
+  .nullish()
+  .transform((v) => (v === "" || v == null ? null : v));
 
 export const PROFICIENCY_VALUES = ["beginner", "intermediate", "advanced", "expert"] as const;
 

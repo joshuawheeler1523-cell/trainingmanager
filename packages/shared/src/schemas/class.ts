@@ -1,28 +1,28 @@
 import { z } from "zod";
 
+// Idempotent: accepts a UUID string OR null OR undefined OR "". Normalizes empty/null → null.
+const optionalUuidToNull = z
+  .union([z.string().uuid(), z.literal(""), z.null()])
+  .nullish()
+  .transform((v) => (v === "" || v == null ? null : v));
+
 const classFieldsSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   description: z
     .string()
-    .optional()
-    .transform((v) => (v === "" || v === undefined ? null : v)),
-  allocation_bucket_id: z
-    .string()
-    .uuid()
-    .optional()
-    .transform((v) => (v === "" || v === undefined ? null : v)),
+    .nullish()
+    .transform((v) => (v === "" || v == null ? null : v)),
+  allocation_bucket_id: optionalUuidToNull,
   is_multi_day: z.boolean().default(false),
   total_days: z.coerce.number().int().min(1).default(1),
   hours_per_day: z.coerce
     .number()
     .min(0)
-    .optional()
-    .nullable()
+    .nullish()
     .transform((v) => v ?? null),
   custom_day_hours: z
     .array(z.coerce.number().min(0, "Hours must be 0 or more"))
-    .optional()
-    .nullable()
+    .nullish()
     .transform((v) => v ?? null),
   offerings_per_year: z.coerce.number().int().min(0).default(0),
   prep_hours_per_offering: z.coerce.number().min(0).default(0),
@@ -41,7 +41,7 @@ export const classInputSchema = classFieldsSchema.superRefine((data, ctx) => {
       path: ["total_days"],
     });
   }
-  if (data.custom_day_hours !== null && data.custom_day_hours.length !== data.total_days) {
+  if (data.custom_day_hours != null && data.custom_day_hours.length !== data.total_days) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: `Custom day hours must have exactly ${String(data.total_days)} entries`,
