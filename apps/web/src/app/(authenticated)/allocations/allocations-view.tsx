@@ -5,7 +5,10 @@ import BucketsTab from "./buckets-tab";
 import GlobalTab from "./global-tab";
 import GroupsTab from "./groups-tab";
 import IndividualsTab from "./individuals-tab";
+import RecurringTab from "./recurring-tab";
+import AdHocTab from "./adhoc-tab";
 import type {
+  AdHocTask,
   AllocationBucket,
   AllocationGroup,
   AllocationGroupMember,
@@ -13,15 +16,19 @@ import type {
   GroupAllocation,
   IndividualAllocation,
   Instructor,
+  RecurringTask,
+  RecurringTaskAssignment,
 } from "@arbor/shared";
 
-type Tab = "buckets" | "global" | "groups" | "individuals";
+type Tab = "buckets" | "global" | "groups" | "individuals" | "recurring" | "adhoc";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "buckets", label: "Buckets" },
   { id: "global", label: "Global (Default)" },
   { id: "groups", label: "Groups" },
   { id: "individuals", label: "Individuals" },
+  { id: "recurring", label: "Recurring" },
+  { id: "adhoc", label: "Ad-Hoc" },
 ];
 
 type Props = {
@@ -33,6 +40,9 @@ type Props = {
   instructors: Instructor[];
   individualAllocations: IndividualAllocation[];
   globalDefaultUserCount: number;
+  recurringTasks: RecurringTask[];
+  recurringAssignments: RecurringTaskAssignment[];
+  adHocTasks: AdHocTask[];
 };
 
 export default function AllocationsView(props: Props) {
@@ -41,7 +51,7 @@ export default function AllocationsView(props: Props) {
   return (
     <div>
       <div className="border-border bg-background border-b px-6">
-        <nav className="-mb-px flex gap-6">
+        <nav className="-mb-px flex gap-6 overflow-x-auto">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -49,7 +59,7 @@ export default function AllocationsView(props: Props) {
               onClick={() => {
                 setTab(t.id);
               }}
-              className={`border-b-2 pb-3 pt-3 text-sm font-medium transition-colors ${
+              className={`shrink-0 border-b-2 pb-3 pt-3 text-sm font-medium transition-colors ${
                 tab === t.id
                   ? "border-primary text-primary"
                   : "text-muted-foreground hover:text-foreground border-transparent"
@@ -88,6 +98,21 @@ export default function AllocationsView(props: Props) {
             groupAllocations={props.groupAllocations}
             groupMembers={props.groupMembers}
             individualAllocations={props.individualAllocations}
+          />
+        )}
+        {tab === "recurring" && (
+          <RecurringTab
+            tasks={props.recurringTasks}
+            assignments={props.recurringAssignments}
+            buckets={props.buckets}
+            instructors={props.instructors}
+          />
+        )}
+        {tab === "adhoc" && (
+          <AdHocTab
+            tasks={props.adHocTasks}
+            buckets={props.buckets}
+            instructors={props.instructors}
           />
         )}
       </div>

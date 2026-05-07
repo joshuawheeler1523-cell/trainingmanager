@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import AllocationsView from "./allocations-view";
 import type {
+  AdHocTask,
   AllocationBucket,
   AllocationGroup,
   AllocationGroupMember,
@@ -10,6 +11,8 @@ import type {
   GroupAllocation,
   IndividualAllocation,
   Instructor,
+  RecurringTask,
+  RecurringTaskAssignment,
 } from "@arbor/shared";
 
 export default async function AllocationsPage() {
@@ -34,6 +37,9 @@ export default async function AllocationsPage() {
     { data: groupAllocationRows },
     { data: instructorRows },
     { data: individualAllocationRows },
+    { data: recurringRows },
+    { data: recurringAssignmentRows },
+    { data: adHocRows },
   ] = await Promise.all([
     supabase.from("allocation_buckets").select("*").eq("org_id", orgId).order("display_order"),
     supabase.from("global_allocations").select("*").eq("org_id", orgId),
@@ -47,6 +53,18 @@ export default async function AllocationsPage() {
       .is("deleted_at", null)
       .order("full_name"),
     supabase.from("individual_allocations").select("*").eq("org_id", orgId),
+    supabase
+      .from("recurring_tasks")
+      .select("*")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .order("name"),
+    supabase.from("recurring_task_assignments").select("*").eq("org_id", orgId),
+    supabase
+      .from("ad_hoc_tasks")
+      .select("*")
+      .eq("org_id", orgId)
+      .order("created_at", { ascending: false }),
   ]);
 
   const buckets = (bucketRows ?? []) as AllocationBucket[];
@@ -56,6 +74,9 @@ export default async function AllocationsPage() {
   const groupAllocations = (groupAllocationRows ?? []) as GroupAllocation[];
   const instructors = (instructorRows ?? []) as Instructor[];
   const individualAllocations = (individualAllocationRows ?? []) as IndividualAllocation[];
+  const recurringTasks = (recurringRows ?? []) as RecurringTask[];
+  const recurringAssignments = (recurringAssignmentRows ?? []) as RecurringTaskAssignment[];
+  const adHocTasks = (adHocRows ?? []) as AdHocTask[];
 
   // Count instructors who'd be affected by a global default change: active
   // instructors with no individual override and no group with group_allocations.
@@ -88,6 +109,9 @@ export default async function AllocationsPage() {
         instructors={instructors}
         individualAllocations={individualAllocations}
         globalDefaultUserCount={globalDefaultUserCount}
+        recurringTasks={recurringTasks}
+        recurringAssignments={recurringAssignments}
+        adHocTasks={adHocTasks}
       />
     </div>
   );
