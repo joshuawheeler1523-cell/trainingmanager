@@ -3,30 +3,33 @@ import type { Json } from "@/lib/supabase/database.types";
 
 interface LogAuditEventParams {
   orgId: string;
-  action: string;
-  resourceType?: string;
-  resourceId?: string;
-  metadata?: Record<string, unknown> | null;
+  operation: string;
+  tableName: string;
+  recordId?: string;
+  oldData?: Json | null;
+  newData?: Json | null;
 }
 
 export async function logAuditEvent({
   orgId,
-  action,
-  resourceType,
-  resourceId,
-  metadata,
+  operation,
+  tableName,
+  recordId,
+  oldData,
+  newData,
 }: LogAuditEventParams) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  await supabase.from("audit_logs").insert({
+  await supabase.from("audit_log").insert({
     org_id: orgId,
     actor_id: user?.id ?? null,
-    action,
-    resource_type: resourceType ?? null,
-    resource_id: resourceId ?? null,
-    metadata: (metadata ?? null) as Json | null,
+    operation,
+    table_name: tableName,
+    record_id: recordId ?? null,
+    ...(oldData !== undefined ? { old_data: oldData } : {}),
+    ...(newData !== undefined ? { new_data: newData } : {}),
   });
 }

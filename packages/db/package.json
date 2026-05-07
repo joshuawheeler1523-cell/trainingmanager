@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "migrate": "supabase db push",
-    "types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/database.types.ts && sed -i '/^A new version/d' src/database.types.ts && sed -i '/^We recommend/d' src/database.types.ts",
-    "seed": "npx tsx src/seed.ts",
+    "reset": "supabase db reset",
+    "types": "supabase gen types typescript --linked --schema public 2>/dev/null | grep -v '^Initialising\\|^A new version\\|^We recommend' > ../../apps/web/src/lib/supabase/database.types.ts",
+    "seed": "tsx src/seed.ts",
     "test": "echo 'no db tests yet' && exit 0"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.49.4",
     "supabase": "2.22.6",
     "tsx": "^4.19.0"
   }

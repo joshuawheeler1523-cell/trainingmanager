@@ -5,7 +5,7 @@ import { useOrg } from "@/lib/org-context";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/supabase/database.types";
 
-type AuditLog = Tables<"audit_logs">;
+type AuditLog = Tables<"audit_log">;
 
 export default function AuditLogsPage() {
   const { activeOrg } = useOrg();
@@ -18,8 +18,8 @@ export default function AuditLogsPage() {
     const supabase = createClient();
     setLoading(true);
 
-    supabase
-      .from("audit_logs")
+    void supabase
+      .from("audit_log")
       .select("*")
       .eq("org_id", activeOrg.id)
       .order("created_at", { ascending: false })
@@ -43,8 +43,8 @@ export default function AuditLogsPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Time</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500">Action</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-500">Resource</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Operation</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500">Table / Record</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500">Actor</th>
               </tr>
             </thead>
@@ -54,11 +54,10 @@ export default function AuditLogsPage() {
                   <td className="whitespace-nowrap px-4 py-3 text-gray-500">
                     {new Date(log.created_at).toLocaleString()}
                   </td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{log.action}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">{log.operation}</td>
                   <td className="px-4 py-3 text-gray-500">
-                    {log.resource_type
-                      ? `${log.resource_type}${log.resource_id ? ` / ${log.resource_id}` : ""}`
-                      : "—"}
+                    {log.table_name}
+                    {log.record_id ? ` / ${log.record_id.slice(0, 8)}…` : ""}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-500">
                     {log.actor_id ? log.actor_id.slice(0, 8) + "…" : "system"}

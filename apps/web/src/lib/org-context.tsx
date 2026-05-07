@@ -30,7 +30,7 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
 
     async function load() {
       const { data: members } = await supabase
-        .from("organization_members")
+        .from("org_memberships")
         .select("org_id")
         .order("created_at");
 

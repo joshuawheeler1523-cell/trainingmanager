@@ -32,7 +32,19 @@
       "Bash(kill %1)",
       "Bash(git rm *)",
       "Bash(git reset *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "mcp__vercel__get_deployment_build_logs",
+      "mcp__vercel__get_runtime_logs",
+      "mcp__vercel__get_deployment",
+      "mcp__supabase__list_migrations",
+      "Bash(npx supabase *)",
+      "Bash(mv 20260101_000_drop_old_schema.sql 20260101000000_drop_old_schema.sql)",
+      "Bash(mv 20260101_001_extensions.sql 20260101000001_extensions.sql)",
+      "Bash(mv 20260101_002_helpers.sql 20260101000002_helpers.sql)",
+      "Bash(mv 20260101_003_organizations.sql 20260101000003_organizations.sql)",
+      "Bash(mv 20260101_004_audit_log.sql 20260101000004_audit_log.sql)",
+      "mcp__supabase__execute_sql",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }

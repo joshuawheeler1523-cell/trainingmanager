@@ -8,6 +8,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "db:migrate": "pnpm --filter db migrate",
+    "db:reset": "pnpm --filter db reset && pnpm db:seed",
     "db:types": "pnpm --filter db types",
     "db:seed": "pnpm --filter db seed",
     "prepare": "simple-git-hooks"

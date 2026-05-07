@@ -8,40 +8,73 @@ export type Database = {
   };
   public: {
     Tables: {
-      audit_logs: {
+      audit_log: {
         Row: {
-          action: string;
           actor_id: string | null;
           created_at: string;
           id: string;
-          metadata: Json | null;
+          new_data: Json | null;
+          old_data: Json | null;
+          operation: string;
           org_id: string;
-          resource_id: string | null;
-          resource_type: string | null;
+          record_id: string | null;
+          table_name: string;
         };
         Insert: {
-          action: string;
           actor_id?: string | null;
           created_at?: string;
           id?: string;
-          metadata?: Json | null;
+          new_data?: Json | null;
+          old_data?: Json | null;
+          operation: string;
           org_id: string;
-          resource_id?: string | null;
-          resource_type?: string | null;
+          record_id?: string | null;
+          table_name: string;
         };
         Update: {
-          action?: string;
           actor_id?: string | null;
           created_at?: string;
           id?: string;
-          metadata?: Json | null;
+          new_data?: Json | null;
+          old_data?: Json | null;
+          operation?: string;
           org_id?: string;
-          resource_id?: string | null;
-          resource_type?: string | null;
+          record_id?: string | null;
+          table_name?: string;
+        };
+        Relationships: [];
+      };
+      feature_flags: {
+        Row: {
+          config: Json | null;
+          created_at: string;
+          enabled: boolean;
+          flag_key: string;
+          id: string;
+          org_id: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          config?: Json | null;
+          created_at?: string;
+          enabled?: boolean;
+          flag_key: string;
+          id?: string;
+          org_id?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          config?: Json | null;
+          created_at?: string;
+          enabled?: boolean;
+          flag_key?: string;
+          id?: string;
+          org_id?: string | null;
+          updated_at?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "audit_logs_org_id_fkey";
+            foreignKeyName: "feature_flags_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -49,31 +82,81 @@ export type Database = {
           },
         ];
       };
-      organization_members: {
+      org_invitations: {
+        Row: {
+          created_at: string;
+          email: string;
+          expires_at: string;
+          id: string;
+          invited_by: string | null;
+          org_id: string;
+          role: Database["public"]["Enums"]["member_role"];
+          status: Database["public"]["Enums"]["invitation_status"];
+          token: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          email: string;
+          expires_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          org_id: string;
+          role?: Database["public"]["Enums"]["member_role"];
+          status?: Database["public"]["Enums"]["invitation_status"];
+          token?: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          email?: string;
+          expires_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          org_id?: string;
+          role?: Database["public"]["Enums"]["member_role"];
+          status?: Database["public"]["Enums"]["invitation_status"];
+          token?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "org_invitations_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      org_memberships: {
         Row: {
           created_at: string;
           id: string;
           org_id: string;
-          role: Database["public"]["Enums"]["org_role"];
+          role: Database["public"]["Enums"]["member_role"];
+          updated_at: string;
           user_id: string;
         };
         Insert: {
           created_at?: string;
           id?: string;
           org_id: string;
-          role?: Database["public"]["Enums"]["org_role"];
+          role?: Database["public"]["Enums"]["member_role"];
+          updated_at?: string;
           user_id: string;
         };
         Update: {
           created_at?: string;
           id?: string;
           org_id?: string;
-          role?: Database["public"]["Enums"]["org_role"];
+          role?: Database["public"]["Enums"]["member_role"];
+          updated_at?: string;
           user_id?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "organization_members_org_id_fkey";
+            foreignKeyName: "org_memberships_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -84,21 +167,33 @@ export type Database = {
       organizations: {
         Row: {
           created_at: string;
+          created_by: string | null;
           id: string;
           name: string;
           slug: string;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
         };
         Insert: {
           created_at?: string;
+          created_by?: string | null;
           id?: string;
           name: string;
           slug: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
         };
         Update: {
           created_at?: string;
+          created_by?: string | null;
           id?: string;
           name?: string;
           slug?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
         };
         Relationships: [];
       };
@@ -107,11 +202,17 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      is_org_admin: { Args: { org_id: string }; Returns: boolean };
-      is_org_member: { Args: { org_id: string }; Returns: boolean };
+      apply_standard_triggers: {
+        Args: { p_table_name: string };
+        Returns: undefined;
+      };
+      current_user_id: { Args: never; Returns: string };
+      is_org_admin: { Args: { p_org_id: string }; Returns: boolean };
+      user_org_ids: { Args: never; Returns: string[] };
     };
     Enums: {
-      org_role: "owner" | "admin" | "member";
+      invitation_status: "pending" | "accepted" | "revoked" | "expired";
+      member_role: "owner" | "admin" | "member";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -237,7 +338,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      org_role: ["owner", "admin", "member"],
+      invitation_status: ["pending", "accepted", "revoked", "expired"],
+      member_role: ["owner", "admin", "member"],
     },
   },
 } as const;
