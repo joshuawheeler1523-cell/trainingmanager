@@ -179,6 +179,80 @@ export type Database = {
           },
         ];
       };
+      instructors: {
+        Row: {
+          id: string;
+          org_id: string;
+          user_id: string | null;
+          full_name: string;
+          email: string | null;
+          phone: string | null;
+          department: string | null;
+          location: string | null;
+          job_title: string | null;
+          start_date: string | null;
+          annual_hours: number;
+          status: string;
+          notes: string | null;
+          deleted_at: string | null;
+          created_at: string;
+          updated_at: string;
+          created_by: string | null;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          user_id?: string | null;
+          full_name: string;
+          email?: string | null;
+          phone?: string | null;
+          department?: string | null;
+          location?: string | null;
+          job_title?: string | null;
+          start_date?: string | null;
+          annual_hours?: number;
+          status?: string;
+          notes?: string | null;
+          deleted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          created_by?: string | null;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          user_id?: string | null;
+          full_name?: string;
+          email?: string | null;
+          phone?: string | null;
+          department?: string | null;
+          location?: string | null;
+          job_title?: string | null;
+          start_date?: string | null;
+          annual_hours?: number;
+          status?: string;
+          notes?: string | null;
+          deleted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          created_by?: string | null;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instructors_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       organizations: {
         Row: {
           billing_tier: string | null;
