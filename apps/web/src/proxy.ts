@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isAllowedPath, skipOrgCheck } from "@/lib/auth/is-allowed-path";
 
 const SUPABASE_URL = process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? "";
 const SUPABASE_ANON_KEY = process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"] ?? "";
@@ -28,19 +29,35 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
-  const isPublic = isAuthRoute || request.nextUrl.pathname === "/";
+  const { pathname } = request.nextUrl;
 
-  if (!user && !isPublic) {
+  // Unauthenticated: redirect to /login for protected routes
+  if (!user && !isAllowedPath(pathname)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/auth/login";
+    url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute) {
+  // Authenticated on /login: send home
+  if (user && pathname === "/login") {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/";
     return NextResponse.redirect(url);
+  }
+
+  // Authenticated but no accepted org membership: redirect to /onboarding
+  if (user && !skipOrgCheck(pathname)) {
+    const { data: membership } = await supabase
+      .from("org_memberships")
+      .select("org_id")
+      .limit(1)
+      .maybeSingle();
+
+    if (!membership) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/onboarding";
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

@@ -61,7 +61,8 @@
       "Bash(pnpm seed *)",
       "Bash(pnpm --filter db seed)",
       "mcp__claude_ai_Supabase__execute_sql",
-      "Bash(pnpm *)"
+      "Bash(pnpm *)",
+      "mcp__claude_ai_Supabase__get_project"
     ]
   }
 }
