@@ -73,6 +73,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "ad_hoc_tasks_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
             foreignKeyName: "ad_hoc_tasks_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
@@ -164,6 +171,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "instructors";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "allocation_group_members_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
           },
           {
             foreignKeyName: "allocation_group_members_org_id_fkey";
@@ -306,6 +320,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "instructors";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_instructor_assignments_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
           },
           {
             foreignKeyName: "class_instructor_assignments_org_id_fkey";
@@ -659,6 +680,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "individual_allocations_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
             foreignKeyName: "individual_allocations_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
@@ -723,6 +751,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "instructors";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_skills_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
           },
           {
             foreignKeyName: "instructor_skills_org_id_fkey";
@@ -1031,6 +1066,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "recurring_task_assignments_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
             foreignKeyName: "recurring_task_assignments_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
@@ -1257,6 +1299,47 @@ export type Database = {
           },
         ];
       };
+      v_bucket_consumption: {
+        Row: {
+          bucket_id: string | null;
+          consumed_hours: number | null;
+          org_id: string | null;
+        };
+        Relationships: [];
+      };
+      v_instructor_capacity: {
+        Row: {
+          annual_hours: number | null;
+          assigned_hours: number | null;
+          full_name: string | null;
+          instructor_id: string | null;
+          org_id: string | null;
+          utilization_pct: number | null;
+          utilization_status: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instructors_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      v_instructor_workload: {
+        Row: {
+          annual_hours: number | null;
+          bucket_id: string | null;
+          instructor_id: string | null;
+          org_id: string | null;
+          quantity: number | null;
+          source: string | null;
+          source_id: string | null;
+          source_label: string | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       apply_standard_triggers: {
@@ -1273,6 +1356,15 @@ export type Database = {
         }[];
       };
       frequency_to_annual: { Args: { p_frequency: string }; Returns: number };
+      instructor_capacity_forecast: {
+        Args: { p_instructor_id: string; p_start: string; p_weeks?: number };
+        Returns: {
+          projected_hours: number;
+          utilization_pct: number;
+          week_start: string;
+          weekly_capacity: number;
+        }[];
+      };
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean };
       notify_expiring_certifications: { Args: never; Returns: undefined };
       proficiency_rank: { Args: { p_proficiency: string }; Returns: number };

@@ -72,7 +72,8 @@
       "mcp__supabase__list_tables",
       "mcp__claude_ai_Supabase__list_migrations",
       "mcp__claude_ai_Supabase__list_tables",
-      "mcp__supabase__generate_typescript_types"
+      "mcp__supabase__generate_typescript_types",
+      "mcp__supabase__get_logs"
     ]
   }
 }
