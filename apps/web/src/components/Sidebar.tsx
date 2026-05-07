@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import OrgSwitcher from "./OrgSwitcher";
+import { usePathname } from "next/navigation";
 import {
   HomeIcon,
   ClipboardDocumentListIcon,
   Cog6ToothIcon,
   ArrowRightStartOnRectangleIcon,
 } from "@heroicons/react/24/outline";
+import { logout } from "@/app/(authenticated)/actions";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: HomeIcon },
@@ -17,17 +16,12 @@ const NAV_ITEMS = [
   { href: "/dashboard/settings", label: "Settings", icon: Cog6ToothIcon },
 ];
 
-export default function Sidebar() {
-  const pathname = usePathname();
-  const router = useRouter();
+type Props = {
+  orgSwitcher?: React.ReactNode;
+};
 
-  function handleSignOut() {
-    const supabase = createClient();
-    void supabase.auth.signOut().then(() => {
-      router.push("/auth/login");
-      router.refresh();
-    });
-  }
+export default function Sidebar({ orgSwitcher }: Props) {
+  const pathname = usePathname();
 
   return (
     <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-200 bg-white">
@@ -35,9 +29,7 @@ export default function Sidebar() {
         <span className="text-lg font-bold text-gray-900">Arbor</span>
       </div>
 
-      <div className="border-b border-gray-100 px-3 py-3">
-        <OrgSwitcher />
-      </div>
+      {orgSwitcher && <div className="border-b border-gray-100 px-3 py-3">{orgSwitcher}</div>}
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
@@ -60,13 +52,15 @@ export default function Sidebar() {
       </nav>
 
       <div className="border-t border-gray-100 px-3 py-4">
-        <button
-          onClick={handleSignOut}
-          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
-        >
-          <ArrowRightStartOnRectangleIcon className="h-4 w-4 shrink-0" />
-          Sign out
-        </button>
+        <form action={logout}>
+          <button
+            type="submit"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
+          >
+            <ArrowRightStartOnRectangleIcon className="h-4 w-4 shrink-0" />
+            Sign out
+          </button>
+        </form>
       </div>
     </aside>
   );

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { OrgProvider } from "@/lib/org-context";
 import Sidebar from "@/components/Sidebar";
+import OrgSwitcher from "@/components/OrgSwitcher";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -12,11 +12,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect("/login");
 
   return (
-    <OrgProvider>
-      <div className="flex min-h-screen bg-gray-50">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto p-8">{children}</main>
-      </div>
-    </OrgProvider>
+    <div className="flex min-h-screen bg-gray-50">
+      <Sidebar orgSwitcher={<OrgSwitcher />} />
+      <main className="flex-1 overflow-y-auto p-8">{children}</main>
+    </div>
   );
 }

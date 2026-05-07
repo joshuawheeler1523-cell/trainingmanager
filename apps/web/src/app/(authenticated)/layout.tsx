@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import OrgGuard from "@/components/org-guard";
 
 export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -7,5 +8,6 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  return <>{children}</>;
+
+  return <OrgGuard>{children}</OrgGuard>;
 }

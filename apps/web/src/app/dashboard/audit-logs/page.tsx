@@ -1,41 +1,24 @@
-"use client";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentOrgId } from "@/lib/auth/current-org";
 
-import { useEffect, useState } from "react";
-import { useOrg } from "@/lib/org-context";
-import { createClient } from "@/lib/supabase/client";
-import type { Tables } from "@/lib/supabase/database.types";
+export default async function AuditLogsPage() {
+  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
 
-type AuditLog = Tables<"audit_log">;
-
-export default function AuditLogsPage() {
-  const { activeOrg } = useOrg();
-  const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!activeOrg) return;
-
-    const supabase = createClient();
-    setLoading(true);
-
-    void supabase
-      .from("audit_log")
-      .select("*")
-      .eq("org_id", activeOrg.id)
-      .order("occurred_at", { ascending: false })
-      .limit(100)
-      .then(({ data }) => {
-        setLogs(data ?? []);
-        setLoading(false);
-      });
-  }, [activeOrg]);
+  const logs = orgId
+    ? ((
+        await supabase
+          .from("audit_log")
+          .select("*")
+          .eq("org_id", orgId)
+          .order("occurred_at", { ascending: false })
+          .limit(100)
+      ).data ?? [])
+    : [];
 
   return (
     <div>
       <h1 className="mb-6 text-2xl font-semibold text-gray-900">Audit Logs</h1>
-      {loading ? (
-        <p className="text-sm text-gray-500">Loading…</p>
-      ) : logs.length === 0 ? (
+      {logs.length === 0 ? (
         <p className="text-sm text-gray-500">No audit log entries yet.</p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
