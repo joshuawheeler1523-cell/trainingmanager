@@ -5,7 +5,7 @@ interface LogAuditEventParams {
   orgId: string;
   operation: string;
   tableName: string;
-  recordId?: string;
+  recordId: string;
   oldData?: Json | null;
   newData?: Json | null;
 }
@@ -28,8 +28,8 @@ export async function logAuditEvent({
     actor_id: user?.id ?? null,
     operation,
     table_name: tableName,
-    record_id: recordId ?? null,
-    ...(oldData !== undefined ? { old_data: oldData } : {}),
-    ...(newData !== undefined ? { new_data: newData } : {}),
+    record_id: recordId,
+    ...(oldData !== undefined ? { old_values: oldData } : {}),
+    ...(newData !== undefined ? { new_values: newData } : {}),
   });
 }

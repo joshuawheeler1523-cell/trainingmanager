@@ -22,7 +22,7 @@ export default function AuditLogsPage() {
       .from("audit_log")
       .select("*")
       .eq("org_id", activeOrg.id)
-      .order("created_at", { ascending: false })
+      .order("occurred_at", { ascending: false })
       .limit(100)
       .then(({ data }) => {
         setLogs(data ?? []);
@@ -52,7 +52,7 @@ export default function AuditLogsPage() {
               {logs.map((log) => (
                 <tr key={log.id} className="hover:bg-gray-50">
                   <td className="whitespace-nowrap px-4 py-3 text-gray-500">
-                    {new Date(log.created_at).toLocaleString()}
+                    {new Date(log.occurred_at).toLocaleString()}
                   </td>
                   <td className="px-4 py-3 font-medium text-gray-900">{log.operation}</td>
                   <td className="px-4 py-3 text-gray-500">

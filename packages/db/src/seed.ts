@@ -41,7 +41,12 @@ async function seed() {
   const { error: memberErr } = await supabase
     .from("org_memberships")
     .upsert(
-      { org_id: DEMO_ORG_ID, user_id: userId, role: "owner" },
+      {
+        org_id: DEMO_ORG_ID,
+        user_id: userId,
+        role: "org_admin",
+        accepted_at: new Date().toISOString(),
+      },
       { onConflict: "org_id,user_id" },
     );
 

@@ -11,66 +11,69 @@ export type Database = {
       audit_log: {
         Row: {
           actor_id: string | null;
-          created_at: string;
-          id: string;
-          new_data: Json | null;
-          old_data: Json | null;
+          changed_fields: string[] | null;
+          id: number;
+          new_values: Json | null;
+          occurred_at: string;
+          old_values: Json | null;
           operation: string;
           org_id: string;
-          record_id: string | null;
+          record_id: string;
           table_name: string;
         };
         Insert: {
           actor_id?: string | null;
-          created_at?: string;
-          id?: string;
-          new_data?: Json | null;
-          old_data?: Json | null;
+          changed_fields?: string[] | null;
+          id?: never;
+          new_values?: Json | null;
+          occurred_at?: string;
+          old_values?: Json | null;
           operation: string;
           org_id: string;
-          record_id?: string | null;
+          record_id: string;
           table_name: string;
         };
         Update: {
           actor_id?: string | null;
-          created_at?: string;
-          id?: string;
-          new_data?: Json | null;
-          old_data?: Json | null;
+          changed_fields?: string[] | null;
+          id?: never;
+          new_values?: Json | null;
+          occurred_at?: string;
+          old_values?: Json | null;
           operation?: string;
           org_id?: string;
-          record_id?: string | null;
+          record_id?: string;
           table_name?: string;
         };
         Relationships: [];
       };
       feature_flags: {
         Row: {
-          config: Json | null;
           created_at: string;
           enabled: boolean;
-          flag_key: string;
           id: string;
+          key: string;
           org_id: string | null;
           updated_at: string;
+          value: Json | null;
         };
         Insert: {
-          config?: Json | null;
           created_at?: string;
           enabled?: boolean;
-          flag_key: string;
           id?: string;
+          key: string;
           org_id?: string | null;
           updated_at?: string;
+          value?: Json | null;
         };
         Update: {
-          config?: Json | null;
           created_at?: string;
           enabled?: boolean;
-          flag_key?: string;
           id?: string;
+          key?: string;
           org_id?: string | null;
           updated_at?: string;
+          value?: Json | null;
         };
         Relationships: [
           {
@@ -84,40 +87,40 @@ export type Database = {
       };
       org_invitations: {
         Row: {
+          accepted_at: string | null;
           created_at: string;
+          created_by: string | null;
           email: string;
           expires_at: string;
           id: string;
-          invited_by: string | null;
           org_id: string;
-          role: Database["public"]["Enums"]["member_role"];
-          status: Database["public"]["Enums"]["invitation_status"];
+          role: string;
           token: string;
-          updated_at: string;
+          visibility: string;
         };
         Insert: {
+          accepted_at?: string | null;
           created_at?: string;
+          created_by?: string | null;
           email: string;
           expires_at?: string;
           id?: string;
-          invited_by?: string | null;
           org_id: string;
-          role?: Database["public"]["Enums"]["member_role"];
-          status?: Database["public"]["Enums"]["invitation_status"];
+          role?: string;
           token?: string;
-          updated_at?: string;
+          visibility?: string;
         };
         Update: {
+          accepted_at?: string | null;
           created_at?: string;
+          created_by?: string | null;
           email?: string;
           expires_at?: string;
           id?: string;
-          invited_by?: string | null;
           org_id?: string;
-          role?: Database["public"]["Enums"]["member_role"];
-          status?: Database["public"]["Enums"]["invitation_status"];
+          role?: string;
           token?: string;
-          updated_at?: string;
+          visibility?: string;
         };
         Relationships: [
           {
@@ -131,28 +134,40 @@ export type Database = {
       };
       org_memberships: {
         Row: {
+          accepted_at: string | null;
           created_at: string;
+          display_name: string | null;
           id: string;
+          invited_at: string | null;
           org_id: string;
-          role: Database["public"]["Enums"]["member_role"];
+          role: string;
           updated_at: string;
           user_id: string;
+          visibility: string;
         };
         Insert: {
+          accepted_at?: string | null;
           created_at?: string;
+          display_name?: string | null;
           id?: string;
+          invited_at?: string | null;
           org_id: string;
-          role?: Database["public"]["Enums"]["member_role"];
+          role?: string;
           updated_at?: string;
           user_id: string;
+          visibility?: string;
         };
         Update: {
+          accepted_at?: string | null;
           created_at?: string;
+          display_name?: string | null;
           id?: string;
+          invited_at?: string | null;
           org_id?: string;
-          role?: Database["public"]["Enums"]["member_role"];
+          role?: string;
           updated_at?: string;
           user_id?: string;
+          visibility?: string;
         };
         Relationships: [
           {
@@ -166,31 +181,46 @@ export type Database = {
       };
       organizations: {
         Row: {
+          billing_tier: string | null;
           created_at: string;
           created_by: string | null;
           id: string;
+          logo_url: string | null;
           name: string;
+          onboarded_at: string | null;
+          settings: Json;
           slug: string;
+          time_zone: string;
           updated_at: string;
           updated_by: string | null;
           version: number;
         };
         Insert: {
+          billing_tier?: string | null;
           created_at?: string;
           created_by?: string | null;
           id?: string;
+          logo_url?: string | null;
           name: string;
+          onboarded_at?: string | null;
+          settings?: Json;
           slug: string;
+          time_zone?: string;
           updated_at?: string;
           updated_by?: string | null;
           version?: number;
         };
         Update: {
+          billing_tier?: string | null;
           created_at?: string;
           created_by?: string | null;
           id?: string;
+          logo_url?: string | null;
           name?: string;
+          onboarded_at?: string | null;
+          settings?: Json;
           slug?: string;
+          time_zone?: string;
           updated_at?: string;
           updated_by?: string | null;
           version?: number;
@@ -211,8 +241,7 @@ export type Database = {
       user_org_ids: { Args: never; Returns: string[] };
     };
     Enums: {
-      invitation_status: "pending" | "accepted" | "revoked" | "expired";
-      member_role: "owner" | "admin" | "member";
+      [_ in never]: never;
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -337,9 +366,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      invitation_status: ["pending", "accepted", "revoked", "expired"],
-      member_role: ["owner", "admin", "member"],
-    },
+    Enums: {},
   },
 } as const;

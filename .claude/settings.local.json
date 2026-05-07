@@ -44,7 +44,24 @@
       "Bash(mv 20260101_003_organizations.sql 20260101000003_organizations.sql)",
       "Bash(mv 20260101_004_audit_log.sql 20260101000004_audit_log.sql)",
       "mcp__supabase__execute_sql",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(xargs grep *)",
+      "Bash(python3 -c \" import zipfile, xml.etree.ElementTree as ET path = 'C:/Users/joshu/Downloads/build_package_complete/01_Technical_Architecture.docx' with zipfile.ZipFile\\(path\\) as z: xml = z.read\\('word/document.xml'\\).decode\\(\\) root = ET.fromstring\\(xml\\) paras = [] for p in root.iter\\('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p'\\): text = ''.join\\(t.text or '' for t in p.iter\\('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t'\\)\\) if text.strip\\(\\): paras.append\\(text\\) print\\('\\\\n'.join\\(paras\\)\\) \")",
+      "Bash(python3 *)",
+      "Bash(node *)",
+      "Bash(powershell.exe -Command ' *)",
+      "Bash(powershell -Command 'Add-Type -AssemblyName System.IO.Compression.FileSystem; $zip = [System.IO.Compression.ZipFile]::OpenRead\\('\\\\''01_Technical_Architecture.docx'\\\\''\\); $entry = $zip.Entries | Where-Object { $_.FullName -eq '\\\\''word/document.xml'\\\\'' }; $reader = New-Object System.IO.StreamReader\\($entry.Open\\(\\)\\); $xml = $reader.ReadToEnd\\(\\); $reader.Close\\(\\); $zip.Dispose\\(\\); $xml')",
+      "Bash(grep -v '^$')",
+      "Bash(powershell -Command ' Add-Type -AssemblyName System.IO.Compression.FileSystem $zip = [System.IO.Compression.ZipFile]::OpenRead\\('\\\\''C:\\\\Users\\\\joshu\\\\Downloads\\\\build_package_complete\\\\01_Technical_Architecture.docx'\\\\''\\) $entry = $zip.Entries | Where-Object { $_.FullName -eq '\\\\''word/document.xml'\\\\'' } $reader = New-Object System.IO.StreamReader\\($entry.Open\\(\\)\\) $xml = $reader.ReadToEnd\\(\\) $reader.Close\\(\\) $zip.Dispose\\(\\) $xml')",
+      "Bash(grep -v '^[[:space:]]*$')",
+      "Bash(powershell -Command ' $bytes = [System.IO.File]::ReadAllBytes\\('\\\\''C:\\\\Users\\\\joshu\\\\Downloads\\\\build_package_complete\\\\01_Technical_Architecture.docx'\\\\''\\) $ms = New-Object System.IO.MemoryStream\\(,$bytes\\) Add-Type -AssemblyName System.IO.Compression.FileSystem $zip = New-Object System.IO.Compression.ZipArchive\\($ms, [System.IO.Compression.ZipArchiveMode]::Read\\) $entry = $zip.GetEntry\\('\\\\''word/document.xml'\\\\''\\) $sr = New-Object System.IO.StreamReader\\($entry.Open\\(\\)\\) $content = $sr.ReadToEnd\\(\\) $sr.Close\\(\\); $zip.Dispose\\(\\); $ms.Dispose\\(\\) $content -replace '\\\\''<[^>]+>'\\\\'', '\\\\'' '\\\\'' -replace '\\\\''\\\\s+'\\\\'', '\\\\'' '\\\\'' ')",
+      "Bash(python -c \" import zipfile, re with zipfile.ZipFile\\('C:/Users/joshu/Downloads/build_package_complete/01_Technical_Architecture.docx'\\) as z: xml = z.read\\('word/document.xml'\\).decode\\('utf-8'\\) text = re.sub\\(r'<[^>]+>', ' ', xml\\) text = re.sub\\(r'[ \\\\t]+', ' ', text\\) lines = [l.strip\\(\\) for l in text.split\\(\\) if l.strip\\(\\)] print\\(' '.join\\(lines[:3000]\\)\\) \")",
+      "Bash(where python *)",
+      "Bash(C:/Python314/python.exe *)",
+      "Bash(pnpm seed *)",
+      "Bash(pnpm --filter db seed)",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(pnpm *)"
     ]
   }
 }

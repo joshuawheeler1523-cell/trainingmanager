@@ -122,6 +122,9 @@ importers:
 
   packages/db:
     devDependencies:
+      "@supabase/supabase-js":
+        specifier: ^2.49.4
+        version: 2.105.3
       supabase:
         specifier: 2.22.6
         version: 2.22.6
