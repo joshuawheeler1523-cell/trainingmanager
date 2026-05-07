@@ -8,6 +8,120 @@ export type Database = {
   };
   public: {
     Tables: {
+      class_instructor_assignments: {
+        Row: {
+          id: string;
+          org_id: string;
+          class_id: string;
+          instructor_id: string;
+          role: string;
+          assigned_offerings: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          class_id: string;
+          instructor_id: string;
+          role?: string;
+          assigned_offerings?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          class_id?: string;
+          instructor_id?: string;
+          role?: string;
+          assigned_offerings?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "class_instructor_assignments_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_instructor_assignments_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      classes: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          description: string | null;
+          allocation_bucket_id: string | null;
+          is_multi_day: boolean;
+          total_days: number;
+          hours_per_day: number | null;
+          custom_day_hours: number[] | null;
+          offerings_per_year: number;
+          prep_hours_per_offering: number;
+          logistics_hours_per_offering: number;
+          status: string;
+          deleted_at: string | null;
+          created_at: string;
+          updated_at: string;
+          created_by: string | null;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          name: string;
+          description?: string | null;
+          allocation_bucket_id?: string | null;
+          is_multi_day?: boolean;
+          total_days?: number;
+          hours_per_day?: number | null;
+          custom_day_hours?: number[] | null;
+          offerings_per_year?: number;
+          prep_hours_per_offering?: number;
+          logistics_hours_per_offering?: number;
+          status?: string;
+          deleted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          created_by?: string | null;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          name?: string;
+          description?: string | null;
+          allocation_bucket_id?: string | null;
+          is_multi_day?: boolean;
+          total_days?: number;
+          hours_per_day?: number | null;
+          custom_day_hours?: number[] | null;
+          offerings_per_year?: number;
+          prep_hours_per_offering?: number;
+          logistics_hours_per_offering?: number;
+          status?: string;
+          deleted_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          created_by?: string | null;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [];
+      };
       audit_log: {
         Row: {
           actor_id: string | null;
@@ -303,7 +417,33 @@ export type Database = {
       };
     };
     Views: {
-      [_ in never]: never;
+      classes_with_hours: {
+        Row: {
+          id: string;
+          org_id: string;
+          name: string;
+          description: string | null;
+          allocation_bucket_id: string | null;
+          is_multi_day: boolean;
+          total_days: number;
+          hours_per_day: number | null;
+          custom_day_hours: number[] | null;
+          offerings_per_year: number;
+          prep_hours_per_offering: number;
+          logistics_hours_per_offering: number;
+          status: string;
+          deleted_at: string | null;
+          created_at: string;
+          updated_at: string;
+          created_by: string | null;
+          updated_by: string | null;
+          version: number;
+          instruction_hours_per_offering: number | null;
+          total_hours_per_offering: number | null;
+          annual_class_hours: number | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       apply_standard_triggers: {

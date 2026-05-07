@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
 import { instructorInsertSchema, instructorUpdateSchema } from "@arbor/shared";
-import type { Instructor, InstructorInsert, InstructorUpdate } from "@arbor/shared";
+import type { Instructor } from "@arbor/shared";
 import { createInstructor, updateInstructor } from "./actions";
 
 type CreateProps = {
@@ -44,10 +44,23 @@ function Label({ htmlFor, children }: { htmlFor: string; children: React.ReactNo
   );
 }
 
-function FieldError({ message }: { message?: string }) {
+function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
   return <p className="text-destructive mt-1 text-xs">{message}</p>;
 }
+
+type FormValues = {
+  full_name: string;
+  email: string;
+  phone: string;
+  department: string;
+  location: string;
+  job_title: string;
+  start_date: string;
+  annual_hours: number;
+  status: "active" | "inactive" | "on_leave";
+  notes: string;
+};
 
 export default function InstructorFormDialog(props: Props) {
   const [open, setOpen] = useState(false);
@@ -63,9 +76,9 @@ export default function InstructorFormDialog(props: Props) {
         job_title: props.instructor.job_title ?? "",
         start_date: props.instructor.start_date ?? "",
         annual_hours: props.instructor.annual_hours,
-        status: (props.instructor.status === "inactive" || props.instructor.status === "on_leave"
+        status: (["inactive", "on_leave"] as string[]).includes(props.instructor.status)
           ? props.instructor.status
-          : "active") satisfies "active" | "inactive" | "on_leave",
+          : ("active" as const),
         notes: props.instructor.notes ?? "",
       }
     : {
@@ -86,12 +99,12 @@ export default function InstructorFormDialog(props: Props) {
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm({
+  } = useForm<FormValues>({
     resolver: zodResolver(isEdit ? instructorUpdateSchema : instructorInsertSchema),
     defaultValues,
   });
 
-  async function onSubmit(data: InstructorInsert | InstructorUpdate) {
+  async function onSubmit(data: FormValues) {
     const result = isEdit
       ? await updateInstructor(props.instructor.id, data)
       : await createInstructor(data);

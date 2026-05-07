@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { instructorInsertSchema, instructorUpdateSchema } from "@arbor/shared";
 import type { Instructor } from "@arbor/shared";
+import type { TablesUpdate } from "@/lib/supabase/database.types";
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -14,12 +15,13 @@ export async function createInstructor(input: unknown): Promise<ActionResult<Ins
   const parsed = instructorInsertSchema.safeParse(input);
   if (!parsed.success) {
     const first = parsed.error.errors[0];
+    const field = first?.path.join(".");
     return {
       ok: false,
       error: {
         code: "VALIDATION",
         message: first?.message ?? "Invalid input",
-        field: first?.path.join("."),
+        ...(field ? { field } : {}),
       },
     };
   }
@@ -52,12 +54,13 @@ export async function updateInstructor(
   const parsed = instructorUpdateSchema.safeParse(input);
   if (!parsed.success) {
     const first = parsed.error.errors[0];
+    const field = first?.path.join(".");
     return {
       ok: false,
       error: {
         code: "VALIDATION",
         message: first?.message ?? "Invalid input",
-        field: first?.path.join("."),
+        ...(field ? { field } : {}),
       },
     };
   }
@@ -67,7 +70,11 @@ export async function updateInstructor(
 
   const { data, error } = await supabase
     .from("instructors")
-    .update(parsed.data)
+    .update(
+      Object.fromEntries(
+        Object.entries(parsed.data as Record<string, unknown>).filter(([, v]) => v !== undefined),
+      ) as unknown as TablesUpdate<"instructors">,
+    )
     .eq("id", id)
     .eq("org_id", orgId)
     .is("deleted_at", null)
