@@ -7,7 +7,32 @@
       "Bash(supabase *)",
       "Bash(npx tsc *)",
       "Bash(npm run *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "mcp__vercel__list_teams",
+      "mcp__vercel__list_projects",
+      "mcp__vercel__list_deployments",
+      "mcp__vercel__get_project",
+      "Bash(git push *)",
+      "Bash(pnpm --version)",
+      "Bash(cp -r src apps/web/src)",
+      "Bash(cp -r public apps/web/public)",
+      "Bash(cp -r supabase packages/db/supabase)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm approve-builds *)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm lint *)",
+      "Bash(pnpm --filter web lint)",
+      "Bash(pnpm --filter web typecheck)",
+      "Bash(pnpm --filter web test)",
+      "Bash(pnpm --filter web add -D @testing-library/jest-dom)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm dev *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(kill %1)",
+      "Bash(git rm *)",
+      "Bash(git reset *)",
+      "Bash(git checkout *)"
     ]
   }
 }

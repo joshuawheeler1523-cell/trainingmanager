@@ -1,0 +1,15 @@
+{
+  "name": "db",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "migrate": "supabase db push",
+    "types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/database.types.ts && sed -i '/^A new version/d' src/database.types.ts && sed -i '/^We recommend/d' src/database.types.ts",
+    "seed": "npx tsx src/seed.ts",
+    "test": "echo 'no db tests yet' && exit 0"
+  },
+  "devDependencies": {
+    "supabase": "2.22.6",
+    "tsx": "^4.19.0"
+  }
+}
