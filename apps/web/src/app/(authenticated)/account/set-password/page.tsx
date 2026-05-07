@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import PageHeader from "@/components/ui/page-header";
 import { setPassword, type SetPasswordState } from "./actions";
 
 export default function SetPasswordPage() {
@@ -8,55 +9,64 @@ export default function SetPasswordPage() {
 
   if (state.success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-          <div className="mb-4 text-4xl">✓</div>
-          <h1 className="mb-2 text-xl font-semibold text-gray-900">Password set</h1>
-          <p className="text-sm text-gray-500">You can now sign in with your email and password.</p>
+      <div>
+        <PageHeader title="Set Password" />
+        <div className="p-6">
+          <div className="border-border bg-background max-w-sm rounded-xl border p-8 text-center">
+            <div className="mb-3 text-2xl">✓</div>
+            <h2 className="text-foreground mb-1 text-base font-semibold">Password set</h2>
+            <p className="text-muted-foreground text-sm">
+              You can now sign in with your email and password.
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-2xl font-semibold text-gray-900">Set a password</h1>
-        <p className="mb-6 text-sm text-gray-500">
-          Once set, you can sign in with email + password in addition to magic links.
-        </p>
-        <form action={action} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">New password</label>
-            <input
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Confirm password</label>
-            <input
-              name="confirm"
-              type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-          <button
-            type="submit"
-            disabled={pending}
-            className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {pending ? "Saving…" : "Set password"}
-          </button>
-        </form>
+    <div>
+      <PageHeader
+        title="Set Password"
+        description="Set a password to sign in without a magic link."
+      />
+      <div className="p-6">
+        <div className="border-border bg-background max-w-sm rounded-xl border p-6">
+          <form action={action} className="space-y-4">
+            <div>
+              <label className="text-foreground mb-1 block text-sm font-medium">New password</label>
+              <input
+                name="password"
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className="border-input bg-background text-foreground focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+              />
+            </div>
+            <div>
+              <label className="text-foreground mb-1 block text-sm font-medium">
+                Confirm password
+              </label>
+              <input
+                name="confirm"
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                className="border-input bg-background text-foreground focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+              />
+            </div>
+            {state.error && <p className="text-destructive text-sm">{state.error}</p>}
+            <button
+              type="submit"
+              disabled={pending}
+              className="bg-primary text-primary-foreground w-full rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? "Saving…" : "Set password"}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
