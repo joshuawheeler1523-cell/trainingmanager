@@ -8,6 +8,213 @@ export type Database = {
   };
   public: {
     Tables: {
+      ad_hoc_tasks: {
+        Row: {
+          bucket_id: string | null;
+          completed_at: string | null;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          due_date: string | null;
+          hours: number;
+          id: string;
+          instructor_id: string | null;
+          name: string;
+          org_id: string;
+          status: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          bucket_id?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          due_date?: string | null;
+          hours: number;
+          id?: string;
+          instructor_id?: string | null;
+          name: string;
+          org_id: string;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          bucket_id?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          due_date?: string | null;
+          hours?: number;
+          id?: string;
+          instructor_id?: string | null;
+          name?: string;
+          org_id?: string;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ad_hoc_tasks_bucket_id_fkey";
+            columns: ["bucket_id"];
+            isOneToOne: false;
+            referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ad_hoc_tasks_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ad_hoc_tasks_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      allocation_buckets: {
+        Row: {
+          color: string;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          display_order: number;
+          id: string;
+          is_archived: boolean;
+          name: string;
+          org_id: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          color?: string;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          display_order?: number;
+          id?: string;
+          is_archived?: boolean;
+          name: string;
+          org_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          color?: string;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          display_order?: number;
+          id?: string;
+          is_archived?: boolean;
+          name?: string;
+          org_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "allocation_buckets_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      allocation_group_members: {
+        Row: {
+          created_at: string;
+          group_id: string;
+          instructor_id: string;
+          org_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          group_id: string;
+          instructor_id: string;
+          org_id: string;
+        };
+        Update: {
+          created_at?: string;
+          group_id?: string;
+          instructor_id?: string;
+          org_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "allocation_group_members_group_id_fkey";
+            columns: ["group_id"];
+            isOneToOne: false;
+            referencedRelation: "allocation_groups";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "allocation_group_members_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "allocation_group_members_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      allocation_groups: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          id: string;
+          name: string;
+          org_id: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          name: string;
+          org_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          name?: string;
+          org_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "allocation_groups_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       audit_log: {
         Row: {
           actor_id: string | null;
@@ -243,6 +450,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: "classes_allocation_bucket_id_fkey";
+            columns: ["allocation_bucket_id"];
+            isOneToOne: false;
+            referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "classes_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
@@ -282,6 +496,170 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "feature_flags_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      global_allocations: {
+        Row: {
+          bucket_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          org_id: string;
+          target_percent: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          bucket_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          org_id: string;
+          target_percent: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          bucket_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          org_id?: string;
+          target_percent?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "global_allocations_bucket_id_fkey";
+            columns: ["bucket_id"];
+            isOneToOne: false;
+            referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "global_allocations_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      group_allocations: {
+        Row: {
+          bucket_id: string;
+          created_at: string;
+          created_by: string | null;
+          group_id: string;
+          id: string;
+          org_id: string;
+          target_percent: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          bucket_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          group_id: string;
+          id?: string;
+          org_id: string;
+          target_percent: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          bucket_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          group_id?: string;
+          id?: string;
+          org_id?: string;
+          target_percent?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "group_allocations_bucket_id_fkey";
+            columns: ["bucket_id"];
+            isOneToOne: false;
+            referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "group_allocations_group_id_fkey";
+            columns: ["group_id"];
+            isOneToOne: false;
+            referencedRelation: "allocation_groups";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "group_allocations_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      individual_allocations: {
+        Row: {
+          bucket_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          instructor_id: string;
+          org_id: string;
+          target_percent: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          bucket_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          instructor_id: string;
+          org_id: string;
+          target_percent: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          bucket_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          instructor_id?: string;
+          org_id?: string;
+          target_percent?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "individual_allocations_bucket_id_fkey";
+            columns: ["bucket_id"];
+            isOneToOne: false;
+            referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "individual_allocations_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "individual_allocations_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -622,6 +1000,118 @@ export type Database = {
         };
         Relationships: [];
       };
+      recurring_task_assignments: {
+        Row: {
+          created_at: string;
+          instructor_id: string;
+          org_id: string;
+          recurring_task_id: string;
+          share_percent: number;
+        };
+        Insert: {
+          created_at?: string;
+          instructor_id: string;
+          org_id: string;
+          recurring_task_id: string;
+          share_percent?: number;
+        };
+        Update: {
+          created_at?: string;
+          instructor_id?: string;
+          org_id?: string;
+          recurring_task_id?: string;
+          share_percent?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recurring_task_assignments_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recurring_task_assignments_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recurring_task_assignments_recurring_task_id_fkey";
+            columns: ["recurring_task_id"];
+            isOneToOne: false;
+            referencedRelation: "recurring_tasks";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      recurring_tasks: {
+        Row: {
+          bucket_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          description: string | null;
+          frequency: string;
+          hours_per_occurrence: number;
+          id: string;
+          name: string;
+          occurrences_per_year: number | null;
+          org_id: string;
+          status: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          bucket_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          frequency: string;
+          hours_per_occurrence: number;
+          id?: string;
+          name: string;
+          occurrences_per_year?: number | null;
+          org_id: string;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          bucket_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          frequency?: string;
+          hours_per_occurrence?: number;
+          id?: string;
+          name?: string;
+          occurrences_per_year?: number | null;
+          org_id?: string;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recurring_tasks_bucket_id_fkey";
+            columns: ["bucket_id"];
+            isOneToOne: false;
+            referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recurring_tasks_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       skills: {
         Row: {
           category: string | null;
@@ -752,6 +1242,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: "classes_allocation_bucket_id_fkey";
+            columns: ["allocation_bucket_id"];
+            isOneToOne: false;
+            referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "classes_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
@@ -767,6 +1264,15 @@ export type Database = {
         Returns: undefined;
       };
       current_user_id: { Args: never; Returns: string };
+      effective_allocation: {
+        Args: { p_instructor_id: string };
+        Returns: {
+          bucket_id: string;
+          source: string;
+          target_percent: number;
+        }[];
+      };
+      frequency_to_annual: { Args: { p_frequency: string }; Returns: number };
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean };
       notify_expiring_certifications: { Args: never; Returns: undefined };
       proficiency_rank: { Args: { p_proficiency: string }; Returns: number };

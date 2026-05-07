@@ -2,5 +2,6 @@ export * from "./schemas/org";
 export * from "./schemas/instructor";
 export * from "./schemas/class";
 export * from "./schemas/skill";
+export * from "./schemas/allocation";
 export * from "./types";
 export * from "./utils/slug";
