@@ -419,14 +419,19 @@ function GroupDetail({
 
       {/* Allocations */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-foreground text-sm font-semibold">Bucket allocations</h4>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h4 className="text-foreground text-sm font-semibold">Bucket allocations</h4>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              Hours shown per 2,080 h/yr FTE — actual member hours scale proportionally.
+            </p>
+          </div>
           <span
-            className={`rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${
+            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${
               isHundred ? "bg-surface text-foreground" : "bg-destructive/10 text-destructive"
             }`}
           >
-            {sum.toFixed(1)}% total
+            {sum.toFixed(1)}% · {Math.round((2080 * sum) / 100).toLocaleString()} h/yr
           </span>
         </div>
         {buckets.length === 0 ? (
@@ -441,6 +446,7 @@ function GroupDetail({
                     key={b.id}
                     bucket={b}
                     value={v}
+                    annualHoursBase={2080}
                     onChange={(val) => {
                       setBucketValue(b.id, val);
                     }}

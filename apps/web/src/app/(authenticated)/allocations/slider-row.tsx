@@ -7,9 +7,18 @@ type Props = {
   value: number;
   onChange: (v: number) => void;
   disabled?: boolean;
+  /** When set, the row also shows annual_hours_base × value as a yearly-hours preview. */
+  annualHoursBase?: number;
 };
 
-export default function SliderRow({ bucket, value, onChange, disabled }: Props) {
+function formatHours(hours: number): string {
+  // Round to a whole number; use locale separators for readability.
+  return Math.round(hours).toLocaleString();
+}
+
+export default function SliderRow({ bucket, value, onChange, disabled, annualHoursBase }: Props) {
+  const hours = annualHoursBase != null ? (annualHoursBase * value) / 100 : null;
+
   return (
     <div className="border-border bg-background flex items-center gap-4 rounded-lg border p-4">
       <span
@@ -22,6 +31,11 @@ export default function SliderRow({ bucket, value, onChange, disabled }: Props) 
           <span className="text-foreground truncate text-sm font-medium">{bucket.name}</span>
           <span className="text-foreground text-sm font-semibold tabular-nums">
             {value.toFixed(1)}%
+            {hours != null && (
+              <span className="text-muted-foreground ml-2 text-xs font-normal">
+                · {formatHours(hours)} h/yr
+              </span>
+            )}
           </span>
         </div>
         <input

@@ -107,6 +107,9 @@ export default function GlobalTab({ buckets, globals, defaultUserCount }: Props)
             }`}
           >
             {sum.toFixed(1)}%
+            <span className="text-muted-foreground ml-2 text-sm font-normal">
+              · {Math.round((2080 * sum) / 100).toLocaleString()} h/yr per FTE
+            </span>
           </p>
         </div>
         <div className="text-muted-foreground text-xs">
@@ -118,6 +121,11 @@ export default function GlobalTab({ buckets, globals, defaultUserCount }: Props)
         </div>
       </div>
 
+      <p className="text-muted-foreground text-xs">
+        Hours shown are based on a 2,080 h/yr full-time schedule. Instructors with different annual
+        hours scale proportionally.
+      </p>
+
       <div className="space-y-2">
         {activeBuckets.map((b) => {
           const v = slate.find((s) => s.bucket_id === b.id)?.target_percent ?? 0;
@@ -126,6 +134,7 @@ export default function GlobalTab({ buckets, globals, defaultUserCount }: Props)
               key={b.id}
               bucket={b}
               value={v}
+              annualHoursBase={2080}
               onChange={(val) => {
                 setBucketValue(b.id, val);
               }}

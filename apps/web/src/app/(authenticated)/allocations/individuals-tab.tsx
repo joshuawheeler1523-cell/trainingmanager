@@ -354,13 +354,24 @@ function CustomizeSheet({
                 isHundred ? "border-border bg-surface" : "border-destructive/40 bg-destructive/5"
               }`}
             >
-              <span className="text-muted-foreground text-xs font-medium">Total</span>
+              <div>
+                <p className="text-muted-foreground text-xs font-medium">Total</p>
+                <p className="text-muted-foreground mt-0.5 text-[11px]">
+                  Annual capacity:{" "}
+                  <span className="text-foreground tabular-nums">
+                    {instructor.annual_hours.toLocaleString()} h/yr
+                  </span>
+                </p>
+              </div>
               <span
                 className={`text-lg font-semibold tabular-nums ${
                   isHundred ? "text-foreground" : "text-destructive"
                 }`}
               >
                 {sum.toFixed(1)}%
+                <span className="text-muted-foreground ml-2 text-xs font-normal">
+                  · {Math.round((instructor.annual_hours * sum) / 100).toLocaleString()} h
+                </span>
               </span>
             </div>
 
@@ -372,6 +383,7 @@ function CustomizeSheet({
                     key={b.id}
                     bucket={b}
                     value={v}
+                    annualHoursBase={instructor.annual_hours}
                     onChange={(val) => {
                       setBucketValue(b.id, val);
                     }}
