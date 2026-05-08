@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState, useState } from "react";
 import {
   sendMagicLink,
@@ -19,125 +20,209 @@ export default function LoginPage() {
     {},
   );
 
-  if (magicState.status === "sent") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-          <div className="mb-4 text-4xl">📬</div>
-          <h1 className="mb-2 text-xl font-semibold text-gray-900">Check your email</h1>
-          <p className="text-sm text-gray-500">
-            We sent a magic link to{" "}
-            <span className="font-medium text-gray-700">{magicState.email}</span>. Click the link to
-            sign in.
-          </p>
-          <button
-            onClick={() => {
-              window.location.reload();
-            }}
-            className="mt-6 text-sm text-blue-600 hover:underline"
-          >
-            Use a different email
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-2xl font-semibold text-gray-900">Sign in to Arbor</h1>
-        <p className="mb-6 text-sm text-gray-500">
-          {mode === "magic"
-            ? "Enter your email and we'll send you a magic link."
-            : "Enter your email and password."}
-        </p>
+    <div className="bg-background grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
+      {/* ── Left: artwork ─────────────────────────────────────────────────── */}
+      <aside
+        aria-hidden="true"
+        className="relative hidden overflow-hidden lg:block"
+        style={{ backgroundColor: "#1a1a1a" }}
+      >
+        <Image
+          src="/branding/arbor-hero.png"
+          alt=""
+          fill
+          priority
+          sizes="(min-width: 1024px) 55vw, 0px"
+          className="object-cover"
+        />
+        {/* Subtle gradient to ground the bottom edge */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/40 to-transparent"
+        />
+      </aside>
 
-        {mode === "magic" ? (
-          <form action={magicAction} className="space-y-4">
-            <div>
-              <label
-                htmlFor="login-magic-email"
-                className="mb-1 block text-sm font-medium text-gray-700"
-              >
-                Email
-              </label>
-              <input
-                id="login-magic-email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            {magicState.status === "error" && (
-              <p className="text-sm text-red-600">{magicState.message}</p>
-            )}
-            <button
-              type="submit"
-              disabled={magicPending}
-              className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {magicPending ? "Sending…" : "Send Magic Link"}
-            </button>
-          </form>
-        ) : (
-          <form action={passAction} className="space-y-4">
-            <div>
-              <label
-                htmlFor="login-password-email"
-                className="mb-1 block text-sm font-medium text-gray-700"
-              >
-                Email
-              </label>
-              <input
-                id="login-password-email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="login-password-password"
-                className="mb-1 block text-sm font-medium text-gray-700"
-              >
-                Password
-              </label>
-              <input
-                id="login-password-password"
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            {passState.error && <p className="text-sm text-red-600">{passState.error}</p>}
-            <button
-              type="submit"
-              disabled={passPending}
-              className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {passPending ? "Signing in…" : "Sign in"}
-            </button>
-          </form>
-        )}
-
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => {
-              setMode(mode === "magic" ? "password" : "magic");
-            }}
-            className="text-sm text-blue-600 hover:underline"
+      {/* ── Right: form panel ─────────────────────────────────────────────── */}
+      <main className="flex flex-col items-center justify-center px-6 py-12 sm:px-10">
+        {/* Mobile logo (artwork is hidden on small screens) */}
+        <div className="mb-8 flex items-center gap-3 lg:hidden">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-full"
+            style={{ backgroundColor: "var(--primary)" }}
           >
-            {mode === "magic" ? "Sign in with password instead" : "Send me a magic link instead"}
-          </button>
+            <span style={{ color: "var(--highlight)" }} className="font-serif text-lg">
+              A
+            </span>
+          </div>
+          <div>
+            <p className="text-foreground font-serif text-lg tracking-tight">Arbor</p>
+            <p className="text-muted-foreground text-[10px] uppercase tracking-[0.18em]">
+              Training Resource Management
+            </p>
+          </div>
         </div>
+
+        <div className="w-full max-w-sm">
+          {magicState.status === "sent" ? (
+            <SentCard email={magicState.email} />
+          ) : (
+            <>
+              <header className="mb-8">
+                <h1 className="text-foreground font-serif text-3xl tracking-tight">Welcome back</h1>
+                <p className="text-muted-foreground mt-2 text-sm">
+                  {mode === "magic"
+                    ? "Enter your email and we'll send you a magic link."
+                    : "Sign in with your email and password."}
+                </p>
+              </header>
+
+              {mode === "magic" ? (
+                <form action={magicAction} className="space-y-5">
+                  <Field
+                    id="login-magic-email"
+                    name="email"
+                    type="email"
+                    label="Email"
+                    autoComplete="email"
+                  />
+                  {magicState.status === "error" && <ErrorText>{magicState.message}</ErrorText>}
+                  <PrimaryButton pending={magicPending} pendingLabel="Sending…">
+                    Send magic link
+                  </PrimaryButton>
+                </form>
+              ) : (
+                <form action={passAction} className="space-y-5">
+                  <Field
+                    id="login-password-email"
+                    name="email"
+                    type="email"
+                    label="Email"
+                    autoComplete="email"
+                  />
+                  <Field
+                    id="login-password-password"
+                    name="password"
+                    type="password"
+                    label="Password"
+                    autoComplete="current-password"
+                  />
+                  {passState.error && <ErrorText>{passState.error}</ErrorText>}
+                  <PrimaryButton pending={passPending} pendingLabel="Signing in…">
+                    Sign in
+                  </PrimaryButton>
+                </form>
+              )}
+
+              <div className="mt-6 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode(mode === "magic" ? "password" : "magic");
+                  }}
+                  className="text-muted-foreground text-sm underline-offset-4 transition-colors hover:underline"
+                  style={{ textDecorationColor: "var(--highlight)" }}
+                >
+                  {mode === "magic"
+                    ? "Sign in with password instead"
+                    : "Send me a magic link instead"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <p className="text-muted-foreground mt-12 text-center text-xs">
+          Arbor &middot; Training Resource Management
+        </p>
+      </main>
+    </div>
+  );
+}
+
+function Field({
+  id,
+  name,
+  type,
+  label,
+  autoComplete,
+}: {
+  id: string;
+  name: string;
+  type: string;
+  label: string;
+  autoComplete?: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="text-foreground mb-1.5 block text-sm font-medium">
+        {label}
+      </label>
+      <input
+        id={id}
+        name={name}
+        type={type}
+        required
+        autoComplete={autoComplete}
+        className="border-input bg-background text-foreground placeholder:text-muted-foreground w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-sm transition-colors focus:outline-none focus-visible:border-transparent"
+        style={{ outline: "none" }}
+      />
+    </div>
+  );
+}
+
+function PrimaryButton({
+  pending,
+  pendingLabel,
+  children,
+}: {
+  pending: boolean;
+  pendingLabel: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="bg-primary text-primary-foreground w-full rounded-lg py-2.5 text-sm font-medium tracking-wide shadow-sm transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {pending ? pendingLabel : children}
+    </button>
+  );
+}
+
+function ErrorText({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-sm" style={{ color: "var(--destructive)" }} role="alert">
+      {children}
+    </p>
+  );
+}
+
+function SentCard({ email }: { email: string }) {
+  return (
+    <div className="text-center">
+      <div
+        className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full"
+        style={{ backgroundColor: "var(--surface)" }}
+      >
+        <span style={{ color: "var(--highlight)" }} className="text-2xl">
+          ✦
+        </span>
       </div>
+      <h1 className="text-foreground font-serif text-2xl tracking-tight">Check your inbox</h1>
+      <p className="text-muted-foreground mt-2 text-sm">
+        We sent a sign-in link to <span className="text-foreground font-medium">{email}</span>.
+      </p>
+      <button
+        onClick={() => {
+          window.location.reload();
+        }}
+        className="text-muted-foreground mt-8 text-sm underline-offset-4 hover:underline"
+        style={{ textDecorationColor: "var(--highlight)" }}
+      >
+        Use a different email
+      </button>
     </div>
   );
 }

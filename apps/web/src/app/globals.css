@@ -3,26 +3,30 @@
 /* ── Design tokens ──────────────────────────────────────────────────────── */
 
 :root {
-  /* Brand / primary */
-  --primary: oklch(34% 0.12 243);
-  --primary-foreground: oklch(99% 0 0);
+  /* Brand */
+  --primary: #1f4d3a; /* Deep forest green */
+  --primary-foreground: #fafaf7; /* Off-white on green */
+  --accent: #8fa68e; /* Warm sage */
+  --accent-foreground: #1a1a1a; /* Charcoal on sage */
+  --highlight: #d4a574; /* Soft amber */
+  --highlight-foreground: #1a1a1a; /* Charcoal on amber */
 
   /* Page surfaces */
-  --background: oklch(100% 0 0);
-  --surface: oklch(98% 0.004 243);
+  --background: #fafaf7; /* Off-white */
+  --surface: #f4f2ec; /* Warm cream for cards / sidebar */
 
   /* Neutral text */
-  --foreground: oklch(16% 0.02 243);
-  --muted-foreground: oklch(50% 0.02 243);
+  --foreground: #1a1a1a; /* Charcoal */
+  --muted-foreground: #6b6b68; /* Warm muted */
 
   /* Borders */
-  --border: oklch(90% 0.01 243);
-  --input: oklch(90% 0.01 243);
-  --ring: oklch(34% 0.12 243);
+  --border: #e2dfd8; /* Soft beige */
+  --input: #e2dfd8;
+  --ring: #1f4d3a; /* Forest green focus ring */
 
   /* Destructive */
   --destructive: oklch(54% 0.22 26);
-  --destructive-foreground: oklch(99% 0 0);
+  --destructive-foreground: #fafaf7;
 
   /* Capacity utilization bands */
   --capacity-green: oklch(50% 0.16 145);
@@ -52,6 +56,10 @@
 
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-foreground: var(--foreground);

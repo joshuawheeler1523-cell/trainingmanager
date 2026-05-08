@@ -61,13 +61,21 @@ export default function AppShell({
       {/* Top bar */}
       <header className="border-border bg-background sticky top-0 z-30 flex h-12 items-center gap-3 border-b px-4">
         {/* Left: logo + org switcher */}
-        <div className="flex items-center gap-2">
-          <Link
-            href="/"
-            className="text-foreground hover:text-primary text-sm font-bold"
-            aria-label="Arbor home"
-          >
-            Arbor
+        <div className="flex items-center gap-3">
+          <Link href="/" className="group flex items-center gap-2" aria-label="Arbor home">
+            <span
+              aria-hidden="true"
+              className="relative inline-flex h-6 w-6 items-center justify-center rounded-full transition-transform group-hover:scale-105"
+              style={{ backgroundColor: "var(--primary)" }}
+            >
+              <span
+                className="font-serif text-[11px] font-semibold leading-none"
+                style={{ color: "var(--highlight)" }}
+              >
+                A
+              </span>
+            </span>
+            <span className="text-foreground font-serif text-base tracking-tight">Arbor</span>
           </Link>
           <span className="text-border">·</span>
           {orgSwitcherSlot}
