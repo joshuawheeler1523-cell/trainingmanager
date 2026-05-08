@@ -79,6 +79,36 @@ export const BUCKET_TEMPLATES: BucketTemplate[] = [
       { match: "pto", percent: 5 },
     ],
   },
+  {
+    id: "training-leadership",
+    label: "Training leadership",
+    description:
+      "For directors, managers, and coordinators running the team. Most time goes to admin (meetings, hiring, vendor management, budget) and project oversight; occasional teaching keeps clinical credibility.",
+    shares: [
+      // Try "project" first so an org with a Special-Projects-style bucket
+      // picks it up. If no bucket matches, the percent is redistributed
+      // across the rest by the renormaliser.
+      { match: "project", percent: 25 },
+      { match: "admin", percent: 40 },
+      { match: "compliance", percent: 15 },
+      { match: "course development", percent: 10 },
+      { match: "direct training", percent: 5 },
+      { match: "pto", percent: 5 },
+    ],
+  },
+  {
+    id: "course-developer",
+    label: "Education developer / instructional designer",
+    description:
+      "For content creators — eLearning module builds, simulation scripts, job aids, video and SCORM authoring. Most time is heads-down design; minimal direct teaching beyond occasional content pilots.",
+    shares: [
+      { match: "course development", percent: 70 },
+      { match: "direct training", percent: 10 },
+      { match: "admin", percent: 10 },
+      { match: "compliance", percent: 5 },
+      { match: "pto", percent: 5 },
+    ],
+  },
 ];
 
 export type AppliedSlate = { bucket_id: string; target_percent: number }[];
