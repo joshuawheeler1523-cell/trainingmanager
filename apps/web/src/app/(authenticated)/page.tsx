@@ -4,7 +4,6 @@ import {
   DocumentPlusIcon,
   FolderPlusIcon,
   CalendarDaysIcon,
-  ExclamationTriangleIcon,
 } from "@heroicons/react/20/solid";
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
@@ -98,10 +97,28 @@ export default async function DashboardPage() {
     return withVal.reduce((acc, c) => acc + (c.utilization_pct ?? 0), 0) / withVal.length;
   })();
 
-  // At-risk: utilization_pct >= 80 (covers at_risk + over_allocated)
-  const atRisk = capacities
-    .filter((c) => c.utilization_pct != null && c.utilization_pct >= 80)
+  // Department lookup so the capacity widget can show context per row.
+  const deptByInstructorId = new Map(activeInstructors.map((i) => [i.id, i.department ?? null]));
+
+  // Capacity bands (thresholds match v_instructor_capacity in the DB):
+  //   over_allocated  ≥ 95
+  //   at_risk         80–94
+  //   balanced        40–79
+  //   under_utilized  < 40
+  type RowWithDept = CapacityRow & { department: string | null };
+  const withDept: RowWithDept[] = capacities
+    .filter((c) => c.utilization_pct != null)
+    .map((c) => ({ ...c, department: deptByInstructorId.get(c.instructor_id) ?? null }));
+
+  const overAllocated = withDept
+    .filter((c) => (c.utilization_pct ?? 0) >= 80)
     .sort((a, b) => (b.utilization_pct ?? 0) - (a.utilization_pct ?? 0));
+  const underUtilized = withDept
+    .filter((c) => (c.utilization_pct ?? 0) < 40)
+    .sort((a, b) => (a.utilization_pct ?? 0) - (b.utilization_pct ?? 0));
+  const balancedCount = withDept.filter(
+    (c) => (c.utilization_pct ?? 0) >= 40 && (c.utilization_pct ?? 0) < 80,
+  ).length;
 
   return (
     <div>
@@ -164,46 +181,44 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* At-risk instructors */}
-          <section className="border-border bg-background rounded-xl border p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-foreground text-sm font-semibold">At-risk instructors</h3>
-              <span className="text-muted-foreground text-xs">
-                {atRisk.length} {atRisk.length === 1 ? "person" : "people"} at 80%+
-              </span>
-            </div>
-            {atRisk.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                No one is over 80% utilization right now.
+        {/* Capacity health — full width */}
+        <section className="border-border bg-background rounded-xl border p-5">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+            <div>
+              <h3 className="text-foreground font-serif text-base tracking-tight">
+                Capacity health
+              </h3>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Where to rebalance assignments first.
               </p>
-            ) : (
-              <ul className="divide-border divide-y">
-                {atRisk.slice(0, 8).map((c) => {
-                  const pct = c.utilization_pct ?? 0;
-                  const color =
-                    pct >= 95 ? "text-destructive" : "text-amber-600 dark:text-amber-400";
-                  return (
-                    <li key={c.instructor_id} className="flex items-center justify-between py-2">
-                      <div className="flex items-center gap-2">
-                        <ExclamationTriangleIcon className={`h-4 w-4 ${color}`} />
-                        <Link
-                          href={`/instructors/${c.instructor_id}`}
-                          className="text-foreground text-sm font-medium hover:underline"
-                        >
-                          {c.full_name}
-                        </Link>
-                      </div>
-                      <span className={`text-sm font-semibold tabular-nums ${color}`}>
-                        {pct.toFixed(0)}%
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
+            </div>
+            <Link href="/instructors" className="text-primary text-xs font-medium hover:underline">
+              View all instructors →
+            </Link>
+          </div>
 
+          <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-2">
+            <CapacityColumn
+              title="Over-allocated"
+              caption="80% and above — at risk of burnout"
+              rows={overAllocated}
+              emptyMessage="Nobody is over 80% utilization right now."
+            />
+            <CapacityColumn
+              title="Under-utilized"
+              caption="Below 40% — available for new work"
+              rows={underUtilized}
+              emptyMessage="Nobody is under 40% utilization right now."
+            />
+          </div>
+
+          <p className="text-muted-foreground border-border mt-5 border-t pt-3 text-xs">
+            <span className="text-foreground font-medium tabular-nums">{balancedCount}</span>{" "}
+            instructor{balancedCount === 1 ? "" : "s"} in the balanced range (40–79%).
+          </p>
+        </section>
+
+        <div className="grid grid-cols-1 gap-6">
           {/* Recent activity */}
           <section className="border-border bg-background rounded-xl border p-4">
             <div className="mb-3 flex items-center justify-between">
@@ -299,5 +314,118 @@ function QuickAction({
       {icon}
       {label}
     </Link>
+  );
+}
+
+type CapacityRowWithDept = CapacityRow & { department: string | null };
+
+function CapacityColumn({
+  title,
+  caption,
+  rows,
+  emptyMessage,
+}: {
+  title: string;
+  caption: string;
+  rows: CapacityRowWithDept[];
+  emptyMessage: string;
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <p className="text-foreground text-xs font-semibold uppercase tracking-[0.08em]">
+          {title}{" "}
+          <span className="text-muted-foreground font-normal normal-case tracking-normal">
+            ({rows.length})
+          </span>
+        </p>
+        <p className="text-muted-foreground text-[11px]">{caption}</p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-muted-foreground py-3 text-sm italic">{emptyMessage}</p>
+      ) : (
+        <ul className="divide-border divide-y">
+          {rows.slice(0, 6).map((r) => (
+            <li key={r.instructor_id} className="py-2.5">
+              <CapacityRowItem row={r} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {rows.length > 6 && (
+        <p className="text-muted-foreground mt-2 text-[11px]">
+          +{rows.length - 6} more — see the instructors page
+        </p>
+      )}
+    </div>
+  );
+}
+
+function bandFor(pct: number): {
+  label: string;
+  fg: string;
+  bg: string;
+} {
+  if (pct >= 95) {
+    return {
+      label: "Over",
+      fg: "var(--destructive)",
+      bg: "color-mix(in oklab, var(--destructive) 18%, transparent)",
+    };
+  }
+  if (pct >= 80) {
+    return {
+      label: "At risk",
+      fg: "var(--highlight)",
+      bg: "color-mix(in oklab, var(--highlight) 30%, transparent)",
+    };
+  }
+  if (pct < 40) {
+    return {
+      label: "Light",
+      fg: "var(--accent)",
+      bg: "color-mix(in oklab, var(--accent) 30%, transparent)",
+    };
+  }
+  return {
+    label: "Healthy",
+    fg: "var(--primary)",
+    bg: "color-mix(in oklab, var(--primary) 18%, transparent)",
+  };
+}
+
+function CapacityRowItem({ row }: { row: CapacityRowWithDept }) {
+  const pct = row.utilization_pct ?? 0;
+  const band = bandFor(pct);
+  // Cap the bar at 110% of the track so over-allocated rows still show
+  // a visible overflow without breaking layout.
+  const fillPct = Math.min(pct, 110);
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(120px,160px)_3.25rem] items-center gap-3">
+      <div className="min-w-0">
+        <Link
+          href={`/instructors/${row.instructor_id}`}
+          className="text-foreground hover:text-primary block truncate text-sm font-medium"
+        >
+          {row.full_name}
+        </Link>
+        {row.department && (
+          <p className="text-muted-foreground truncate text-xs">{row.department}</p>
+        )}
+      </div>
+      <div
+        className="h-1.5 overflow-hidden rounded-full"
+        style={{ backgroundColor: "color-mix(in oklab, var(--border) 70%, transparent)" }}
+        aria-hidden="true"
+      >
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${String(fillPct)}%`, backgroundColor: band.fg }}
+        />
+      </div>
+      <span className="text-right text-sm font-semibold tabular-nums" style={{ color: band.fg }}>
+        {pct.toFixed(0)}%
+      </span>
+    </div>
   );
 }
