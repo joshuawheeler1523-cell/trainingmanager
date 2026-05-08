@@ -2308,6 +2308,119 @@ export type Database = {
           },
         ];
       };
+      report_runs: {
+        Row: {
+          duration_ms: number | null;
+          filters: Json;
+          format: string;
+          id: string;
+          org_id: string;
+          ran_at: string;
+          ran_by: string | null;
+          row_count: number | null;
+          saved_report_id: string | null;
+          slug: string;
+        };
+        Insert: {
+          duration_ms?: number | null;
+          filters?: Json;
+          format: string;
+          id?: string;
+          org_id: string;
+          ran_at?: string;
+          ran_by?: string | null;
+          row_count?: number | null;
+          saved_report_id?: string | null;
+          slug: string;
+        };
+        Update: {
+          duration_ms?: number | null;
+          filters?: Json;
+          format?: string;
+          id?: string;
+          org_id?: string;
+          ran_at?: string;
+          ran_by?: string | null;
+          row_count?: number | null;
+          saved_report_id?: string | null;
+          slug?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "report_runs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "report_runs_saved_report_id_fkey";
+            columns: ["saved_report_id"];
+            isOneToOne: false;
+            referencedRelation: "saved_reports";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      saved_reports: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          filters: Json;
+          id: string;
+          last_run_at: string | null;
+          name: string;
+          org_id: string;
+          org_visibility: boolean;
+          schedule_cron: string | null;
+          slug: string;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          filters?: Json;
+          id?: string;
+          last_run_at?: string | null;
+          name: string;
+          org_id: string;
+          org_visibility?: boolean;
+          schedule_cron?: string | null;
+          slug: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          filters?: Json;
+          id?: string;
+          last_run_at?: string | null;
+          name?: string;
+          org_id?: string;
+          org_visibility?: boolean;
+          schedule_cron?: string | null;
+          slug?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "saved_reports_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       skills: {
         Row: {
           category: string | null;
