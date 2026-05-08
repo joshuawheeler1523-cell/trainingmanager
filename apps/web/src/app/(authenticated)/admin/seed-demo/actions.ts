@@ -50,14 +50,14 @@ export async function seedDemoOrg(): Promise<SeedResult> {
 
     // ── 3. Skills ────────────────────────────────────────────────────────
     const skillSeeds = [
-      { name: "Epic EHR", category: "Clinical Systems" },
-      { name: "Cerner Millennium", category: "Clinical Systems" },
+      { name: "Epic EHR", category: "Clinical Systems", is_certification: false },
+      { name: "Cerner Millennium", category: "Clinical Systems", is_certification: false },
       { name: "Adult ACLS", category: "Certification", is_certification: true },
       { name: "BLS / CPR", category: "Certification", is_certification: true },
-      { name: "Surgical Robotics (da Vinci)", category: "Procedural" },
-      { name: "Trauma & Code Response", category: "Clinical Skills" },
-      { name: "Pediatric Critical Care", category: "Clinical Skills" },
-      { name: "Adult Learning Theory", category: "Education" },
+      { name: "Surgical Robotics (da Vinci)", category: "Procedural", is_certification: false },
+      { name: "Trauma & Code Response", category: "Clinical Skills", is_certification: false },
+      { name: "Pediatric Critical Care", category: "Clinical Skills", is_certification: false },
+      { name: "Adult Learning Theory", category: "Education", is_certification: false },
     ];
     const { data: skills, error: skillErr } = await admin
       .from("skills")
