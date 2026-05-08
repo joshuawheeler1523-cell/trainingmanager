@@ -14,11 +14,16 @@ import {
   taskAssignmentUpdateSchema,
   actionItemInsertSchema,
   actionItemUpdateSchema,
+  milestoneInsertSchema,
+  milestoneUpdateSchema,
+  dependencyInsertSchema,
   type Project,
   type ProjectTeamMember,
   type Task,
   type TaskAssignment,
   type TaskActionItem,
+  type Milestone,
+  type TaskDependency,
 } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 
@@ -391,6 +396,112 @@ export async function deleteActionItem(
 
   const { error } = await c.supabase
     .from("task_action_items")
+    .delete()
+    .eq("id", id)
+    .eq("org_id", c.orgId);
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateProject(projectId);
+  return { ok: true, data: { id } };
+}
+
+// ── milestones ──────────────────────────────────────────────────────────────
+
+export async function createMilestone(
+  projectId: string,
+  input: unknown,
+): Promise<ActionResult<Milestone>> {
+  const parsed = milestoneInsertSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("milestones")
+    .insert({ ...parsed.data, org_id: c.orgId, project_id: projectId })
+    .select()
+    .single();
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateProject(projectId);
+  return { ok: true, data };
+}
+
+export async function updateMilestone(
+  id: string,
+  projectId: string,
+  input: unknown,
+): Promise<ActionResult<Milestone>> {
+  const parsed = milestoneUpdateSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("milestones")
+    .update(
+      stripUndefined(
+        parsed.data as Record<string, unknown>,
+      ) as unknown as TablesUpdate<"milestones">,
+    )
+    .eq("id", id)
+    .eq("org_id", c.orgId)
+    .select()
+    .single();
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateProject(projectId);
+  return { ok: true, data };
+}
+
+export async function deleteMilestone(
+  id: string,
+  projectId: string,
+): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { error } = await c.supabase.from("milestones").delete().eq("id", id).eq("org_id", c.orgId);
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateProject(projectId);
+  return { ok: true, data: { id } };
+}
+
+// ── task_dependencies ──────────────────────────────────────────────────────
+
+export async function createDependency(
+  projectId: string,
+  input: unknown,
+): Promise<ActionResult<TaskDependency>> {
+  const parsed = dependencyInsertSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("task_dependencies")
+    .insert({ ...parsed.data, org_id: c.orgId })
+    .select()
+    .single();
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateProject(projectId);
+  return { ok: true, data: data as TaskDependency };
+}
+
+export async function deleteDependency(
+  id: string,
+  projectId: string,
+): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { error } = await c.supabase
+    .from("task_dependencies")
     .delete()
     .eq("id", id)
     .eq("org_id", c.orgId);

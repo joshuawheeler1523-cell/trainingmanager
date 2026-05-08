@@ -1122,6 +1122,72 @@ export type Database = {
           },
         ];
       };
+      milestones: {
+        Row: {
+          completed_at: string | null;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          due_date: string;
+          id: string;
+          is_complete: boolean;
+          name: string;
+          org_id: string;
+          project_id: string;
+          sort_order: number;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          due_date: string;
+          id?: string;
+          is_complete?: boolean;
+          name: string;
+          org_id: string;
+          project_id: string;
+          sort_order?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          due_date?: string;
+          id?: string;
+          is_complete?: boolean;
+          name?: string;
+          org_id?: string;
+          project_id?: string;
+          sort_order?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "milestones_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "milestones_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       notifications: {
         Row: {
           body: string | null;
@@ -1805,6 +1871,67 @@ export type Database = {
           },
         ];
       };
+      task_dependencies: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          dep_type: string;
+          id: string;
+          lag_days: number;
+          org_id: string;
+          predecessor_id: string;
+          successor_id: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          dep_type?: string;
+          id?: string;
+          lag_days?: number;
+          org_id: string;
+          predecessor_id: string;
+          successor_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          dep_type?: string;
+          id?: string;
+          lag_days?: number;
+          org_id?: string;
+          predecessor_id?: string;
+          successor_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "task_dependencies_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "task_dependencies_predecessor_id_fkey";
+            columns: ["predecessor_id"];
+            isOneToOne: false;
+            referencedRelation: "tasks";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "task_dependencies_successor_id_fkey";
+            columns: ["successor_id"];
+            isOneToOne: false;
+            referencedRelation: "tasks";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tasks: {
         Row: {
           actual_hours: number | null;
@@ -1814,6 +1941,7 @@ export type Database = {
           end_date: string | null;
           estimated_hours: number | null;
           id: string;
+          milestone_id: string | null;
           name: string;
           org_id: string;
           percent_complete: number;
@@ -1834,6 +1962,7 @@ export type Database = {
           end_date?: string | null;
           estimated_hours?: number | null;
           id?: string;
+          milestone_id?: string | null;
           name: string;
           org_id: string;
           percent_complete?: number;
@@ -1854,6 +1983,7 @@ export type Database = {
           end_date?: string | null;
           estimated_hours?: number | null;
           id?: string;
+          milestone_id?: string | null;
           name?: string;
           org_id?: string;
           percent_complete?: number;
@@ -1867,6 +1997,13 @@ export type Database = {
           version?: number;
         };
         Relationships: [
+          {
+            foreignKeyName: "tasks_milestone_id_fkey";
+            columns: ["milestone_id"];
+            isOneToOne: false;
+            referencedRelation: "milestones";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "tasks_org_id_fkey";
             columns: ["org_id"];

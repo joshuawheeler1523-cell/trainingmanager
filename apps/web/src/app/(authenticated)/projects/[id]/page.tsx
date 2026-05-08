@@ -5,11 +5,13 @@ import ProjectDetailClient from "./project-detail-client";
 import {
   projectPercentComplete,
   type Instructor,
+  type Milestone,
   type Project,
   type ProjectTeamMember,
   type Task,
   type TaskActionItem,
   type TaskAssignment,
+  type TaskDependency,
 } from "@arbor/shared";
 
 type Params = Promise<{ id: string }>;
@@ -34,6 +36,8 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
     { data: taskAssignments },
     { data: actionItems },
     { data: instructors },
+    { data: milestones },
+    { data: dependencies },
   ] = await Promise.all([
     supabase
       .from("tasks")
@@ -52,6 +56,13 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
       .is("deleted_at", null)
       .eq("status", "active")
       .order("full_name"),
+    supabase
+      .from("milestones")
+      .select("*")
+      .eq("project_id", id)
+      .eq("org_id", orgId)
+      .order("due_date"),
+    supabase.from("task_dependencies").select("*").eq("org_id", orgId),
   ]);
 
   const tasksList = (tasks ?? []) as Task[];
@@ -59,10 +70,16 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
   const assignmentsAll = (taskAssignments ?? []) as TaskAssignment[];
   const actionItemsAll = (actionItems ?? []) as TaskActionItem[];
   const instructorList = (instructors ?? []) as Instructor[];
+  const milestonesList = (milestones ?? []) as Milestone[];
+  const dependenciesAll = (dependencies ?? []) as TaskDependency[];
 
   const taskIds = new Set(tasksList.map((t) => t.id));
   const projectAssignments = assignmentsAll.filter((a) => taskIds.has(a.task_id));
   const projectActionItems = actionItemsAll.filter((a) => taskIds.has(a.task_id));
+  // Dependencies belong to this project iff both endpoints are in its task set.
+  const projectDependencies = dependenciesAll.filter(
+    (d) => taskIds.has(d.predecessor_id) && taskIds.has(d.successor_id),
+  );
 
   const percentComplete = projectPercentComplete(tasksList);
 
@@ -74,6 +91,8 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
       assignments={projectAssignments}
       actionItems={projectActionItems}
       instructors={instructorList}
+      milestones={milestonesList}
+      dependencies={projectDependencies}
       percentComplete={percentComplete}
     />
   );

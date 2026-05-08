@@ -118,6 +118,7 @@ export const taskInsertSchema = z.object({
   description: emptyToNull,
   status: z.enum(TASK_STATUS_VALUES).default("not_started"),
   priority: z.enum(TASK_PRIORITY_VALUES).default("medium"),
+  milestone_id: optionalUuid,
   start_date: emptyToNull,
   end_date: emptyToNull,
   estimated_hours: z
@@ -141,6 +142,7 @@ export type Task = {
   id: string;
   org_id: string;
   project_id: string;
+  milestone_id: string | null;
   name: string;
   description: string | null;
   status: TaskStatus;
@@ -226,6 +228,70 @@ export function projectPercentComplete(tasks: { percent_complete: number }[]): n
   const sum = tasks.reduce((acc, t) => acc + (t.percent_complete || 0), 0);
   return Math.round(sum / tasks.length);
 }
+
+// ── milestones ──────────────────────────────────────────────────────────────
+
+export const milestoneInsertSchema = z.object({
+  name: z.string().min(1, "Milestone name is required").max(200),
+  description: emptyToNull,
+  due_date: z.string().min(1, "Due date is required"),
+  is_complete: z.coerce.boolean().default(false),
+  sort_order: z.coerce.number().int().default(0),
+});
+
+export const milestoneUpdateSchema = milestoneInsertSchema.partial();
+
+export type MilestoneInput = z.infer<typeof milestoneInsertSchema>;
+export type MilestoneUpdate = z.infer<typeof milestoneUpdateSchema>;
+
+export type Milestone = {
+  id: string;
+  org_id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  due_date: string;
+  is_complete: boolean;
+  completed_at: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+  version: number;
+};
+
+// ── task_dependencies ───────────────────────────────────────────────────────
+
+export const DEP_TYPE_VALUES = [
+  "finish_to_start",
+  "start_to_start",
+  "finish_to_finish",
+  "start_to_finish",
+] as const;
+export type DepType = (typeof DEP_TYPE_VALUES)[number];
+
+export const dependencyInsertSchema = z.object({
+  predecessor_id: z.string().uuid(),
+  successor_id: z.string().uuid(),
+  dep_type: z.enum(DEP_TYPE_VALUES).default("finish_to_start"),
+  lag_days: z.coerce.number().int().default(0),
+});
+
+export type DependencyInput = z.infer<typeof dependencyInsertSchema>;
+
+export type TaskDependency = {
+  id: string;
+  org_id: string;
+  predecessor_id: string;
+  successor_id: string;
+  dep_type: DepType;
+  lag_days: number;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+};
 
 // Status badge → bucket: a task in 'completed' is 100% even if percent_complete
 // wasn't explicitly set. Useful when the UI shows a checkbox + percent slider

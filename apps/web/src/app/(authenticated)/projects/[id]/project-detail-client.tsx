@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeftIcon, PencilIcon } from "@heroicons/react/20/solid";
 import {
   type Instructor,
+  type Milestone,
   type Project,
   type ProjectPriority,
   type ProjectStatus,
@@ -12,12 +13,19 @@ import {
   type Task,
   type TaskActionItem,
   type TaskAssignment,
+  type TaskDependency,
 } from "@arbor/shared";
+import { useIsNarrow } from "@/lib/use-media-query";
 import ProjectFormDialog from "../project-form-dialog";
 import OverviewTab from "./overview-tab";
 import TasksTab from "./tasks-tab";
 import TeamTab from "./team-tab";
 import ActionItemsTab from "./action-items-tab";
+import GanttTab from "./gantt-tab";
+import KanbanTab from "./kanban-tab";
+import CalendarTab from "./calendar-tab";
+import MilestonesTab from "./milestones-tab";
+import DependenciesTab from "./dependencies-tab";
 
 type Props = {
   project: Project;
@@ -26,6 +34,8 @@ type Props = {
   assignments: TaskAssignment[];
   actionItems: TaskActionItem[];
   instructors: Instructor[];
+  milestones: Milestone[];
+  dependencies: TaskDependency[];
   percentComplete: number | null;
 };
 
@@ -66,10 +76,13 @@ export default function ProjectDetailClient({
   assignments,
   actionItems,
   instructors,
+  milestones,
+  dependencies,
   percentComplete,
 }: Props) {
   const [tab, setTab] = useState<TabKey>("overview");
   const [editing, setEditing] = useState(false);
+  const isNarrow = useIsNarrow();
 
   const instructorMap = useMemo(() => {
     return new Map(instructors.map((i) => [i.id, i]));
@@ -81,6 +94,11 @@ export default function ProjectDetailClient({
       instructor: instructorMap.get(m.instructor_id) ?? null,
     }));
   }, [team, instructorMap]);
+
+  // Mobile fallback: Gantt and Calendar are too wide on narrow screens, so
+  // we render Kanban instead. The active tab pill keeps the user's intent
+  // visible — switching the page back to a wider screen restores the view.
+  const effectiveTab: TabKey = isNarrow && (tab === "gantt" || tab === "calendar") ? "kanban" : tab;
 
   return (
     <div>
@@ -155,9 +173,17 @@ export default function ProjectDetailClient({
         </nav>
       </div>
 
+      {/* Mobile fallback notice */}
+      {isNarrow && (tab === "gantt" || tab === "calendar") && (
+        <div className="bg-amber-50 px-6 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+          {tab === "gantt" ? "Gantt" : "Calendar"} is unavailable at this width — showing Kanban
+          instead.
+        </div>
+      )}
+
       {/* Body */}
       <div className="p-6">
-        {tab === "overview" && (
+        {effectiveTab === "overview" && (
           <OverviewTab
             project={project}
             tasks={tasks}
@@ -165,19 +191,57 @@ export default function ProjectDetailClient({
             percentComplete={percentComplete}
           />
         )}
-        {tab === "tasks" && (
+        {effectiveTab === "tasks" && (
           <TasksTab
             project={project}
             tasks={tasks}
             team={teamWithInstructor}
             assignments={assignments}
             actionItems={actionItems}
+            milestones={milestones}
           />
         )}
-        {tab === "team" && (
+        {effectiveTab === "gantt" && (
+          <GanttTab
+            project={project}
+            tasks={tasks}
+            team={teamWithInstructor}
+            assignments={assignments}
+            actionItems={actionItems}
+            milestones={milestones}
+            dependencies={dependencies}
+          />
+        )}
+        {effectiveTab === "kanban" && (
+          <KanbanTab
+            project={project}
+            tasks={tasks}
+            team={teamWithInstructor}
+            assignments={assignments}
+            actionItems={actionItems}
+            milestones={milestones}
+          />
+        )}
+        {effectiveTab === "calendar" && (
+          <CalendarTab
+            project={project}
+            tasks={tasks}
+            team={teamWithInstructor}
+            assignments={assignments}
+            actionItems={actionItems}
+            milestones={milestones}
+          />
+        )}
+        {effectiveTab === "team" && (
           <TeamTab project={project} team={teamWithInstructor} instructors={instructors} />
         )}
-        {tab === "action-items" && (
+        {effectiveTab === "milestones" && (
+          <MilestonesTab project={project} milestones={milestones} />
+        )}
+        {effectiveTab === "dependencies" && (
+          <DependenciesTab project={project} tasks={tasks} dependencies={dependencies} />
+        )}
+        {effectiveTab === "action-items" && (
           <ActionItemsTab
             project={project}
             tasks={tasks}
@@ -185,12 +249,7 @@ export default function ProjectDetailClient({
             actionItems={actionItems}
           />
         )}
-        {tab === "tra" && <TraTab traId={project.source_tra_id} />}
-        {(tab === "gantt" ||
-          tab === "kanban" ||
-          tab === "calendar" ||
-          tab === "milestones" ||
-          tab === "dependencies") && <ComingSoonTab tabName={tab} />}
+        {effectiveTab === "tra" && <TraTab traId={project.source_tra_id} />}
       </div>
 
       {editing && (
@@ -213,17 +272,6 @@ export default function ProjectDetailClient({
           }}
         />
       )}
-    </div>
-  );
-}
-
-function ComingSoonTab({ tabName }: { tabName: string }) {
-  return (
-    <div className="border-border bg-surface flex flex-col items-center rounded-lg border border-dashed p-12 text-center">
-      <p className="text-foreground text-sm font-medium capitalize">{tabName} view</p>
-      <p className="text-muted-foreground mt-1 text-xs">
-        Coming in a later phase. Tasks, team, and action items already wire through to workload.
-      </p>
     </div>
   );
 }

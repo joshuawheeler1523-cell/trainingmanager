@@ -6,33 +6,23 @@ import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import {
   TASK_STATUS_VALUES,
-  type Instructor,
+  type Milestone,
   type Project,
-  type ProjectTeamMember,
   type Task,
   type TaskActionItem,
   type TaskAssignment,
   type TaskStatus,
 } from "@arbor/shared";
-import {
-  createTask,
-  deleteTask,
-  updateTask,
-  assignTaskMember,
-  unassignTaskMember,
-  createActionItem,
-  deleteActionItem,
-  updateActionItem,
-} from "../actions";
-
-type TeamMember = ProjectTeamMember & { instructor: Instructor | null };
+import { createTask, deleteTask, updateTask } from "../actions";
+import TaskDrawer, { type TeamMemberWithInstructor } from "./task-drawer";
 
 type Props = {
   project: Project;
   tasks: Task[];
-  team: TeamMember[];
+  team: TeamMemberWithInstructor[];
   assignments: TaskAssignment[];
   actionItems: TaskActionItem[];
+  milestones: Milestone[];
 };
 
 const STATUS_BADGE: Record<TaskStatus, string> = {
@@ -42,7 +32,14 @@ const STATUS_BADGE: Record<TaskStatus, string> = {
   completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
 };
 
-export default function TasksTab({ project, tasks, team, assignments, actionItems }: Props) {
+export default function TasksTab({
+  project,
+  tasks,
+  team,
+  assignments,
+  actionItems,
+  milestones,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
@@ -70,22 +67,16 @@ export default function TasksTab({ project, tasks, team, assignments, actionItem
     if (status === "completed") patch["percent_complete"] = 100;
     startTransition(async () => {
       const result = await updateTask(t.id, project.id, patch);
-      if (result.ok) {
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) router.refresh();
+      else toast.error(result.error.message);
     });
   }
 
   function handlePercentChange(t: Task, percent: number) {
     startTransition(async () => {
       const result = await updateTask(t.id, project.id, { percent_complete: percent });
-      if (result.ok) {
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) router.refresh();
+      else toast.error(result.error.message);
     });
   }
 
@@ -103,8 +94,6 @@ export default function TasksTab({ project, tasks, team, assignments, actionItem
   }
 
   const openTask = openTaskId ? (tasks.find((t) => t.id === openTaskId) ?? null) : null;
-  const openTaskAssignments = openTask ? assignments.filter((a) => a.task_id === openTask.id) : [];
-  const openTaskActionItems = openTask ? actionItems.filter((a) => a.task_id === openTask.id) : [];
 
   return (
     <div className="space-y-3">
@@ -134,7 +123,7 @@ export default function TasksTab({ project, tasks, team, assignments, actionItem
                 <Th>Status</Th>
                 <Th className="w-32">Progress</Th>
                 <Th>Hours</Th>
-                <Th className="w-12"></Th>
+                <Th className="w-12" />
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
@@ -275,8 +264,9 @@ export default function TasksTab({ project, tasks, team, assignments, actionItem
           project={project}
           task={openTask}
           team={team}
-          assignments={openTaskAssignments}
-          actionItems={openTaskActionItems}
+          assignments={assignments.filter((a) => a.task_id === openTask.id)}
+          actionItems={actionItems.filter((a) => a.task_id === openTask.id)}
+          milestones={milestones}
           onClose={() => {
             setOpenTaskId(null);
           }}
@@ -293,293 +283,5 @@ function Th({ children, className }: { children?: React.ReactNode; className?: s
     >
       {children}
     </th>
-  );
-}
-
-// ── Task drawer (assignments + action items) ────────────────────────────────
-
-function TaskDrawer({
-  project,
-  task,
-  team,
-  assignments,
-  actionItems,
-  onClose,
-}: {
-  project: Project;
-  task: Task;
-  team: TeamMember[];
-  assignments: TaskAssignment[];
-  actionItems: TaskActionItem[];
-  onClose: () => void;
-}) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-
-  const assignedIds = new Set(assignments.map((a) => a.project_team_member_id));
-  const availableMembers = team.filter((m) => !assignedIds.has(m.id));
-
-  const [pickMember, setPickMember] = useState("");
-  const [pickHours, setPickHours] = useState(0);
-
-  const [newItem, setNewItem] = useState("");
-
-  function memberName(memberId: string) {
-    const m = team.find((x) => x.id === memberId);
-    return m?.instructor?.full_name ?? "Unknown";
-  }
-
-  function handleAddAssignment() {
-    if (!pickMember) return;
-    startTransition(async () => {
-      const result = await assignTaskMember(task.id, project.id, {
-        project_team_member_id: pickMember,
-        allocated_hours: pickHours,
-      });
-      if (result.ok) {
-        toast.success("Member assigned");
-        setPickMember("");
-        setPickHours(0);
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
-    });
-  }
-
-  function handleRemoveAssignment(id: string) {
-    startTransition(async () => {
-      const result = await unassignTaskMember(id, project.id);
-      if (result.ok) {
-        toast.success("Removed");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
-    });
-  }
-
-  function handleCreateActionItem() {
-    const description = newItem.trim();
-    if (!description) return;
-    startTransition(async () => {
-      const result = await createActionItem(task.id, project.id, { description });
-      if (result.ok) {
-        setNewItem("");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
-    });
-  }
-
-  function handleToggleActionItem(item: TaskActionItem) {
-    startTransition(async () => {
-      const result = await updateActionItem(item.id, project.id, {
-        is_complete: !item.is_complete,
-      });
-      if (result.ok) {
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
-    });
-  }
-
-  function handleDeleteActionItem(id: string) {
-    startTransition(async () => {
-      const result = await deleteActionItem(id, project.id);
-      if (result.ok) {
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
-    });
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
-      <div
-        className="border-border bg-background flex w-full max-w-xl flex-col border-l shadow-xl"
-        onClick={(e) => {
-          e.stopPropagation();
-        }}
-      >
-        <div className="border-border flex items-start justify-between border-b px-6 py-4">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-foreground truncate text-base font-semibold">{task.name}</h2>
-            <p className="text-muted-foreground mt-0.5 text-xs capitalize">
-              {task.status.replace(/_/g, " ")} · {task.percent_complete.toString()}%
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="text-muted-foreground hover:text-foreground text-2xl leading-none"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-4">
-          {task.description && (
-            <section>
-              <h3 className="text-muted-foreground mb-1 text-xs font-medium uppercase">
-                Description
-              </h3>
-              <p className="text-foreground whitespace-pre-wrap text-sm">{task.description}</p>
-            </section>
-          )}
-
-          {/* Assignments */}
-          <section>
-            <h3 className="text-foreground mb-2 text-sm font-semibold">
-              Assigned ({assignments.length.toString()})
-            </h3>
-            {assignments.length === 0 ? (
-              <p className="text-muted-foreground text-xs">No team members assigned yet.</p>
-            ) : (
-              <ul className="border-border divide-border divide-y rounded-md border">
-                {assignments.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                    <span className="text-foreground">{memberName(a.project_team_member_id)}</span>
-                    <span className="flex items-center gap-3">
-                      <span className="text-muted-foreground text-xs tabular-nums">
-                        {a.allocated_hours.toFixed(1)}h
-                      </span>
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={() => {
-                          handleRemoveAssignment(a.id);
-                        }}
-                        aria-label="Remove assignment"
-                        className="text-muted-foreground hover:text-destructive disabled:opacity-50"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {availableMembers.length > 0 && (
-              <div className="mt-3 flex items-end gap-2">
-                <div className="flex-1">
-                  <p className="text-muted-foreground mb-1 text-xs font-medium">Add member</p>
-                  <select
-                    value={pickMember}
-                    onChange={(e) => {
-                      setPickMember(e.target.value);
-                    }}
-                    className="border-input bg-background text-foreground w-full rounded-md border px-2 py-1.5 text-sm"
-                  >
-                    <option value="">Select…</option>
-                    {availableMembers.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.instructor?.full_name ?? "Unknown"}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="w-24">
-                  <p className="text-muted-foreground mb-1 text-xs font-medium">Hours</p>
-                  <input
-                    type="number"
-                    min={0}
-                    step="1"
-                    value={pickHours}
-                    onChange={(e) => {
-                      setPickHours(Number(e.target.value));
-                    }}
-                    className="border-input bg-background text-foreground w-full rounded-md border px-2 py-1.5 text-sm tabular-nums"
-                  />
-                </div>
-                <button
-                  type="button"
-                  disabled={pending || !pickMember}
-                  onClick={handleAddAssignment}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-                >
-                  <PlusIcon className="h-4 w-4" />
-                  Assign
-                </button>
-              </div>
-            )}
-            {team.length === 0 && (
-              <p className="text-muted-foreground mt-2 text-xs">
-                Add team members in the Team tab to assign them to tasks.
-              </p>
-            )}
-          </section>
-
-          {/* Action items */}
-          <section>
-            <h3 className="text-foreground mb-2 text-sm font-semibold">
-              Action items ({actionItems.length.toString()})
-            </h3>
-            {actionItems.length === 0 ? (
-              <p className="text-muted-foreground text-xs">No action items yet.</p>
-            ) : (
-              <ul className="space-y-1">
-                {actionItems.map((item) => (
-                  <li key={item.id} className="flex items-start gap-2 py-1">
-                    <input
-                      type="checkbox"
-                      checked={item.is_complete}
-                      disabled={pending}
-                      onChange={() => {
-                        handleToggleActionItem(item);
-                      }}
-                      className="mt-0.5"
-                    />
-                    <span
-                      className={`text-foreground flex-1 text-sm ${item.is_complete ? "text-muted-foreground line-through" : ""}`}
-                    >
-                      {item.description}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => {
-                        handleDeleteActionItem(item.id);
-                      }}
-                      aria-label="Delete action item"
-                      className="text-muted-foreground hover:text-destructive disabled:opacity-50"
-                    >
-                      <TrashIcon className="h-3.5 w-3.5" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <div className="mt-2 flex gap-2">
-              <input
-                value={newItem}
-                onChange={(e) => {
-                  setNewItem(e.target.value);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreateActionItem();
-                }}
-                placeholder="Add an action item…"
-                className="border-input bg-background text-foreground flex-1 rounded-md border px-3 py-1.5 text-sm"
-              />
-              <button
-                type="button"
-                disabled={pending || !newItem.trim()}
-                onClick={handleCreateActionItem}
-                className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-              >
-                Add
-              </button>
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
   );
 }

@@ -18,9 +18,12 @@ const {
   updateProject,
   addTeamMember,
   createTask,
+  updateTask,
   assignTaskMember,
   createActionItem,
   updateActionItem,
+  createMilestone,
+  createDependency,
 } = await import("./actions");
 
 const ORG_ID = "aaaaaaaa-0000-0000-0000-000000000000";
@@ -272,5 +275,96 @@ describe("projectPercentComplete + effectiveTaskPercent (pure helpers)", () => {
     const { effectiveTaskPercent } = await import("@arbor/shared");
     expect(effectiveTaskPercent({ status: "completed", percent_complete: 0 })).toBe(100);
     expect(effectiveTaskPercent({ status: "in_progress", percent_complete: 60 })).toBe(60);
+  });
+});
+
+describe("updateTask (Gantt drag → date update)", () => {
+  it("rejects an invalid percent_complete on update", async () => {
+    const result = await updateTask(TASK_ID, PROJECT_ID, { percent_complete: 200 });
+    expect(result.ok).toBe(false);
+  });
+
+  it("succeeds when persisting drag-shifted dates", async () => {
+    mockFrom.mockReturnValue(
+      makeUpdateChain({
+        data: { id: TASK_ID, start_date: "2026-06-01", end_date: "2026-06-10" },
+        error: null,
+      }),
+    );
+    const result = await updateTask(TASK_ID, PROJECT_ID, {
+      start_date: "2026-06-01",
+      end_date: "2026-06-10",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("succeeds when Kanban moves a card to completed", async () => {
+    mockFrom.mockReturnValue(
+      makeUpdateChain({
+        data: { id: TASK_ID, status: "completed", percent_complete: 100 },
+        error: null,
+      }),
+    );
+    const result = await updateTask(TASK_ID, PROJECT_ID, {
+      status: "completed",
+      percent_complete: 100,
+    });
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("createMilestone", () => {
+  it("rejects an empty name", async () => {
+    const result = await createMilestone(PROJECT_ID, { name: "", due_date: "2026-06-15" });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a missing due_date", async () => {
+    const result = await createMilestone(PROJECT_ID, { name: "Pilot kickoff", due_date: "" });
+    expect(result.ok).toBe(false);
+  });
+
+  it("succeeds with a valid milestone", async () => {
+    mockFrom.mockReturnValue(
+      makeInsertChain({
+        data: { id: "ms-1", name: "Pilot kickoff", due_date: "2026-06-15", is_complete: false },
+        error: null,
+      }),
+    );
+    const result = await createMilestone(PROJECT_ID, {
+      name: "Pilot kickoff",
+      due_date: "2026-06-15",
+    });
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("createDependency", () => {
+  it("rejects non-uuid endpoints", async () => {
+    const result = await createDependency(PROJECT_ID, {
+      predecessor_id: "not-a-uuid",
+      successor_id: "also-bad",
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("succeeds with two valid task ids", async () => {
+    mockFrom.mockReturnValue(
+      makeInsertChain({
+        data: {
+          id: "dep-1",
+          predecessor_id: TASK_ID,
+          successor_id: "ffffffff-0000-0000-0000-000000000000",
+          dep_type: "finish_to_start",
+          lag_days: 0,
+        },
+        error: null,
+      }),
+    );
+    const result = await createDependency(PROJECT_ID, {
+      predecessor_id: TASK_ID,
+      successor_id: "ffffffff-0000-0000-0000-000000000000",
+    });
+    expect(result.ok).toBe(true);
   });
 });
