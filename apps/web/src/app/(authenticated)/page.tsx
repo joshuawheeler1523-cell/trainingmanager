@@ -4,6 +4,10 @@ import {
   DocumentPlusIcon,
   FolderPlusIcon,
   CalendarDaysIcon,
+  ClipboardDocumentCheckIcon,
+  BriefcaseIcon,
+  UserGroupIcon,
+  ChartPieIcon,
 } from "@heroicons/react/20/solid";
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
@@ -69,7 +73,14 @@ export default async function DashboardPage() {
     );
   }
 
-  const [{ data: instructors }, { data: capacityRows }, { data: auditRows }] = await Promise.all([
+  const [
+    { data: instructors },
+    { data: capacityRows },
+    { data: auditRows },
+    { count: trasToReview },
+    { count: trasApproved },
+    { count: activeProjectCount },
+  ] = await Promise.all([
     supabase
       .from("instructors")
       .select("*")
@@ -83,6 +94,22 @@ export default async function DashboardPage() {
       .eq("org_id", orgId)
       .order("occurred_at", { ascending: false })
       .limit(10),
+    supabase
+      .from("tras")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "submitted"),
+    supabase
+      .from("tras")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "approved"),
+    supabase
+      .from("projects")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .in("status", ["planning", "active"]),
   ]);
 
   const activeInstructors = (instructors ?? []) as Instructor[];
@@ -90,12 +117,12 @@ export default async function DashboardPage() {
   const recentActivity = (auditRows ?? []) as AuditEntry[];
 
   const instructorCount = activeInstructors.length;
-  const totalAllocationHours = activeInstructors.reduce((acc, i) => acc + i.annual_hours, 0);
   const avgUtilization = (() => {
     const withVal = capacities.filter((c) => c.utilization_pct != null);
     if (withVal.length === 0) return 0;
     return withVal.reduce((acc, c) => acc + (c.utilization_pct ?? 0), 0) / withVal.length;
   })();
+  const trasNeedingAttention = (trasToReview ?? 0) + (trasApproved ?? 0);
 
   // Department lookup so the capacity widget can show context per row.
   const deptByInstructorId = new Map(activeInstructors.map((i) => [i.id, i.department ?? null]));
@@ -128,27 +155,49 @@ export default async function DashboardPage() {
       />
 
       <div className="space-y-6 p-6">
-        {/* Stats row */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatCard
+        {/* KPI strip */}
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <KpiCard
+            href="/tras"
+            icon={<ClipboardDocumentCheckIcon className="h-4 w-4" />}
+            label="TRAs needing attention"
+            value={trasNeedingAttention.toString()}
+            sub={
+              trasNeedingAttention === 0
+                ? "All caught up"
+                : `${String(trasToReview ?? 0)} to review · ${String(trasApproved ?? 0)} ready to convert`
+            }
+            tone={trasNeedingAttention >= 5 ? "warning" : trasNeedingAttention > 0 ? "info" : "ok"}
+          />
+          <KpiCard
+            href="/projects"
+            icon={<BriefcaseIcon className="h-4 w-4" />}
+            label="Active projects"
+            value={(activeProjectCount ?? 0).toString()}
+            sub="planning or in flight"
+            tone="ok"
+          />
+          <KpiCard
+            href="/instructors"
+            icon={<UserGroupIcon className="h-4 w-4" />}
             label="Active instructors"
             value={instructorCount.toString()}
             sub="across all departments"
+            tone="ok"
           />
-          <StatCard
-            label="Total allocation hours"
-            value={totalAllocationHours.toLocaleString()}
-            sub="annual capacity (active only)"
-          />
-          <StatCard
+          <KpiCard
+            href="/instructors"
+            icon={<ChartPieIcon className="h-4 w-4" />}
             label="Average utilization"
             value={`${avgUtilization.toFixed(1)}%`}
             sub={
-              avgUtilization >= 80
-                ? "Watch — approaching cap"
-                : avgUtilization >= 40
-                  ? "Healthy"
-                  : "Light"
+              avgUtilization >= 95
+                ? "Over — at risk of burnout"
+                : avgUtilization >= 80
+                  ? "Watch — approaching cap"
+                  : avgUtilization >= 40
+                    ? "Healthy range"
+                    : "Light — capacity available"
             }
             tone={avgUtilization >= 95 ? "danger" : avgUtilization >= 80 ? "warning" : "ok"}
           />
@@ -271,29 +320,79 @@ export default async function DashboardPage() {
   );
 }
 
-function StatCard({
+type KpiTone = "ok" | "info" | "warning" | "danger";
+
+function kpiToneStyles(tone: KpiTone): { value: string; iconBg: string; iconFg: string } {
+  switch (tone) {
+    case "danger":
+      return {
+        value: "var(--destructive)",
+        iconBg: "color-mix(in oklab, var(--destructive) 14%, transparent)",
+        iconFg: "var(--destructive)",
+      };
+    case "warning":
+      return {
+        value: "var(--highlight)",
+        iconBg: "color-mix(in oklab, var(--highlight) 25%, transparent)",
+        iconFg: "color-mix(in oklab, var(--highlight) 90%, var(--foreground))",
+      };
+    case "info":
+      return {
+        value: "var(--primary)",
+        iconBg: "color-mix(in oklab, var(--primary) 14%, transparent)",
+        iconFg: "var(--primary)",
+      };
+    case "ok":
+    default:
+      return {
+        value: "var(--foreground)",
+        iconBg: "color-mix(in oklab, var(--accent) 22%, transparent)",
+        iconFg: "color-mix(in oklab, var(--accent) 90%, var(--foreground))",
+      };
+  }
+}
+
+function KpiCard({
+  href,
+  icon,
   label,
   value,
   sub,
-  tone = "ok",
+  tone,
 }: {
+  href: string;
+  icon: React.ReactNode;
   label: string;
   value: string;
-  sub?: string;
-  tone?: "ok" | "warning" | "danger";
+  sub: string;
+  tone: KpiTone;
 }) {
-  const valueCls =
-    tone === "danger"
-      ? "text-destructive"
-      : tone === "warning"
-        ? "text-amber-600 dark:text-amber-400"
-        : "text-foreground";
+  const styles = kpiToneStyles(tone);
   return (
-    <div className="border-border bg-background rounded-xl border p-4">
-      <p className="text-muted-foreground text-xs font-medium">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold tabular-nums ${valueCls}`}>{value}</p>
-      {sub && <p className="text-muted-foreground mt-0.5 text-xs">{sub}</p>}
-    </div>
+    <Link
+      href={href}
+      className="border-border bg-background hover:border-primary group block rounded-xl border p-4 transition-colors"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-muted-foreground text-xs font-medium uppercase tracking-[0.06em]">
+          {label}
+        </p>
+        <span
+          aria-hidden="true"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+          style={{ backgroundColor: styles.iconBg, color: styles.iconFg }}
+        >
+          {icon}
+        </span>
+      </div>
+      <p
+        className="mt-2 font-serif text-3xl tabular-nums tracking-tight"
+        style={{ color: styles.value }}
+      >
+        {value}
+      </p>
+      <p className="text-muted-foreground mt-1 text-xs">{sub}</p>
+    </Link>
   );
 }
 
