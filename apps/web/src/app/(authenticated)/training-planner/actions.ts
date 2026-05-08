@@ -21,7 +21,6 @@ import {
   type ImplModule,
   type ImplClass,
   type ImplClassPrerequisite,
-  type ImplClassTrainer,
 } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 
@@ -507,28 +506,6 @@ export async function removeClassPrerequisite(
 export async function setStep(id: string, step: number): Promise<ActionResult<Implementation>> {
   return updateImpl(id, { current_step: step });
 }
-
-// Used by tests + dev to assert the data that the next step requires is
-// present. Callers should run this before navigating forward.
-export type ImplReadiness = {
-  hasSetup: boolean;
-  hasRooms: boolean;
-  hasTrainers: boolean;
-  hasModules: boolean;
-  hasClasses: boolean;
-  canCalculate: boolean;
-};
-
-// Dummy helper so TS exports are stable; the real readiness is computed in
-// the layout from server-fetched counts.
-export function _readinessExportMarker(): "ok" {
-  return "ok";
-}
-
-export type {
-  ImplClassPrerequisite as _ImplClassPrerequisite,
-  ImplClassTrainer as _ImplClassTrainer,
-};
 
 // ── schedule generator ─────────────────────────────────────────────────────
 
