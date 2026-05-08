@@ -3075,6 +3075,7 @@ export type Database = {
       };
     };
     Functions: {
+      accept_invitation: { Args: { p_token: string }; Returns: string };
       apply_standard_triggers: {
         Args: { p_table_name: string };
         Returns: undefined;
@@ -3117,6 +3118,19 @@ export type Database = {
         }[];
       };
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean };
+      lookup_invitation_by_token: {
+        Args: { p_token: string };
+        Returns: {
+          accepted_at: string;
+          email: string;
+          expires_at: string;
+          invitation_id: string;
+          org_id: string;
+          org_name: string;
+          role: string;
+          visibility: string;
+        }[];
+      };
       notify_aging_requests: { Args: never; Returns: undefined };
       notify_expiring_certifications: { Args: never; Returns: undefined };
       proficiency_rank: { Args: { p_proficiency: string }; Returns: number };
