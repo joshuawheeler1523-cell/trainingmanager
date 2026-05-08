@@ -8,9 +8,10 @@ import { logout } from "@/app/(authenticated)/actions";
 type Props = {
   email: string;
   name: string;
+  isAdmin: boolean;
 };
 
-export default function ProfileMenu({ email, name }: Props) {
+export default function ProfileMenu({ email, name, isAdmin }: Props) {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
@@ -41,6 +42,29 @@ export default function ProfileMenu({ email, name }: Props) {
               My Tickets
             </Link>
           </DropdownMenu.Item>
+
+          <DropdownMenu.Item asChild>
+            <Link
+              href="/account/notifications"
+              className="text-foreground hover:bg-surface focus:bg-surface flex cursor-pointer items-center rounded-md px-3 py-1.5 text-sm outline-none"
+            >
+              Notifications
+            </Link>
+          </DropdownMenu.Item>
+
+          {isAdmin && (
+            <>
+              <DropdownMenu.Separator className="bg-border my-1 h-px" />
+              <DropdownMenu.Item asChild>
+                <Link
+                  href="/admin"
+                  className="text-foreground hover:bg-surface focus:bg-surface flex cursor-pointer items-center rounded-md px-3 py-1.5 text-sm outline-none"
+                >
+                  Organization admin
+                </Link>
+              </DropdownMenu.Item>
+            </>
+          )}
 
           <DropdownMenu.Item asChild>
             <Link

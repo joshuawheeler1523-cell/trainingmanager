@@ -10,15 +10,27 @@ import ProfileMenu from "./profile-menu";
 import MobileNav from "./mobile-nav";
 import CommandPalette from "./command-palette";
 import HelpDrawer from "./help-drawer";
+import NotificationBell, { type NotificationRow } from "./notification-bell";
 
 type Props = {
   children: React.ReactNode;
   orgSwitcherSlot: React.ReactNode;
   userEmail: string;
   userName: string;
+  userId: string;
+  isAdmin: boolean;
+  initialNotifications: NotificationRow[];
 };
 
-export default function AppShell({ children, orgSwitcherSlot, userEmail, userName }: Props) {
+export default function AppShell({
+  children,
+  orgSwitcherSlot,
+  userEmail,
+  userName,
+  userId,
+  isAdmin,
+  initialNotifications,
+}: Props) {
   const [commandOpen, setCommandOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -58,8 +70,9 @@ export default function AppShell({ children, orgSwitcherSlot, userEmail, userNam
           <PrimaryNav />
         </div>
 
-        {/* Right: help + profile + mobile trigger */}
+        {/* Right: bell + help + profile + mobile trigger */}
         <div className="flex items-center gap-1">
+          <NotificationBell initial={initialNotifications} userId={userId} />
           <button
             onClick={() => {
               setHelpOpen(true);
@@ -71,7 +84,7 @@ export default function AppShell({ children, orgSwitcherSlot, userEmail, userNam
             <QuestionMarkCircleIcon className="h-5 w-5" />
           </button>
 
-          <ProfileMenu email={userEmail} name={userName} />
+          <ProfileMenu email={userEmail} name={userName} isAdmin={isAdmin} />
           <MobileNav />
         </div>
       </header>

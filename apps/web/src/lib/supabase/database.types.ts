@@ -2474,6 +2474,119 @@ export type Database = {
           },
         ];
       };
+      support_ticket_messages: {
+        Row: {
+          author_id: string | null;
+          author_kind: string;
+          body: string;
+          created_at: string;
+          id: string;
+          org_id: string;
+          ticket_id: string;
+        };
+        Insert: {
+          author_id?: string | null;
+          author_kind: string;
+          body: string;
+          created_at?: string;
+          id?: string;
+          org_id: string;
+          ticket_id: string;
+        };
+        Update: {
+          author_id?: string | null;
+          author_kind?: string;
+          body?: string;
+          created_at?: string;
+          id?: string;
+          org_id?: string;
+          ticket_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_messages_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "support_ticket_messages_ticket_id_fkey";
+            columns: ["ticket_id"];
+            isOneToOne: false;
+            referencedRelation: "support_tickets";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      support_tickets: {
+        Row: {
+          category: string;
+          created_at: string;
+          created_by: string | null;
+          description: string;
+          id: string;
+          last_message_at: string;
+          last_message_by: string;
+          org_id: string;
+          priority: string;
+          status: string;
+          subject: string;
+          unread_for_admin: boolean;
+          unread_for_user: boolean;
+          updated_at: string;
+          updated_by: string | null;
+          user_id: string;
+          version: number;
+        };
+        Insert: {
+          category?: string;
+          created_at?: string;
+          created_by?: string | null;
+          description: string;
+          id?: string;
+          last_message_at?: string;
+          last_message_by?: string;
+          org_id: string;
+          priority?: string;
+          status?: string;
+          subject: string;
+          unread_for_admin?: boolean;
+          unread_for_user?: boolean;
+          updated_at?: string;
+          updated_by?: string | null;
+          user_id: string;
+          version?: number;
+        };
+        Update: {
+          category?: string;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string;
+          id?: string;
+          last_message_at?: string;
+          last_message_by?: string;
+          org_id?: string;
+          priority?: string;
+          status?: string;
+          subject?: string;
+          unread_for_admin?: boolean;
+          unread_for_user?: boolean;
+          updated_at?: string;
+          updated_by?: string | null;
+          user_id?: string;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       task_action_items: {
         Row: {
           assigned_to_team_member_id: string | null;
@@ -3131,6 +3244,8 @@ export type Database = {
           visibility: string;
         }[];
       };
+      mark_all_notifications_read: { Args: never; Returns: number };
+      mark_notification_read: { Args: { p_id: string }; Returns: number };
       notify_aging_requests: { Args: never; Returns: undefined };
       notify_expiring_certifications: { Args: never; Returns: undefined };
       proficiency_rank: { Args: { p_proficiency: string }; Returns: number };
