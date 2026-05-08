@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useHotkeys } from "react-hotkeys-hook";
 import { QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
 import PrimaryNav from "./primary-nav";
@@ -59,23 +60,22 @@ export default function AppShell({
       </a>
 
       {/* Top bar */}
-      <header className="border-border bg-background sticky top-0 z-30 flex h-12 items-center gap-3 border-b px-4">
+      <header className="border-border bg-background sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-4">
         {/* Left: logo + org switcher */}
         <div className="flex items-center gap-3">
-          <Link href="/" className="group flex items-center gap-2" aria-label="Arbor home">
-            <span
-              aria-hidden="true"
-              className="relative inline-flex h-6 w-6 items-center justify-center rounded-full transition-transform group-hover:scale-105"
-              style={{ backgroundColor: "var(--primary)" }}
-            >
-              <span
-                className="font-serif text-[11px] font-semibold leading-none"
-                style={{ color: "var(--highlight)" }}
-              >
-                A
-              </span>
-            </span>
-            <span className="text-foreground font-serif text-base tracking-tight">Arbor</span>
+          <Link
+            href="/"
+            className="group inline-flex items-center transition-transform hover:scale-[1.02]"
+            aria-label="Arbor home"
+          >
+            <Image
+              src="/branding/arbor-mark.png"
+              alt="Arbor"
+              width={160}
+              height={160}
+              priority
+              className="h-12 w-auto"
+            />
           </Link>
           <span className="text-border">·</span>
           {orgSwitcherSlot}
