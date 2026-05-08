@@ -7,5 +7,6 @@ export * from "./schemas/task";
 export * from "./queries/workload";
 export * from "./queries/recommendations";
 export * from "./schemas/tra";
+export * from "./schemas/education-request";
 export * from "./types";
 export * from "./utils/slug";

@@ -536,6 +536,229 @@ export type Database = {
           },
         ];
       };
+      education_request_assignments: {
+        Row: {
+          actual_hours: number | null;
+          completed_at: string | null;
+          created_at: string;
+          created_by: string | null;
+          estimated_hours: number;
+          id: string;
+          instructor_id: string;
+          org_id: string;
+          request_id: string;
+          started_at: string | null;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          actual_hours?: number | null;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          estimated_hours: number;
+          id?: string;
+          instructor_id: string;
+          org_id: string;
+          request_id: string;
+          started_at?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          actual_hours?: number | null;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          estimated_hours?: number;
+          id?: string;
+          instructor_id?: string;
+          org_id?: string;
+          request_id?: string;
+          started_at?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "education_request_assignments_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "education_request_assignments_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
+            foreignKeyName: "education_request_assignments_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "education_request_assignments_request_id_fkey";
+            columns: ["request_id"];
+            isOneToOne: false;
+            referencedRelation: "education_requests";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      education_request_history: {
+        Row: {
+          actor_id: string | null;
+          comment: string | null;
+          from_status: string | null;
+          id: number;
+          occurred_at: string;
+          org_id: string;
+          request_id: string;
+          to_status: string;
+        };
+        Insert: {
+          actor_id?: string | null;
+          comment?: string | null;
+          from_status?: string | null;
+          id?: never;
+          occurred_at?: string;
+          org_id: string;
+          request_id: string;
+          to_status: string;
+        };
+        Update: {
+          actor_id?: string | null;
+          comment?: string | null;
+          from_status?: string | null;
+          id?: never;
+          occurred_at?: string;
+          org_id?: string;
+          request_id?: string;
+          to_status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "education_request_history_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "education_request_history_request_id_fkey";
+            columns: ["request_id"];
+            isOneToOne: false;
+            referencedRelation: "education_requests";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      education_requests: {
+        Row: {
+          business_justification: string | null;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          id: string;
+          linked_project_id: string | null;
+          linked_tra_id: string | null;
+          org_id: string;
+          public_form_token: string | null;
+          requested_by_department: string | null;
+          requested_by_email: string | null;
+          requested_by_name: string;
+          review_notes: string | null;
+          status: string;
+          submitted_via: string;
+          target_audience: string | null;
+          target_completion_date: string | null;
+          title: string;
+          updated_at: string;
+          updated_by: string | null;
+          urgency: string;
+        };
+        Insert: {
+          business_justification?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          id?: string;
+          linked_project_id?: string | null;
+          linked_tra_id?: string | null;
+          org_id: string;
+          public_form_token?: string | null;
+          requested_by_department?: string | null;
+          requested_by_email?: string | null;
+          requested_by_name: string;
+          review_notes?: string | null;
+          status?: string;
+          submitted_via?: string;
+          target_audience?: string | null;
+          target_completion_date?: string | null;
+          title: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          urgency?: string;
+        };
+        Update: {
+          business_justification?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          id?: string;
+          linked_project_id?: string | null;
+          linked_tra_id?: string | null;
+          org_id?: string;
+          public_form_token?: string | null;
+          requested_by_department?: string | null;
+          requested_by_email?: string | null;
+          requested_by_name?: string;
+          review_notes?: string | null;
+          status?: string;
+          submitted_via?: string;
+          target_audience?: string | null;
+          target_completion_date?: string | null;
+          title?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          urgency?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "education_requests_linked_project_id_fkey";
+            columns: ["linked_project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "education_requests_linked_tra_id_fkey";
+            columns: ["linked_tra_id"];
+            isOneToOne: false;
+            referencedRelation: "tras";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "education_requests_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "education_requests_public_form_token_fkey";
+            columns: ["public_form_token"];
+            isOneToOne: false;
+            referencedRelation: "public_intake_links";
+            referencedColumns: ["token"];
+          },
+        ];
+      };
       feature_flags: {
         Row: {
           created_at: string;
@@ -1167,6 +1390,47 @@ export type Database = {
           },
         ];
       };
+      public_intake_links: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          expires_at: string | null;
+          id: string;
+          is_active: boolean;
+          label: string | null;
+          org_id: string;
+          token: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          is_active?: boolean;
+          label?: string | null;
+          org_id: string;
+          token?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          expires_at?: string | null;
+          id?: string;
+          is_active?: boolean;
+          label?: string | null;
+          org_id?: string;
+          token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "public_intake_links_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       recurring_task_assignments: {
         Row: {
           created_at: string;
@@ -1730,6 +1994,7 @@ export type Database = {
         }[];
       };
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean };
+      notify_aging_requests: { Args: never; Returns: undefined };
       notify_expiring_certifications: { Args: never; Returns: undefined };
       proficiency_rank: { Args: { p_proficiency: string }; Returns: number };
       qualified_instructors_for_class: {

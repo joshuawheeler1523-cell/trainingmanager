@@ -631,6 +631,12 @@ function WorkloadTab({
         rows={grouped.ad_hoc_task}
         emptyMessage="No active ad-hoc tasks. (Done/cancelled tasks are excluded from workload.)"
       />
+      <SourceSection
+        title="Education requests"
+        total={totalSourceHours("education_request")}
+        rows={grouped.education_request}
+        emptyMessage="No assigned education requests. Assign this instructor in /request-queue."
+      />
 
       {/* Placeholders for sources that ship in later phases */}
       <DeferredSourceSection
@@ -640,10 +646,6 @@ function WorkloadTab({
       <DeferredSourceSection
         title="Project tasks"
         message="Project task assignments will appear here once the projects module ships."
-      />
-      <DeferredSourceSection
-        title="Education requests"
-        message="Education request assignments will appear here once that module ships."
       />
     </div>
   );

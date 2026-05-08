@@ -16,7 +16,7 @@ const MONTHLY = 12;
 const QUARTERLY = 4;
 const ANNUALLY = 1;
 
-export type WorkloadSource = "class" | "recurring_task" | "ad_hoc_task";
+export type WorkloadSource = "class" | "recurring_task" | "ad_hoc_task" | "education_request";
 
 export type WorkloadRow = {
   org_id: string;
@@ -52,6 +52,7 @@ export function groupWorkloadBySource(rows: WorkloadRow[]): Record<WorkloadSourc
     class: [],
     recurring_task: [],
     ad_hoc_task: [],
+    education_request: [],
   };
   for (const r of rows) {
     out[r.source].push(r);
