@@ -47,6 +47,7 @@ export default function TrasView({ tras, departments }: Props) {
           <div>
             <p className="text-muted-foreground mb-1 text-xs font-medium">Status</p>
             <select
+              aria-label="Filter by status"
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value as TraStatus | "all");
@@ -64,6 +65,7 @@ export default function TrasView({ tras, departments }: Props) {
           <div>
             <p className="text-muted-foreground mb-1 text-xs font-medium">Department</p>
             <select
+              aria-label="Filter by department"
               value={departmentFilter}
               onChange={(e) => {
                 setDepartmentFilter(e.target.value);

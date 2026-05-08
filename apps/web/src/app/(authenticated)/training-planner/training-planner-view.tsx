@@ -57,6 +57,7 @@ export default function TrainingPlannerView({ implementations }: Props) {
         <div>
           <p className="text-muted-foreground mb-1 text-xs font-medium">Status</p>
           <select
+            aria-label="Filter by status"
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value as ImplStatus | "all");
@@ -74,6 +75,7 @@ export default function TrainingPlannerView({ implementations }: Props) {
 
         <div className="flex items-end gap-2">
           <input
+            aria-label="New implementation name"
             value={name}
             onChange={(e) => {
               setName(e.target.value);

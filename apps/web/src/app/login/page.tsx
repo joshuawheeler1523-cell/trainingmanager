@@ -56,8 +56,14 @@ export default function LoginPage() {
         {mode === "magic" ? (
           <form action={magicAction} className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+              <label
+                htmlFor="login-magic-email"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                Email
+              </label>
               <input
+                id="login-magic-email"
                 name="email"
                 type="email"
                 required
@@ -79,8 +85,14 @@ export default function LoginPage() {
         ) : (
           <form action={passAction} className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+              <label
+                htmlFor="login-password-email"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                Email
+              </label>
               <input
+                id="login-password-email"
                 name="email"
                 type="email"
                 required
@@ -89,8 +101,14 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Password</label>
+              <label
+                htmlFor="login-password-password"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                Password
+              </label>
               <input
+                id="login-password-password"
                 name="password"
                 type="password"
                 required

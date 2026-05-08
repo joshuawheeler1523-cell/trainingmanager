@@ -58,6 +58,7 @@ export default function ProjectsView({ projects }: Props) {
           <div>
             <p className="text-muted-foreground mb-1 text-xs font-medium">Status</p>
             <select
+              aria-label="Filter by status"
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value as ProjectStatus | "all");
@@ -75,6 +76,7 @@ export default function ProjectsView({ projects }: Props) {
           <div>
             <p className="text-muted-foreground mb-1 text-xs font-medium">Priority</p>
             <select
+              aria-label="Filter by priority"
               value={priorityFilter}
               onChange={(e) => {
                 setPriorityFilter(e.target.value as ProjectPriority | "all");

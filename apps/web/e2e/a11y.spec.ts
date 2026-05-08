@@ -29,7 +29,6 @@ test("a11y: /login has no axe violations", async ({ page }) => {
   await page.waitForLoadState("networkidle");
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .disableRules(["color-contrast"])
     .analyze();
   expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
 });
