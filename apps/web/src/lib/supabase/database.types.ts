@@ -1492,6 +1492,7 @@ export type Database = {
       };
       tras: {
         Row: {
+          adjustments_notes: string | null;
           ai_assistant_used: boolean;
           business_justification: string | null;
           converted_to_project_id: string | null;
@@ -1512,6 +1513,7 @@ export type Database = {
           urgency: string;
         };
         Insert: {
+          adjustments_notes?: string | null;
           ai_assistant_used?: boolean;
           business_justification?: string | null;
           converted_to_project_id?: string | null;
@@ -1532,6 +1534,7 @@ export type Database = {
           urgency?: string;
         };
         Update: {
+          adjustments_notes?: string | null;
           ai_assistant_used?: boolean;
           business_justification?: string | null;
           converted_to_project_id?: string | null;

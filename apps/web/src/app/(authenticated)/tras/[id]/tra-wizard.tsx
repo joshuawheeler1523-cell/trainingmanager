@@ -1,0 +1,240 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import {
+  CheckCircleIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  SparklesIcon,
+} from "@heroicons/react/20/solid";
+import PageHeader from "@/components/ui/page-header";
+import StepInfo from "./step-info";
+import StepDeliverables from "./step-deliverables";
+import StepReview from "./step-review";
+import StepDocument from "./step-document";
+import AiAssistantPanel from "./ai-assistant-panel";
+import { submitTra, approveTra, rejectTra, convertTraToProject } from "../actions";
+import type { DeliverableType, Tra, TraDeliverable, TraStatus } from "@arbor/shared";
+
+type Step = 1 | 2 | 3 | 4;
+
+const STEPS: { id: Step; label: string }[] = [
+  { id: 1, label: "Project information" },
+  { id: 2, label: "Deliverables" },
+  { id: 3, label: "Review & calculate" },
+  { id: 4, label: "Generate document" },
+];
+
+const STATUS_BADGE: Record<TraStatus, string> = {
+  draft: "bg-surface text-muted-foreground",
+  submitted: "bg-primary/10 text-primary",
+  approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  converted: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
+  rejected: "bg-destructive/10 text-destructive",
+};
+
+type Props = {
+  tra: Tra;
+  deliverables: TraDeliverable[];
+  deliverableTypes: DeliverableType[];
+  aiAssistantEnabled: boolean;
+};
+
+export default function TraWizard({
+  tra,
+  deliverables,
+  deliverableTypes,
+  aiAssistantEnabled,
+}: Props) {
+  const router = useRouter();
+  const [step, setStep] = useState<Step>(1);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  const isLocked = tra.status === "converted" || tra.status === "approved";
+
+  function handleSubmit() {
+    startTransition(async () => {
+      const r = await submitTra(tra.id);
+      if (r.ok) {
+        toast.success("Submitted for approval");
+        router.refresh();
+      } else {
+        toast.error(r.error.message);
+      }
+    });
+  }
+
+  function handleApprove() {
+    startTransition(async () => {
+      const r = await approveTra(tra.id);
+      if (r.ok) {
+        toast.success("TRA approved");
+        router.refresh();
+      } else {
+        toast.error(r.error.message);
+      }
+    });
+  }
+
+  function handleReject() {
+    startTransition(async () => {
+      const r = await rejectTra(tra.id);
+      if (r.ok) {
+        toast.success("TRA rejected");
+        router.refresh();
+      } else {
+        toast.error(r.error.message);
+      }
+    });
+  }
+
+  function handleConvert() {
+    startTransition(async () => {
+      const result = await convertTraToProject(tra.id);
+      if (result.ok) {
+        toast.success(`Converted — ${String(result.data.task_count)} tasks created`);
+        router.push(`/projects/${result.data.project_id}`);
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title={tra.project_name}
+        description={
+          tra.requesting_department
+            ? `Training Request Assessment · ${tra.requesting_department}`
+            : "Training Request Assessment"
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_BADGE[tra.status]}`}
+            >
+              {tra.status}
+            </span>
+            {aiAssistantEnabled && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAiOpen(true);
+                }}
+                className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs"
+              >
+                <SparklesIcon className="h-3.5 w-3.5" />
+                AI assistant
+              </button>
+            )}
+          </div>
+        }
+      />
+
+      {/* Step indicator */}
+      <div className="border-border bg-background border-b px-6 py-3">
+        <ol className="flex flex-wrap gap-2">
+          {STEPS.map((s) => (
+            <li key={s.id} className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(s.id);
+                }}
+                className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                  step === s.id
+                    ? "bg-primary text-primary-foreground"
+                    : step > s.id
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+                      : "bg-surface text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="tabular-nums">
+                  {step > s.id ? <CheckCircleIcon className="h-3.5 w-3.5" /> : s.id}
+                </span>
+                <span>{s.label}</span>
+              </button>
+              {s.id < STEPS.length && (
+                <ChevronRightIcon className="text-muted-foreground h-3 w-3" />
+              )}
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="p-6">
+        {step === 1 && <StepInfo tra={tra} disabled={isLocked} />}
+        {step === 2 && (
+          <StepDeliverables
+            traId={tra.id}
+            deliverables={deliverables}
+            deliverableTypes={deliverableTypes}
+            disabled={isLocked}
+          />
+        )}
+        {step === 3 && (
+          <StepReview
+            tra={tra}
+            deliverables={deliverables}
+            deliverableTypes={deliverableTypes}
+            disabled={isLocked}
+          />
+        )}
+        {step === 4 && (
+          <StepDocument
+            tra={tra}
+            deliverables={deliverables}
+            deliverableTypes={deliverableTypes}
+            pending={pending}
+            onSubmit={handleSubmit}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onConvert={handleConvert}
+          />
+        )}
+      </div>
+
+      {/* Footer nav */}
+      <div className="border-border bg-background sticky bottom-0 flex items-center justify-between border-t px-6 py-3">
+        <button
+          type="button"
+          disabled={step === 1}
+          onClick={() => {
+            setStep((s) => (s - 1) as Step);
+          }}
+          className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+          Back
+        </button>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          Step {step} of {STEPS.length}
+        </span>
+        <button
+          type="button"
+          disabled={step === 4}
+          onClick={() => {
+            setStep((s) => (s + 1) as Step);
+          }}
+          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+        >
+          Next
+          <ChevronRightIcon className="h-4 w-4" />
+        </button>
+      </div>
+
+      {aiOpen && (
+        <AiAssistantPanel
+          onClose={() => {
+            setAiOpen(false);
+          }}
+          enabled={aiAssistantEnabled}
+        />
+      )}
+    </div>
+  );
+}

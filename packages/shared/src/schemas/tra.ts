@@ -50,6 +50,7 @@ export const traInsertSchema = z.object({
   business_justification: emptyToNull,
   target_audience: emptyToNull,
   urgency: z.enum(TRA_URGENCY_VALUES).default("standard"),
+  adjustments_notes: emptyToNull,
   ai_assistant_used: z.boolean().default(false),
 });
 
@@ -71,6 +72,7 @@ export type Tra = {
   urgency: TraUrgency;
   status: TraStatus;
   total_estimated_hours: number;
+  adjustments_notes: string | null;
   converted_to_project_id: string | null;
   ai_assistant_used: boolean;
   created_at: string;
