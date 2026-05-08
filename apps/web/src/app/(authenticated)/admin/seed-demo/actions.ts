@@ -67,16 +67,20 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     const skillByName = new Map(skills.map((s) => [s.name, s.id]));
 
     // ── 4. Instructors ───────────────────────────────────────────────────
+    // Capacity narrative for the demo: a few part-time educators dedicated to
+    // a specific program land in the over-allocated / at-risk bands so the
+    // dashboard shows realistic variety; the rest are full-time but
+    // under-loaded (typical for an internal ed team that has slack).
     const instructorSeeds: { full_name: string; department: string; annual_hours: number }[] = [
-      { full_name: "Maya Castellanos", department: "Nursing Education", annual_hours: 2080 },
-      { full_name: "Devon Park", department: "Nursing Education", annual_hours: 2080 },
-      { full_name: "Aisha Bello", department: "Nursing Education", annual_hours: 1872 },
+      { full_name: "Maya Castellanos", department: "Nursing Education", annual_hours: 600 },
+      { full_name: "Devon Park", department: "Nursing Education", annual_hours: 58 },
+      { full_name: "Aisha Bello", department: "Nursing Education", annual_hours: 500 },
       { full_name: "Tomás Rivera", department: "Clinical Informatics", annual_hours: 2080 },
       { full_name: "Sasha Petrov", department: "Clinical Informatics", annual_hours: 2080 },
-      { full_name: "Priya Chandrasekaran", department: "Surgery", annual_hours: 2080 },
+      { full_name: "Priya Chandrasekaran", department: "Surgery", annual_hours: 150 },
       { full_name: "Marcus Webb", department: "Surgery", annual_hours: 1664 },
-      { full_name: "Hannah O'Connor", department: "Emergency", annual_hours: 2080 },
-      { full_name: "Reggie Strand", department: "Emergency", annual_hours: 2080 },
+      { full_name: "Hannah O'Connor", department: "Emergency", annual_hours: 200 },
+      { full_name: "Reggie Strand", department: "Emergency", annual_hours: 280 },
       { full_name: "Nadia Haddad", department: "Pediatrics", annual_hours: 2080 },
       { full_name: "Quentin Reyes", department: "Compliance & Quality", annual_hours: 2080 },
       { full_name: "Linnea Forsberg", department: "Compliance & Quality", annual_hours: 1872 },
@@ -316,6 +320,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           prep_hours_per_offering: 4,
           logistics_hours_per_offering: 2,
           status: "active",
+          hours_per_day: 8,
           allocation_bucket_id: bucketByName.get("Direct Training")!,
         },
         {
@@ -326,6 +331,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           prep_hours_per_offering: 6,
           logistics_hours_per_offering: 4,
           status: "active",
+          hours_per_day: 8,
           allocation_bucket_id: bucketByName.get("Direct Training")!,
         },
         {
@@ -336,6 +342,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           prep_hours_per_offering: 3,
           logistics_hours_per_offering: 2,
           status: "active",
+          hours_per_day: 8,
           allocation_bucket_id: bucketByName.get("Direct Training")!,
         },
         {
@@ -346,6 +353,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           prep_hours_per_offering: 4,
           logistics_hours_per_offering: 3,
           status: "active",
+          hours_per_day: 8,
           allocation_bucket_id: bucketByName.get("Direct Training")!,
         },
         {
@@ -356,6 +364,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           prep_hours_per_offering: 1,
           logistics_hours_per_offering: 1,
           status: "active",
+          hours_per_day: 8,
           allocation_bucket_id: bucketByName.get("Direct Training")!,
         },
       ])
