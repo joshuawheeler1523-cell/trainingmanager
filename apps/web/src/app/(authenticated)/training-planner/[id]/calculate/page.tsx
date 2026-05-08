@@ -9,31 +9,38 @@ import {
   type ImplTrainer,
   type Implementation,
 } from "@arbor/shared";
+import GenerateButton from "./generate-button";
 
 type Params = Promise<{ id: string }>;
-
-// Step 6 placeholder. Phase 7.2 will replace this with the live capacity
-// calculator + session-generation RPC. For now, we surface the inputs and a
-// rough utilization preview so users see what the calculator will run on.
 
 export default async function CalculatePage({ params }: { params: Params }) {
   const { id } = await params;
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) notFound();
 
-  const [{ data: impl }, { data: rooms }, { data: trainers }, { data: classes }] =
-    await Promise.all([
-      supabase
-        .from("implementations")
-        .select("*")
-        .eq("id", id)
-        .eq("org_id", orgId)
-        .is("deleted_at", null)
-        .maybeSingle(),
-      supabase.from("impl_rooms").select("*").eq("implementation_id", id).eq("org_id", orgId),
-      supabase.from("impl_trainers").select("*").eq("implementation_id", id).eq("org_id", orgId),
-      supabase.from("impl_classes").select("*").eq("implementation_id", id).eq("org_id", orgId),
-    ]);
+  const [
+    { data: impl },
+    { data: rooms },
+    { data: trainers },
+    { data: classes },
+    { count: sessionCount },
+  ] = await Promise.all([
+    supabase
+      .from("implementations")
+      .select("*")
+      .eq("id", id)
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase.from("impl_rooms").select("*").eq("implementation_id", id).eq("org_id", orgId),
+    supabase.from("impl_trainers").select("*").eq("implementation_id", id).eq("org_id", orgId),
+    supabase.from("impl_classes").select("*").eq("implementation_id", id).eq("org_id", orgId),
+    supabase
+      .from("impl_sessions")
+      .select("*", { count: "exact", head: true })
+      .eq("implementation_id", id)
+      .eq("org_id", orgId),
+  ]);
 
   if (!impl) notFound();
 
@@ -79,8 +86,8 @@ export default async function CalculatePage({ params }: { params: Params }) {
       <div>
         <h2 className="text-foreground text-lg font-semibold">Capacity calculation</h2>
         <p className="text-muted-foreground mt-1 text-xs">
-          The full scheduler runs in Phase 7.2. The numbers below are a static preview computed from
-          your inputs.
+          Static preview below. Click <strong>Generate Schedule</strong> to run the greedy scheduler
+          — it will create draft sessions and surface any capacity gaps.
         </p>
       </div>
 
@@ -125,6 +132,8 @@ export default async function CalculatePage({ params }: { params: Params }) {
         <UtilCard label="Trainer utilization" pct={trainerUtil} />
         <UtilCard label="Room utilization" pct={roomUtil} />
       </div>
+
+      <GenerateButton implementationId={id} ready={ready} existingSessions={sessionCount ?? 0} />
 
       <div className="border-border flex items-center justify-between border-t pt-4">
         <Link

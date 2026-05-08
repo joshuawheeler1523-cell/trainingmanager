@@ -529,3 +529,113 @@ export type {
   ImplClassPrerequisite as _ImplClassPrerequisite,
   ImplClassTrainer as _ImplClassTrainer,
 };
+
+// ── schedule generator ─────────────────────────────────────────────────────
+
+export type ScheduleGenResult = {
+  sessions: number;
+  conflicts: number;
+  capacity_gaps: { class_id: string; class_name: string; session_index: number; reason: string }[];
+};
+
+export async function generateSchedule(
+  implementationId: string,
+): Promise<ActionResult<ScheduleGenResult>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase.rpc("generate_implementation_schedule", {
+    p_implementation_id: implementationId,
+  });
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateImpl(implementationId);
+  return { ok: true, data: data as ScheduleGenResult };
+}
+
+// ── session edits (drag, swap trainer/room, cancel) ────────────────────────
+
+export async function updateSessionTime(
+  id: string,
+  implementationId: string,
+  scheduledStart: string,
+  scheduledEnd: string,
+): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { error } = await c.supabase
+    .from("impl_sessions")
+    .update({ scheduled_start: scheduledStart, scheduled_end: scheduledEnd })
+    .eq("id", id)
+    .eq("org_id", c.orgId);
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateImpl(implementationId);
+  return { ok: true, data: { id } };
+}
+
+export async function updateSessionAssignments(
+  id: string,
+  implementationId: string,
+  patch: { impl_trainer_id?: string | null; impl_room_id?: string | null },
+): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { error } = await c.supabase
+    .from("impl_sessions")
+    .update(
+      stripUndefined(patch as Record<string, unknown>) as unknown as TablesUpdate<"impl_sessions">,
+    )
+    .eq("id", id)
+    .eq("org_id", c.orgId);
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateImpl(implementationId);
+  return { ok: true, data: { id } };
+}
+
+export async function setSessionStatus(
+  id: string,
+  implementationId: string,
+  status: "draft" | "published" | "cancelled",
+): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { error } = await c.supabase
+    .from("impl_sessions")
+    .update({ status })
+    .eq("id", id)
+    .eq("org_id", c.orgId);
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateImpl(implementationId);
+  return { ok: true, data: { id } };
+}
+
+// Bulk-publish: flip every draft session in this implementation to published.
+// Per User Guide §11.4, this also flips the implementation's status to active.
+export async function publishImplementation(
+  implementationId: string,
+): Promise<ActionResult<{ count: number }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { error: pubError, count } = await c.supabase
+    .from("impl_sessions")
+    .update({ status: "published" }, { count: "exact" })
+    .eq("implementation_id", implementationId)
+    .eq("org_id", c.orgId)
+    .eq("status", "draft");
+  if (pubError) return { ok: false, error: { code: pubError.code, message: pubError.message } };
+
+  await c.supabase
+    .from("implementations")
+    .update({ status: "active" })
+    .eq("id", implementationId)
+    .eq("org_id", c.orgId);
+
+  revalidateImpl(implementationId);
+  return { ok: true, data: { count: count ?? 0 } };
+}

@@ -308,3 +308,49 @@ describe("training-planner pure helpers", () => {
     expect(result).toBe(100);
   });
 });
+
+describe("generateSchedule (RPC wrapper)", async () => {
+  const { generateSchedule } = await import("./actions");
+
+  it("returns NO_ORG when org context missing", async () => {
+    mockGetCurrentOrgId.mockResolvedValue(null);
+    const result = await generateSchedule(IMPL_ID);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("NO_ORG");
+  });
+
+  it("relays the RPC payload", async () => {
+    const mockClient = {
+      from: mockFrom,
+      rpc: vi.fn().mockResolvedValue({
+        data: { sessions: 5, conflicts: 0, capacity_gaps: [] },
+        error: null,
+      }),
+    };
+    const { createClient: cc } = await import("@/lib/supabase/server");
+    (cc as unknown as { mockResolvedValueOnce: (v: unknown) => void }).mockResolvedValueOnce(
+      mockClient,
+    );
+    const result = await generateSchedule(IMPL_ID);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.sessions).toBe(5);
+      expect(result.data.conflicts).toBe(0);
+    }
+  });
+});
+
+describe("ICS helpers", () => {
+  it("toIcsDate strips dashes/colons and milliseconds", async () => {
+    const { toIcsDate } = await import("@/app/api/training-planner/[id]/schedule.ics/route");
+    const d = new Date("2026-06-15T14:30:00.123Z");
+    expect(toIcsDate(d)).toBe("20260615T143000Z");
+  });
+
+  it("escapeIcs escapes backslash, comma, semicolon, and newline", async () => {
+    const { escapeIcs } = await import("@/app/api/training-planner/[id]/schedule.ics/route");
+    // Input chars: a , space b ; space c <newline> d \ e
+    // Expected:    a \, space b \; space c \n d \\ e
+    expect(escapeIcs("a, b; c\nd\\e")).toBe("a\\, b\\; c\\nd\\\\e");
+  });
+});

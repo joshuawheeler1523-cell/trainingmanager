@@ -2976,7 +2976,15 @@ export type Database = {
         }[];
       };
       frequency_to_annual: { Args: { p_frequency: string }; Returns: number };
+      generate_implementation_schedule: {
+        Args: { p_implementation_id: string };
+        Returns: Json;
+      };
       get_pg_share_token: { Args: never; Returns: string };
+      impl_class_prereq_earliest: {
+        Args: { p_class_id: string };
+        Returns: string;
+      };
       import_tasks: {
         Args: {
           p_delete_ids: string[];
