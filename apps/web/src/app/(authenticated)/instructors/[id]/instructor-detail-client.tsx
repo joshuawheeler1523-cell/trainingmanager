@@ -638,14 +638,11 @@ function WorkloadTab({
         emptyMessage="No assigned education requests. Assign this instructor in /request-queue."
       />
 
-      {/* Placeholders for sources that ship in later phases */}
-      <DeferredSourceSection
-        title="Special projects"
-        message="Project commitments will appear here once the projects module ships."
-      />
-      <DeferredSourceSection
+      <SourceSection
         title="Project tasks"
-        message="Project task assignments will appear here once the projects module ships."
+        total={totalSourceHours("project_task")}
+        rows={grouped.project_task}
+        emptyMessage="No active project task assignments. Assign this instructor to tasks in /projects."
       />
     </div>
   );
@@ -707,18 +704,6 @@ function SourceSection({
           )}
         </>
       )}
-    </section>
-  );
-}
-
-function DeferredSourceSection({ title, message }: { title: string; message: string }) {
-  return (
-    <section className="border-border bg-surface rounded-xl border border-dashed p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground text-sm font-medium">{title}</span>
-        <span className="text-muted-foreground text-xs">— pending</span>
-      </div>
-      <p className="text-muted-foreground mt-1 text-xs">{message}</p>
     </section>
   );
 }

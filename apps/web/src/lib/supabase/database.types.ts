@@ -1308,6 +1308,77 @@ export type Database = {
         };
         Relationships: [];
       };
+      project_team_members: {
+        Row: {
+          allocated_hours: number;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          instructor_id: string;
+          org_id: string;
+          project_id: string;
+          role: string;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          allocated_hours?: number;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          instructor_id: string;
+          org_id: string;
+          project_id: string;
+          role?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          allocated_hours?: number;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          instructor_id?: string;
+          org_id?: string;
+          project_id?: string;
+          role?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_team_members_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "project_team_members_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
+            foreignKeyName: "project_team_members_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "project_team_members_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       projects: {
         Row: {
           bucket_id: string | null;
@@ -1599,6 +1670,137 @@ export type Database = {
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      task_action_items: {
+        Row: {
+          assigned_to_team_member_id: string | null;
+          completed_at: string | null;
+          created_at: string;
+          created_by: string | null;
+          description: string;
+          due_date: string | null;
+          id: string;
+          is_complete: boolean;
+          org_id: string;
+          sort_order: number;
+          task_id: string;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          assigned_to_team_member_id?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description: string;
+          due_date?: string | null;
+          id?: string;
+          is_complete?: boolean;
+          org_id: string;
+          sort_order?: number;
+          task_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          assigned_to_team_member_id?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string;
+          due_date?: string | null;
+          id?: string;
+          is_complete?: boolean;
+          org_id?: string;
+          sort_order?: number;
+          task_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "task_action_items_assigned_to_team_member_id_fkey";
+            columns: ["assigned_to_team_member_id"];
+            isOneToOne: false;
+            referencedRelation: "project_team_members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "task_action_items_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "task_action_items_task_id_fkey";
+            columns: ["task_id"];
+            isOneToOne: false;
+            referencedRelation: "tasks";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      task_assignments: {
+        Row: {
+          allocated_hours: number;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          org_id: string;
+          project_team_member_id: string;
+          task_id: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          allocated_hours?: number;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          org_id: string;
+          project_team_member_id: string;
+          task_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          allocated_hours?: number;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          org_id?: string;
+          project_team_member_id?: string;
+          task_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "task_assignments_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "task_assignments_project_team_member_id_fkey";
+            columns: ["project_team_member_id"];
+            isOneToOne: false;
+            referencedRelation: "project_team_members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "task_assignments_task_id_fkey";
+            columns: ["task_id"];
+            isOneToOne: false;
+            referencedRelation: "tasks";
             referencedColumns: ["id"];
           },
         ];

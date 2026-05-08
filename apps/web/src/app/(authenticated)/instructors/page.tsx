@@ -94,6 +94,7 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
       recurring_task: 0,
       ad_hoc_task: 0,
       education_request: 0,
+      project_task: 0,
     };
     cur[row.source] += row.annual_hours || 0;
     sourceBreakdownByInstructor.set(row.instructor_id, cur);

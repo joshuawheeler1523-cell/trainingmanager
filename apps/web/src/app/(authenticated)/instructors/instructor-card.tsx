@@ -17,6 +17,7 @@ type SourceBreakdown = {
   recurring_task: number;
   ad_hoc_task: number;
   education_request: number;
+  project_task: number;
 };
 
 type Props = {
@@ -30,6 +31,7 @@ const SOURCE_LABELS = {
   recurring_task: "Recurring",
   ad_hoc_task: "Ad-hoc",
   education_request: "Requests",
+  project_task: "Projects",
 } as const;
 
 const STATUS_STYLES: Record<string, string> = {
@@ -50,7 +52,13 @@ export default function InstructorCard({ instructor, capacity, sourceBreakdown }
   const tooltipText = (() => {
     if (!sourceBreakdown) return undefined;
     const parts: string[] = [];
-    for (const k of ["class", "recurring_task", "ad_hoc_task", "education_request"] as const) {
+    for (const k of [
+      "class",
+      "recurring_task",
+      "ad_hoc_task",
+      "education_request",
+      "project_task",
+    ] as const) {
       const v = sourceBreakdown[k];
       if (v > 0) parts.push(`${SOURCE_LABELS[k]}: ${v.toFixed(0)}h`);
     }
