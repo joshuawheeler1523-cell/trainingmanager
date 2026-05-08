@@ -11,10 +11,12 @@ import {
   type Task,
   type TaskActionItem,
   type TaskAssignment,
+  type TaskDependency,
   type TaskStatus,
 } from "@arbor/shared";
 import { createTask, deleteTask, updateTask } from "../actions";
 import TaskDrawer, { type TeamMemberWithInstructor } from "./task-drawer";
+import ImportExportControls from "./import-export";
 
 type Props = {
   project: Project;
@@ -22,6 +24,7 @@ type Props = {
   team: TeamMemberWithInstructor[];
   assignments: TaskAssignment[];
   actionItems: TaskActionItem[];
+  dependencies: TaskDependency[];
   milestones: Milestone[];
 };
 
@@ -38,6 +41,7 @@ export default function TasksTab({
   team,
   assignments,
   actionItems,
+  dependencies,
   milestones,
 }: Props) {
   const router = useRouter();
@@ -97,6 +101,7 @@ export default function TasksTab({
 
   return (
     <div className="space-y-3">
+      <ImportExportControls project={project} tasks={tasks} />
       {tasks.length === 0 && !creating ? (
         <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
           <p className="text-foreground text-sm font-medium">No tasks yet</p>
@@ -263,9 +268,11 @@ export default function TasksTab({
         <TaskDrawer
           project={project}
           task={openTask}
+          allProjectTasks={tasks}
           team={team}
           assignments={assignments.filter((a) => a.task_id === openTask.id)}
           actionItems={actionItems.filter((a) => a.task_id === openTask.id)}
+          dependencies={dependencies}
           milestones={milestones}
           onClose={() => {
             setOpenTaskId(null);

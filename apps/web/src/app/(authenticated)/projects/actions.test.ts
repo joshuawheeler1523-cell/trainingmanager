@@ -24,6 +24,8 @@ const {
   updateActionItem,
   createMilestone,
   createDependency,
+  createExternalDep,
+  generateShareToken,
 } = await import("./actions");
 
 const ORG_ID = "aaaaaaaa-0000-0000-0000-000000000000";
@@ -366,5 +368,156 @@ describe("createDependency", () => {
       successor_id: "ffffffff-0000-0000-0000-000000000000",
     });
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("createExternalDep", () => {
+  it("rejects an empty name", async () => {
+    const result = await createExternalDep(PROJECT_ID, { name: "" });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects an unknown dep_type", async () => {
+    const result = await createExternalDep(PROJECT_ID, {
+      name: "Vendor X",
+      dep_type: "supernatural",
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects an unknown status", async () => {
+    const result = await createExternalDep(PROJECT_ID, {
+      name: "Vendor X",
+      status: "unknown",
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("succeeds with a valid record", async () => {
+    mockFrom.mockReturnValue(
+      makeInsertChain({
+        data: { id: "ed-1", name: "Vendor X", dep_type: "vendor", status: "open" },
+        error: null,
+      }),
+    );
+    const result = await createExternalDep(PROJECT_ID, {
+      name: "Vendor X",
+      dep_type: "vendor",
+    });
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("generateShareToken", () => {
+  it("issues a UUID and persists it", async () => {
+    mockFrom.mockReturnValue(makeUpdateChain({ data: null, error: null }));
+    const result = await generateShareToken(PROJECT_ID);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.token).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
+    }
+  });
+});
+
+describe("diffTaskImport (pure)", () => {
+  it("classifies inserts, updates, and deletes correctly", async () => {
+    const { diffTaskImport } = await import("@arbor/shared");
+    const baseTask = {
+      id: "t-existing",
+      org_id: "o",
+      project_id: "p",
+      milestone_id: null,
+      name: "Existing",
+      description: null,
+      status: "in_progress" as const,
+      priority: "medium" as const,
+      start_date: "2026-06-01",
+      end_date: "2026-06-10",
+      estimated_hours: 10,
+      actual_hours: null,
+      percent_complete: 30,
+      sort_order: 0,
+      created_at: "",
+      updated_at: "",
+      created_by: null,
+      updated_by: null,
+      version: 1,
+    };
+    const willBeDeleted = { ...baseTask, id: "t-gone", name: "Gone" };
+
+    const importedRows = [
+      {
+        // unchanged → no entry
+        id: "t-existing",
+        name: "Existing",
+        description: null,
+        status: "in_progress" as const,
+        priority: "medium" as const,
+        start_date: "2026-06-01",
+        end_date: "2026-06-10",
+        estimated_hours: 10,
+        percent_complete: 30,
+      },
+      {
+        // status changed → update
+        id: "t-existing", // same id, but the test array uses a different ID below
+        name: "Existing",
+        description: null,
+        status: "completed" as const,
+        priority: "medium" as const,
+        start_date: "2026-06-01",
+        end_date: "2026-06-10",
+        estimated_hours: 10,
+        percent_complete: 100,
+      },
+      {
+        // new row
+        id: null,
+        name: "Brand new",
+        description: null,
+        status: "not_started" as const,
+        priority: "low" as const,
+        start_date: null,
+        end_date: null,
+        estimated_hours: null,
+        percent_complete: 0,
+      },
+    ];
+
+    const diff = diffTaskImport({
+      currentTasks: [baseTask, willBeDeleted],
+      importedRows,
+    });
+
+    expect(diff.inserts).toHaveLength(1);
+    expect(diff.inserts[0]?.name).toBe("Brand new");
+    expect(diff.updates).toHaveLength(1);
+    expect(diff.updates[0]?.changedFields).toContain("status");
+    expect(diff.deletes).toHaveLength(1);
+    expect(diff.deletes[0]?.id).toBe("t-gone");
+  });
+
+  it("treats an unknown ID as a fresh insert", async () => {
+    const { diffTaskImport } = await import("@arbor/shared");
+    const diff = diffTaskImport({
+      currentTasks: [],
+      importedRows: [
+        {
+          id: "stale-id",
+          name: "Recovered",
+          description: null,
+          status: "not_started" as const,
+          priority: "medium" as const,
+          start_date: null,
+          end_date: null,
+          estimated_hours: null,
+          percent_complete: 0,
+        },
+      ],
+    });
+    expect(diff.inserts).toHaveLength(1);
+    expect(diff.inserts[0]?.id).toBeNull();
   });
 });

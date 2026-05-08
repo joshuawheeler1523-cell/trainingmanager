@@ -1,6 +1,7 @@
 "use client";
 
 import type { Instructor, Project, ProjectTeamMember, Task } from "@arbor/shared";
+import ShareCard from "./share-card";
 
 type TeamMember = ProjectTeamMember & { instructor: Instructor | null };
 
@@ -127,6 +128,11 @@ export default function OverviewTab({ project, tasks, team, percentComplete }: P
             ))}
           </ul>
         )}
+      </div>
+
+      {/* Share */}
+      <div className="lg:col-span-3">
+        <ShareCard project={project} />
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ import {
   type Task,
   type TaskActionItem,
   type TaskAssignment,
+  type TaskDependency,
   type TaskPriority,
   type TaskStatus,
 } from "@arbor/shared";
@@ -31,6 +32,7 @@ type Props = {
   team: TeamMemberWithInstructor[];
   assignments: TaskAssignment[];
   actionItems: TaskActionItem[];
+  dependencies: TaskDependency[];
   milestones: Milestone[];
 };
 
@@ -54,6 +56,7 @@ export default function KanbanTab({
   team,
   assignments,
   actionItems,
+  dependencies,
   milestones,
 }: Props) {
   const router = useRouter();
@@ -146,9 +149,11 @@ export default function KanbanTab({
         <TaskDrawer
           project={project}
           task={openTask}
+          allProjectTasks={tasks}
           team={team}
           assignments={assignments.filter((a) => a.task_id === openTask.id)}
           actionItems={actionItems.filter((a) => a.task_id === openTask.id)}
+          dependencies={dependencies}
           milestones={milestones}
           onClose={() => {
             setOpenTaskId(null);

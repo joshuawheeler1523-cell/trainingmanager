@@ -4,6 +4,7 @@ import { getCurrentOrgId } from "@/lib/auth/current-org";
 import ProjectDetailClient from "./project-detail-client";
 import {
   projectPercentComplete,
+  type ExternalDependency,
   type Instructor,
   type Milestone,
   type Project,
@@ -38,6 +39,7 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
     { data: instructors },
     { data: milestones },
     { data: dependencies },
+    { data: externalDeps },
   ] = await Promise.all([
     supabase
       .from("tasks")
@@ -63,6 +65,12 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
       .eq("org_id", orgId)
       .order("due_date"),
     supabase.from("task_dependencies").select("*").eq("org_id", orgId),
+    supabase
+      .from("dependencies")
+      .select("*")
+      .eq("project_id", id)
+      .eq("org_id", orgId)
+      .order("sort_order"),
   ]);
 
   const tasksList = (tasks ?? []) as Task[];
@@ -72,6 +80,7 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
   const instructorList = (instructors ?? []) as Instructor[];
   const milestonesList = (milestones ?? []) as Milestone[];
   const dependenciesAll = (dependencies ?? []) as TaskDependency[];
+  const externalDepList = (externalDeps ?? []) as ExternalDependency[];
 
   const taskIds = new Set(tasksList.map((t) => t.id));
   const projectAssignments = assignmentsAll.filter((a) => taskIds.has(a.task_id));
@@ -93,6 +102,7 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
       instructors={instructorList}
       milestones={milestonesList}
       dependencies={projectDependencies}
+      externalDeps={externalDepList}
       percentComplete={percentComplete}
     />
   );

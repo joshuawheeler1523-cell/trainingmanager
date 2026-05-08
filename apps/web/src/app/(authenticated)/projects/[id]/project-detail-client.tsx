@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeftIcon, PencilIcon } from "@heroicons/react/20/solid";
 import {
+  type ExternalDependency,
   type Instructor,
   type Milestone,
   type Project,
@@ -36,6 +37,7 @@ type Props = {
   instructors: Instructor[];
   milestones: Milestone[];
   dependencies: TaskDependency[];
+  externalDeps: ExternalDependency[];
   percentComplete: number | null;
 };
 
@@ -78,6 +80,7 @@ export default function ProjectDetailClient({
   instructors,
   milestones,
   dependencies,
+  externalDeps,
   percentComplete,
 }: Props) {
   const [tab, setTab] = useState<TabKey>("overview");
@@ -198,6 +201,7 @@ export default function ProjectDetailClient({
             team={teamWithInstructor}
             assignments={assignments}
             actionItems={actionItems}
+            dependencies={dependencies}
             milestones={milestones}
           />
         )}
@@ -219,6 +223,7 @@ export default function ProjectDetailClient({
             team={teamWithInstructor}
             assignments={assignments}
             actionItems={actionItems}
+            dependencies={dependencies}
             milestones={milestones}
           />
         )}
@@ -229,6 +234,7 @@ export default function ProjectDetailClient({
             team={teamWithInstructor}
             assignments={assignments}
             actionItems={actionItems}
+            dependencies={dependencies}
             milestones={milestones}
           />
         )}
@@ -239,7 +245,7 @@ export default function ProjectDetailClient({
           <MilestonesTab project={project} milestones={milestones} />
         )}
         {effectiveTab === "dependencies" && (
-          <DependenciesTab project={project} tasks={tasks} dependencies={dependencies} />
+          <DependenciesTab project={project} dependencies={externalDeps} />
         )}
         {effectiveTab === "action-items" && (
           <ActionItemsTab

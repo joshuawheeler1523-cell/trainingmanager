@@ -570,9 +570,11 @@ export default function GanttTab({
         <TaskDrawer
           project={project}
           task={openTask}
+          allProjectTasks={tasks}
           team={team}
           assignments={assignments.filter((a) => a.task_id === openTask.id)}
           actionItems={actionItems.filter((a) => a.task_id === openTask.id)}
+          dependencies={dependencies}
           milestones={milestones}
           onClose={() => {
             setOpenTaskId(null);

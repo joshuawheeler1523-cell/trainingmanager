@@ -11,6 +11,7 @@ import {
   type Task,
   type TaskActionItem,
   type TaskAssignment,
+  type TaskDependency,
   type TaskStatus,
 } from "@arbor/shared";
 import TaskDrawer, { type TeamMemberWithInstructor } from "./task-drawer";
@@ -21,6 +22,7 @@ type Props = {
   team: TeamMemberWithInstructor[];
   assignments: TaskAssignment[];
   actionItems: TaskActionItem[];
+  dependencies: TaskDependency[];
   milestones: Milestone[];
 };
 
@@ -55,6 +57,7 @@ export default function CalendarTab({
   team,
   assignments,
   actionItems,
+  dependencies,
   milestones,
 }: Props) {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
@@ -136,9 +139,11 @@ export default function CalendarTab({
         <TaskDrawer
           project={project}
           task={openTask}
+          allProjectTasks={tasks}
           team={team}
           assignments={assignments.filter((a) => a.task_id === openTask.id)}
           actionItems={actionItems.filter((a) => a.task_id === openTask.id)}
+          dependencies={dependencies}
           milestones={milestones}
           onClose={() => {
             setOpenTaskId(null);

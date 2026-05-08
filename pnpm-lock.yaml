@@ -118,6 +118,9 @@ importers:
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
+      xlsx:
+        specifier: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
+        version: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
       zod:
         specifier: ^3.24.0
         version: 3.25.76
@@ -6156,6 +6159,16 @@ packages:
       utf-8-validate:
         optional: true
 
+  xlsx@https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz:
+    resolution:
+      {
+        integrity: sha512-oLDq3jw7AcLqKWH2AhCpVTZl8mf6X2YReP+Neh0SJUzV/BdZYjth94tG5toiMB1PPrYtxOCfaoUCkvtuH+3AJA==,
+        tarball: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz,
+      }
+    version: 0.20.3
+    engines: { node: ">=0.8" }
+    hasBin: true
+
   xml-name-validator@5.0.0:
     resolution:
       {
@@ -9866,6 +9879,8 @@ snapshots:
       signal-exit: 4.1.0
 
   ws@8.20.0: {}
+
+  xlsx@https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz: {}
 
   xml-name-validator@5.0.0: {}
 

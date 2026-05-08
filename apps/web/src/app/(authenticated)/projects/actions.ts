@@ -17,6 +17,8 @@ import {
   milestoneInsertSchema,
   milestoneUpdateSchema,
   dependencyInsertSchema,
+  externalDepInsertSchema,
+  externalDepUpdateSchema,
   type Project,
   type ProjectTeamMember,
   type Task,
@@ -24,6 +26,8 @@ import {
   type TaskActionItem,
   type Milestone,
   type TaskDependency,
+  type ExternalDependency,
+  type ImportRow,
 } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 
@@ -509,4 +513,161 @@ export async function deleteDependency(
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
   revalidateProject(projectId);
   return { ok: true, data: { id } };
+}
+
+// ── external dependencies ──────────────────────────────────────────────────
+
+export async function createExternalDep(
+  projectId: string,
+  input: unknown,
+): Promise<ActionResult<ExternalDependency>> {
+  const parsed = externalDepInsertSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("dependencies")
+    .insert({ ...parsed.data, org_id: c.orgId, project_id: projectId })
+    .select()
+    .single();
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateProject(projectId);
+  return { ok: true, data: data as ExternalDependency };
+}
+
+export async function updateExternalDep(
+  id: string,
+  projectId: string,
+  input: unknown,
+): Promise<ActionResult<ExternalDependency>> {
+  const parsed = externalDepUpdateSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("dependencies")
+    .update(
+      stripUndefined(
+        parsed.data as Record<string, unknown>,
+      ) as unknown as TablesUpdate<"dependencies">,
+    )
+    .eq("id", id)
+    .eq("org_id", c.orgId)
+    .select()
+    .single();
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateProject(projectId);
+  return { ok: true, data: data as ExternalDependency };
+}
+
+export async function deleteExternalDep(
+  id: string,
+  projectId: string,
+): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { error } = await c.supabase
+    .from("dependencies")
+    .delete()
+    .eq("id", id)
+    .eq("org_id", c.orgId);
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateProject(projectId);
+  return { ok: true, data: { id } };
+}
+
+// ── public share token ─────────────────────────────────────────────────────
+
+export async function generateShareToken(
+  projectId: string,
+): Promise<ActionResult<{ token: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  // Generate a UUID client-side so we can return it without an extra select.
+  const token = crypto.randomUUID();
+
+  const { error } = await c.supabase
+    .from("projects")
+    .update({ public_share_token: token })
+    .eq("id", projectId)
+    .eq("org_id", c.orgId)
+    .is("deleted_at", null);
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateProject(projectId);
+  return { ok: true, data: { token } };
+}
+
+export async function revokeShareToken(projectId: string): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { error } = await c.supabase
+    .from("projects")
+    .update({ public_share_token: null })
+    .eq("id", projectId)
+    .eq("org_id", c.orgId)
+    .is("deleted_at", null);
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateProject(projectId);
+  return { ok: true, data: { id: projectId } };
+}
+
+// ── transactional task import (Excel round-trip) ───────────────────────────
+
+export async function commitTaskImport(
+  projectId: string,
+  args: {
+    inserts: ImportRow[];
+    updates: { id: string; row: ImportRow }[];
+    deleteIds: string[];
+  },
+): Promise<ActionResult<{ inserted: number; updated: number; deleted: number }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const insertsForRpc = args.inserts.map((r) => ({
+    name: r.name,
+    description: r.description,
+    status: r.status,
+    priority: r.priority,
+    start_date: r.start_date,
+    end_date: r.end_date,
+    estimated_hours: r.estimated_hours,
+    percent_complete: r.percent_complete,
+  }));
+
+  const updatesForRpc = args.updates.map((u) => ({
+    id: u.id,
+    name: u.row.name,
+    description: u.row.description,
+    status: u.row.status,
+    priority: u.row.priority,
+    start_date: u.row.start_date,
+    end_date: u.row.end_date,
+    estimated_hours: u.row.estimated_hours,
+    percent_complete: u.row.percent_complete,
+  }));
+
+  const { data, error } = await c.supabase.rpc("import_tasks", {
+    p_project_id: projectId,
+    p_inserts: insertsForRpc,
+    p_updates: updatesForRpc,
+    p_delete_ids: args.deleteIds,
+  });
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateProject(projectId);
+  const result = data as { inserted: number; updated: number; deleted: number };
+  return { ok: true, data: result };
 }

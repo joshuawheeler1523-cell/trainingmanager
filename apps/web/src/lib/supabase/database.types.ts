@@ -536,6 +536,78 @@ export type Database = {
           },
         ];
       };
+      dependencies: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          dep_type: string;
+          description: string | null;
+          id: string;
+          name: string;
+          org_id: string;
+          owner: string | null;
+          project_id: string;
+          resolved_at: string | null;
+          sort_order: number;
+          status: string;
+          target_resolution_date: string | null;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          dep_type?: string;
+          description?: string | null;
+          id?: string;
+          name: string;
+          org_id: string;
+          owner?: string | null;
+          project_id: string;
+          resolved_at?: string | null;
+          sort_order?: number;
+          status?: string;
+          target_resolution_date?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          dep_type?: string;
+          description?: string | null;
+          id?: string;
+          name?: string;
+          org_id?: string;
+          owner?: string | null;
+          project_id?: string;
+          resolved_at?: string | null;
+          sort_order?: number;
+          status?: string;
+          target_resolution_date?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dependencies_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dependencies_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       education_request_assignments: {
         Row: {
           actual_hours: number | null;
@@ -1457,6 +1529,7 @@ export type Database = {
           name: string;
           org_id: string;
           priority: string;
+          public_share_token: string | null;
           source_tra_id: string | null;
           start_date: string | null;
           status: string;
@@ -1476,6 +1549,7 @@ export type Database = {
           name: string;
           org_id: string;
           priority?: string;
+          public_share_token?: string | null;
           source_tra_id?: string | null;
           start_date?: string | null;
           status?: string;
@@ -1495,6 +1569,7 @@ export type Database = {
           name?: string;
           org_id?: string;
           priority?: string;
+          public_share_token?: string | null;
           source_tra_id?: string | null;
           start_date?: string | null;
           status?: string;
@@ -1798,6 +1873,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "task_action_items_assigned_to_team_member_id_fkey";
+            columns: ["assigned_to_team_member_id"];
+            isOneToOne: false;
+            referencedRelation: "v_public_project_team";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "task_action_items_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
@@ -1860,6 +1942,13 @@ export type Database = {
             columns: ["project_team_member_id"];
             isOneToOne: false;
             referencedRelation: "project_team_members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "task_assignments_project_team_member_id_fkey";
+            columns: ["project_team_member_id"];
+            isOneToOne: false;
+            referencedRelation: "v_public_project_team";
             referencedColumns: ["id"];
           },
           {
@@ -2307,6 +2396,24 @@ export type Database = {
         };
         Relationships: [];
       };
+      v_public_project_team: {
+        Row: {
+          allocated_hours: number | null;
+          id: string | null;
+          instructor_name: string | null;
+          project_id: string | null;
+          role: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_team_members_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Functions: {
       apply_standard_triggers: {
@@ -2323,6 +2430,16 @@ export type Database = {
         }[];
       };
       frequency_to_annual: { Args: { p_frequency: string }; Returns: number };
+      get_pg_share_token: { Args: never; Returns: string };
+      import_tasks: {
+        Args: {
+          p_delete_ids: string[];
+          p_inserts: Json;
+          p_project_id: string;
+          p_updates: Json;
+        };
+        Returns: Json;
+      };
       instructor_capacity_forecast: {
         Args: { p_instructor_id: string; p_start: string; p_weeks?: number };
         Returns: {
@@ -2342,6 +2459,7 @@ export type Database = {
           instructor_id: string;
         }[];
       };
+      set_share_token: { Args: { p_token: string }; Returns: undefined };
       user_org_ids: { Args: never; Returns: string[] };
     };
     Enums: {

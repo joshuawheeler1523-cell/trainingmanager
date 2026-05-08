@@ -61,6 +61,7 @@ export type Project = {
   end_date: string | null;
   total_estimated_hours: number | null;
   source_tra_id: string | null;
+  public_share_token: string | null;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
@@ -292,6 +293,143 @@ export type TaskDependency = {
   created_by: string | null;
   updated_by: string | null;
 };
+
+// ── external dependencies ───────────────────────────────────────────────────
+// Different from task_dependencies (which are task→task arrows). These are
+// project-level blockers like vendor deliveries or compliance approvals.
+
+export const EXTERNAL_DEP_TYPE_VALUES = [
+  "external",
+  "technical",
+  "vendor",
+  "compliance",
+  "other",
+] as const;
+export type ExternalDepType = (typeof EXTERNAL_DEP_TYPE_VALUES)[number];
+
+export const EXTERNAL_DEP_STATUS_VALUES = ["open", "in_progress", "resolved", "blocked"] as const;
+export type ExternalDepStatus = (typeof EXTERNAL_DEP_STATUS_VALUES)[number];
+
+export const externalDepInsertSchema = z.object({
+  name: z.string().min(1, "Name is required").max(200),
+  description: emptyToNull,
+  dep_type: z.enum(EXTERNAL_DEP_TYPE_VALUES).default("external"),
+  owner: emptyToNull,
+  target_resolution_date: emptyToNull,
+  status: z.enum(EXTERNAL_DEP_STATUS_VALUES).default("open"),
+  sort_order: z.coerce.number().int().default(0),
+});
+
+export const externalDepUpdateSchema = externalDepInsertSchema.partial();
+
+export type ExternalDepInput = z.infer<typeof externalDepInsertSchema>;
+export type ExternalDepUpdate = z.infer<typeof externalDepUpdateSchema>;
+
+export type ExternalDependency = {
+  id: string;
+  org_id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  dep_type: ExternalDepType;
+  owner: string | null;
+  target_resolution_date: string | null;
+  status: ExternalDepStatus;
+  resolved_at: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+  version: number;
+};
+
+// ── XLSX round-trip ─────────────────────────────────────────────────────────
+
+// Column headers the export writes and the import expects. Order matters —
+// it's what users see in Excel.
+export const TASK_EXPORT_COLUMNS = [
+  "ID",
+  "Name",
+  "Description",
+  "Status",
+  "Priority",
+  "Start",
+  "End",
+  "Estimated Hours",
+  "Assignees",
+  "% Complete",
+] as const;
+
+// One parsed row from an uploaded XLSX. ID is empty for new rows.
+export type ImportRow = {
+  id: string | null;
+  name: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  start_date: string | null;
+  end_date: string | null;
+  estimated_hours: number | null;
+  percent_complete: number;
+};
+
+// Diff between current tasks and imported rows. Drives the preview screen.
+export type ImportDiff = {
+  inserts: ImportRow[];
+  updates: { id: string; current: Task; next: ImportRow; changedFields: string[] }[];
+  deletes: { id: string; current: Task }[];
+};
+
+// Computes the diff between current tasks and uploaded rows. Pure function —
+// no Supabase, no DOM. Lives in shared so the preview screen can render it
+// and the import action can re-validate before committing.
+export function diffTaskImport(args: {
+  currentTasks: Task[];
+  importedRows: ImportRow[];
+}): ImportDiff {
+  const inserts: ImportRow[] = [];
+  const updates: ImportDiff["updates"] = [];
+  const seenIds = new Set<string>();
+
+  for (const row of args.importedRows) {
+    if (!row.id) {
+      inserts.push(row);
+      continue;
+    }
+    seenIds.add(row.id);
+    const current = args.currentTasks.find((t) => t.id === row.id);
+    if (!current) {
+      // Stale ID — treat as a fresh insert so a renamed/deleted task doesn't
+      // silently lose its identity.
+      inserts.push({ ...row, id: null });
+      continue;
+    }
+    const changed = changedFields(current, row);
+    if (changed.length > 0) {
+      updates.push({ id: row.id, current, next: row, changedFields: changed });
+    }
+  }
+
+  const deletes: ImportDiff["deletes"] = args.currentTasks
+    .filter((t) => !seenIds.has(t.id))
+    .map((t) => ({ id: t.id, current: t }));
+
+  return { inserts, updates, deletes };
+}
+
+function changedFields(current: Task, next: ImportRow): string[] {
+  const out: string[] = [];
+  if (current.name !== next.name) out.push("name");
+  if ((current.description ?? null) !== next.description) out.push("description");
+  if (current.status !== next.status) out.push("status");
+  if (current.priority !== next.priority) out.push("priority");
+  if ((current.start_date ?? null) !== next.start_date) out.push("start_date");
+  if ((current.end_date ?? null) !== next.end_date) out.push("end_date");
+  if ((current.estimated_hours ?? null) !== next.estimated_hours) out.push("estimated_hours");
+  if (current.percent_complete !== next.percent_complete) out.push("percent_complete");
+  return out;
+}
 
 // Status badge → bucket: a task in 'completed' is 100% even if percent_complete
 // wasn't explicitly set. Useful when the UI shows a checkbox + percent slider

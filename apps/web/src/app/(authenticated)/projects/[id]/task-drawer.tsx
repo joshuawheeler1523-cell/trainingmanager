@@ -14,12 +14,15 @@ import {
   type Task,
   type TaskActionItem,
   type TaskAssignment,
+  type TaskDependency,
   type TaskStatus,
 } from "@arbor/shared";
 import {
   assignTaskMember,
   createActionItem,
+  createDependency,
   deleteActionItem,
+  deleteDependency,
   deleteTask,
   unassignTaskMember,
   updateActionItem,
@@ -31,9 +34,11 @@ export type TeamMemberWithInstructor = ProjectTeamMember & { instructor: Instruc
 type Props = {
   project: Project;
   task: Task;
+  allProjectTasks: Task[];
   team: TeamMemberWithInstructor[];
   assignments: TaskAssignment[];
   actionItems: TaskActionItem[];
+  dependencies: TaskDependency[];
   milestones: Milestone[];
   onClose: () => void;
 };
@@ -44,9 +49,11 @@ const fieldClass =
 export default function TaskDrawer({
   project,
   task,
+  allProjectTasks,
   team,
   assignments,
   actionItems,
+  dependencies,
   milestones,
   onClose,
 }: Props) {
@@ -117,6 +124,41 @@ export default function TaskDrawer({
   function handleRemoveAssignment(id: string) {
     startTransition(async () => {
       const result = await unassignTaskMember(id, project.id);
+      if (result.ok) router.refresh();
+      else toast.error(result.error.message);
+    });
+  }
+
+  // Predecessors (task_dependencies where this task is the successor)
+  const predecessors = dependencies.filter((d) => d.successor_id === task.id);
+  const predecessorIds = new Set(predecessors.map((d) => d.predecessor_id));
+  const candidatePredecessors = allProjectTasks.filter(
+    (t) => t.id !== task.id && !predecessorIds.has(t.id),
+  );
+  const [pickPredecessor, setPickPredecessor] = useState("");
+  const taskNameById = new Map(allProjectTasks.map((t) => [t.id, t.name]));
+
+  function handleAddPredecessor() {
+    if (!pickPredecessor) return;
+    startTransition(async () => {
+      const result = await createDependency(project.id, {
+        predecessor_id: pickPredecessor,
+        successor_id: task.id,
+      });
+      if (result.ok) {
+        setPickPredecessor("");
+        router.refresh();
+      } else if (result.error.message.toLowerCase().includes("cycle")) {
+        toast.error("That predecessor would create a cycle.");
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function handleRemovePredecessor(depId: string) {
+    startTransition(async () => {
+      const result = await deleteDependency(depId, project.id);
       if (result.ok) router.refresh();
       else toast.error(result.error.message);
     });
@@ -437,6 +479,70 @@ export default function TaskDrawer({
                 >
                   <PlusIcon className="h-4 w-4" />
                   Assign
+                </button>
+              </div>
+            )}
+          </section>
+
+          {/* Predecessors */}
+          <section>
+            <h3 className="text-foreground mb-2 text-sm font-semibold">
+              Predecessors ({predecessors.length.toString()})
+            </h3>
+            {predecessors.length === 0 ? (
+              <p className="text-muted-foreground text-xs">
+                No predecessors. This task can start at any time.
+              </p>
+            ) : (
+              <ul className="border-border divide-border divide-y rounded-md border">
+                {predecessors.map((d) => (
+                  <li key={d.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                    <span className="text-foreground">
+                      {taskNameById.get(d.predecessor_id) ?? "Unknown"}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => {
+                        handleRemovePredecessor(d.id);
+                      }}
+                      aria-label="Remove predecessor"
+                      className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {candidatePredecessors.length > 0 && (
+              <div className="mt-3 flex items-end gap-2">
+                <div className="flex-1">
+                  <p className="text-muted-foreground mb-1 text-xs font-medium">Add predecessor</p>
+                  <select
+                    value={pickPredecessor}
+                    onChange={(e) => {
+                      setPickPredecessor(e.target.value);
+                    }}
+                    className={fieldClass}
+                  >
+                    <option value="">Select task…</option>
+                    {candidatePredecessors.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  disabled={pending || !pickPredecessor}
+                  onClick={handleAddPredecessor}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Add
                 </button>
               </div>
             )}
