@@ -25,22 +25,35 @@ export default function LoginPage() {
       {/* ── Left: artwork ─────────────────────────────────────────────────── */}
       <aside
         aria-hidden="true"
-        className="relative hidden overflow-hidden lg:block"
-        style={{ backgroundColor: "#1a1a1a" }}
+        className="relative hidden overflow-hidden lg:flex lg:items-center lg:justify-center"
+        style={{
+          backgroundColor: "#1a1a1a",
+          backgroundImage:
+            "radial-gradient(circle at 30% 40%, rgba(143,166,142,0.18), transparent 60%), radial-gradient(circle at 70% 70%, rgba(212,165,116,0.12), transparent 55%)",
+        }}
       >
-        <Image
-          src="/branding/arbor-hero.png"
-          alt=""
-          fill
-          priority
-          sizes="(min-width: 1024px) 55vw, 0px"
-          className="object-cover"
-        />
-        {/* Subtle gradient to ground the bottom edge */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/40 to-transparent"
-        />
+        <div className="relative w-full max-w-md px-10">
+          <div
+            className="rounded-2xl shadow-2xl ring-1 ring-white/5"
+            style={{ boxShadow: "0 30px 80px -20px rgba(0,0,0,0.6)" }}
+          >
+            <Image
+              src="/branding/arbor-mark.png"
+              alt="Arbor — Training Resource Management"
+              width={1024}
+              height={1024}
+              priority
+              sizes="(min-width: 1024px) 35vw, 0px"
+              className="h-auto w-full rounded-2xl"
+            />
+          </div>
+          <p
+            className="mt-6 text-center text-[11px] uppercase tracking-[0.32em]"
+            style={{ color: "#8FA68E" }}
+          >
+            Training operations &middot; for hospitals
+          </p>
+        </div>
       </aside>
 
       {/* ── Right: form panel ─────────────────────────────────────────────── */}

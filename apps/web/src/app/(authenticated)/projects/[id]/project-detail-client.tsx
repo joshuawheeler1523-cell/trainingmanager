@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { ArrowLeftIcon, PencilIcon } from "@heroicons/react/20/solid";
 import {
   type ExternalDependency,
@@ -22,11 +23,25 @@ import OverviewTab from "./overview-tab";
 import TasksTab from "./tasks-tab";
 import TeamTab from "./team-tab";
 import ActionItemsTab from "./action-items-tab";
-import GanttTab from "./gantt-tab";
-import KanbanTab from "./kanban-tab";
-import CalendarTab from "./calendar-tab";
 import MilestonesTab from "./milestones-tab";
 import DependenciesTab from "./dependencies-tab";
+
+// Heavy tabs are lazy-loaded — Gantt is a custom SVG renderer, Kanban
+// pulls dnd-kit, Calendar pulls react-big-calendar + its CSS. Users land
+// on Overview by default, so these are off the critical path.
+const TabLoading = () => <div className="text-muted-foreground p-6 text-sm">Loading…</div>;
+const GanttTab = dynamic(() => import("./gantt-tab"), {
+  ssr: false,
+  loading: TabLoading,
+});
+const KanbanTab = dynamic(() => import("./kanban-tab"), {
+  ssr: false,
+  loading: TabLoading,
+});
+const CalendarTab = dynamic(() => import("./calendar-tab"), {
+  ssr: false,
+  loading: TabLoading,
+});
 
 type Props = {
   project: Project;

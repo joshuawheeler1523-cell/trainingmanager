@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import BucketsTab from "./buckets-tab";
-import GlobalTab from "./global-tab";
-import GroupsTab from "./groups-tab";
-import IndividualsTab from "./individuals-tab";
-import RecurringTab from "./recurring-tab";
-import AdHocTab from "./adhoc-tab";
+
+// Buckets is the default landing tab — keep it eager so the first paint
+// is fully hydrated. Off-landing tabs lazy-load on demand.
+const TabLoading = () => <div className="text-muted-foreground p-6 text-sm">Loading…</div>;
+const GlobalTab = dynamic(() => import("./global-tab"), { loading: TabLoading });
+const GroupsTab = dynamic(() => import("./groups-tab"), { loading: TabLoading });
+const IndividualsTab = dynamic(() => import("./individuals-tab"), { loading: TabLoading });
+const RecurringTab = dynamic(() => import("./recurring-tab"), { loading: TabLoading });
+const AdHocTab = dynamic(() => import("./adhoc-tab"), { loading: TabLoading });
 import type {
   AdHocTask,
   AllocationBucket,
