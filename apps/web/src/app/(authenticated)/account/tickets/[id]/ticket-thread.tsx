@@ -3,12 +3,8 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import {
-  TICKET_STATUS_VALUES,
-  markTicketReadForViewer,
-  replyToTicket,
-  setTicketStatus,
-} from "@/app/account/actions";
+import { markTicketReadForViewer, replyToTicket, setTicketStatus } from "@/app/account/actions";
+import { TICKET_STATUS_VALUES } from "@/app/account/constants";
 
 export type TicketDetail = {
   id: string;

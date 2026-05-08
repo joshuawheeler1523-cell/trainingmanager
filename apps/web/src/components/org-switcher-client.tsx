@@ -60,11 +60,12 @@ export default function OrgSwitcherClient({ orgs, currentOrgId, isAdmin = false 
                 <form key={org.id} action={switchOrg}>
                   <input type="hidden" name="orgId" value={org.id} />
                   <input type="hidden" name="returnPath" value={pathname} />
+                  {/* No onClick that sets state here — pre-empting the
+                      submission can tear down the form before the server
+                      action fires. The post-action redirect re-renders the
+                      page anyway, which closes the dropdown. */}
                   <button
                     type="submit"
-                    onClick={() => {
-                      setOpen(false);
-                    }}
                     className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   >
                     <BuildingOfficeIcon className="h-4 w-4 shrink-0 text-gray-400" />

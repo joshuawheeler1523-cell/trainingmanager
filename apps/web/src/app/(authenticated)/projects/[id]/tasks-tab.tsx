@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
@@ -165,28 +165,13 @@ export default function TasksTab({
                     </select>
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        step={5}
-                        defaultValue={t.percent_complete}
-                        disabled={pending}
-                        onMouseUp={(e) => {
-                          const v = Number((e.target as HTMLInputElement).value);
-                          if (v !== t.percent_complete) handlePercentChange(t, v);
-                        }}
-                        onTouchEnd={(e) => {
-                          const v = Number((e.target as HTMLInputElement).value);
-                          if (v !== t.percent_complete) handlePercentChange(t, v);
-                        }}
-                        className="w-20"
-                      />
-                      <span className="text-muted-foreground w-9 text-right text-xs tabular-nums">
-                        {t.percent_complete.toString()}%
-                      </span>
-                    </div>
+                    <TaskPercentInput
+                      value={t.percent_complete}
+                      disabled={pending}
+                      onCommit={(v) => {
+                        handlePercentChange(t, v);
+                      }}
+                    />
                   </td>
                   <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
                     {t.estimated_hours != null ? `${t.estimated_hours.toFixed(0)}h est` : "—"}
@@ -290,5 +275,84 @@ function Th({ children, className }: { children?: React.ReactNode; className?: s
     >
       {children}
     </th>
+  );
+}
+
+/**
+ * Slider + number input for task completion %. Either control commits via
+ * onCommit. Slider commits on release; number commits on blur or Enter.
+ * Both are controlled and stay in sync with the parent's value (so a
+ * router.refresh() updates them).
+ */
+function TaskPercentInput({
+  value,
+  disabled,
+  onCommit,
+}: {
+  value: number;
+  disabled: boolean;
+  onCommit: (v: number) => void;
+}) {
+  const [draft, setDraft] = useState<number>(value);
+
+  // Sync if the parent's value changes (e.g. after router.refresh()).
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  function clamp(n: number): number {
+    if (!Number.isFinite(n)) return value;
+    return Math.max(0, Math.min(100, Math.round(n)));
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={5}
+        value={draft}
+        disabled={disabled}
+        onChange={(e) => {
+          setDraft(Number(e.target.value));
+        }}
+        onPointerUp={() => {
+          if (draft !== value) onCommit(draft);
+        }}
+        onKeyUp={(e) => {
+          if (e.key === "Enter" && draft !== value) onCommit(draft);
+        }}
+        className="w-20"
+        aria-label="Percent complete"
+      />
+      <input
+        type="number"
+        min={0}
+        max={100}
+        step={1}
+        value={draft}
+        disabled={disabled}
+        onChange={(e) => {
+          setDraft(Number(e.target.value));
+        }}
+        onBlur={() => {
+          const next = clamp(draft);
+          setDraft(next);
+          if (next !== value) onCommit(next);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+          } else if (e.key === "Escape") {
+            setDraft(value);
+            e.currentTarget.blur();
+          }
+        }}
+        className="border-input bg-background text-foreground focus:ring-ring w-14 rounded-md border px-1.5 py-0.5 text-right text-xs tabular-nums focus:outline-none focus:ring-1"
+        aria-label="Percent complete (numeric)"
+      />
+      <span className="text-muted-foreground text-xs">%</span>
+    </div>
   );
 }

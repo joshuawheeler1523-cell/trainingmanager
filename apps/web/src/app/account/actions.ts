@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { TICKET_CATEGORY_VALUES, TICKET_PRIORITY_VALUES, TICKET_STATUS_VALUES } from "./constants";
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -42,15 +43,6 @@ async function ctx() {
 }
 
 // ── tickets ────────────────────────────────────────────────────────────────
-
-export const TICKET_CATEGORY_VALUES = [
-  "bug",
-  "how_to",
-  "feature_request",
-  "account_billing",
-] as const;
-export const TICKET_PRIORITY_VALUES = ["low", "medium", "high", "urgent"] as const;
-export const TICKET_STATUS_VALUES = ["open", "pending", "resolved", "closed"] as const;
 
 const ticketInsertSchema = z.object({
   subject: z.string().min(1, "Subject is required").max(200),

@@ -10,11 +10,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { PlusIcon } from "@heroicons/react/20/solid";
 import EmptyState from "@/components/ui/empty-state";
-import {
-  TICKET_CATEGORY_VALUES,
-  TICKET_PRIORITY_VALUES,
-  createTicket,
-} from "@/app/account/actions";
+import { createTicket } from "@/app/account/actions";
+import { TICKET_CATEGORY_VALUES, TICKET_PRIORITY_VALUES } from "@/app/account/constants";
 
 export type TicketRow = {
   id: string;
