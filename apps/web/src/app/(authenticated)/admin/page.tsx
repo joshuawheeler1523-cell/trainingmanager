@@ -4,6 +4,7 @@ import {
   Cog8ToothIcon,
   EnvelopeIcon,
   LinkIcon,
+  SparklesIcon,
   UsersIcon,
 } from "@heroicons/react/20/solid";
 import PageHeader from "@/components/ui/page-header";
@@ -38,6 +39,12 @@ const TILES = [
     title: "Public intake links",
     description: "Tokenized URLs for the education request form.",
     Icon: LinkIcon,
+  },
+  {
+    href: "/admin/seed-demo",
+    title: "Demo organization",
+    description: "Spin up Riverside Memorial Hospital with full demo data.",
+    Icon: SparklesIcon,
   },
 ];
 
