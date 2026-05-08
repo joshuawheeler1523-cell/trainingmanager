@@ -15,13 +15,68 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Polls GitHub deployment_status events for the SHA we're testing until
+      # Vercel reports success. We don't HTTP-check the URL here because
+      # preview URLs are behind Standard Protection — Lighthouse will hit
+      # them with the bypass header (configured in lighthouserc.cjs).
       - name: Wait for Vercel deployment
         id: vercel
-        uses: patrickedqvist/wait-for-vercel-preview@v1.3.2
+        uses: actions/github-script@v7
+        env:
+          MAX_WAIT_SECONDS: "600"
+          POLL_INTERVAL_SECONDS: "10"
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          max_timeout: 600
-          check_interval: 10
+          script: |
+            const sha =
+              context.payload.pull_request?.head?.sha ?? context.sha;
+            const start = Date.now();
+            const maxMs = Number(process.env.MAX_WAIT_SECONDS) * 1000;
+            const intervalMs = Number(process.env.POLL_INTERVAL_SECONDS) * 1000;
+
+            core.info(`Waiting for Vercel deployment for ${sha}`);
+
+            while (Date.now() - start < maxMs) {
+              const { data: deployments } = await github.rest.repos.listDeployments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha,
+                per_page: 20,
+              });
+
+              const vercelDeployments = deployments.filter(
+                (d) => d.creator?.login === "vercel[bot]",
+              );
+
+              for (const d of vercelDeployments) {
+                const { data: statuses } =
+                  await github.rest.repos.listDeploymentStatuses({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    deployment_id: d.id,
+                  });
+                const success = statuses.find((s) => s.state === "success");
+                if (success?.environment_url) {
+                  core.info(`Found deployment URL: ${success.environment_url}`);
+                  core.setOutput("url", success.environment_url);
+                  return;
+                }
+                const failed = statuses.find(
+                  (s) => s.state === "failure" || s.state === "error",
+                );
+                if (failed) {
+                  core.setFailed(
+                    `Vercel deployment ${d.id} reported ${failed.state}: ${failed.description ?? "(no description)"}`,
+                  );
+                  return;
+                }
+              }
+
+              await new Promise((resolve) => setTimeout(resolve, intervalMs));
+            }
+
+            core.setFailed(
+              `Timed out after ${process.env.MAX_WAIT_SECONDS}s waiting for a Vercel deployment success status for ${sha}`,
+            );
 
       - name: Run Lighthouse
         uses: treosh/lighthouse-ci-action@v12
