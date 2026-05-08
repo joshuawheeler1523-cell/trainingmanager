@@ -104,3 +104,15 @@
     border-radius: var(--radius-sm);
   }
 }
+
+/* Honor prefers-reduced-motion for users who set the OS-level preference. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

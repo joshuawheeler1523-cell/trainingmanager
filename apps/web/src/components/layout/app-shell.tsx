@@ -50,6 +50,14 @@ export default function AppShell({
 
   return (
     <div className="flex min-h-screen flex-col">
+      {/* Skip to content — visible only when focused via keyboard. */}
+      <a
+        href="#main-content"
+        className="bg-primary text-primary-foreground focus:ring-ring sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2"
+      >
+        Skip to main content
+      </a>
+
       {/* Top bar */}
       <header className="border-border bg-background sticky top-0 z-30 flex h-12 items-center gap-3 border-b px-4">
         {/* Left: logo + org switcher */}
@@ -74,6 +82,7 @@ export default function AppShell({
         <div className="flex items-center gap-1">
           <NotificationBell initial={initialNotifications} userId={userId} />
           <button
+            type="button"
             onClick={() => {
               setHelpOpen(true);
             }}
@@ -93,7 +102,9 @@ export default function AppShell({
       <SubBar />
 
       {/* Page content */}
-      <main className="bg-surface flex-1">{children}</main>
+      <main id="main-content" tabIndex={-1} className="bg-surface flex-1">
+        {children}
+      </main>
 
       {/* Global overlays */}
       <CommandPalette

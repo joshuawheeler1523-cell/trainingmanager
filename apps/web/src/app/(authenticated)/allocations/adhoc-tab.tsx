@@ -102,6 +102,7 @@ export default function AdHocTab({ tasks, buckets, instructors }: Props) {
           <div>
             <p className="text-muted-foreground mb-1 text-xs font-medium">Status</p>
             <select
+              aria-label="Filter by status"
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value as AdHocStatus | "all");
@@ -119,6 +120,7 @@ export default function AdHocTab({ tasks, buckets, instructors }: Props) {
           <div>
             <p className="text-muted-foreground mb-1 text-xs font-medium">Instructor</p>
             <select
+              aria-label="Filter by instructor"
               value={instructorFilter}
               onChange={(e) => {
                 setInstructorFilter(e.target.value);
@@ -140,6 +142,7 @@ export default function AdHocTab({ tasks, buckets, instructors }: Props) {
           <div>
             <p className="text-muted-foreground mb-1 text-xs font-medium">Bucket</p>
             <select
+              aria-label="Filter by bucket"
               value={bucketFilter}
               onChange={(e) => {
                 setBucketFilter(e.target.value);
@@ -162,6 +165,7 @@ export default function AdHocTab({ tasks, buckets, instructors }: Props) {
             <p className="text-muted-foreground mb-1 text-xs font-medium">Due from</p>
             <input
               type="date"
+              aria-label="Filter due date from"
               value={fromDate}
               onChange={(e) => {
                 setFromDate(e.target.value);
@@ -173,6 +177,7 @@ export default function AdHocTab({ tasks, buckets, instructors }: Props) {
             <p className="text-muted-foreground mb-1 text-xs font-medium">Due to</p>
             <input
               type="date"
+              aria-label="Filter due date to"
               value={toDate}
               onChange={(e) => {
                 setToDate(e.target.value);

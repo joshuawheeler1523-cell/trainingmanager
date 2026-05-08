@@ -40,6 +40,7 @@ export default function InstructorFilters({ departments }: Props) {
         <MagnifyingGlassIcon className="text-muted-foreground absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
         <input
           type="search"
+          aria-label="Search instructors by name or email"
           value={search}
           onChange={(e) => {
             push("search", e.target.value);

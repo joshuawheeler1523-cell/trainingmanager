@@ -344,6 +344,7 @@ function GroupDetail({
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="search"
+            aria-label="Search instructors to add"
             placeholder="Search instructors…"
             value={memberSearch}
             onChange={(e) => {

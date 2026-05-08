@@ -56,6 +56,8 @@ export default function DataTable<T>({
       {/* Search */}
       <div className="flex items-center gap-3">
         <input
+          type="search"
+          aria-label={searchPlaceholder}
           value={globalFilter}
           onChange={(e) => {
             setGlobalFilter(e.target.value);

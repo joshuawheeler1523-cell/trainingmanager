@@ -25,6 +25,7 @@ export default function CommandPalette({ open, onClose }: Props) {
             <MagnifyingGlassIcon className="text-muted-foreground h-4 w-4 shrink-0" />
             <input
               autoFocus
+              aria-label="Search the app"
               placeholder="Search…"
               className="text-foreground placeholder:text-muted-foreground flex-1 bg-transparent text-sm focus:outline-none"
             />

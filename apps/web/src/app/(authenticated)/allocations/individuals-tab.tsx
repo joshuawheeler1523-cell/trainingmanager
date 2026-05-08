@@ -150,6 +150,7 @@ export default function IndividualsTab({
     <div className="space-y-4">
       <input
         type="search"
+        aria-label="Search instructors"
         placeholder="Search instructors…"
         value={search}
         onChange={(e) => {

@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "analyze": "next experimental-analyze --output",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@arbor/shared": "workspace:*",
@@ -40,6 +42,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@playwright/test": "^1.49.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",

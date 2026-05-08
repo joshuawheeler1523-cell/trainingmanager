@@ -96,6 +96,7 @@ export default function HelpDrawer({ open, onClose }: Props) {
                 <MagnifyingGlassIcon className="text-muted-foreground h-4 w-4 shrink-0" />
                 <input
                   autoFocus
+                  aria-label="Search help articles"
                   value={query}
                   onChange={(e) => {
                     setQuery(e.target.value);
