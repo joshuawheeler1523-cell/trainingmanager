@@ -336,7 +336,7 @@ export default async function DashboardPage() {
         <section className="border-border bg-background rounded-xl border p-5">
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <div>
-              <h3 className="text-foreground font-serif text-base tracking-tight">
+              <h3 className="text-foreground text-base font-bold tracking-tight">
                 Capacity health
               </h3>
               <p className="text-muted-foreground mt-0.5 text-xs">
@@ -372,7 +372,7 @@ export default async function DashboardPage() {
         {/* At-risk commitments — full width */}
         <section className="border-border bg-background rounded-xl border p-5">
           <div className="mb-4">
-            <h3 className="text-foreground font-serif text-base tracking-tight">
+            <h3 className="text-foreground text-base font-bold tracking-tight">
               At-risk commitments
             </h3>
             <p className="text-muted-foreground mt-0.5 text-xs">
@@ -383,7 +383,7 @@ export default async function DashboardPage() {
           <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-3">
             {/* Overdue milestones */}
             <div>
-              <p className="text-foreground mb-2 text-xs font-semibold uppercase tracking-[0.08em]">
+              <p className="text-muted-foreground mb-2 text-xs font-semibold">
                 Overdue milestones{" "}
                 <span className="text-muted-foreground font-normal normal-case tracking-normal">
                   ({overdueMilestones.length})
@@ -421,7 +421,7 @@ export default async function DashboardPage() {
 
             {/* Schedule conflicts */}
             <div>
-              <p className="text-foreground mb-2 text-xs font-semibold uppercase tracking-[0.08em]">
+              <p className="text-muted-foreground mb-2 text-xs font-semibold">
                 Schedule conflicts{" "}
                 <span className="text-muted-foreground font-normal normal-case tracking-normal">
                   ({conflictRollups.length})
@@ -460,7 +460,7 @@ export default async function DashboardPage() {
 
             {/* Coverage gaps */}
             <div>
-              <p className="text-foreground mb-2 text-xs font-semibold uppercase tracking-[0.08em]">
+              <p className="text-muted-foreground mb-2 text-xs font-semibold">
                 Coverage gaps{" "}
                 <span className="text-muted-foreground font-normal normal-case tracking-normal">
                   ({coverageGaps.length})
@@ -602,9 +602,7 @@ function KpiCard({
       className="border-border bg-background hover:border-primary group block rounded-xl border p-4 transition-colors"
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-muted-foreground text-xs font-medium uppercase tracking-[0.06em]">
-          {label}
-        </p>
+        <p className="text-muted-foreground text-xs font-medium">{label}</p>
         <span
           aria-hidden="true"
           className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
@@ -614,7 +612,7 @@ function KpiCard({
         </span>
       </div>
       <p
-        className="mt-2 font-serif text-3xl tabular-nums tracking-tight"
+        className="mt-2 text-3xl font-bold tabular-nums tracking-tight"
         style={{ color: styles.value }}
       >
         {value}
@@ -660,7 +658,7 @@ function CapacityColumn({
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <p className="text-foreground text-xs font-semibold uppercase tracking-[0.08em]">
+        <p className="text-muted-foreground text-xs font-semibold">
           {title}{" "}
           <span className="text-muted-foreground font-normal normal-case tracking-normal">
             ({rows.length})

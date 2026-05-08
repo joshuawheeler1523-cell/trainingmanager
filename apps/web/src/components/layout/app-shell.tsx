@@ -46,7 +46,7 @@ export default function AppShell({
   });
 
   return (
-    <div className="bg-surface flex min-h-screen">
+    <div className="bg-canvas flex min-h-screen">
       {/* Skip to content — visible only when focused via keyboard. */}
       <a
         href="#main-content"
@@ -80,7 +80,7 @@ export default function AppShell({
         </header>
 
         {/* Page content */}
-        <main id="main-content" tabIndex={-1} className="bg-surface flex-1">
+        <main id="main-content" tabIndex={-1} className="bg-canvas flex-1">
           {children}
         </main>
       </div>
