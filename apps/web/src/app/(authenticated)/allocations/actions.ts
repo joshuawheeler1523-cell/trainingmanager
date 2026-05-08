@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import {
   bucketInsertSchema,
   bucketUpdateSchema,
@@ -38,11 +39,21 @@ function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 async function ctx() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) {
     return { ok: false as const, error: { code: "NO_ORG", message: "No active organization" } };
   }
-  return { ok: true as const, supabase, orgId };
+  if (!departmentId) {
+    return {
+      ok: false as const,
+      error: { code: "NO_DEPARTMENT", message: "No active department" },
+    };
+  }
+  return { ok: true as const, supabase, orgId, departmentId };
 }
 
 // ── allocation_buckets ──────────────────────────────────────────────────────
@@ -56,7 +67,7 @@ export async function createBucket(input: unknown): Promise<ActionResult<Allocat
 
   const { data, error } = await c.supabase
     .from("allocation_buckets")
-    .insert({ ...parsed.data, org_id: c.orgId })
+    .insert({ ...parsed.data, org_id: c.orgId, department_id: c.departmentId })
     .select()
     .single();
 
@@ -186,6 +197,7 @@ export async function saveGlobalAllocations(
     const { error: upsertErr } = await c.supabase.from("global_allocations").upsert(
       parsed.data.map((s) => ({
         org_id: c.orgId,
+        department_id: c.departmentId,
         bucket_id: s.bucket_id,
         target_percent: s.target_percent,
       })),
@@ -210,7 +222,7 @@ export async function createGroup(input: unknown): Promise<ActionResult<Allocati
 
   const { data, error } = await c.supabase
     .from("allocation_groups")
-    .insert({ ...parsed.data, org_id: c.orgId })
+    .insert({ ...parsed.data, org_id: c.orgId, department_id: c.departmentId })
     .select()
     .single();
 
@@ -284,7 +296,12 @@ export async function addGroupMember(
 
   const { error } = await c.supabase
     .from("allocation_group_members")
-    .insert({ group_id: groupId, instructor_id: instructorId, org_id: c.orgId });
+    .insert({
+      group_id: groupId,
+      instructor_id: instructorId,
+      org_id: c.orgId,
+      department_id: c.departmentId,
+    });
 
   if (error) {
     const message = error.code === "23505" ? "Instructor is already in this group." : error.message;
@@ -354,6 +371,7 @@ export async function saveGroupAllocations(
     const { error: upsertErr } = await c.supabase.from("group_allocations").upsert(
       parsed.data.map((s) => ({
         org_id: c.orgId,
+        department_id: c.departmentId,
         group_id: groupId,
         bucket_id: s.bucket_id,
         target_percent: s.target_percent,
@@ -401,6 +419,7 @@ export async function saveIndividualAllocations(
     const { error: upsertErr } = await c.supabase.from("individual_allocations").upsert(
       parsed.data.map((s) => ({
         org_id: c.orgId,
+        department_id: c.departmentId,
         instructor_id: instructorId,
         bucket_id: s.bucket_id,
         target_percent: s.target_percent,

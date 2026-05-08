@@ -40,6 +40,23 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     if (orgErr || !org) throw new Error(`Create org: ${orgErr?.message ?? "no row"}`);
     const orgId = org.id;
 
+    // Create the General department for this org and the caller's
+    // department membership. Every seeded record below is scoped to
+    // this department.
+    const { data: dept, error: deptErr } = await admin
+      .from("departments")
+      .insert({
+        org_id: orgId,
+        name: "General",
+        slug: "general",
+        description: "Default department — created with the org.",
+      })
+      .select("id")
+      .single();
+    if (deptErr || !dept) throw new Error(`Create department: ${deptErr?.message ?? "no row"}`);
+    const deptId = dept.id;
+
+    // org_memberships is org-scoped — does NOT take department_id.
     const { error: memErr } = await admin.from("org_memberships").insert({
       org_id: orgId,
       user_id: user.id,
@@ -47,6 +64,14 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       accepted_at: new Date().toISOString(),
     });
     if (memErr) throw new Error(`Create membership: ${memErr.message}`);
+
+    const { error: deptMemErr } = await admin.from("department_memberships").insert({
+      department_id: deptId,
+      user_id: user.id,
+      role: "department_admin",
+      accepted_at: new Date().toISOString(),
+    });
+    if (deptMemErr) throw new Error(`Create department membership: ${deptMemErr.message}`);
 
     // ── 3. Skills ────────────────────────────────────────────────────────
     const skillSeeds = [
@@ -61,7 +86,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     ];
     const { data: skills, error: skillErr } = await admin
       .from("skills")
-      .insert(skillSeeds.map((s) => ({ ...s, org_id: orgId })))
+      .insert(skillSeeds.map((s) => ({ ...s, org_id: orgId, department_id: deptId })))
       .select("id, name");
     if (skillErr || !skills) throw new Error(`Skills: ${skillErr?.message ?? "no rows"}`);
     const skillByName = new Map(skills.map((s) => [s.name, s.id]));
@@ -87,7 +112,14 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     ];
     const { data: instructors, error: instErr } = await admin
       .from("instructors")
-      .insert(instructorSeeds.map((i) => ({ ...i, org_id: orgId, status: "active" as const })))
+      .insert(
+        instructorSeeds.map((i) => ({
+          ...i,
+          org_id: orgId,
+          department_id: deptId,
+          status: "active" as const,
+        })),
+      )
       .select("id, full_name, department");
     if (instErr || !instructors) throw new Error(`Instructors: ${instErr?.message ?? "no rows"}`);
     const instById = new Map(instructors.map((i) => [i.full_name, i]));
@@ -125,6 +157,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         if (!inst || !skillId) return null;
         return {
           org_id: orgId,
+          department_id: deptId,
           instructor_id: inst.id,
           skill_id: skillId,
           proficiency: prof,
@@ -144,7 +177,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     ];
     const { data: buckets, error: bucketErr } = await admin
       .from("allocation_buckets")
-      .insert(bucketSeeds.map((b) => ({ ...b, org_id: orgId })))
+      .insert(bucketSeeds.map((b) => ({ ...b, org_id: orgId, department_id: deptId })))
       .select("id, name");
     if (bucketErr || !buckets) throw new Error(`Buckets: ${bucketErr?.message ?? "no rows"}`);
     const bucketByName = new Map(buckets.map((b) => [b.name, b.id]));
@@ -160,6 +193,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     const { error: gaErr } = await admin.from("global_allocations").insert(
       globalAllocs.map((g) => ({
         org_id: orgId,
+        department_id: deptId,
         bucket_id: bucketByName.get(g.bucketName)!,
         target_percent: g.percent,
       })),
@@ -170,8 +204,8 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     const { data: groups, error: groupErr } = await admin
       .from("allocation_groups")
       .insert([
-        { org_id: orgId, name: "Surgical Education Team" },
-        { org_id: orgId, name: "Emergency & Trauma Educators" },
+        { org_id: orgId, department_id: deptId, name: "Surgical Education Team" },
+        { org_id: orgId, department_id: deptId, name: "Emergency & Trauma Educators" },
       ])
       .select("id, name");
     if (groupErr || !groups) throw new Error(`Groups: ${groupErr?.message ?? "no rows"}`);
@@ -186,6 +220,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     await admin.from("allocation_group_members").insert(
       groupMembers.map((m) => ({
         org_id: orgId,
+        department_id: deptId,
         group_id: groupByName.get(m.group)!,
         instructor_id: instById.get(m.instructor)!.id,
       })),
@@ -195,12 +230,14 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       // Surgical team — heavier on procedural / direct training
       {
         org_id: orgId,
+        department_id: deptId,
         group_id: groupByName.get("Surgical Education Team")!,
         bucket_id: bucketByName.get("Direct Training")!,
         target_percent: 60,
       },
       {
         org_id: orgId,
+        department_id: deptId,
         group_id: groupByName.get("Surgical Education Team")!,
         bucket_id: bucketByName.get("Course Development")!,
         target_percent: 25,
@@ -208,6 +245,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       // Emergency team — heavier on direct training
       {
         org_id: orgId,
+        department_id: deptId,
         group_id: groupByName.get("Emergency & Trauma Educators")!,
         bucket_id: bucketByName.get("Direct Training")!,
         target_percent: 65,
@@ -218,12 +256,14 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     await admin.from("individual_allocations").insert([
       {
         org_id: orgId,
+        department_id: deptId,
         instructor_id: instById.get("Quentin Reyes")!.id,
         bucket_id: bucketByName.get("Compliance & Audits")!,
         target_percent: 50,
       },
       {
         org_id: orgId,
+        department_id: deptId,
         instructor_id: instById.get("Quentin Reyes")!.id,
         bucket_id: bucketByName.get("Direct Training")!,
         target_percent: 30,
@@ -236,6 +276,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       .insert([
         {
           org_id: orgId,
+          department_id: deptId,
           name: "Weekly competency huddle",
           frequency: "weekly",
           hours_per_occurrence: 1,
@@ -245,6 +286,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           name: "Quarterly compliance audit prep",
           frequency: "quarterly",
           hours_per_occurrence: 8,
@@ -270,6 +312,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         await admin.from("recurring_task_assignments").insert(
           recAssigns.map((r) => ({
             org_id: orgId,
+            department_id: deptId,
             recurring_task_id: r.recurring_task_id,
             instructor_id: instById.get(r.name)!.id,
             share_percent: 100,
@@ -282,6 +325,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     await admin.from("ad_hoc_tasks").insert([
       {
         org_id: orgId,
+        department_id: deptId,
         name: "Update sepsis bundle order set training",
         hours: 6,
         status: "in_progress",
@@ -291,6 +335,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         name: "Pediatric pain assessment refresher",
         hours: 4,
         status: "open",
@@ -299,6 +344,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         name: "OR robotics quarterly recert",
         hours: 12,
         status: "open",
@@ -314,6 +360,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       .insert([
         {
           org_id: orgId,
+          department_id: deptId,
           name: "Epic EHR — Inpatient Nursing Bootcamp",
           total_days: 3,
           offerings_per_year: 30,
@@ -325,6 +372,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           name: "Trauma Code Response Simulation",
           total_days: 1,
           offerings_per_year: 16,
@@ -336,6 +384,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           name: "Pediatric Critical Care Refresher",
           total_days: 2,
           offerings_per_year: 6,
@@ -347,6 +396,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           name: "da Vinci Robotics — Console Recert",
           total_days: 1,
           offerings_per_year: 8,
@@ -358,6 +408,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           name: "BLS Provider — Quarterly Cohort",
           total_days: 1,
           offerings_per_year: 16,
@@ -376,6 +427,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     await admin.from("class_skill_requirements").insert([
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("Epic EHR — Inpatient Nursing Bootcamp")!,
         skill_id: skillByName.get("Epic EHR")!,
         min_proficiency: "advanced",
@@ -383,6 +435,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("Trauma Code Response Simulation")!,
         skill_id: skillByName.get("Trauma & Code Response")!,
         min_proficiency: "expert",
@@ -390,6 +443,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("Trauma Code Response Simulation")!,
         skill_id: skillByName.get("Adult ACLS")!,
         min_proficiency: "advanced",
@@ -397,6 +451,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("Pediatric Critical Care Refresher")!,
         skill_id: skillByName.get("Pediatric Critical Care")!,
         min_proficiency: "expert",
@@ -404,6 +459,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("da Vinci Robotics — Console Recert")!,
         skill_id: skillByName.get("Surgical Robotics (da Vinci)")!,
         min_proficiency: "expert",
@@ -411,6 +467,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("BLS Provider — Quarterly Cohort")!,
         skill_id: skillByName.get("BLS / CPR")!,
         min_proficiency: "advanced",
@@ -421,6 +478,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     await admin.from("class_instructor_assignments").insert([
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("Epic EHR — Inpatient Nursing Bootcamp")!,
         instructor_id: instById.get("Maya Castellanos")!.id,
         role: "primary",
@@ -428,6 +486,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("Epic EHR — Inpatient Nursing Bootcamp")!,
         instructor_id: instById.get("Aisha Bello")!.id,
         role: "backup",
@@ -435,6 +494,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("Trauma Code Response Simulation")!,
         instructor_id: instById.get("Hannah O'Connor")!.id,
         role: "primary",
@@ -442,6 +502,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("Trauma Code Response Simulation")!,
         instructor_id: instById.get("Reggie Strand")!.id,
         role: "backup",
@@ -449,6 +510,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("Pediatric Critical Care Refresher")!,
         instructor_id: instById.get("Nadia Haddad")!.id,
         role: "primary",
@@ -456,6 +518,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("da Vinci Robotics — Console Recert")!,
         instructor_id: instById.get("Priya Chandrasekaran")!.id,
         role: "primary",
@@ -463,6 +526,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("da Vinci Robotics — Console Recert")!,
         instructor_id: instById.get("Marcus Webb")!.id,
         role: "backup",
@@ -470,6 +534,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("BLS Provider — Quarterly Cohort")!,
         instructor_id: instById.get("Reggie Strand")!.id,
         role: "primary",
@@ -477,6 +542,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         class_id: classByName.get("BLS Provider — Quarterly Cohort")!,
         instructor_id: instById.get("Aisha Bello")!.id,
         role: "eligible",
@@ -501,6 +567,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       .insert([
         {
           org_id: orgId,
+          department_id: deptId,
           project_name: "Sepsis Bundle Rollout — Phase 1",
           requesting_department: "Quality & Patient Safety",
           stakeholder_name: "Dr. Elise Mwangi",
@@ -513,6 +580,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_name: "Cerner-to-Epic Migration Education",
           requesting_department: "Clinical Informatics",
           stakeholder_name: "Tomás Rivera",
@@ -525,6 +593,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_name: "Pediatric Pain Assessment Refresh",
           requesting_department: "Pediatrics",
           stakeholder_name: "Dr. Aanya Khanna",
@@ -535,6 +604,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_name: "Robotics Console Recertification",
           requesting_department: "Surgery",
           stakeholder_name: "Priya Chandrasekaran",
@@ -551,6 +621,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       await admin.from("tra_deliverables").insert([
         {
           org_id: orgId,
+          department_id: deptId,
           tra_id: traByName.get("Sepsis Bundle Rollout — Phase 1")!,
           deliverable_type_id: dtId("eLearning Module"),
           name: "Sepsis bundle eLearning",
@@ -560,6 +631,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           tra_id: traByName.get("Sepsis Bundle Rollout — Phase 1")!,
           deliverable_type_id: dtId("Job Aid"),
           name: "Order set quick-reference card",
@@ -569,6 +641,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           tra_id: traByName.get("Cerner-to-Epic Migration Education")!,
           deliverable_type_id: dtId("Instructor-Led Class"),
           name: "Inpatient Nursing Bootcamp (3-day)",
@@ -578,6 +651,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           tra_id: traByName.get("Cerner-to-Epic Migration Education")!,
           deliverable_type_id: dtId("Simulation"),
           name: "Code response sim w/ Epic flowsheets",
@@ -587,6 +661,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           tra_id: traByName.get("Pediatric Pain Assessment Refresh")!,
           deliverable_type_id: dtId("eLearning Module"),
           name: "FLACC & CRIES refresher",
@@ -596,6 +671,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           tra_id: traByName.get("Robotics Console Recertification")!,
           deliverable_type_id: dtId("Instructor-Led Class"),
           name: "Console recert lab",
@@ -612,6 +688,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       .insert([
         {
           org_id: orgId,
+          department_id: deptId,
           name: "Cerner-to-Epic Migration Education",
           description:
             "End-to-end curriculum buildout and rollout for the Cerner → Epic migration.",
@@ -624,6 +701,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           name: "Robotics Console Recertification — Q3",
           description: "Q3 recert wave for da Vinci console operators.",
           status: "planning",
@@ -635,6 +713,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           name: "Pediatric Pain Assessment Refresh",
           description: "Quarterly Peds refresh with online module + huddle.",
           status: "completed",
@@ -654,6 +733,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       .insert([
         {
           org_id: orgId,
+          department_id: deptId,
           project_id: projByName.get("Cerner-to-Epic Migration Education")!,
           instructor_id: instById.get("Tomás Rivera")!.id,
           role: "lead",
@@ -661,6 +741,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_id: projByName.get("Cerner-to-Epic Migration Education")!,
           instructor_id: instById.get("Maya Castellanos")!.id,
           role: "member",
@@ -668,6 +749,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_id: projByName.get("Cerner-to-Epic Migration Education")!,
           instructor_id: instById.get("Devon Park")!.id,
           role: "member",
@@ -675,6 +757,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_id: projByName.get("Cerner-to-Epic Migration Education")!,
           instructor_id: instById.get("Hannah O'Connor")!.id,
           role: "reviewer",
@@ -682,6 +765,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_id: projByName.get("Robotics Console Recertification — Q3")!,
           instructor_id: instById.get("Priya Chandrasekaran")!.id,
           role: "lead",
@@ -689,6 +773,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_id: projByName.get("Robotics Console Recertification — Q3")!,
           instructor_id: instById.get("Marcus Webb")!.id,
           role: "member",
@@ -702,6 +787,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     await admin.from("milestones").insert([
       {
         org_id: orgId,
+        department_id: deptId,
         project_id: cernerProjId,
         name: "Curriculum approved",
         // Intentionally past — drives the "Overdue milestones" dashboard widget.
@@ -711,6 +797,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         project_id: cernerProjId,
         name: "First cohort complete",
         due_date: addDaysIso(45),
@@ -719,6 +806,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       },
       {
         org_id: orgId,
+        department_id: deptId,
         project_id: cernerProjId,
         name: "Go-live training complete",
         due_date: addDaysIso(110),
@@ -733,6 +821,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       .insert([
         {
           org_id: orgId,
+          department_id: deptId,
           project_id: cernerProjId,
           name: "Curriculum design + outline",
           status: "completed",
@@ -745,6 +834,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_id: cernerProjId,
           name: "Build inpatient bootcamp deck",
           status: "in_progress",
@@ -757,6 +847,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_id: cernerProjId,
           name: "Build ED & surgical decks",
           status: "in_progress",
@@ -769,6 +860,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_id: cernerProjId,
           name: "Schedule cohort sessions",
           status: "not_started",
@@ -781,6 +873,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_id: cernerProjId,
           name: "Run first cohort (3-day)",
           status: "not_started",
@@ -793,6 +886,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           project_id: cernerProjId,
           name: "Code response sim build",
           status: "on_hold",
@@ -809,6 +903,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     // External dep for Cerner project
     await admin.from("dependencies").insert({
       org_id: orgId,
+      department_id: deptId,
       project_id: cernerProjId,
       name: "Epic build environment access for screen captures",
       description: "Need provisioned screens before deck build can finish.",
@@ -831,6 +926,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         await admin.from("task_assignments").insert(
           assigns.map((a) => ({
             org_id: orgId,
+            department_id: deptId,
             task_id: a.task_id,
             project_team_member_id: a.ptm_id,
             allocated_hours: a.hours,
@@ -844,6 +940,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       .from("implementations")
       .insert({
         org_id: orgId,
+        department_id: deptId,
         name: "Epic Cutover — Wave 1 (Inpatient Nursing)",
         status: "active",
         description:
@@ -865,11 +962,18 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         .insert([
           {
             org_id: orgId,
+            department_id: deptId,
             implementation_id: implId,
             name: "Core Inpatient Workflows",
             sort_order: 0,
           },
-          { org_id: orgId, implementation_id: implId, name: "Med Admin & MAR", sort_order: 1 },
+          {
+            org_id: orgId,
+            department_id: deptId,
+            implementation_id: implId,
+            name: "Med Admin & MAR",
+            sort_order: 1,
+          },
         ])
         .select("id, name");
       const modByName = new Map((moduleRows ?? []).map((m) => [m.name, m.id]));
@@ -878,6 +982,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       await admin.from("impl_classes").insert([
         {
           org_id: orgId,
+          department_id: deptId,
           implementation_id: implId,
           module_id: modByName.get("Core Inpatient Workflows") ?? null,
           name: "Inpatient Bootcamp (3-day)",
@@ -888,6 +993,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           implementation_id: implId,
           module_id: modByName.get("Med Admin & MAR") ?? null,
           name: "Med Admin Lab",
@@ -902,6 +1008,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       await admin.from("impl_rooms").insert([
         {
           org_id: orgId,
+          department_id: deptId,
           implementation_id: implId,
           name: "Education Center A",
           seat_capacity: 24,
@@ -910,6 +1017,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           implementation_id: implId,
           name: "Education Center B (Sim)",
           seat_capacity: 16,
@@ -918,6 +1026,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           implementation_id: implId,
           name: "Conference Suite 304",
           seat_capacity: 30,
@@ -930,6 +1039,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       await admin.from("impl_trainers").insert([
         {
           org_id: orgId,
+          department_id: deptId,
           implementation_id: implId,
           name: "Maya Castellanos",
           instructor_id: instById.get("Maya Castellanos")!.id,
@@ -939,6 +1049,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           implementation_id: implId,
           name: "Devon Park",
           instructor_id: instById.get("Devon Park")!.id,
@@ -948,6 +1059,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         },
         {
           org_id: orgId,
+          department_id: deptId,
           implementation_id: implId,
           name: "Aisha Bello",
           instructor_id: instById.get("Aisha Bello")!.id,
@@ -958,7 +1070,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       ]);
     }
 
-    // ── 15. Support tickets (sample) ─────────────────────────────────────
+    // ── 15. Support tickets (sample) — org-scoped (no department_id) ─────
     await admin.from("support_tickets").insert([
       {
         org_id: orgId,

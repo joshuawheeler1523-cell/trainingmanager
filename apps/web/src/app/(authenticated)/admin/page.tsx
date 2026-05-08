@@ -5,6 +5,7 @@ import {
   EnvelopeIcon,
   LinkIcon,
   SparklesIcon,
+  Squares2X2Icon,
   UsersIcon,
 } from "@heroicons/react/20/solid";
 import PageHeader from "@/components/ui/page-header";
@@ -45,6 +46,13 @@ const TILES = [
     title: "Demo organization",
     description: "Spin up Riverside Memorial Hospital with full demo data.",
     Icon: SparklesIcon,
+  },
+  {
+    href: "/admin/departments",
+    title: "Departments",
+    description:
+      "Sub-org isolation. Create departments inside this org for separate instructors, allocations, classes, and projects.",
+    Icon: Squares2X2Icon,
   },
 ];
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import {
   projectInsertSchema,
   projectUpdateSchema,
@@ -55,11 +56,21 @@ function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 async function ctx() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) {
     return { ok: false as const, error: { code: "NO_ORG", message: "No active organization" } };
   }
-  return { ok: true as const, supabase, orgId };
+  if (!departmentId) {
+    return {
+      ok: false as const,
+      error: { code: "NO_DEPARTMENT", message: "No active department" },
+    };
+  }
+  return { ok: true as const, supabase, orgId, departmentId };
 }
 
 function revalidateProject(id?: string) {
@@ -78,7 +89,7 @@ export async function createProject(input: unknown): Promise<ActionResult<Projec
 
   const { data, error } = await c.supabase
     .from("projects")
-    .insert({ ...parsed.data, org_id: c.orgId })
+    .insert({ ...parsed.data, org_id: c.orgId, department_id: c.departmentId })
     .select()
     .single();
 
@@ -142,6 +153,7 @@ export async function addTeamMember(
     .from("project_team_members")
     .insert({
       org_id: c.orgId,
+      department_id: c.departmentId,
       project_id: projectId,
       instructor_id: parsed.data.instructor_id,
       role: parsed.data.role,
@@ -212,7 +224,12 @@ export async function createTask(projectId: string, input: unknown): Promise<Act
 
   const { data, error } = await c.supabase
     .from("tasks")
-    .insert({ ...parsed.data, org_id: c.orgId, project_id: projectId })
+    .insert({
+      ...parsed.data,
+      org_id: c.orgId,
+      department_id: c.departmentId,
+      project_id: projectId,
+    })
     .select()
     .single();
 
@@ -279,6 +296,7 @@ export async function assignTaskMember(
     .upsert(
       {
         org_id: c.orgId,
+        department_id: c.departmentId,
         task_id: taskId,
         project_team_member_id: parsed.data.project_team_member_id,
         allocated_hours: parsed.data.allocated_hours,
@@ -354,7 +372,7 @@ export async function createActionItem(
 
   const { data, error } = await c.supabase
     .from("task_action_items")
-    .insert({ ...parsed.data, org_id: c.orgId, task_id: taskId })
+    .insert({ ...parsed.data, org_id: c.orgId, department_id: c.departmentId, task_id: taskId })
     .select()
     .single();
 
@@ -423,7 +441,12 @@ export async function createMilestone(
 
   const { data, error } = await c.supabase
     .from("milestones")
-    .insert({ ...parsed.data, org_id: c.orgId, project_id: projectId })
+    .insert({
+      ...parsed.data,
+      org_id: c.orgId,
+      department_id: c.departmentId,
+      project_id: projectId,
+    })
     .select()
     .single();
 
@@ -488,7 +511,7 @@ export async function createDependency(
 
   const { data, error } = await c.supabase
     .from("task_dependencies")
-    .insert({ ...parsed.data, org_id: c.orgId })
+    .insert({ ...parsed.data, org_id: c.orgId, department_id: c.departmentId })
     .select()
     .single();
 
@@ -529,7 +552,12 @@ export async function createExternalDep(
 
   const { data, error } = await c.supabase
     .from("dependencies")
-    .insert({ ...parsed.data, org_id: c.orgId, project_id: projectId })
+    .insert({
+      ...parsed.data,
+      org_id: c.orgId,
+      department_id: c.departmentId,
+      project_id: projectId,
+    })
     .select()
     .single();
 

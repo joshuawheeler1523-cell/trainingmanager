@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import {
   traInsertSchema,
   traUpdateSchema,
@@ -39,11 +40,21 @@ function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 async function ctx() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) {
     return { ok: false as const, error: { code: "NO_ORG", message: "No active organization" } };
   }
-  return { ok: true as const, supabase, orgId };
+  if (!departmentId) {
+    return {
+      ok: false as const,
+      error: { code: "NO_DEPARTMENT", message: "No active department" },
+    };
+  }
+  return { ok: true as const, supabase, orgId, departmentId };
 }
 
 // ── tras CRUD ───────────────────────────────────────────────────────────────
@@ -57,7 +68,7 @@ export async function createTra(input: unknown): Promise<ActionResult<Tra>> {
 
   const { data, error } = await c.supabase
     .from("tras")
-    .insert({ ...parsed.data, org_id: c.orgId })
+    .insert({ ...parsed.data, org_id: c.orgId, department_id: c.departmentId })
     .select()
     .single();
 
@@ -159,7 +170,13 @@ export async function addDeliverable(
 
   const { data, error } = await c.supabase
     .from("tra_deliverables")
-    .insert({ ...parsed.data, tra_id: traId, org_id: c.orgId, estimated_hours: 0 })
+    .insert({
+      ...parsed.data,
+      tra_id: traId,
+      org_id: c.orgId,
+      department_id: c.departmentId,
+      estimated_hours: 0,
+    })
     .select()
     .single();
 
@@ -277,6 +294,7 @@ export async function convertTraToProject(
     .from("projects")
     .insert({
       org_id: c.orgId,
+      department_id: c.departmentId,
       name: tra.project_name,
       description: tra.description,
       bucket_id: bucketId,
@@ -294,6 +312,7 @@ export async function convertTraToProject(
   if (deliverableRows.length > 0) {
     const taskRows = deliverableRows.map((d, i) => ({
       org_id: c.orgId,
+      department_id: c.departmentId,
       project_id: project.id,
       name: d.name,
       estimated_hours: d.estimated_hours,

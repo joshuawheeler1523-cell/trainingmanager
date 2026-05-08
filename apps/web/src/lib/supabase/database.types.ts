@@ -14,6 +14,7 @@ export type Database = {
           completed_at: string | null;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           description: string | null;
           due_date: string | null;
           hours: number;
@@ -30,6 +31,7 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           description?: string | null;
           due_date?: string | null;
           hours: number;
@@ -46,6 +48,7 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           description?: string | null;
           due_date?: string | null;
           hours?: number;
@@ -63,6 +66,13 @@ export type Database = {
             columns: ["bucket_id"];
             isOneToOne: false;
             referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ad_hoc_tasks_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
             referencedColumns: ["id"];
           },
           {
@@ -93,6 +103,7 @@ export type Database = {
           color: string;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           description: string | null;
           display_order: number;
           id: string;
@@ -106,6 +117,7 @@ export type Database = {
           color?: string;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           description?: string | null;
           display_order?: number;
           id?: string;
@@ -119,6 +131,7 @@ export type Database = {
           color?: string;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           description?: string | null;
           display_order?: number;
           id?: string;
@@ -129,6 +142,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "allocation_buckets_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "allocation_buckets_org_id_fkey";
             columns: ["org_id"];
@@ -141,23 +161,33 @@ export type Database = {
       allocation_group_members: {
         Row: {
           created_at: string;
+          department_id: string;
           group_id: string;
           instructor_id: string;
           org_id: string;
         };
         Insert: {
           created_at?: string;
+          department_id: string;
           group_id: string;
           instructor_id: string;
           org_id: string;
         };
         Update: {
           created_at?: string;
+          department_id?: string;
           group_id?: string;
           instructor_id?: string;
           org_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "allocation_group_members_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "allocation_group_members_group_id_fkey";
             columns: ["group_id"];
@@ -192,6 +222,7 @@ export type Database = {
         Row: {
           created_at: string;
           created_by: string | null;
+          department_id: string;
           description: string | null;
           id: string;
           name: string;
@@ -202,6 +233,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           description?: string | null;
           id?: string;
           name: string;
@@ -212,6 +244,7 @@ export type Database = {
         Update: {
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           description?: string | null;
           id?: string;
           name?: string;
@@ -220,6 +253,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "allocation_groups_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "allocation_groups_org_id_fkey";
             columns: ["org_id"];
@@ -273,6 +313,7 @@ export type Database = {
           assigned_offerings: number;
           class_id: string;
           created_at: string;
+          department_id: string;
           id: string;
           instructor_id: string;
           org_id: string;
@@ -283,6 +324,7 @@ export type Database = {
           assigned_offerings?: number;
           class_id: string;
           created_at?: string;
+          department_id: string;
           id?: string;
           instructor_id: string;
           org_id: string;
@@ -293,6 +335,7 @@ export type Database = {
           assigned_offerings?: number;
           class_id?: string;
           created_at?: string;
+          department_id?: string;
           id?: string;
           instructor_id?: string;
           org_id?: string;
@@ -312,6 +355,13 @@ export type Database = {
             columns: ["class_id"];
             isOneToOne: false;
             referencedRelation: "classes_with_hours";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_instructor_assignments_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
             referencedColumns: ["id"];
           },
           {
@@ -342,6 +392,7 @@ export type Database = {
           class_id: string;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           id: string;
           min_proficiency: string;
           org_id: string;
@@ -354,6 +405,7 @@ export type Database = {
           class_id: string;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           id?: string;
           min_proficiency: string;
           org_id: string;
@@ -366,6 +418,7 @@ export type Database = {
           class_id?: string;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           id?: string;
           min_proficiency?: string;
           org_id?: string;
@@ -387,6 +440,13 @@ export type Database = {
             columns: ["class_id"];
             isOneToOne: false;
             referencedRelation: "classes_with_hours";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_skill_requirements_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
             referencedColumns: ["id"];
           },
           {
@@ -412,6 +472,7 @@ export type Database = {
           created_by: string | null;
           custom_day_hours: number[] | null;
           deleted_at: string | null;
+          department_id: string;
           description: string | null;
           hours_per_day: number | null;
           id: string;
@@ -433,6 +494,7 @@ export type Database = {
           created_by?: string | null;
           custom_day_hours?: number[] | null;
           deleted_at?: string | null;
+          department_id: string;
           description?: string | null;
           hours_per_day?: number | null;
           id?: string;
@@ -454,6 +516,7 @@ export type Database = {
           created_by?: string | null;
           custom_day_hours?: number[] | null;
           deleted_at?: string | null;
+          department_id?: string;
           description?: string | null;
           hours_per_day?: number | null;
           id?: string;
@@ -475,6 +538,13 @@ export type Database = {
             columns: ["allocation_bucket_id"];
             isOneToOne: false;
             referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "classes_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
             referencedColumns: ["id"];
           },
           {
@@ -536,11 +606,85 @@ export type Database = {
           },
         ];
       };
+      department_memberships: {
+        Row: {
+          accepted_at: string | null;
+          created_at: string;
+          department_id: string;
+          id: string;
+          role: string;
+          user_id: string;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          created_at?: string;
+          department_id: string;
+          id?: string;
+          role?: string;
+          user_id: string;
+        };
+        Update: {
+          accepted_at?: string | null;
+          created_at?: string;
+          department_id?: string;
+          id?: string;
+          role?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "department_memberships_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      departments: {
+        Row: {
+          created_at: string;
+          description: string | null;
+          id: string;
+          name: string;
+          org_id: string;
+          slug: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          name: string;
+          org_id: string;
+          slug: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          name?: string;
+          org_id?: string;
+          slug?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "departments_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       dependencies: {
         Row: {
           created_at: string;
           created_by: string | null;
           dep_type: string;
+          department_id: string;
           description: string | null;
           id: string;
           name: string;
@@ -559,6 +703,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           dep_type?: string;
+          department_id: string;
           description?: string | null;
           id?: string;
           name: string;
@@ -577,6 +722,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           dep_type?: string;
+          department_id?: string;
           description?: string | null;
           id?: string;
           name?: string;
@@ -592,6 +738,13 @@ export type Database = {
           version?: number;
         };
         Relationships: [
+          {
+            foreignKeyName: "dependencies_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "dependencies_org_id_fkey";
             columns: ["org_id"];
@@ -614,6 +767,7 @@ export type Database = {
           completed_at: string | null;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           estimated_hours: number;
           id: string;
           instructor_id: string;
@@ -628,6 +782,7 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           estimated_hours: number;
           id?: string;
           instructor_id: string;
@@ -642,6 +797,7 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           estimated_hours?: number;
           id?: string;
           instructor_id?: string;
@@ -652,6 +808,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "education_request_assignments_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "education_request_assignments_instructor_id_fkey";
             columns: ["instructor_id"];
@@ -686,6 +849,7 @@ export type Database = {
         Row: {
           actor_id: string | null;
           comment: string | null;
+          department_id: string;
           from_status: string | null;
           id: number;
           occurred_at: string;
@@ -696,6 +860,7 @@ export type Database = {
         Insert: {
           actor_id?: string | null;
           comment?: string | null;
+          department_id: string;
           from_status?: string | null;
           id?: never;
           occurred_at?: string;
@@ -706,6 +871,7 @@ export type Database = {
         Update: {
           actor_id?: string | null;
           comment?: string | null;
+          department_id?: string;
           from_status?: string | null;
           id?: never;
           occurred_at?: string;
@@ -714,6 +880,13 @@ export type Database = {
           to_status?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "education_request_history_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "education_request_history_org_id_fkey";
             columns: ["org_id"];
@@ -736,6 +909,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           deleted_at: string | null;
+          department_id: string;
           id: string;
           linked_project_id: string | null;
           linked_tra_id: string | null;
@@ -759,6 +933,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
+          department_id: string;
           id?: string;
           linked_project_id?: string | null;
           linked_tra_id?: string | null;
@@ -782,6 +957,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
+          department_id?: string;
           id?: string;
           linked_project_id?: string | null;
           linked_tra_id?: string | null;
@@ -801,6 +977,13 @@ export type Database = {
           urgency?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "education_requests_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "education_requests_linked_project_id_fkey";
             columns: ["linked_project_id"];
@@ -874,6 +1057,7 @@ export type Database = {
           bucket_id: string;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           id: string;
           org_id: string;
           target_percent: number;
@@ -884,6 +1068,7 @@ export type Database = {
           bucket_id: string;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           id?: string;
           org_id: string;
           target_percent: number;
@@ -894,6 +1079,7 @@ export type Database = {
           bucket_id?: string;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           id?: string;
           org_id?: string;
           target_percent?: number;
@@ -906,6 +1092,13 @@ export type Database = {
             columns: ["bucket_id"];
             isOneToOne: false;
             referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "global_allocations_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
             referencedColumns: ["id"];
           },
           {
@@ -922,6 +1115,7 @@ export type Database = {
           bucket_id: string;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           group_id: string;
           id: string;
           org_id: string;
@@ -933,6 +1127,7 @@ export type Database = {
           bucket_id: string;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           group_id: string;
           id?: string;
           org_id: string;
@@ -944,6 +1139,7 @@ export type Database = {
           bucket_id?: string;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           group_id?: string;
           id?: string;
           org_id?: string;
@@ -957,6 +1153,13 @@ export type Database = {
             columns: ["bucket_id"];
             isOneToOne: false;
             referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "group_allocations_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
             referencedColumns: ["id"];
           },
           {
@@ -979,6 +1182,7 @@ export type Database = {
         Row: {
           created_at: string;
           created_by: string | null;
+          department_id: string;
           id: string;
           impl_class_id: string;
           org_id: string;
@@ -987,6 +1191,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           id?: string;
           impl_class_id: string;
           org_id: string;
@@ -995,12 +1200,20 @@ export type Database = {
         Update: {
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           id?: string;
           impl_class_id?: string;
           org_id?: string;
           prerequisite_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "impl_class_prerequisites_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "impl_class_prerequisites_impl_class_id_fkey";
             columns: ["impl_class_id"];
@@ -1028,6 +1241,7 @@ export type Database = {
         Row: {
           created_at: string;
           created_by: string | null;
+          department_id: string;
           id: string;
           impl_class_id: string;
           impl_trainer_id: string;
@@ -1036,6 +1250,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           id?: string;
           impl_class_id: string;
           impl_trainer_id: string;
@@ -1044,12 +1259,20 @@ export type Database = {
         Update: {
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           id?: string;
           impl_class_id?: string;
           impl_trainer_id?: string;
           org_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "impl_class_trainers_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "impl_class_trainers_impl_class_id_fkey";
             columns: ["impl_class_id"];
@@ -1077,6 +1300,7 @@ export type Database = {
         Row: {
           created_at: string;
           created_by: string | null;
+          department_id: string;
           description: string | null;
           expected_learners_per_session: number;
           hours_per_session: number;
@@ -1094,6 +1318,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           description?: string | null;
           expected_learners_per_session: number;
           hours_per_session: number;
@@ -1111,6 +1336,7 @@ export type Database = {
         Update: {
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           description?: string | null;
           expected_learners_per_session?: number;
           hours_per_session?: number;
@@ -1126,6 +1352,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "impl_classes_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "impl_classes_implementation_id_fkey";
             columns: ["implementation_id"];
@@ -1153,6 +1386,7 @@ export type Database = {
         Row: {
           created_at: string;
           created_by: string | null;
+          department_id: string;
           description: string | null;
           id: string;
           implementation_id: string;
@@ -1165,6 +1399,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           description?: string | null;
           id?: string;
           implementation_id: string;
@@ -1177,6 +1412,7 @@ export type Database = {
         Update: {
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           description?: string | null;
           id?: string;
           implementation_id?: string;
@@ -1187,6 +1423,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "impl_modules_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "impl_modules_implementation_id_fkey";
             columns: ["implementation_id"];
@@ -1209,6 +1452,7 @@ export type Database = {
           available_hours_per_day: number;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           equipment_notes: string | null;
           id: string;
           implementation_id: string;
@@ -1225,6 +1469,7 @@ export type Database = {
           available_hours_per_day?: number;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           equipment_notes?: string | null;
           id?: string;
           implementation_id: string;
@@ -1241,6 +1486,7 @@ export type Database = {
           available_hours_per_day?: number;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           equipment_notes?: string | null;
           id?: string;
           implementation_id?: string;
@@ -1253,6 +1499,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "impl_rooms_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "impl_rooms_implementation_id_fkey";
             columns: ["implementation_id"];
@@ -1274,6 +1527,7 @@ export type Database = {
           conflict_status: string;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           id: string;
           impl_class_id: string;
           impl_room_id: string | null;
@@ -1292,6 +1546,7 @@ export type Database = {
           conflict_status?: string;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           id?: string;
           impl_class_id: string;
           impl_room_id?: string | null;
@@ -1310,6 +1565,7 @@ export type Database = {
           conflict_status?: string;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           id?: string;
           impl_class_id?: string;
           impl_room_id?: string | null;
@@ -1325,6 +1581,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "impl_sessions_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "impl_sessions_impl_class_id_fkey";
             columns: ["impl_class_id"];
@@ -1367,6 +1630,7 @@ export type Database = {
           availability_hours_per_week: number;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           email: string | null;
           id: string;
           implementation_id: string;
@@ -1382,6 +1646,7 @@ export type Database = {
           availability_hours_per_week: number;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           email?: string | null;
           id?: string;
           implementation_id: string;
@@ -1397,6 +1662,7 @@ export type Database = {
           availability_hours_per_week?: number;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           email?: string | null;
           id?: string;
           implementation_id?: string;
@@ -1409,6 +1675,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "impl_trainers_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "impl_trainers_implementation_id_fkey";
             columns: ["implementation_id"];
@@ -1445,6 +1718,7 @@ export type Database = {
           created_by: string | null;
           current_step: number;
           deleted_at: string | null;
+          department_id: string;
           description: string | null;
           go_live_date: string | null;
           id: string;
@@ -1464,6 +1738,7 @@ export type Database = {
           created_by?: string | null;
           current_step?: number;
           deleted_at?: string | null;
+          department_id: string;
           description?: string | null;
           go_live_date?: string | null;
           id?: string;
@@ -1483,6 +1758,7 @@ export type Database = {
           created_by?: string | null;
           current_step?: number;
           deleted_at?: string | null;
+          department_id?: string;
           description?: string | null;
           go_live_date?: string | null;
           id?: string;
@@ -1498,6 +1774,13 @@ export type Database = {
           window_start_date?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "implementations_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "implementations_linked_project_id_fkey";
             columns: ["linked_project_id"];
@@ -1526,6 +1809,7 @@ export type Database = {
           bucket_id: string;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           id: string;
           instructor_id: string;
           org_id: string;
@@ -1537,6 +1821,7 @@ export type Database = {
           bucket_id: string;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           id?: string;
           instructor_id: string;
           org_id: string;
@@ -1548,6 +1833,7 @@ export type Database = {
           bucket_id?: string;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           id?: string;
           instructor_id?: string;
           org_id?: string;
@@ -1561,6 +1847,13 @@ export type Database = {
             columns: ["bucket_id"];
             isOneToOne: false;
             referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "individual_allocations_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
             referencedColumns: ["id"];
           },
           {
@@ -1592,6 +1885,7 @@ export type Database = {
           certified_at: string | null;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           expires_at: string | null;
           id: string;
           instructor_id: string;
@@ -1608,6 +1902,7 @@ export type Database = {
           certified_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           expires_at?: string | null;
           id?: string;
           instructor_id: string;
@@ -1624,6 +1919,7 @@ export type Database = {
           certified_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           expires_at?: string | null;
           id?: string;
           instructor_id?: string;
@@ -1636,6 +1932,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "instructor_skills_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "instructor_skills_instructor_id_fkey";
             columns: ["instructor_id"];
@@ -1673,6 +1976,7 @@ export type Database = {
           created_by: string | null;
           deleted_at: string | null;
           department: string | null;
+          department_id: string;
           email: string | null;
           full_name: string;
           id: string;
@@ -1694,6 +1998,7 @@ export type Database = {
           created_by?: string | null;
           deleted_at?: string | null;
           department?: string | null;
+          department_id: string;
           email?: string | null;
           full_name: string;
           id?: string;
@@ -1715,6 +2020,7 @@ export type Database = {
           created_by?: string | null;
           deleted_at?: string | null;
           department?: string | null;
+          department_id?: string;
           email?: string | null;
           full_name?: string;
           id?: string;
@@ -1732,6 +2038,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: "instructors_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "instructors_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
@@ -1745,6 +2058,7 @@ export type Database = {
           completed_at: string | null;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           description: string | null;
           due_date: string;
           id: string;
@@ -1761,6 +2075,7 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           description?: string | null;
           due_date: string;
           id?: string;
@@ -1777,6 +2092,7 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           description?: string | null;
           due_date?: string;
           id?: string;
@@ -1790,6 +2106,13 @@ export type Database = {
           version?: number;
         };
         Relationships: [
+          {
+            foreignKeyName: "milestones_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "milestones_org_id_fkey";
             columns: ["org_id"];
@@ -1997,6 +2320,7 @@ export type Database = {
           allocated_hours: number;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           id: string;
           instructor_id: string;
           org_id: string;
@@ -2010,6 +2334,7 @@ export type Database = {
           allocated_hours?: number;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           id?: string;
           instructor_id: string;
           org_id: string;
@@ -2023,6 +2348,7 @@ export type Database = {
           allocated_hours?: number;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           id?: string;
           instructor_id?: string;
           org_id?: string;
@@ -2033,6 +2359,13 @@ export type Database = {
           version?: number;
         };
         Relationships: [
+          {
+            foreignKeyName: "project_team_members_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "project_team_members_instructor_id_fkey";
             columns: ["instructor_id"];
@@ -2069,6 +2402,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           deleted_at: string | null;
+          department_id: string;
           description: string | null;
           end_date: string | null;
           id: string;
@@ -2089,6 +2423,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
+          department_id: string;
           description?: string | null;
           end_date?: string | null;
           id?: string;
@@ -2109,6 +2444,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
+          department_id?: string;
           description?: string | null;
           end_date?: string | null;
           id?: string;
@@ -2133,6 +2469,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "projects_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "projects_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
@@ -2152,6 +2495,7 @@ export type Database = {
         Row: {
           created_at: string;
           created_by: string | null;
+          department_id: string;
           expires_at: string | null;
           id: string;
           is_active: boolean;
@@ -2162,6 +2506,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           expires_at?: string | null;
           id?: string;
           is_active?: boolean;
@@ -2172,6 +2517,7 @@ export type Database = {
         Update: {
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           expires_at?: string | null;
           id?: string;
           is_active?: boolean;
@@ -2180,6 +2526,13 @@ export type Database = {
           token?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "public_intake_links_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "public_intake_links_org_id_fkey";
             columns: ["org_id"];
@@ -2192,6 +2545,7 @@ export type Database = {
       recurring_task_assignments: {
         Row: {
           created_at: string;
+          department_id: string;
           instructor_id: string;
           org_id: string;
           recurring_task_id: string;
@@ -2199,6 +2553,7 @@ export type Database = {
         };
         Insert: {
           created_at?: string;
+          department_id: string;
           instructor_id: string;
           org_id: string;
           recurring_task_id: string;
@@ -2206,12 +2561,20 @@ export type Database = {
         };
         Update: {
           created_at?: string;
+          department_id?: string;
           instructor_id?: string;
           org_id?: string;
           recurring_task_id?: string;
           share_percent?: number;
         };
         Relationships: [
+          {
+            foreignKeyName: "recurring_task_assignments_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "recurring_task_assignments_instructor_id_fkey";
             columns: ["instructor_id"];
@@ -2248,6 +2611,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           deleted_at: string | null;
+          department_id: string;
           description: string | null;
           frequency: string;
           hours_per_occurrence: number;
@@ -2264,6 +2628,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
+          department_id: string;
           description?: string | null;
           frequency: string;
           hours_per_occurrence: number;
@@ -2280,6 +2645,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
+          department_id?: string;
           description?: string | null;
           frequency?: string;
           hours_per_occurrence?: number;
@@ -2300,6 +2666,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "recurring_tasks_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "recurring_tasks_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
@@ -2310,6 +2683,7 @@ export type Database = {
       };
       report_runs: {
         Row: {
+          department_id: string;
           duration_ms: number | null;
           filters: Json;
           format: string;
@@ -2322,6 +2696,7 @@ export type Database = {
           slug: string;
         };
         Insert: {
+          department_id: string;
           duration_ms?: number | null;
           filters?: Json;
           format: string;
@@ -2334,6 +2709,7 @@ export type Database = {
           slug: string;
         };
         Update: {
+          department_id?: string;
           duration_ms?: number | null;
           filters?: Json;
           format?: string;
@@ -2346,6 +2722,13 @@ export type Database = {
           slug?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "report_runs_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "report_runs_org_id_fkey";
             columns: ["org_id"];
@@ -2366,6 +2749,7 @@ export type Database = {
         Row: {
           created_at: string;
           created_by: string | null;
+          department_id: string;
           description: string | null;
           filters: Json;
           id: string;
@@ -2382,6 +2766,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           description?: string | null;
           filters?: Json;
           id?: string;
@@ -2398,6 +2783,7 @@ export type Database = {
         Update: {
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           description?: string | null;
           filters?: Json;
           id?: string;
@@ -2413,6 +2799,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: "saved_reports_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "saved_reports_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
@@ -2427,6 +2820,7 @@ export type Database = {
           certifying_authority: string | null;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           description: string | null;
           id: string;
           is_archived: boolean;
@@ -2441,6 +2835,7 @@ export type Database = {
           certifying_authority?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           description?: string | null;
           id?: string;
           is_archived?: boolean;
@@ -2455,6 +2850,7 @@ export type Database = {
           certifying_authority?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           description?: string | null;
           id?: string;
           is_archived?: boolean;
@@ -2465,6 +2861,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "skills_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "skills_org_id_fkey";
             columns: ["org_id"];
@@ -2593,6 +2996,7 @@ export type Database = {
           completed_at: string | null;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           description: string;
           due_date: string | null;
           id: string;
@@ -2609,6 +3013,7 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           description: string;
           due_date?: string | null;
           id?: string;
@@ -2625,6 +3030,7 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           description?: string;
           due_date?: string | null;
           id?: string;
@@ -2652,6 +3058,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "task_action_items_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "task_action_items_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
@@ -2672,6 +3085,7 @@ export type Database = {
           allocated_hours: number;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           id: string;
           org_id: string;
           project_team_member_id: string;
@@ -2683,6 +3097,7 @@ export type Database = {
           allocated_hours?: number;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           id?: string;
           org_id: string;
           project_team_member_id: string;
@@ -2694,6 +3109,7 @@ export type Database = {
           allocated_hours?: number;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           id?: string;
           org_id?: string;
           project_team_member_id?: string;
@@ -2702,6 +3118,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "task_assignments_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "task_assignments_org_id_fkey";
             columns: ["org_id"];
@@ -2737,6 +3160,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           dep_type: string;
+          department_id: string;
           id: string;
           lag_days: number;
           org_id: string;
@@ -2749,6 +3173,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           dep_type?: string;
+          department_id: string;
           id?: string;
           lag_days?: number;
           org_id: string;
@@ -2761,6 +3186,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           dep_type?: string;
+          department_id?: string;
           id?: string;
           lag_days?: number;
           org_id?: string;
@@ -2770,6 +3196,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "task_dependencies_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "task_dependencies_org_id_fkey";
             columns: ["org_id"];
@@ -2798,6 +3231,7 @@ export type Database = {
           actual_hours: number | null;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           description: string | null;
           end_date: string | null;
           estimated_hours: number | null;
@@ -2819,6 +3253,7 @@ export type Database = {
           actual_hours?: number | null;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           description?: string | null;
           end_date?: string | null;
           estimated_hours?: number | null;
@@ -2840,6 +3275,7 @@ export type Database = {
           actual_hours?: number | null;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           description?: string | null;
           end_date?: string | null;
           estimated_hours?: number | null;
@@ -2858,6 +3294,13 @@ export type Database = {
           version?: number;
         };
         Relationships: [
+          {
+            foreignKeyName: "tasks_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "tasks_milestone_id_fkey";
             columns: ["milestone_id"];
@@ -2887,6 +3330,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           deliverable_type_id: string;
+          department_id: string;
           estimated_hours: number;
           id: string;
           name: string;
@@ -2903,6 +3347,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           deliverable_type_id: string;
+          department_id: string;
           estimated_hours?: number;
           id?: string;
           name: string;
@@ -2919,6 +3364,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           deliverable_type_id?: string;
+          department_id?: string;
           estimated_hours?: number;
           id?: string;
           name?: string;
@@ -2936,6 +3382,13 @@ export type Database = {
             columns: ["deliverable_type_id"];
             isOneToOne: false;
             referencedRelation: "deliverable_types";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_deliverables_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
             referencedColumns: ["id"];
           },
           {
@@ -2962,6 +3415,7 @@ export type Database = {
           converted_to_project_id: string | null;
           created_at: string;
           created_by: string | null;
+          department_id: string;
           description: string | null;
           id: string;
           org_id: string;
@@ -2983,6 +3437,7 @@ export type Database = {
           converted_to_project_id?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id: string;
           description?: string | null;
           id?: string;
           org_id: string;
@@ -3004,6 +3459,7 @@ export type Database = {
           converted_to_project_id?: string | null;
           created_at?: string;
           created_by?: string | null;
+          department_id?: string;
           description?: string | null;
           id?: string;
           org_id?: string;
@@ -3024,6 +3480,13 @@ export type Database = {
             columns: ["converted_to_project_id"];
             isOneToOne: false;
             referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tras_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
             referencedColumns: ["id"];
           },
           {
@@ -3194,6 +3657,10 @@ export type Database = {
         Returns: undefined;
       };
       current_user_id: { Args: never; Returns: string };
+      default_department_for_org: {
+        Args: { p_org_id: string };
+        Returns: string;
+      };
       effective_allocation: {
         Args: { p_instructor_id: string };
         Returns: {
@@ -3230,6 +3697,10 @@ export type Database = {
           weekly_capacity: number;
         }[];
       };
+      is_department_admin: {
+        Args: { p_department_id: string };
+        Returns: boolean;
+      };
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean };
       lookup_invitation_by_token: {
         Args: { p_token: string };
@@ -3256,6 +3727,7 @@ export type Database = {
         }[];
       };
       set_share_token: { Args: { p_token: string }; Returns: undefined };
+      user_department_ids: { Args: never; Returns: string[] };
       user_org_ids: { Args: never; Returns: string[] };
     };
     Enums: {

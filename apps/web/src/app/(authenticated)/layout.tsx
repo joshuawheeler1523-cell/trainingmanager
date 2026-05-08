@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import OrgGuard from "@/components/org-guard";
 import OrgSwitcher from "@/components/OrgSwitcher";
+import DepartmentSwitcher from "@/components/DepartmentSwitcher";
 import AppShell from "@/components/layout/app-shell";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isOrgAdmin } from "@/lib/auth/org-admin";
@@ -34,7 +35,13 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
   return (
     <OrgGuard>
       <AppShell
-        orgSwitcherSlot={<OrgSwitcher />}
+        orgSwitcherSlot={
+          <div className="flex items-center gap-2">
+            <OrgSwitcher />
+            <span className="text-border">·</span>
+            <DepartmentSwitcher />
+          </div>
+        }
         userEmail={email}
         userName={name}
         userId={user.id}

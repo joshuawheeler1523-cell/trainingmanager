@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import {
   implementationInsertSchema,
   implementationSetupSchema,
@@ -48,11 +49,21 @@ function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 async function ctx() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) {
     return { ok: false as const, error: { code: "NO_ORG", message: "No active organization" } };
   }
-  return { ok: true as const, supabase, orgId };
+  if (!departmentId) {
+    return {
+      ok: false as const,
+      error: { code: "NO_DEPARTMENT", message: "No active department" },
+    };
+  }
+  return { ok: true as const, supabase, orgId, departmentId };
 }
 
 function revalidateImpl(id?: string) {
@@ -71,7 +82,7 @@ export async function createImplementation(input: unknown): Promise<ActionResult
 
   const { data, error } = await c.supabase
     .from("implementations")
-    .insert({ ...parsed.data, org_id: c.orgId })
+    .insert({ ...parsed.data, org_id: c.orgId, department_id: c.departmentId })
     .select()
     .single();
 
@@ -150,7 +161,12 @@ export async function createRoom(
 
   const { data, error } = await c.supabase
     .from("impl_rooms")
-    .insert({ ...parsed.data, org_id: c.orgId, implementation_id: implementationId })
+    .insert({
+      ...parsed.data,
+      org_id: c.orgId,
+      department_id: c.departmentId,
+      implementation_id: implementationId,
+    })
     .select()
     .single();
 
@@ -215,7 +231,12 @@ export async function createTrainer(
 
   const { data, error } = await c.supabase
     .from("impl_trainers")
-    .insert({ ...parsed.data, org_id: c.orgId, implementation_id: implementationId })
+    .insert({
+      ...parsed.data,
+      org_id: c.orgId,
+      department_id: c.departmentId,
+      implementation_id: implementationId,
+    })
     .select()
     .single();
 
@@ -284,7 +305,12 @@ export async function createModule(
 
   const { data, error } = await c.supabase
     .from("impl_modules")
-    .insert({ ...parsed.data, org_id: c.orgId, implementation_id: implementationId })
+    .insert({
+      ...parsed.data,
+      org_id: c.orgId,
+      department_id: c.departmentId,
+      implementation_id: implementationId,
+    })
     .select()
     .single();
 
@@ -353,7 +379,12 @@ export async function createClass(
 
   const { data, error } = await c.supabase
     .from("impl_classes")
-    .insert({ ...parsed.data, org_id: c.orgId, implementation_id: implementationId })
+    .insert({
+      ...parsed.data,
+      org_id: c.orgId,
+      department_id: c.departmentId,
+      implementation_id: implementationId,
+    })
     .select()
     .single();
 
@@ -434,6 +465,7 @@ export async function setClassTrainers(
 
   const rows = trainerIds.map((id) => ({
     org_id: c.orgId,
+    department_id: c.departmentId,
     impl_class_id: classId,
     impl_trainer_id: id,
   }));
@@ -462,6 +494,7 @@ export async function addClassPrerequisite(
     .from("impl_class_prerequisites")
     .insert({
       org_id: c.orgId,
+      department_id: c.departmentId,
       impl_class_id: classId,
       prerequisite_id: prerequisiteId,
     })

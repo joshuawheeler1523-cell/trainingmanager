@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import {
   skillInsertSchema,
   skillUpdateSchema,
@@ -43,12 +44,18 @@ export async function createSkill(input: unknown): Promise<ActionResult<Skill>> 
   const parsed = skillInsertSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { data, error } = await supabase
     .from("skills")
-    .insert({ ...parsed.data, org_id: orgId })
+    .insert({ ...parsed.data, org_id: orgId, department_id: departmentId })
     .select()
     .single();
 
@@ -68,8 +75,14 @@ export async function updateSkill(id: string, input: unknown): Promise<ActionRes
   const parsed = skillUpdateSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { data, error } = await supabase
     .from("skills")
@@ -94,8 +107,14 @@ export async function updateSkill(id: string, input: unknown): Promise<ActionRes
 }
 
 export async function archiveSkill(id: string): Promise<ActionResult<{ id: string }>> {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { error } = await supabase
     .from("skills")
@@ -110,8 +129,14 @@ export async function archiveSkill(id: string): Promise<ActionResult<{ id: strin
 }
 
 export async function unarchiveSkill(id: string): Promise<ActionResult<{ id: string }>> {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { error } = await supabase
     .from("skills")
@@ -134,13 +159,20 @@ export async function addInstructorSkill(
   const parsed = instructorSkillSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { data, error } = await supabase
     .from("instructor_skills")
     .insert({
       org_id: orgId,
+      department_id: departmentId,
       instructor_id: instructorId,
       skill_id: parsed.data.skill_id,
       proficiency: parsed.data.proficiency,
@@ -172,8 +204,14 @@ export async function updateInstructorSkill(
   const parsed = instructorSkillUpdateSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { data, error } = await supabase
     .from("instructor_skills")
@@ -198,8 +236,14 @@ export async function removeInstructorSkill(
   instructorSkillId: string,
   instructorId: string,
 ): Promise<ActionResult<{ id: string }>> {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { error } = await supabase
     .from("instructor_skills")
@@ -223,13 +267,20 @@ export async function addClassSkillRequirement(
   const parsed = classSkillRequirementSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { data, error } = await supabase
     .from("class_skill_requirements")
     .insert({
       org_id: orgId,
+      department_id: departmentId,
       class_id: classId,
       skill_id: parsed.data.skill_id,
       min_proficiency: parsed.data.min_proficiency,
@@ -257,8 +308,14 @@ export async function updateClassSkillRequirement(
   const parsed = classSkillRequirementUpdateSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { data, error } = await supabase
     .from("class_skill_requirements")
@@ -283,8 +340,14 @@ export async function removeClassSkillRequirement(
   requirementId: string,
   classId: string,
 ): Promise<ActionResult<{ id: string }>> {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { error } = await supabase
     .from("class_skill_requirements")

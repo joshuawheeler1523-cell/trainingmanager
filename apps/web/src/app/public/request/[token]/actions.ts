@@ -60,10 +60,26 @@ export async function submitPublicRequest(
     };
   }
 
+  // Anon submissions land in the org's "general" department by default.
+  const { data: dept } = await anonClient
+    .from("departments")
+    .select("id")
+    .eq("org_id", link.org_id)
+    .eq("slug", "general")
+    .maybeSingle();
+  const departmentId = dept?.id;
+  if (!departmentId) {
+    return {
+      ok: false,
+      error: { code: "NO_DEPARTMENT", message: "Org has no default department" },
+    };
+  }
+
   const { data, error } = await anonClient
     .from("education_requests")
     .insert({
       org_id: link.org_id,
+      department_id: departmentId,
       title: parsed.data.title,
       requested_by_name: parsed.data.requested_by_name,
       requested_by_email: parsed.data.requested_by_email,

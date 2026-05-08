@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import {
   classInputSchema,
   classUpdateSchema,
@@ -38,12 +39,18 @@ export async function createClass(input: unknown): Promise<ActionResult<Class>> 
   const parsed = classInputSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { data, error } = await supabase
     .from("classes")
-    .insert({ ...parsed.data, org_id: orgId })
+    .insert({ ...parsed.data, org_id: orgId, department_id: departmentId })
     .select()
     .single();
 
@@ -56,8 +63,14 @@ export async function updateClass(id: string, input: unknown): Promise<ActionRes
   const parsed = classUpdateSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { data, error } = await supabase
     .from("classes")
@@ -77,8 +90,14 @@ export async function updateClass(id: string, input: unknown): Promise<ActionRes
 }
 
 export async function softDeleteClass(id: string): Promise<ActionResult<{ id: string }>> {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { error } = await supabase
     .from("classes")
@@ -100,14 +119,21 @@ export async function assignInstructorToClass(
   const parsed = classInstructorAssignmentSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { data, error } = await supabase
     .from("class_instructor_assignments")
     .upsert(
       {
         org_id: orgId,
+        department_id: departmentId,
         class_id: classId,
         instructor_id: parsed.data.instructor_id,
         role: parsed.data.role,
@@ -134,8 +160,14 @@ export async function unassignInstructorFromClass(
   classId: string,
   instructorId: string,
 ): Promise<ActionResult<{ id: string }>> {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { error } = await supabase
     .from("class_instructor_assignments")
@@ -169,8 +201,14 @@ export async function updateAssignment(
 export async function distributeOfferingsEvenly(
   classId: string,
 ): Promise<ActionResult<{ count: number; total: number }>> {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { data: cls, error: clsErr } = await supabase
     .from("classes")
@@ -219,6 +257,7 @@ export async function distributeOfferingsEvenly(
 
   const updates = sorted.map((r, i) => ({
     org_id: orgId,
+    department_id: departmentId,
     class_id: classId,
     instructor_id: r.instructor_id,
     role: r.role,
@@ -241,8 +280,14 @@ export async function distributeOfferingsEvenly(
 }
 
 export async function restoreClass(id: string): Promise<ActionResult<{ id: string }>> {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { error } = await supabase
     .from("classes")

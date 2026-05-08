@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import {
   requestInsertSchema,
   requestUpdateSchema,
@@ -40,11 +41,21 @@ function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 async function ctx() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) {
     return { ok: false as const, error: { code: "NO_ORG", message: "No active organization" } };
   }
-  return { ok: true as const, supabase, orgId };
+  if (!departmentId) {
+    return {
+      ok: false as const,
+      error: { code: "NO_DEPARTMENT", message: "No active department" },
+    };
+  }
+  return { ok: true as const, supabase, orgId, departmentId };
 }
 
 // ── education_requests ──────────────────────────────────────────────────────
@@ -58,7 +69,12 @@ export async function createRequest(input: unknown): Promise<ActionResult<Educat
 
   const { data, error } = await c.supabase
     .from("education_requests")
-    .insert({ ...parsed.data, org_id: c.orgId, submitted_via: "app" })
+    .insert({
+      ...parsed.data,
+      org_id: c.orgId,
+      department_id: c.departmentId,
+      submitted_via: "app",
+    })
     .select()
     .single();
 
@@ -157,6 +173,7 @@ export async function assignRequestInstructor(
     .upsert(
       {
         org_id: c.orgId,
+        department_id: c.departmentId,
         request_id: requestId,
         instructor_id: parsed.data.instructor_id,
         estimated_hours: parsed.data.estimated_hours,
@@ -228,6 +245,7 @@ export async function createIntakeLink(input: unknown): Promise<ActionResult<Pub
     .from("public_intake_links")
     .insert({
       org_id: c.orgId,
+      department_id: c.departmentId,
       label: parsed.data.label,
       expires_at: parsed.data.expires_at,
     })
