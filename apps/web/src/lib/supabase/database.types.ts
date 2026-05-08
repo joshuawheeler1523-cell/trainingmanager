@@ -486,6 +486,56 @@ export type Database = {
           },
         ];
       };
+      deliverable_types: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          dev_to_seat_ratio: number;
+          id: string;
+          is_archived: boolean;
+          is_built_in: boolean;
+          name: string;
+          org_id: string | null;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          dev_to_seat_ratio: number;
+          id?: string;
+          is_archived?: boolean;
+          is_built_in?: boolean;
+          name: string;
+          org_id?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          dev_to_seat_ratio?: number;
+          id?: string;
+          is_archived?: boolean;
+          is_built_in?: boolean;
+          name?: string;
+          org_id?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "deliverable_types_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       feature_flags: {
         Row: {
           created_at: string;
@@ -1035,6 +1085,88 @@ export type Database = {
         };
         Relationships: [];
       };
+      projects: {
+        Row: {
+          bucket_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          description: string | null;
+          end_date: string | null;
+          id: string;
+          name: string;
+          org_id: string;
+          priority: string;
+          source_tra_id: string | null;
+          start_date: string | null;
+          status: string;
+          total_estimated_hours: number | null;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          bucket_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          end_date?: string | null;
+          id?: string;
+          name: string;
+          org_id: string;
+          priority?: string;
+          source_tra_id?: string | null;
+          start_date?: string | null;
+          status?: string;
+          total_estimated_hours?: number | null;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          bucket_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          end_date?: string | null;
+          id?: string;
+          name?: string;
+          org_id?: string;
+          priority?: string;
+          source_tra_id?: string | null;
+          start_date?: string | null;
+          status?: string;
+          total_estimated_hours?: number | null;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "projects_bucket_id_fkey";
+            columns: ["bucket_id"];
+            isOneToOne: false;
+            referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "projects_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "projects_source_tra_id_fkey";
+            columns: ["source_tra_id"];
+            isOneToOne: false;
+            referencedRelation: "tras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       recurring_task_assignments: {
         Row: {
           created_at: string;
@@ -1200,6 +1332,235 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "skills_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tasks: {
+        Row: {
+          actual_hours: number | null;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          end_date: string | null;
+          estimated_hours: number | null;
+          id: string;
+          name: string;
+          org_id: string;
+          percent_complete: number;
+          priority: string;
+          project_id: string;
+          sort_order: number;
+          start_date: string | null;
+          status: string;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          actual_hours?: number | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          end_date?: string | null;
+          estimated_hours?: number | null;
+          id?: string;
+          name: string;
+          org_id: string;
+          percent_complete?: number;
+          priority?: string;
+          project_id: string;
+          sort_order?: number;
+          start_date?: string | null;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          actual_hours?: number | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          end_date?: string | null;
+          estimated_hours?: number | null;
+          id?: string;
+          name?: string;
+          org_id?: string;
+          percent_complete?: number;
+          priority?: string;
+          project_id?: string;
+          sort_order?: number;
+          start_date?: string | null;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tasks_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tasks_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tra_deliverables: {
+        Row: {
+          complexity_multiplier: number;
+          created_at: string;
+          created_by: string | null;
+          deliverable_type_id: string;
+          estimated_hours: number;
+          id: string;
+          name: string;
+          notes: string | null;
+          org_id: string;
+          quantity: number;
+          seat_time_hours: number;
+          tra_id: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          complexity_multiplier?: number;
+          created_at?: string;
+          created_by?: string | null;
+          deliverable_type_id: string;
+          estimated_hours?: number;
+          id?: string;
+          name: string;
+          notes?: string | null;
+          org_id: string;
+          quantity?: number;
+          seat_time_hours: number;
+          tra_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          complexity_multiplier?: number;
+          created_at?: string;
+          created_by?: string | null;
+          deliverable_type_id?: string;
+          estimated_hours?: number;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          org_id?: string;
+          quantity?: number;
+          seat_time_hours?: number;
+          tra_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tra_deliverables_deliverable_type_id_fkey";
+            columns: ["deliverable_type_id"];
+            isOneToOne: false;
+            referencedRelation: "deliverable_types";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_deliverables_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_deliverables_tra_id_fkey";
+            columns: ["tra_id"];
+            isOneToOne: false;
+            referencedRelation: "tras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tras: {
+        Row: {
+          ai_assistant_used: boolean;
+          business_justification: string | null;
+          converted_to_project_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          id: string;
+          org_id: string;
+          project_name: string;
+          requesting_department: string | null;
+          stakeholder_email: string | null;
+          stakeholder_name: string | null;
+          status: string;
+          target_audience: string | null;
+          total_estimated_hours: number;
+          updated_at: string;
+          updated_by: string | null;
+          urgency: string;
+        };
+        Insert: {
+          ai_assistant_used?: boolean;
+          business_justification?: string | null;
+          converted_to_project_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          org_id: string;
+          project_name: string;
+          requesting_department?: string | null;
+          stakeholder_email?: string | null;
+          stakeholder_name?: string | null;
+          status?: string;
+          target_audience?: string | null;
+          total_estimated_hours?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+          urgency?: string;
+        };
+        Update: {
+          ai_assistant_used?: boolean;
+          business_justification?: string | null;
+          converted_to_project_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          org_id?: string;
+          project_name?: string;
+          requesting_department?: string | null;
+          stakeholder_email?: string | null;
+          stakeholder_name?: string | null;
+          status?: string;
+          target_audience?: string | null;
+          total_estimated_hours?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+          urgency?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tras_converted_to_project_id_fkey";
+            columns: ["converted_to_project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tras_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
