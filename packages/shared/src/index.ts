@@ -9,5 +9,6 @@ export * from "./queries/recommendations";
 export * from "./schemas/tra";
 export * from "./schemas/education-request";
 export * from "./schemas/project";
+export * from "./schemas/training-planner";
 export * from "./types";
 export * from "./utils/slug";

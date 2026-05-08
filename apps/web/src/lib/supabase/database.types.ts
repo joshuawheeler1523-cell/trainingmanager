@@ -975,6 +975,552 @@ export type Database = {
           },
         ];
       };
+      impl_class_prerequisites: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          impl_class_id: string;
+          org_id: string;
+          prerequisite_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          impl_class_id: string;
+          org_id: string;
+          prerequisite_id: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          impl_class_id?: string;
+          org_id?: string;
+          prerequisite_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "impl_class_prerequisites_impl_class_id_fkey";
+            columns: ["impl_class_id"];
+            isOneToOne: false;
+            referencedRelation: "impl_classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_class_prerequisites_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_class_prerequisites_prerequisite_id_fkey";
+            columns: ["prerequisite_id"];
+            isOneToOne: false;
+            referencedRelation: "impl_classes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      impl_class_trainers: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          impl_class_id: string;
+          impl_trainer_id: string;
+          org_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          impl_class_id: string;
+          impl_trainer_id: string;
+          org_id: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          impl_class_id?: string;
+          impl_trainer_id?: string;
+          org_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "impl_class_trainers_impl_class_id_fkey";
+            columns: ["impl_class_id"];
+            isOneToOne: false;
+            referencedRelation: "impl_classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_class_trainers_impl_trainer_id_fkey";
+            columns: ["impl_trainer_id"];
+            isOneToOne: false;
+            referencedRelation: "impl_trainers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_class_trainers_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      impl_classes: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          expected_learners_per_session: number;
+          hours_per_session: number;
+          id: string;
+          implementation_id: string;
+          module_id: string | null;
+          name: string;
+          org_id: string;
+          required_equipment_notes: string | null;
+          sort_order: number;
+          total_people_to_train: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          expected_learners_per_session: number;
+          hours_per_session: number;
+          id?: string;
+          implementation_id: string;
+          module_id?: string | null;
+          name: string;
+          org_id: string;
+          required_equipment_notes?: string | null;
+          sort_order?: number;
+          total_people_to_train?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          expected_learners_per_session?: number;
+          hours_per_session?: number;
+          id?: string;
+          implementation_id?: string;
+          module_id?: string | null;
+          name?: string;
+          org_id?: string;
+          required_equipment_notes?: string | null;
+          sort_order?: number;
+          total_people_to_train?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "impl_classes_implementation_id_fkey";
+            columns: ["implementation_id"];
+            isOneToOne: false;
+            referencedRelation: "implementations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_classes_module_id_fkey";
+            columns: ["module_id"];
+            isOneToOne: false;
+            referencedRelation: "impl_modules";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_classes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      impl_modules: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          id: string;
+          implementation_id: string;
+          name: string;
+          org_id: string;
+          sort_order: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          implementation_id: string;
+          name: string;
+          org_id: string;
+          sort_order?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          id?: string;
+          implementation_id?: string;
+          name?: string;
+          org_id?: string;
+          sort_order?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "impl_modules_implementation_id_fkey";
+            columns: ["implementation_id"];
+            isOneToOne: false;
+            referencedRelation: "implementations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_modules_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      impl_rooms: {
+        Row: {
+          available_days_of_week: number[];
+          available_hours_per_day: number;
+          created_at: string;
+          created_by: string | null;
+          equipment_notes: string | null;
+          id: string;
+          implementation_id: string;
+          location: string | null;
+          name: string;
+          org_id: string;
+          seat_capacity: number;
+          sort_order: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          available_days_of_week?: number[];
+          available_hours_per_day?: number;
+          created_at?: string;
+          created_by?: string | null;
+          equipment_notes?: string | null;
+          id?: string;
+          implementation_id: string;
+          location?: string | null;
+          name: string;
+          org_id: string;
+          seat_capacity: number;
+          sort_order?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          available_days_of_week?: number[];
+          available_hours_per_day?: number;
+          created_at?: string;
+          created_by?: string | null;
+          equipment_notes?: string | null;
+          id?: string;
+          implementation_id?: string;
+          location?: string | null;
+          name?: string;
+          org_id?: string;
+          seat_capacity?: number;
+          sort_order?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "impl_rooms_implementation_id_fkey";
+            columns: ["implementation_id"];
+            isOneToOne: false;
+            referencedRelation: "implementations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_rooms_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      impl_sessions: {
+        Row: {
+          conflict_status: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          impl_class_id: string;
+          impl_room_id: string | null;
+          impl_trainer_id: string | null;
+          implementation_id: string;
+          learners_count: number;
+          notes: string | null;
+          org_id: string;
+          scheduled_end: string;
+          scheduled_start: string;
+          status: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          conflict_status?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          impl_class_id: string;
+          impl_room_id?: string | null;
+          impl_trainer_id?: string | null;
+          implementation_id: string;
+          learners_count?: number;
+          notes?: string | null;
+          org_id: string;
+          scheduled_end: string;
+          scheduled_start: string;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          conflict_status?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          impl_class_id?: string;
+          impl_room_id?: string | null;
+          impl_trainer_id?: string | null;
+          implementation_id?: string;
+          learners_count?: number;
+          notes?: string | null;
+          org_id?: string;
+          scheduled_end?: string;
+          scheduled_start?: string;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "impl_sessions_impl_class_id_fkey";
+            columns: ["impl_class_id"];
+            isOneToOne: false;
+            referencedRelation: "impl_classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_sessions_impl_room_id_fkey";
+            columns: ["impl_room_id"];
+            isOneToOne: false;
+            referencedRelation: "impl_rooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_sessions_impl_trainer_id_fkey";
+            columns: ["impl_trainer_id"];
+            isOneToOne: false;
+            referencedRelation: "impl_trainers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_sessions_implementation_id_fkey";
+            columns: ["implementation_id"];
+            isOneToOne: false;
+            referencedRelation: "implementations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_sessions_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      impl_trainers: {
+        Row: {
+          availability_hours_per_week: number;
+          created_at: string;
+          created_by: string | null;
+          email: string | null;
+          id: string;
+          implementation_id: string;
+          instructor_id: string | null;
+          max_concurrent_sessions: number;
+          name: string;
+          org_id: string;
+          sort_order: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          availability_hours_per_week: number;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          id?: string;
+          implementation_id: string;
+          instructor_id?: string | null;
+          max_concurrent_sessions?: number;
+          name: string;
+          org_id: string;
+          sort_order?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          availability_hours_per_week?: number;
+          created_at?: string;
+          created_by?: string | null;
+          email?: string | null;
+          id?: string;
+          implementation_id?: string;
+          instructor_id?: string | null;
+          max_concurrent_sessions?: number;
+          name?: string;
+          org_id?: string;
+          sort_order?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "impl_trainers_implementation_id_fkey";
+            columns: ["implementation_id"];
+            isOneToOne: false;
+            referencedRelation: "implementations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_trainers_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_trainers_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
+            foreignKeyName: "impl_trainers_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      implementations: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          current_step: number;
+          deleted_at: string | null;
+          description: string | null;
+          go_live_date: string | null;
+          id: string;
+          linked_project_id: string | null;
+          linked_tra_id: string | null;
+          name: string;
+          org_id: string;
+          status: string;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+          window_end_date: string | null;
+          window_start_date: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          current_step?: number;
+          deleted_at?: string | null;
+          description?: string | null;
+          go_live_date?: string | null;
+          id?: string;
+          linked_project_id?: string | null;
+          linked_tra_id?: string | null;
+          name: string;
+          org_id: string;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+          window_end_date?: string | null;
+          window_start_date?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          current_step?: number;
+          deleted_at?: string | null;
+          description?: string | null;
+          go_live_date?: string | null;
+          id?: string;
+          linked_project_id?: string | null;
+          linked_tra_id?: string | null;
+          name?: string;
+          org_id?: string;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+          window_end_date?: string | null;
+          window_start_date?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "implementations_linked_project_id_fkey";
+            columns: ["linked_project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "implementations_linked_tra_id_fkey";
+            columns: ["linked_tra_id"];
+            isOneToOne: false;
+            referencedRelation: "tras";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "implementations_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       individual_allocations: {
         Row: {
           bucket_id: string;
