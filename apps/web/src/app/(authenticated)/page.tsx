@@ -73,6 +73,8 @@ export default async function DashboardPage() {
     );
   }
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+
   const [
     { data: instructors },
     { data: capacityRows },
@@ -80,6 +82,10 @@ export default async function DashboardPage() {
     { count: trasToReview },
     { count: trasApproved },
     { count: activeProjectCount },
+    { data: overdueMilestoneRows },
+    { data: conflictSessionRows },
+    { data: classRows },
+    { data: classAssignmentRows },
   ] = await Promise.all([
     supabase
       .from("instructors")
@@ -110,6 +116,33 @@ export default async function DashboardPage() {
       .eq("org_id", orgId)
       .is("deleted_at", null)
       .in("status", ["planning", "active"]),
+    supabase
+      .from("milestones")
+      .select("id, name, due_date, project:projects!inner(id, name, status, deleted_at)")
+      .eq("org_id", orgId)
+      .eq("is_complete", false)
+      .lt("due_date", todayIso)
+      .order("due_date", { ascending: true })
+      .limit(20),
+    supabase
+      .from("impl_sessions")
+      .select(
+        "id, conflict_status, scheduled_start, implementation:implementations!inner(id, name, status)",
+      )
+      .eq("org_id", orgId)
+      .neq("conflict_status", "none")
+      .order("scheduled_start", { ascending: true })
+      .limit(20),
+    supabase
+      .from("classes")
+      .select("id, name, offerings_per_year")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .eq("status", "active"),
+    supabase
+      .from("class_instructor_assignments")
+      .select("class_id, assigned_offerings")
+      .eq("org_id", orgId),
   ]);
 
   const activeInstructors = (instructors ?? []) as Instructor[];
@@ -146,6 +179,75 @@ export default async function DashboardPage() {
   const balancedCount = withDept.filter(
     (c) => (c.utilization_pct ?? 0) >= 40 && (c.utilization_pct ?? 0) < 80,
   ).length;
+
+  // ── At-risk commitments ────────────────────────────────────────────────
+  type OverdueMilestone = {
+    id: string;
+    name: string;
+    due_date: string;
+    project: { id: string; name: string; status: string; deleted_at: string | null } | null;
+  };
+  const overdueMilestones = ((overdueMilestoneRows ?? []) as OverdueMilestone[]).filter((m) => {
+    const p = m.project;
+    if (!p || p.deleted_at) return false;
+    return p.status === "planning" || p.status === "active";
+  });
+
+  type ConflictSession = {
+    id: string;
+    conflict_status: string;
+    scheduled_start: string;
+    implementation: { id: string; name: string; status: string } | null;
+  };
+  const conflictSessions = (conflictSessionRows ?? []) as ConflictSession[];
+  // Roll up to one row per implementation with a count of conflicting sessions.
+  const conflictsByImpl = new Map<
+    string,
+    { id: string; name: string; count: number; severity: string }
+  >();
+  for (const s of conflictSessions) {
+    const impl = s.implementation;
+    if (!impl) continue;
+    const cur = conflictsByImpl.get(impl.id);
+    const severity = s.conflict_status === "full" ? "full" : "partial";
+    if (cur) {
+      cur.count += 1;
+      if (severity === "full") cur.severity = "full";
+    } else {
+      conflictsByImpl.set(impl.id, { id: impl.id, name: impl.name, count: 1, severity });
+    }
+  }
+  const conflictRollups = Array.from(conflictsByImpl.values()).sort((a, b) =>
+    a.severity === b.severity ? b.count - a.count : a.severity === "full" ? -1 : 1,
+  );
+
+  type ClassRow = { id: string; name: string; offerings_per_year: number };
+  type AssignmentRow = { class_id: string; assigned_offerings: number };
+  const classRowsTyped = (classRows ?? []) as ClassRow[];
+  const assignmentRowsTyped = (classAssignmentRows ?? []) as AssignmentRow[];
+  const assignedByClassId = new Map<string, number>();
+  for (const a of assignmentRowsTyped) {
+    assignedByClassId.set(
+      a.class_id,
+      (assignedByClassId.get(a.class_id) ?? 0) + a.assigned_offerings,
+    );
+  }
+  const coverageGaps = classRowsTyped
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      target: c.offerings_per_year,
+      assigned: assignedByClassId.get(c.id) ?? 0,
+    }))
+    .filter((c) => c.assigned < c.target)
+    .map((c) => ({ ...c, gap: c.target - c.assigned }))
+    .sort((a, b) => b.gap - a.gap);
+
+  function daysOverdue(iso: string): number {
+    const due = new Date(iso).getTime();
+    const now = new Date(todayIso).getTime();
+    return Math.max(0, Math.round((now - due) / 86_400_000));
+  }
 
   return (
     <div>
@@ -265,6 +367,132 @@ export default async function DashboardPage() {
             <span className="text-foreground font-medium tabular-nums">{balancedCount}</span>{" "}
             instructor{balancedCount === 1 ? "" : "s"} in the balanced range (40–79%).
           </p>
+        </section>
+
+        {/* At-risk commitments — full width */}
+        <section className="border-border bg-background rounded-xl border p-5">
+          <div className="mb-4">
+            <h3 className="text-foreground font-serif text-base tracking-tight">
+              At-risk commitments
+            </h3>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              Deadlines slipping, schedule conflicts, and coverage gaps that need a decision.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-3">
+            {/* Overdue milestones */}
+            <div>
+              <p className="text-foreground mb-2 text-xs font-semibold uppercase tracking-[0.08em]">
+                Overdue milestones{" "}
+                <span className="text-muted-foreground font-normal normal-case tracking-normal">
+                  ({overdueMilestones.length})
+                </span>
+              </p>
+              {overdueMilestones.length === 0 ? (
+                <p className="text-muted-foreground py-3 text-sm italic">
+                  Nothing overdue right now.
+                </p>
+              ) : (
+                <ul className="divide-border divide-y">
+                  {overdueMilestones.slice(0, 5).map((m) => {
+                    const days = daysOverdue(m.due_date);
+                    return (
+                      <li key={m.id} className="py-2.5">
+                        <Link
+                          href={`/projects/${m.project?.id ?? ""}`}
+                          className="text-foreground hover:text-primary block text-sm font-medium"
+                        >
+                          {m.project?.name ?? "Project"}
+                        </Link>
+                        <p className="text-muted-foreground truncate text-xs">{m.name}</p>
+                        <p
+                          className="mt-0.5 text-xs font-medium"
+                          style={{ color: "var(--destructive)" }}
+                        >
+                          {days} day{days === 1 ? "" : "s"} overdue
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {/* Schedule conflicts */}
+            <div>
+              <p className="text-foreground mb-2 text-xs font-semibold uppercase tracking-[0.08em]">
+                Schedule conflicts{" "}
+                <span className="text-muted-foreground font-normal normal-case tracking-normal">
+                  ({conflictRollups.length})
+                </span>
+              </p>
+              {conflictRollups.length === 0 ? (
+                <p className="text-muted-foreground py-3 text-sm italic">All sessions clear.</p>
+              ) : (
+                <ul className="divide-border divide-y">
+                  {conflictRollups.slice(0, 5).map((c) => (
+                    <li key={c.id} className="py-2.5">
+                      <Link
+                        href={`/training-planner/${c.id}/schedule`}
+                        className="text-foreground hover:text-primary block text-sm font-medium"
+                      >
+                        {c.name}
+                      </Link>
+                      <p
+                        className="mt-0.5 text-xs font-medium"
+                        style={{
+                          color:
+                            c.severity === "full"
+                              ? "var(--destructive)"
+                              : // Darkened amber so it passes WCAG AA on the cream background.
+                                "color-mix(in oklab, var(--highlight) 35%, var(--foreground))",
+                        }}
+                      >
+                        {c.count} session{c.count === 1 ? "" : "s"} ·{" "}
+                        {c.severity === "full" ? "full conflict" : "partial conflict"}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Coverage gaps */}
+            <div>
+              <p className="text-foreground mb-2 text-xs font-semibold uppercase tracking-[0.08em]">
+                Coverage gaps{" "}
+                <span className="text-muted-foreground font-normal normal-case tracking-normal">
+                  ({coverageGaps.length})
+                </span>
+              </p>
+              {coverageGaps.length === 0 ? (
+                <p className="text-muted-foreground py-3 text-sm italic">
+                  Every class is fully staffed.
+                </p>
+              ) : (
+                <ul className="divide-border divide-y">
+                  {coverageGaps.slice(0, 5).map((c) => (
+                    <li key={c.id} className="py-2.5">
+                      <Link
+                        href={`/classes/${c.id}`}
+                        className="text-foreground hover:text-primary block text-sm font-medium"
+                      >
+                        {c.name}
+                      </Link>
+                      <p className="text-muted-foreground mt-0.5 text-xs">
+                        <span className="text-foreground font-medium tabular-nums">
+                          {c.assigned}
+                        </span>
+                        <span className="tabular-nums"> / {c.target}</span> offerings staffed{" "}
+                        <span style={{ color: "var(--destructive)" }}>(−{c.gap})</span>
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         </section>
 
         <div className="grid grid-cols-1 gap-6">
