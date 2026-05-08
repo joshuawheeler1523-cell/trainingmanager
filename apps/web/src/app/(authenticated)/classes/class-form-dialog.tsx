@@ -10,6 +10,30 @@ import { classInputSchema } from "@arbor/shared";
 import type { Class, ClassInput, Instructor } from "@arbor/shared";
 import { createClass, updateClass, assignInstructorToClass } from "./actions";
 
+// Frequency presets that auto-fill offerings_per_year. Numbers reflect
+// typical hospital education planning (50 working weeks/yr, 12 months,
+// etc.). "Custom" leaves the field as-is.
+type FrequencyPreset =
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "quarterly"
+  | "twice_yearly"
+  | "yearly"
+  | "custom";
+const FREQUENCY_OPTIONS: { value: FrequencyPreset; label: string; offerings: number | null }[] = [
+  { value: "weekly", label: "Weekly (50/yr)", offerings: 50 },
+  { value: "biweekly", label: "Bi-weekly (26/yr)", offerings: 26 },
+  { value: "monthly", label: "Monthly (12/yr)", offerings: 12 },
+  { value: "quarterly", label: "Quarterly (4/yr)", offerings: 4 },
+  { value: "twice_yearly", label: "Twice a year (2/yr)", offerings: 2 },
+  { value: "yearly", label: "Yearly (1/yr)", offerings: 1 },
+  { value: "custom", label: "Custom", offerings: null },
+];
+function frequencyForOfferings(n: number): FrequencyPreset {
+  return FREQUENCY_OPTIONS.find((o) => o.offerings === n)?.value ?? "custom";
+}
+
 type CreateProps = {
   mode: "create";
   trigger: React.ReactNode;
@@ -91,15 +115,19 @@ function StepBasic({
 function StepTime({
   control,
   register,
+  setValue,
   errors,
 }: {
   control: ReturnType<typeof useForm<ClassInput>>["control"];
   register: ReturnType<typeof useForm<ClassInput>>["register"];
+  setValue: ReturnType<typeof useForm<ClassInput>>["setValue"];
   errors: Record<string, { message?: string } | undefined>;
 }) {
   const isMultiDay = useWatch({ control, name: "is_multi_day" });
   const totalDays = useWatch({ control, name: "total_days" });
   const customEnabled = useWatch({ control, name: "custom_day_hours" });
+  const offeringsValue = useWatch({ control, name: "offerings_per_year" });
+  const frequency = frequencyForOfferings(offeringsValue || 0);
 
   const { fields, replace } = useFieldArray({ control, name: "custom_day_hours" as never });
 
@@ -187,7 +215,30 @@ function StepTime({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
+      {/* Frequency presets — pick one to auto-fill offerings/year, or
+          override the number directly to switch to "Custom". */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label htmlFor="frequency">How often is this class offered?</Label>
+          <select
+            id="frequency"
+            value={frequency}
+            onChange={(e) => {
+              const next = e.target.value as FrequencyPreset;
+              const preset = FREQUENCY_OPTIONS.find((o) => o.value === next);
+              if (preset?.offerings != null) {
+                setValue("offerings_per_year", preset.offerings, { shouldDirty: true });
+              }
+            }}
+            className={inputCls()}
+          >
+            {FREQUENCY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <Label htmlFor="offerings_per_year">Offerings/year</Label>
           <input
@@ -198,8 +249,11 @@ function StepTime({
             className={inputCls()}
           />
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label htmlFor="prep_hours_per_offering">Prep hrs</Label>
+          <Label htmlFor="prep_hours_per_offering">Prep hrs / offering</Label>
           <input
             id="prep_hours_per_offering"
             type="number"
@@ -210,7 +264,7 @@ function StepTime({
           />
         </div>
         <div>
-          <Label htmlFor="logistics_hours_per_offering">Logistics hrs</Label>
+          <Label htmlFor="logistics_hours_per_offering">Logistics hrs / offering</Label>
           <input
             id="logistics_hours_per_offering"
             type="number"
@@ -394,6 +448,7 @@ export default function ClassFormDialog(props: Props) {
   const {
     register,
     control,
+    setValue,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -489,7 +544,7 @@ export default function ClassFormDialog(props: Props) {
           >
             {(isEdit || step === 0) && <StepBasic register={register} errors={errors} />}
             {(isEdit || step === 1) && (
-              <StepTime control={control} register={register} errors={errors} />
+              <StepTime control={control} register={register} setValue={setValue} errors={errors} />
             )}
             {!isEdit && step === 2 && (
               <StepInstructors

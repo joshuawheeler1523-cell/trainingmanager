@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import {
   ArrowUturnLeftIcon,
   PlusIcon,
   TrashIcon,
+  ArrowsRightLeftIcon,
 } from "@heroicons/react/20/solid";
 import ClassFormDialog from "@/app/(authenticated)/classes/class-form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
@@ -19,6 +20,7 @@ import {
   assignInstructorToClass,
   unassignInstructorFromClass,
   updateAssignment,
+  distributeOfferingsEvenly,
 } from "@/app/(authenticated)/classes/actions";
 import {
   addClassSkillRequirement,
@@ -136,6 +138,8 @@ function OverviewTab({ cls }: { cls: ClassWithHours }) {
   );
 }
 
+type AssignmentRole = "eligible" | "primary" | "backup";
+
 function InstructorsTab({
   classId,
   offeringsPerYear,
@@ -149,9 +153,6 @@ function InstructorsTab({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editRole, setEditRole] = useState<"eligible" | "primary" | "backup">("eligible");
-  const [editOfferings, setEditOfferings] = useState(0);
   const [addingId, setAddingId] = useState("");
 
   const assignedIds = new Set(assignments.map((a) => a.instructor_id));
@@ -161,25 +162,25 @@ function InstructorsTab({
     return allInstructors.find((i) => i.id === id)?.full_name ?? id;
   }
 
-  function startEdit(a: Assignment) {
-    setEditingId(a.id);
-    setEditRole(a.role as "eligible" | "primary" | "backup");
-    setEditOfferings(a.assigned_offerings);
-  }
-
-  function saveEdit(instructorId: string) {
+  function saveRole(instructorId: string, nextRole: AssignmentRole, currentOfferings: number) {
     startTransition(async () => {
       const result = await updateAssignment(classId, instructorId, {
-        role: editRole,
-        assigned_offerings: editOfferings,
+        role: nextRole,
+        assigned_offerings: currentOfferings,
       });
-      if (result.ok) {
-        toast.success("Assignment updated");
-        setEditingId(null);
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) router.refresh();
+      else toast.error(result.error.message);
+    });
+  }
+
+  function saveOfferings(instructorId: string, nextOfferings: number, currentRole: AssignmentRole) {
+    startTransition(async () => {
+      const result = await updateAssignment(classId, instructorId, {
+        role: currentRole,
+        assigned_offerings: nextOfferings,
+      });
+      if (result.ok) router.refresh();
+      else toast.error(result.error.message);
     });
   }
 
@@ -213,37 +214,86 @@ function InstructorsTab({
     });
   }
 
-  const inputCls =
-    "border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring";
+  function distributeEvenly() {
+    startTransition(async () => {
+      const result = await distributeOfferingsEvenly(classId);
+      if (result.ok) {
+        toast.success(
+          `Distributed ${String(result.data.total)} offerings across ${String(result.data.count)} instructors`,
+        );
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  const totalAssigned = assignments.reduce((s, a) => s + a.assigned_offerings, 0);
+  const remaining = offeringsPerYear - totalAssigned;
 
   return (
     <div className="space-y-4">
-      {available.length > 0 && (
-        <div className="flex items-center gap-3">
-          <select
-            value={addingId}
-            onChange={(e) => {
-              setAddingId(e.target.value);
-            }}
-            className={inputCls}
-          >
-            <option value="">Select instructor to add…</option>
-            {available.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.full_name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            disabled={!addingId || pending}
-            onClick={addInstructor}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-          >
-            Add
-          </button>
+      {/* Toolbar: add + distribute + summary */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          {available.length > 0 && (
+            <>
+              <select
+                value={addingId}
+                onChange={(e) => {
+                  setAddingId(e.target.value);
+                }}
+                className="border-input bg-background text-foreground focus:ring-ring rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-1"
+                aria-label="Select instructor to add"
+              >
+                <option value="">Select instructor to add…</option>
+                {available.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.full_name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!addingId || pending}
+                onClick={addInstructor}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Add
+              </button>
+            </>
+          )}
         </div>
-      )}
+
+        <div className="flex items-center gap-3">
+          {offeringsPerYear > 0 && (
+            <span className="text-muted-foreground text-xs">
+              <span
+                className="text-foreground font-medium tabular-nums"
+                style={remaining < 0 ? { color: "var(--destructive)" } : undefined}
+              >
+                {totalAssigned}
+              </span>
+              {" / "}
+              <span className="tabular-nums">{offeringsPerYear}</span> offerings assigned
+              {remaining > 0 && <span className="ml-1">({remaining} unstaffed)</span>}
+            </span>
+          )}
+          {assignments.length >= 2 && offeringsPerYear > 0 && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={distributeEvenly}
+              title="Split offerings_per_year evenly across all assigned instructors"
+              className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+            >
+              <ArrowsRightLeftIcon className="h-4 w-4" />
+              Distribute evenly
+            </button>
+          )}
+        </div>
+      </div>
 
       {assignments.length === 0 ? (
         <div className="border-border bg-surface rounded-xl border border-dashed p-10 text-center">
@@ -271,104 +321,132 @@ function InstructorsTab({
             </thead>
             <tbody className="divide-border divide-y">
               {assignments.map((a) => (
-                <tr key={a.id} className="hover:bg-surface">
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/instructors/${a.instructor_id}`}
-                      className="text-foreground font-medium hover:underline"
-                    >
-                      {instructorName(a.instructor_id)}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    {editingId === a.id ? (
-                      <select
-                        value={editRole}
-                        onChange={(e) => {
-                          setEditRole(e.target.value as "eligible" | "primary" | "backup");
-                        }}
-                        className={inputCls}
-                      >
-                        <option value="eligible">Eligible</option>
-                        <option value="primary">Primary</option>
-                        <option value="backup">Backup</option>
-                      </select>
-                    ) : (
-                      <span className="text-foreground capitalize">{a.role}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {editingId === a.id ? (
-                      <input
-                        type="number"
-                        min={0}
-                        max={offeringsPerYear || undefined}
-                        value={editOfferings}
-                        onChange={(e) => {
-                          setEditOfferings(Number(e.target.value));
-                        }}
-                        className={`${inputCls} w-20`}
-                      />
-                    ) : (
-                      <span className="text-foreground">{a.assigned_offerings}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      {editingId === a.id ? (
-                        <>
-                          <button
-                            type="button"
-                            disabled={pending}
-                            onClick={() => {
-                              saveEdit(a.instructor_id);
-                            }}
-                            className="text-primary hover:text-primary/80 text-xs font-medium disabled:opacity-50"
-                          >
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingId(null);
-                            }}
-                            className="text-muted-foreground hover:text-foreground text-xs"
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              startEdit(a);
-                            }}
-                            className="text-muted-foreground hover:text-foreground text-xs font-medium"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            disabled={pending}
-                            onClick={() => {
-                              removeAssignment(a.instructor_id);
-                            }}
-                            className="text-destructive hover:text-destructive/80 text-xs disabled:opacity-50"
-                          >
-                            Remove
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                <AssignmentRow
+                  key={a.id}
+                  assignment={a}
+                  instructorName={instructorName(a.instructor_id)}
+                  offeringsPerYear={offeringsPerYear}
+                  pending={pending}
+                  onRoleChange={(role) => {
+                    saveRole(a.instructor_id, role, a.assigned_offerings);
+                  }}
+                  onOfferingsCommit={(value) => {
+                    if (value !== a.assigned_offerings) {
+                      saveOfferings(a.instructor_id, value, a.role as AssignmentRole);
+                    }
+                  }}
+                  onRemove={() => {
+                    removeAssignment(a.instructor_id);
+                  }}
+                />
               ))}
             </tbody>
           </table>
         </div>
       )}
     </div>
+  );
+}
+
+function AssignmentRow({
+  assignment,
+  instructorName,
+  offeringsPerYear,
+  pending,
+  onRoleChange,
+  onOfferingsCommit,
+  onRemove,
+}: {
+  assignment: Assignment;
+  instructorName: string;
+  offeringsPerYear: number;
+  pending: boolean;
+  onRoleChange: (role: AssignmentRole) => void;
+  onOfferingsCommit: (value: number) => void;
+  onRemove: () => void;
+}) {
+  // Local mirror for the offerings input so the user can type freely;
+  // we commit on blur or Enter.
+  const [draftOfferings, setDraftOfferings] = useState(String(assignment.assigned_offerings));
+
+  // Re-sync if the underlying assignment changes (e.g. after distribute-evenly).
+  useEffect(() => {
+    setDraftOfferings(String(assignment.assigned_offerings));
+  }, [assignment.assigned_offerings]);
+
+  function commitOfferings() {
+    const n = Number(draftOfferings);
+    if (!Number.isFinite(n) || n < 0) {
+      setDraftOfferings(String(assignment.assigned_offerings));
+      return;
+    }
+    onOfferingsCommit(Math.floor(n));
+  }
+
+  const inputCls =
+    "border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring";
+
+  return (
+    <tr className="hover:bg-surface">
+      <td className="px-4 py-3">
+        <Link
+          href={`/instructors/${assignment.instructor_id}`}
+          className="text-foreground font-medium hover:underline"
+        >
+          {instructorName}
+        </Link>
+      </td>
+      <td className="px-4 py-3">
+        <select
+          value={assignment.role}
+          disabled={pending}
+          onChange={(e) => {
+            onRoleChange(e.target.value as AssignmentRole);
+          }}
+          className={inputCls}
+          aria-label={`Role for ${instructorName}`}
+        >
+          <option value="eligible">Eligible</option>
+          <option value="primary">Primary</option>
+          <option value="backup">Backup</option>
+        </select>
+      </td>
+      <td className="px-4 py-3">
+        <input
+          type="number"
+          min={0}
+          max={offeringsPerYear || undefined}
+          step={1}
+          value={draftOfferings}
+          disabled={pending}
+          onChange={(e) => {
+            setDraftOfferings(e.target.value);
+          }}
+          onBlur={commitOfferings}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.currentTarget.blur();
+            } else if (e.key === "Escape") {
+              setDraftOfferings(String(assignment.assigned_offerings));
+              e.currentTarget.blur();
+            }
+          }}
+          className={`${inputCls} w-20`}
+          aria-label={`Assigned offerings for ${instructorName}`}
+        />
+      </td>
+      <td className="px-4 py-3 text-right">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={onRemove}
+          className="text-destructive hover:text-destructive/80 inline-flex items-center gap-1 text-xs disabled:opacity-50"
+        >
+          <TrashIcon className="h-3.5 w-3.5" />
+          Remove
+        </button>
+      </td>
+    </tr>
   );
 }
 

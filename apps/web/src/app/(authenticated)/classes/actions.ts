@@ -160,6 +160,86 @@ export async function updateAssignment(
   });
 }
 
+/**
+ * Spread the class's offerings_per_year evenly across all current
+ * instructor assignments. The remainder (when offerings don't divide
+ * cleanly) goes to the first N rows alphabetically by instructor name —
+ * stable and predictable, no winners-and-losers feel.
+ */
+export async function distributeOfferingsEvenly(
+  classId: string,
+): Promise<ActionResult<{ count: number; total: number }>> {
+  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+
+  const { data: cls, error: clsErr } = await supabase
+    .from("classes")
+    .select("id, offerings_per_year")
+    .eq("id", classId)
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .single();
+  if (clsErr) {
+    return { ok: false, error: { code: clsErr.code, message: clsErr.message } };
+  }
+
+  const { data: rows, error: rowsErr } = await supabase
+    .from("class_instructor_assignments")
+    .select("id, instructor_id, role, instructor:instructors!inner(full_name)")
+    .eq("class_id", classId)
+    .eq("org_id", orgId);
+  if (rowsErr) return { ok: false, error: { code: rowsErr.code, message: rowsErr.message } };
+  if (rows.length === 0) {
+    return {
+      ok: false,
+      error: { code: "NO_ASSIGNMENTS", message: "No instructors assigned yet" },
+    };
+  }
+
+  type Row = {
+    id: string;
+    instructor_id: string;
+    role: string;
+    instructor: { full_name: string } | { full_name: string }[] | null;
+  };
+  const sorted = (rows as Row[]).slice().sort((a, b) => {
+    const an = Array.isArray(a.instructor)
+      ? (a.instructor[0]?.full_name ?? "")
+      : (a.instructor?.full_name ?? "");
+    const bn = Array.isArray(b.instructor)
+      ? (b.instructor[0]?.full_name ?? "")
+      : (b.instructor?.full_name ?? "");
+    return an.localeCompare(bn);
+  });
+
+  const total = cls.offerings_per_year;
+  const n = sorted.length;
+  const base = Math.floor(total / n);
+  const remainder = total - base * n;
+
+  const updates = sorted.map((r, i) => ({
+    org_id: orgId,
+    class_id: classId,
+    instructor_id: r.instructor_id,
+    role: r.role,
+    assigned_offerings: base + (i < remainder ? 1 : 0),
+  }));
+
+  const { error: upErr } = await supabase
+    .from("class_instructor_assignments")
+    .upsert(updates, { onConflict: "class_id,instructor_id" });
+  if (upErr) {
+    const message =
+      upErr.code === "23514" || upErr.message.includes("exceeds")
+        ? "Total assigned offerings would exceed the class limit."
+        : upErr.message;
+    return { ok: false, error: { code: upErr.code, message } };
+  }
+
+  revalidatePath(`/classes/${classId}`);
+  return { ok: true, data: { count: n, total } };
+}
+
 export async function restoreClass(id: string): Promise<ActionResult<{ id: string }>> {
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
