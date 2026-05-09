@@ -11,6 +11,8 @@
     "db:reset": "pnpm --filter db reset && pnpm db:seed",
     "db:types": "pnpm --filter db types",
     "db:seed": "pnpm --filter db seed",
+    "permissions:doc": "node --experimental-strip-types --no-warnings scripts/generate-permissions-doc.ts",
+    "permissions:check": "node --experimental-strip-types --no-warnings scripts/generate-permissions-doc.ts --check",
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {

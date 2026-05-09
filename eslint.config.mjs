@@ -15,6 +15,7 @@ export default [
       "**/dist/**",
       "**/build/**",
       "packages/db/**",
+      "scripts/**",
       "**/supabase/database.types.ts",
       "**/lib/supabase/database.types.ts",
     ],
