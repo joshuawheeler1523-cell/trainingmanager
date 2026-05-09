@@ -21,6 +21,7 @@ import {
   XMarkIcon,
   ArrowRightEndOnRectangleIcon,
 } from "@heroicons/react/24/outline";
+import type { ToggleableModule } from "@arbor/shared";
 import { cn } from "@/lib/utils";
 import { logout } from "@/app/(authenticated)/actions";
 
@@ -28,28 +29,36 @@ type IconType = React.ComponentType<{ className?: string }>;
 
 type NavItem = { href: string; label: string; icon: IconType };
 type NavGroup = { title: string; items: NavItem[] };
+type ModuleFlags = Record<ToggleableModule, boolean>;
 
 const HOME: NavItem = { href: "/", label: "Dashboard", icon: HomeIcon };
 
-const TEAM_GROUP: NavGroup = {
-  title: "Team",
-  items: [
-    { href: "/instructors", label: "Instructors", icon: UserGroupIcon },
-    { href: "/classes", label: "Classes", icon: AcademicCapIcon },
-    { href: "/skills", label: "Skills", icon: SparklesIcon },
-  ],
-};
+// Nav groups are computed per-render based on the org's enabled modules.
+// Modules off → item hidden. Hospital training has all modules on, so the
+// nav looks identical to before this change.
+function teamGroup(modules: ModuleFlags): NavGroup {
+  const items: NavItem[] = [{ href: "/instructors", label: "Instructors", icon: UserGroupIcon }];
+  if (modules["module.classes"]) {
+    items.push({ href: "/classes", label: "Classes", icon: AcademicCapIcon });
+  }
+  items.push({ href: "/skills", label: "Skills", icon: SparklesIcon });
+  return { title: "Team", items };
+}
 
-const WORK_GROUP: NavGroup = {
-  title: "Work",
-  items: [
+function workGroup(modules: ModuleFlags): NavGroup {
+  const items: NavItem[] = [
     { href: "/allocations", label: "Allocations", icon: AdjustmentsHorizontalIcon },
     { href: "/tras", label: "TRAs", icon: ClipboardDocumentListIcon },
-    { href: "/request-queue", label: "Request Queue", icon: InboxStackIcon },
-    { href: "/projects", label: "Special Projects", icon: BriefcaseIcon },
-    { href: "/training-planner", label: "Training Planner", icon: CalendarDaysIcon },
-  ],
-};
+  ];
+  if (modules["module.education_requests"]) {
+    items.push({ href: "/request-queue", label: "Request Queue", icon: InboxStackIcon });
+  }
+  items.push({ href: "/projects", label: "Special Projects", icon: BriefcaseIcon });
+  if (modules["module.training_planner"]) {
+    items.push({ href: "/training-planner", label: "Training Planner", icon: CalendarDaysIcon });
+  }
+  return { title: "Work", items };
+}
 
 const INSIGHTS_GROUP: NavGroup = {
   title: "Insights",
@@ -118,12 +127,16 @@ function NavGroupBlock({
 
 function SidebarContent({
   isAdmin,
+  modules,
   onNavigate,
 }: {
   isAdmin: boolean;
+  modules: ModuleFlags;
   onNavigate?: (() => void) | undefined;
 }) {
   const pathname = usePathname();
+  const team = teamGroup(modules);
+  const work = workGroup(modules);
   return (
     <>
       <div className="border-border flex h-16 shrink-0 items-center border-b px-4">
@@ -153,8 +166,8 @@ function SidebarContent({
         <div className="space-y-0.5">
           <NavLink item={HOME} pathname={pathname} onNavigate={onNavigate} />
         </div>
-        <NavGroupBlock group={TEAM_GROUP} pathname={pathname} onNavigate={onNavigate} />
-        <NavGroupBlock group={WORK_GROUP} pathname={pathname} onNavigate={onNavigate} />
+        <NavGroupBlock group={team} pathname={pathname} onNavigate={onNavigate} />
+        <NavGroupBlock group={work} pathname={pathname} onNavigate={onNavigate} />
         <NavGroupBlock group={INSIGHTS_GROUP} pathname={pathname} onNavigate={onNavigate} />
         {isAdmin && (
           <NavGroupBlock group={ADMIN_GROUP} pathname={pathname} onNavigate={onNavigate} />
@@ -177,16 +190,16 @@ function SidebarContent({
 }
 
 /** Desktop sidebar — visible on md+, sticky full-height. */
-export function DesktopSidebar({ isAdmin }: { isAdmin: boolean }) {
+export function DesktopSidebar({ isAdmin, modules }: { isAdmin: boolean; modules: ModuleFlags }) {
   return (
     <aside className="border-border bg-background sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r md:flex">
-      <SidebarContent isAdmin={isAdmin} />
+      <SidebarContent isAdmin={isAdmin} modules={modules} />
     </aside>
   );
 }
 
 /** Mobile drawer — hamburger trigger + slide-in panel. */
-export function MobileSidebar({ isAdmin }: { isAdmin: boolean }) {
+export function MobileSidebar({ isAdmin, modules }: { isAdmin: boolean; modules: ModuleFlags }) {
   const [open, setOpen] = useState(false);
   const close = () => {
     setOpen(false);
@@ -216,7 +229,7 @@ export function MobileSidebar({ isAdmin }: { isAdmin: boolean }) {
               <XMarkIcon className="h-5 w-5" />
             </button>
           </Dialog.Close>
-          <SidebarContent isAdmin={isAdmin} onNavigate={close} />
+          <SidebarContent isAdmin={isAdmin} modules={modules} onNavigate={close} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

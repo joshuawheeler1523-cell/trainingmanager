@@ -2272,10 +2272,13 @@ export type Database = {
           billing_tier: string | null;
           created_at: string;
           created_by: string | null;
+          entity_labels: Json;
           id: string;
           logo_url: string | null;
           name: string;
           onboarded_at: string | null;
+          preset_key: Database["public"]["Enums"]["workspace_preset_key"];
+          role_labels: Json;
           settings: Json;
           slug: string;
           time_zone: string;
@@ -2287,10 +2290,13 @@ export type Database = {
           billing_tier?: string | null;
           created_at?: string;
           created_by?: string | null;
+          entity_labels?: Json;
           id?: string;
           logo_url?: string | null;
           name: string;
           onboarded_at?: string | null;
+          preset_key?: Database["public"]["Enums"]["workspace_preset_key"];
+          role_labels?: Json;
           settings?: Json;
           slug: string;
           time_zone?: string;
@@ -2302,10 +2308,13 @@ export type Database = {
           billing_tier?: string | null;
           created_at?: string;
           created_by?: string | null;
+          entity_labels?: Json;
           id?: string;
           logo_url?: string | null;
           name?: string;
           onboarded_at?: string | null;
+          preset_key?: Database["public"]["Enums"]["workspace_preset_key"];
+          role_labels?: Json;
           settings?: Json;
           slug?: string;
           time_zone?: string;
@@ -4219,6 +4228,17 @@ export type Database = {
         Args: { p_table_name: string };
         Returns: undefined;
       };
+      apply_workspace_preset: {
+        Args: {
+          p_entity_labels?: Json;
+          p_module_flags: Json;
+          p_org_id: string;
+          p_overwrite_labels?: boolean;
+          p_preset_key: Database["public"]["Enums"]["workspace_preset_key"];
+          p_role_labels?: Json;
+        };
+        Returns: undefined;
+      };
       current_instructor_id: { Args: { p_org_id: string }; Returns: string };
       current_user_id: { Args: never; Returns: string };
       default_department_for_org: {
@@ -4303,7 +4323,15 @@ export type Database = {
       user_role_in_org: { Args: { p_org_id: string }; Returns: string };
     };
     Enums: {
-      [_ in never]: never;
+      workspace_preset_key:
+        | "hospital_training"
+        | "corporate_ld"
+        | "emr_analyst"
+        | "clinical_informatics"
+        | "software_engineering"
+        | "consulting"
+        | "creative_agency"
+        | "custom";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -4428,6 +4456,17 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      workspace_preset_key: [
+        "hospital_training",
+        "corporate_ld",
+        "emr_analyst",
+        "clinical_informatics",
+        "software_engineering",
+        "consulting",
+        "creative_agency",
+        "custom",
+      ],
+    },
   },
 } as const;

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
+import type { ToggleableModule } from "@arbor/shared";
 import ProfileMenu from "./profile-menu";
 import CommandPalette from "./command-palette";
 import HelpDrawer from "./help-drawer";
@@ -16,6 +17,7 @@ type Props = {
   userName: string;
   userId: string;
   isAdmin: boolean;
+  modules: Record<ToggleableModule, boolean>;
   initialNotifications: NotificationRow[];
 };
 
@@ -26,6 +28,7 @@ export default function AppShell({
   userName,
   userId,
   isAdmin,
+  modules,
   initialNotifications,
 }: Props) {
   const [commandOpen, setCommandOpen] = useState(false);
@@ -55,12 +58,12 @@ export default function AppShell({
         Skip to main content
       </a>
 
-      <DesktopSidebar isAdmin={isAdmin} />
+      <DesktopSidebar isAdmin={isAdmin} modules={modules} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar */}
         <header className="border-border bg-background sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-4">
-          <MobileSidebar isAdmin={isAdmin} />
+          <MobileSidebar isAdmin={isAdmin} modules={modules} />
           <div className="min-w-0 flex-1">{orgSwitcherSlot}</div>
           <div className="flex items-center gap-1">
             <NotificationBell initial={initialNotifications} userId={userId} />

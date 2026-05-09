@@ -6,6 +6,8 @@ import DepartmentSwitcher from "@/components/DepartmentSwitcher";
 import AppShell from "@/components/layout/app-shell";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
+import { getOrgIdentity } from "@/lib/labels/get-org-identity";
+import { OrgIdentityProvider } from "@/components/labels";
 
 export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -20,9 +22,9 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
       | string
       | undefined) ?? email;
 
-  // Initial notifications + admin flag, parallelized.
+  // Initial notifications + admin flag + workspace identity, parallelized.
   const orgId = await getCurrentOrgId();
-  const [{ data: notifications }, admin] = await Promise.all([
+  const [{ data: notifications }, admin, identity] = await Promise.all([
     supabase
       .from("notifications")
       .select("*")
@@ -30,26 +32,36 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
       .order("created_at", { ascending: false })
       .limit(10),
     orgId ? isManager(orgId) : Promise.resolve(false),
+    orgId ? getOrgIdentity(orgId) : Promise.resolve(null),
   ]);
 
   return (
     <OrgGuard>
-      <AppShell
-        orgSwitcherSlot={
-          <div className="flex items-center gap-2">
-            <OrgSwitcher />
-            <span className="text-border">·</span>
-            <DepartmentSwitcher />
-          </div>
-        }
-        userEmail={email}
-        userName={name}
-        userId={user.id}
-        isAdmin={admin}
-        initialNotifications={notifications ?? []}
-      >
-        {children}
-      </AppShell>
+      <OrgIdentityProvider value={identity}>
+        <AppShell
+          orgSwitcherSlot={
+            <div className="flex items-center gap-2">
+              <OrgSwitcher />
+              <span className="text-border">·</span>
+              <DepartmentSwitcher />
+            </div>
+          }
+          userEmail={email}
+          userName={name}
+          userId={user.id}
+          isAdmin={admin}
+          modules={
+            identity?.modules ?? {
+              "module.classes": true,
+              "module.training_planner": true,
+              "module.education_requests": true,
+            }
+          }
+          initialNotifications={notifications ?? []}
+        >
+          {children}
+        </AppShell>
+      </OrgIdentityProvider>
     </OrgGuard>
   );
 }

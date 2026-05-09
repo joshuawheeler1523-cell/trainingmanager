@@ -2,7 +2,14 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2022"],
-    "outDir": "dist"
+    "outDir": "dist",
+    // The package is consumed as TypeScript source via the workspace `exports`
+    // field (./src/index.ts), so it's bundled by the consuming app's bundler
+    // (Next.js/Turbopack, Vitest). NodeNext's requirement for explicit .js
+    // extensions on relative imports breaks Turbopack — see memory:
+    // feedback_turbopack_extensions. Use Bundler resolution instead.
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]
