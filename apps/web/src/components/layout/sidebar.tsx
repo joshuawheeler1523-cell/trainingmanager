@@ -23,11 +23,12 @@ import {
 } from "@heroicons/react/24/outline";
 import type { ToggleableModule } from "@arbor/shared";
 import { cn } from "@/lib/utils";
+import { Label } from "@/components/labels";
 import { logout } from "@/app/(authenticated)/actions";
 
 type IconType = React.ComponentType<{ className?: string }>;
 
-type NavItem = { href: string; label: string; icon: IconType };
+type NavItem = { href: string; label: React.ReactNode; icon: IconType };
 type NavGroup = { title: string; items: NavItem[] };
 type ModuleFlags = Record<ToggleableModule, boolean>;
 
@@ -37,7 +38,9 @@ const HOME: NavItem = { href: "/", label: "Dashboard", icon: HomeIcon };
 // Modules off → item hidden. Hospital training has all modules on, so the
 // nav looks identical to before this change.
 function teamGroup(modules: ModuleFlags): NavGroup {
-  const items: NavItem[] = [{ href: "/instructors", label: "Instructors", icon: UserGroupIcon }];
+  const items: NavItem[] = [
+    { href: "/instructors", label: <Label kind="entity.instructor" plural />, icon: UserGroupIcon },
+  ];
   if (modules["module.classes"]) {
     items.push({ href: "/classes", label: "Classes", icon: AcademicCapIcon });
   }

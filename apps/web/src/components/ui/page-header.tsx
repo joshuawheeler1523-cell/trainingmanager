@@ -1,7 +1,8 @@
 import { cn } from "@/lib/utils";
 
 type Props = {
-  title: string;
+  /** Accepts string or ReactNode so callers can interpolate <Label /> for org-customizable copy. */
+  title: React.ReactNode;
   description?: string;
   actions?: React.ReactNode;
   className?: string;

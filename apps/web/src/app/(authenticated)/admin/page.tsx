@@ -4,6 +4,7 @@ import {
   Cog8ToothIcon,
   EnvelopeIcon,
   LinkIcon,
+  PuzzlePieceIcon,
   SparklesIcon,
   Squares2X2Icon,
   UsersIcon,
@@ -28,6 +29,13 @@ const TILES = [
     title: "Settings",
     description: "Org profile, time zone, brand color, notifications, feature flags.",
     Icon: Cog8ToothIcon,
+  },
+  {
+    href: "/admin/settings/workspace",
+    title: "Workspace identity",
+    description:
+      "Pick a workspace preset, override terminology (Instructor → Trainer, etc.), or toggle modules on/off.",
+    Icon: PuzzlePieceIcon,
   },
   {
     href: "/admin/audit-log",

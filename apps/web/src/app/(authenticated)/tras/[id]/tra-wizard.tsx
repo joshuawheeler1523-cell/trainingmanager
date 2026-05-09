@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -10,6 +10,7 @@ import {
   SparklesIcon,
 } from "@heroicons/react/20/solid";
 import PageHeader from "@/components/ui/page-header";
+import { useIsModuleEnabled } from "@/components/labels";
 import Step1Basics from "./step-1-basics";
 import Step2Need from "./step-2-need";
 import Step3Audience from "./step-3-audience";
@@ -97,6 +98,33 @@ export default function TraWizard({
 }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
+  // Sections 5 (Learning design) + 6 (Logistics) are training-rollout-flavored;
+  // hide them for orgs whose preset has the training planner module off.
+  // See docs/build-plans/2026-05-09_permissions-and-workspace-identity.md §5.5.
+  const trainingPlannerEnabled = useIsModuleEnabled("module.training_planner");
+  const visibleSteps = trainingPlannerEnabled
+    ? STEPS
+    : STEPS.filter((s) => s.id !== 5 && s.id !== 6);
+  // If the user lands on a now-hidden step (e.g. preset just changed), bounce
+  // them back to a visible one.
+  useEffect(() => {
+    if (!visibleSteps.some((s) => s.id === step)) {
+      setStep(4);
+    }
+  }, [visibleSteps, step]);
+
+  function nextStep() {
+    const idx = visibleSteps.findIndex((s) => s.id === step);
+    const next = visibleSteps[idx + 1];
+    if (next) setStep(next.id);
+  }
+  function prevStep() {
+    const idx = visibleSteps.findIndex((s) => s.id === step);
+    const prev = visibleSteps[idx - 1];
+    if (prev) setStep(prev.id);
+  }
+  const isFirstVisible = visibleSteps[0]?.id === step;
+  const isLastVisible = visibleSteps[visibleSteps.length - 1]?.id === step;
   const [aiOpen, setAiOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -188,7 +216,7 @@ export default function TraWizard({
       {/* Step indicator */}
       <div className="border-border bg-background border-b px-6 py-3">
         <ol className="flex flex-wrap gap-1.5">
-          {STEPS.map((s) => (
+          {visibleSteps.map((s) => (
             <li key={s.id} className="flex items-center gap-1.5">
               <button
                 type="button"
@@ -227,7 +255,7 @@ export default function TraWizard({
             disabled={isLocked}
           />
         )}
-        {step === 5 && (
+        {step === 5 && trainingPlannerEnabled && (
           <Step5LearningDesign
             tra={tra}
             objectives={objectives}
@@ -238,7 +266,7 @@ export default function TraWizard({
             disabled={isLocked}
           />
         )}
-        {step === 6 && <Step6Logistics tra={tra} disabled={isLocked} />}
+        {step === 6 && trainingPlannerEnabled && <Step6Logistics tra={tra} disabled={isLocked} />}
         {step === 7 && <Step7Sustainment tra={tra} disabled={isLocked} />}
         {step === 8 && <Step8Approvals traId={tra.id} approvals={approvals} disabled={isLocked} />}
         {step === 9 && (
@@ -267,24 +295,20 @@ export default function TraWizard({
       <div className="border-border bg-background sticky bottom-0 flex items-center justify-between border-t px-6 py-3">
         <button
           type="button"
-          disabled={step === 1}
-          onClick={() => {
-            setStep((s) => (s - 1) as Step);
-          }}
+          disabled={isFirstVisible}
+          onClick={prevStep}
           className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
         >
           <ChevronLeftIcon className="h-4 w-4" />
           Back
         </button>
         <span className="text-muted-foreground text-xs tabular-nums">
-          Step {step} of {STEPS.length}
+          Step {visibleSteps.findIndex((s) => s.id === step) + 1} of {visibleSteps.length}
         </span>
         <button
           type="button"
-          disabled={step === STEPS.length}
-          onClick={() => {
-            setStep((s) => (s + 1) as Step);
-          }}
+          disabled={isLastVisible}
+          onClick={nextStep}
           className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
         >
           Next

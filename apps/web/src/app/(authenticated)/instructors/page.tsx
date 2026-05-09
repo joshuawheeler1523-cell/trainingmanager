@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import PageHeader from "@/components/ui/page-header";
+import { Label } from "@/components/labels";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import InstructorsView from "./instructors-view";
@@ -105,7 +106,10 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
 export default function InstructorsPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <div>
-      <PageHeader title="Instructors" description="Manage your instructor roster." />
+      <PageHeader
+        title={<Label kind="entity.instructor" plural />}
+        description="Manage your roster."
+      />
       <Suspense
         fallback={
           <div className="p-6">
