@@ -132,7 +132,7 @@ drop policy if exists saved_reports_modify_own on public.saved_reports;
 create policy saved_reports_modify_own on public.saved_reports
   for all
   using (
-    user_id = auth.uid()
+    created_by = auth.uid()
     and org_id in (select user_org_ids())
     and (
       is_org_admin(org_id)
@@ -140,7 +140,7 @@ create policy saved_reports_modify_own on public.saved_reports
     )
   )
   with check (
-    user_id = auth.uid()
+    created_by = auth.uid()
     and org_id in (select user_org_ids())
     and (
       is_org_admin(org_id)
