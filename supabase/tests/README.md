@@ -19,10 +19,13 @@ Each test file:
 
 ## Files
 
-| File                           | Coverage                                                                                                                                                                                  |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `role_helpers.test.sql`        | `is_manager` / `is_instructor` / `is_viewer` / `has_any_role` / `current_instructor_id` / `user_role_in_org` for each role + anon                                                         |
-| `rls_role_boundaries.test.sql` | Representative RLS behavior: viewer SELECT-only, instructor cannot INSERT into manager-only tables, instructor can self-edit own row, column ACL trigger blocks unauthorized column edits |
+| File                               | Coverage                                                                                                                                                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `role_helpers.test.sql`            | `is_manager` / `is_instructor` / `is_viewer` / `has_any_role` / `current_instructor_id` / `user_role_in_org` for each role + anon                                                                      |
+| `rls_role_boundaries.test.sql`     | Representative RLS behavior: viewer SELECT-only, instructor cannot INSERT into manager-only tables, instructor can self-edit own row, column ACL trigger blocks unauthorized column edits              |
+| `rls_manager_only_tables.test.sql` | Manager-only category: classes, skills, allocation_buckets, recurring_tasks, education_requests. Sample of the ~26 manager-only tables; pattern is uniform per Phase 4.                                |
+| `rls_creator_scoped_tras.test.sql` | TRAs + tra_stakeholders: instructor-1 creates own TRA + child rows; instructor-2 cannot edit instructor-1's TRA; once status=converted, even creator is locked out; manager always wins.               |
+| `rls_assignment_scoped.test.sql`   | tasks + task_action_items: assigned instructor can update status/percent_complete but column ACL blocks renames; unassigned instructor blocked; manager bypasses both column ACL and assignment scope. |
 
 ## Adding tests
 
