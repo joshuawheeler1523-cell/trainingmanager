@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { MapPinIcon, EnvelopeIcon, BuildingOffice2Icon } from "@heroicons/react/20/solid";
-import UtilizationBadge from "@/components/ui/utilization-badge";
 import type { Instructor } from "@arbor/shared";
 
 type CapacityRow = {
@@ -110,27 +109,83 @@ export default function InstructorCard({ instructor, capacity, sourceBreakdown }
       </div>
 
       {/* Capacity row */}
-      <div className="border-border mt-4 flex items-center justify-between border-t pt-3">
-        <div className="text-muted-foreground text-xs">
-          <span className="text-foreground font-medium">{instructor.annual_hours}</span> available
-          hrs
+      <div className="border-border mt-4 flex items-center justify-between gap-3 border-t pt-3">
+        <div className="min-w-0 text-xs">
+          <p className="text-foreground tabular-nums">
+            <span className="font-medium">{capacity?.assigned_hours.toFixed(0) ?? "0"}</span>
+            <span className="text-muted-foreground"> / {instructor.annual_hours}</span>
+            <span className="text-muted-foreground"> h assigned</span>
+          </p>
           {capacity != null && (
-            <span className="ml-2">
-              · <span className="text-foreground font-medium">{capacity.assigned_hours}</span>{" "}
-              assigned
-            </span>
+            <p className="text-muted-foreground mt-0.5 tabular-nums">
+              {Math.max(0, instructor.annual_hours - capacity.assigned_hours).toFixed(0)} h free
+            </p>
           )}
         </div>
-        {utilizationPct != null ? (
-          <span title={tooltipText}>
-            <UtilizationBadge value={utilizationPct} />
-          </span>
-        ) : (
-          <span className="text-muted-foreground text-xs" title="No workload assigned yet">
-            —
-          </span>
-        )}
+        <CapacityDonut
+          pct={utilizationPct != null ? utilizationPct * 100 : null}
+          tooltip={tooltipText}
+        />
       </div>
     </Link>
+  );
+}
+
+/**
+ * Small SVG donut showing utilization. Track underneath, progress arc on top
+ * coloured by the same utilization bands the rest of the dashboard uses.
+ */
+function CapacityDonut({ pct, tooltip }: { pct: number | null; tooltip?: string | undefined }) {
+  const SIZE = 56;
+  const STROKE = 6;
+  const RADIUS = (SIZE - STROKE) / 2;
+  const CIRC = 2 * Math.PI * RADIUS;
+  const display = pct ?? 0;
+  // Cap visible arc at 100% — over-allocation is signalled by the colour.
+  const arcPct = Math.min(display, 100);
+  const offset = CIRC - (arcPct / 100) * CIRC;
+
+  const color =
+    pct == null
+      ? "var(--muted-foreground)"
+      : pct >= 95
+        ? "var(--destructive)"
+        : pct >= 80
+          ? "var(--highlight)"
+          : pct < 40
+            ? "var(--accent)"
+            : "var(--primary)";
+
+  return (
+    <span title={tooltip} className="relative inline-flex shrink-0 items-center justify-center">
+      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${String(SIZE)} ${String(SIZE)}`} aria-hidden>
+        <circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={RADIUS}
+          fill="none"
+          stroke="color-mix(in oklab, var(--border) 70%, transparent)"
+          strokeWidth={STROKE}
+        />
+        <circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={RADIUS}
+          fill="none"
+          stroke={color}
+          strokeWidth={STROKE}
+          strokeDasharray={CIRC}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${String(SIZE / 2)} ${String(SIZE / 2)})`}
+        />
+      </svg>
+      <span
+        className="absolute text-xs font-bold tabular-nums"
+        style={{ color: pct == null ? "var(--muted-foreground)" : color }}
+      >
+        {pct == null ? "—" : `${pct.toFixed(0)}%`}
+      </span>
+    </span>
   );
 }

@@ -3,12 +3,20 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { CheckCircleIcon, ExclamationTriangleIcon, XCircleIcon } from "@heroicons/react/20/solid";
+import {
+  CheckCircleIcon,
+  ChevronUpDownIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  ExclamationTriangleIcon,
+  Squares2X2Icon,
+  TableCellsIcon,
+  XCircleIcon,
+} from "@heroicons/react/20/solid";
 import InstructorCard from "./instructor-card";
 import InstructorFilters from "./instructor-filters";
 import EmptyState from "@/components/ui/empty-state";
 import {
-  projectedAnnualized,
   type CapacityRow,
   type ForecastWeek,
   type Instructor,
@@ -16,11 +24,11 @@ import {
   type WorkloadSource,
 } from "@arbor/shared";
 
-type Tab = "roster" | "actual_vs_projected" | "recommendations";
+type Tab = "roster" | "capacity" | "recommendations";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "roster", label: "Roster" },
-  { id: "actual_vs_projected", label: "Actual vs Projected" },
+  { id: "capacity", label: "Capacity" },
   { id: "recommendations", label: "Smart Recommendations" },
 ];
 
@@ -41,8 +49,14 @@ export default function InstructorsView(props: Props) {
   const pathname = usePathname();
   const sp = useSearchParams();
   const tabParam = sp.get("tab");
+  // Old "actual_vs_projected" param maps to the simplified "capacity" tab so
+  // existing bookmarks keep working.
   const tab: Tab =
-    tabParam === "actual_vs_projected" || tabParam === "recommendations" ? tabParam : "roster";
+    tabParam === "capacity" || tabParam === "actual_vs_projected"
+      ? "capacity"
+      : tabParam === "recommendations"
+        ? "recommendations"
+        : "roster";
 
   function setTab(next: Tab) {
     const params = new URLSearchParams(sp.toString());
@@ -87,11 +101,10 @@ export default function InstructorsView(props: Props) {
             showDeleted={props.showDeleted}
           />
         )}
-        {tab === "actual_vs_projected" && (
+        {tab === "capacity" && (
           <ActualVsProjectedTab
             instructors={props.instructors}
             capacityByInstructor={props.capacityByInstructor}
-            forecastByInstructor={props.forecastByInstructor}
           />
         )}
         {tab === "recommendations" && (
@@ -103,6 +116,10 @@ export default function InstructorsView(props: Props) {
 }
 
 // ── Roster ───────────────────────────────────────────────────────────────────
+
+type View = "cards" | "rows";
+type SortKey = "name" | "department" | "status" | "capacity" | "assigned" | "utilization";
+type SortDir = "asc" | "desc";
 
 function RosterTab({
   instructors,
@@ -117,11 +134,29 @@ function RosterTab({
   sourceBreakdownByInstructor: Map<string, SourceBreakdown>;
   showDeleted: boolean;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const sp = useSearchParams();
   const utilizationFilter = sp.get("utilization");
+  const view: View = sp.get("view") === "rows" ? "rows" : "cards";
+  const sortKey: SortKey = (sp.get("sort") as SortKey | null) ?? "name";
+  const sortDir: SortDir = sp.get("dir") === "desc" ? "desc" : "asc";
 
-  // Apply utilization filter on the client (the server filters by status,
-  // search, department, deleted; utilization comes from the capacity view).
+  function setView(next: View) {
+    const params = new URLSearchParams(sp.toString());
+    if (next === "cards") params.delete("view");
+    else params.set("view", next);
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  function setSort(key: SortKey) {
+    const params = new URLSearchParams(sp.toString());
+    const nextDir: SortDir = sortKey === key && sortDir === "asc" ? "desc" : "asc";
+    params.set("sort", key);
+    params.set("dir", nextDir);
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
   const filtered = useMemo(() => {
     if (!utilizationFilter) return instructors;
     return instructors.filter((i) => {
@@ -129,6 +164,47 @@ function RosterTab({
       return cap?.utilization_status === utilizationFilter;
     });
   }, [instructors, capacityByInstructor, utilizationFilter]);
+
+  const sorted = useMemo(() => {
+    const rows = [...filtered];
+    rows.sort((a, b) => {
+      const ca = capacityByInstructor.get(a.id);
+      const cb = capacityByInstructor.get(b.id);
+      let av: number | string;
+      let bv: number | string;
+      switch (sortKey) {
+        case "department":
+          av = a.department ?? "";
+          bv = b.department ?? "";
+          break;
+        case "status":
+          av = a.status;
+          bv = b.status;
+          break;
+        case "capacity":
+          av = a.annual_hours;
+          bv = b.annual_hours;
+          break;
+        case "assigned":
+          av = ca?.assigned_hours ?? 0;
+          bv = cb?.assigned_hours ?? 0;
+          break;
+        case "utilization":
+          av = ca?.utilization_pct ?? -1;
+          bv = cb?.utilization_pct ?? -1;
+          break;
+        default:
+          av = a.full_name.toLowerCase();
+          bv = b.full_name.toLowerCase();
+      }
+      const cmp =
+        typeof av === "number" && typeof bv === "number"
+          ? av - bv
+          : String(av).localeCompare(String(bv));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return rows;
+  }, [filtered, capacityByInstructor, sortKey, sortDir]);
 
   if (instructors.length === 0) {
     return (
@@ -150,14 +226,54 @@ function RosterTab({
     <>
       <InstructorFilters departments={departments} />
 
-      {filtered.length === 0 ? (
+      {/* View toggle */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-muted-foreground text-xs">
+          {sorted.length} of {instructors.length}{" "}
+          {instructors.length === 1 ? "instructor" : "instructors"}
+        </p>
+        <div className="border-input inline-flex overflow-hidden rounded-md border">
+          <button
+            type="button"
+            onClick={() => {
+              setView("cards");
+            }}
+            aria-pressed={view === "cards"}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+              view === "cards"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-surface"
+            }`}
+          >
+            <Squares2X2Icon className="h-4 w-4" />
+            Cards
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setView("rows");
+            }}
+            aria-pressed={view === "rows"}
+            className={`border-input inline-flex items-center gap-1.5 border-l px-3 py-1.5 text-xs font-medium transition-colors ${
+              view === "rows"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-surface"
+            }`}
+          >
+            <TableCellsIcon className="h-4 w-4" />
+            Rows
+          </button>
+        </div>
+      </div>
+
+      {sorted.length === 0 ? (
         <EmptyState
           title="No instructors match the current filter"
           description="Try clearing the utilization filter."
         />
-      ) : (
+      ) : view === "cards" ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((instructor) => (
+          {sorted.map((instructor) => (
             <InstructorCard
               key={instructor.id}
               instructor={instructor}
@@ -166,56 +282,224 @@ function RosterTab({
             />
           ))}
         </div>
+      ) : (
+        <RosterRowView
+          instructors={sorted}
+          capacityByInstructor={capacityByInstructor}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSort={setSort}
+        />
       )}
     </>
   );
 }
 
-// ── Actual vs Projected ──────────────────────────────────────────────────────
+function RosterRowView({
+  instructors,
+  capacityByInstructor,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  instructors: Instructor[];
+  capacityByInstructor: Map<string, CapacityRow>;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (k: SortKey) => void;
+}) {
+  const STATUS_LABELS: Record<string, string> = {
+    active: "Active",
+    inactive: "Inactive",
+    on_leave: "On leave",
+  };
+
+  return (
+    <div className="border-border bg-background overflow-hidden rounded-xl border">
+      <table className="w-full text-sm">
+        <thead className="border-border bg-surface border-b">
+          <tr>
+            <SortHeader
+              k="name"
+              label="Instructor"
+              align="left"
+              current={sortKey}
+              dir={sortDir}
+              onSort={onSort}
+            />
+            <SortHeader
+              k="department"
+              label="Department"
+              align="left"
+              current={sortKey}
+              dir={sortDir}
+              onSort={onSort}
+            />
+            <SortHeader
+              k="status"
+              label="Status"
+              align="left"
+              current={sortKey}
+              dir={sortDir}
+              onSort={onSort}
+            />
+            <SortHeader
+              k="capacity"
+              label="Capacity"
+              align="right"
+              current={sortKey}
+              dir={sortDir}
+              onSort={onSort}
+            />
+            <SortHeader
+              k="assigned"
+              label="Assigned"
+              align="right"
+              current={sortKey}
+              dir={sortDir}
+              onSort={onSort}
+            />
+            <SortHeader
+              k="utilization"
+              label="Utilization"
+              align="right"
+              current={sortKey}
+              dir={sortDir}
+              onSort={onSort}
+            />
+          </tr>
+        </thead>
+        <tbody className="divide-border divide-y">
+          {instructors.map((i) => {
+            const cap = capacityByInstructor.get(i.id);
+            const pct = cap?.utilization_pct ?? null;
+            const utilColor =
+              pct == null
+                ? "var(--muted-foreground)"
+                : pct >= 95
+                  ? "var(--destructive)"
+                  : pct >= 80
+                    ? "var(--highlight)"
+                    : pct < 40
+                      ? "var(--accent)"
+                      : "var(--primary)";
+            return (
+              <tr key={i.id} className="hover:bg-surface">
+                <td className="px-4 py-3">
+                  <Link
+                    href={`/instructors/${i.id}`}
+                    className="text-foreground hover:text-primary text-sm font-medium"
+                  >
+                    {i.full_name}
+                  </Link>
+                  {i.job_title && (
+                    <p className="text-muted-foreground mt-0.5 text-xs">{i.job_title}</p>
+                  )}
+                </td>
+                <td className="text-foreground px-4 py-3 text-xs">{i.department ?? "—"}</td>
+                <td className="text-muted-foreground px-4 py-3 text-xs capitalize">
+                  {STATUS_LABELS[i.status] ?? i.status}
+                </td>
+                <td className="text-foreground px-4 py-3 text-right text-sm tabular-nums">
+                  {i.annual_hours.toLocaleString()}
+                </td>
+                <td className="text-foreground px-4 py-3 text-right text-sm tabular-nums">
+                  {(cap?.assigned_hours ?? 0).toFixed(0)}
+                </td>
+                <td
+                  className="px-4 py-3 text-right text-sm font-semibold tabular-nums"
+                  style={{ color: utilColor }}
+                >
+                  {pct == null ? "—" : `${pct.toFixed(0)}%`}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SortHeader({
+  k,
+  label,
+  align,
+  current,
+  dir,
+  onSort,
+}: {
+  k: SortKey;
+  label: string;
+  align: "left" | "right";
+  current: SortKey;
+  dir: SortDir;
+  onSort: (k: SortKey) => void;
+}) {
+  const active = k === current;
+  const Icon = active ? (dir === "asc" ? ChevronUpIcon : ChevronDownIcon) : ChevronUpDownIcon;
+  return (
+    <th
+      className={`px-4 py-2.5 text-xs font-medium ${align === "right" ? "text-right" : "text-left"}`}
+    >
+      <button
+        type="button"
+        onClick={() => {
+          onSort(k);
+        }}
+        className={`hover:text-foreground inline-flex items-center gap-1 transition-colors ${
+          active ? "text-foreground" : "text-muted-foreground"
+        } ${align === "right" ? "flex-row-reverse" : ""}`}
+      >
+        <span>{label}</span>
+        <Icon className="text-muted-foreground h-3.5 w-3.5" />
+      </button>
+    </th>
+  );
+}
+
+// ── Capacity ─────────────────────────────────────────────────────────────────
 
 function ActualVsProjectedTab({
   instructors,
   capacityByInstructor,
-  forecastByInstructor,
 }: {
   instructors: Instructor[];
   capacityByInstructor: Map<string, CapacityRow>;
-  forecastByInstructor: Map<string, ForecastWeek[]>;
 }) {
   type Row = {
     id: string;
     name: string;
-    actual: number;
-    projected: number;
     capacity: number;
-    delta: number; // projected - actual, positive means projected is higher
+    assigned: number;
+    free: number;
+    pct: number | null;
   };
 
   const rows: Row[] = instructors.map((i) => {
     const cap = capacityByInstructor.get(i.id);
-    const actual = cap?.assigned_hours ?? 0;
-    const projected = projectedAnnualized(forecastByInstructor.get(i.id) ?? []);
+    const assigned = cap?.assigned_hours ?? 0;
     return {
       id: i.id,
       name: i.full_name,
-      actual,
-      projected,
       capacity: i.annual_hours,
-      delta: projected - actual,
+      assigned,
+      free: Math.max(0, i.annual_hours - assigned),
+      pct: cap?.utilization_pct ?? null,
     };
   });
 
-  const sorted = [...rows].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  // Default sort: highest utilization first (where attention is needed).
+  const sorted = [...rows].sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
 
   return (
     <div className="space-y-4">
       <div className="border-border bg-background rounded-xl border p-4">
-        <p className="text-foreground text-sm font-medium">Actual vs Projected</p>
+        <p className="text-foreground text-sm font-medium">Capacity vs assigned</p>
         <p className="text-muted-foreground mt-1 text-xs">
-          <strong>Actual</strong> = current{" "}
-          <code className="bg-surface rounded px-1">assigned_hours</code> from the workload view.{" "}
-          <strong>Projected</strong> = sum of the next 8 weeks of forecast × (52 / 8) annualized.
-          We&apos;ll refine &ldquo;actual&rdquo; once we add a time-tracking story.
+          <strong>Capacity</strong> is each instructor&apos;s annual hours.{" "}
+          <strong>Assigned</strong> sums their classes, recurring tasks, ad-hoc work, and project
+          tasks. <strong>Free</strong> is what&apos;s left for new work.
         </p>
       </div>
 
@@ -230,24 +514,28 @@ function ActualVsProjectedTab({
                 Capacity
               </th>
               <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
-                Actual (annual)
+                Assigned
               </th>
               <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
-                Projected (annualized)
+                Free
               </th>
               <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
-                Δ
+                Utilization
               </th>
             </tr>
           </thead>
           <tbody className="divide-border divide-y">
             {sorted.map((r) => {
-              const deltaCls =
-                Math.abs(r.delta) < 1
-                  ? "text-muted-foreground"
-                  : r.delta > 0
-                    ? "text-amber-600 dark:text-amber-400"
-                    : "text-emerald-600 dark:text-emerald-400";
+              const color =
+                r.pct == null
+                  ? "var(--muted-foreground)"
+                  : r.pct >= 95
+                    ? "var(--destructive)"
+                    : r.pct >= 80
+                      ? "var(--highlight)"
+                      : r.pct < 40
+                        ? "var(--accent)"
+                        : "var(--primary)";
               return (
                 <tr key={r.id} className="hover:bg-surface">
                   <td className="px-4 py-3">
@@ -259,17 +547,19 @@ function ActualVsProjectedTab({
                     </Link>
                   </td>
                   <td className="text-foreground px-4 py-3 text-right text-sm tabular-nums">
-                    {r.capacity.toFixed(0)}
+                    {r.capacity.toLocaleString()}
                   </td>
                   <td className="text-foreground px-4 py-3 text-right text-sm tabular-nums">
-                    {r.actual.toFixed(0)}
+                    {r.assigned.toFixed(0)}
                   </td>
                   <td className="text-foreground px-4 py-3 text-right text-sm tabular-nums">
-                    {r.projected.toFixed(0)}
+                    {r.free.toFixed(0)}
                   </td>
-                  <td className={`px-4 py-3 text-right text-sm tabular-nums ${deltaCls}`}>
-                    {r.delta > 0 ? "+" : ""}
-                    {r.delta.toFixed(0)}
+                  <td
+                    className="px-4 py-3 text-right text-sm font-semibold tabular-nums"
+                    style={{ color }}
+                  >
+                    {r.pct == null ? "—" : `${r.pct.toFixed(0)}%`}
                   </td>
                 </tr>
               );
