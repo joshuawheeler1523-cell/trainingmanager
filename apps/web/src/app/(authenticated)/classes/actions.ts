@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
@@ -277,6 +278,187 @@ export async function distributeOfferingsEvenly(
 
   revalidatePath(`/classes/${classId}`);
   return { ok: true, data: { count: n, total } };
+}
+
+// ── CSV import ──────────────────────────────────────────────────────────────
+
+type ImportRowResult = {
+  row: number;
+  action: "created" | "updated" | "failed";
+  message?: string;
+};
+type ImportResult = {
+  created: number;
+  updated: number;
+  failed: number;
+  results: ImportRowResult[];
+};
+
+const csvBool = z
+  .string()
+  .nullish()
+  .transform((s) => {
+    const v = (s ?? "").trim().toLowerCase();
+    return v === "true" || v === "yes" || v === "1" || v === "y";
+  });
+
+const csvOptionalString = z
+  .string()
+  .nullish()
+  .transform((s) => s?.trim() || null);
+
+const csvNumberOr = (defaultValue: number) =>
+  z
+    .string()
+    .nullish()
+    .transform((s) => {
+      const v = (s ?? "").trim();
+      if (v === "") return defaultValue;
+      const n = Number(v);
+      return Number.isNaN(n) ? Number.NaN : n;
+    });
+
+const csvIntOr = (defaultValue: number) =>
+  z
+    .string()
+    .nullish()
+    .transform((s) => {
+      const v = (s ?? "").trim();
+      if (v === "") return defaultValue;
+      const n = Number(v);
+      return Number.isNaN(n) ? Number.NaN : Math.trunc(n);
+    });
+
+const csvClassSchema = z
+  .object({
+    name: z.string().trim().min(1, "name is required").max(200),
+    description: csvOptionalString,
+    is_multi_day: csvBool,
+    total_days: csvIntOr(1).pipe(z.number().int().min(1)),
+    hours_per_day: csvNumberOr(0).pipe(z.number().min(0)),
+    offerings_per_year: csvIntOr(0).pipe(z.number().int().min(0)),
+    prep_hours_per_offering: csvNumberOr(0).pipe(z.number().min(0)),
+    logistics_hours_per_offering: csvNumberOr(0).pipe(z.number().min(0)),
+    status: z
+      .string()
+      .nullish()
+      .transform((s) => s?.trim().toLowerCase() || "active")
+      .pipe(z.enum(["active", "archived"])),
+  })
+  .superRefine((d, ctx) => {
+    if (d.is_multi_day && d.total_days < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "is_multi_day=true requires total_days>=2",
+        path: ["total_days"],
+      });
+    }
+  });
+
+export async function importClassesCsv(rawRows: unknown): Promise<ActionResult<ImportResult>> {
+  if (!Array.isArray(rawRows)) {
+    return { ok: false, error: { code: "BAD_INPUT", message: "Expected an array of rows" } };
+  }
+
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
+  if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
+
+  // No unique constraint on class name, so look up the FIRST match (case-
+  // insensitive) per row and update it. New names always insert.
+  const { data: existing, error: fetchErr } = await supabase
+    .from("classes")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .is("deleted_at", null);
+  if (fetchErr) {
+    return { ok: false, error: { code: fetchErr.code, message: fetchErr.message } };
+  }
+  const idByLowerName = new Map<string, string>();
+  for (const c of existing) {
+    const key = c.name.toLowerCase();
+    if (!idByLowerName.has(key)) idByLowerName.set(key, c.id);
+  }
+
+  const results: ImportRowResult[] = [];
+  let created = 0;
+  let updated = 0;
+  let failed = 0;
+
+  for (let i = 0; i < rawRows.length; i++) {
+    const rowNum = i + 2;
+    const parsed = csvClassSchema.safeParse(rawRows[i]);
+    if (!parsed.success) {
+      failed++;
+      results.push({
+        row: rowNum,
+        action: "failed",
+        message: parsed.error.errors[0]?.message ?? "Invalid row",
+      });
+      continue;
+    }
+    const data = parsed.data;
+    const existingId = idByLowerName.get(data.name.toLowerCase());
+
+    if (existingId) {
+      const { error } = await supabase
+        .from("classes")
+        .update({
+          name: data.name,
+          description: data.description,
+          is_multi_day: data.is_multi_day,
+          total_days: data.total_days,
+          hours_per_day: data.hours_per_day,
+          offerings_per_year: data.offerings_per_year,
+          prep_hours_per_offering: data.prep_hours_per_offering,
+          logistics_hours_per_offering: data.logistics_hours_per_offering,
+          status: data.status,
+        })
+        .eq("id", existingId)
+        .eq("org_id", orgId);
+      if (error) {
+        failed++;
+        results.push({ row: rowNum, action: "failed", message: error.message });
+      } else {
+        updated++;
+        results.push({ row: rowNum, action: "updated" });
+      }
+    } else {
+      const { data: insertData, error } = await supabase
+        .from("classes")
+        .insert({
+          org_id: orgId,
+          department_id: departmentId,
+          name: data.name,
+          description: data.description,
+          is_multi_day: data.is_multi_day,
+          total_days: data.total_days,
+          hours_per_day: data.hours_per_day,
+          offerings_per_year: data.offerings_per_year,
+          prep_hours_per_offering: data.prep_hours_per_offering,
+          logistics_hours_per_offering: data.logistics_hours_per_offering,
+          status: data.status,
+        })
+        .select("id, name")
+        .single();
+      if (error) {
+        failed++;
+        results.push({ row: rowNum, action: "failed", message: error.message });
+      } else {
+        created++;
+        results.push({ row: rowNum, action: "created" });
+        idByLowerName.set(insertData.name.toLowerCase(), insertData.id);
+      }
+    }
+  }
+
+  revalidatePath("/classes");
+  return { ok: true, data: { created, updated, failed, results } };
 }
 
 export async function restoreClass(id: string): Promise<ActionResult<{ id: string }>> {

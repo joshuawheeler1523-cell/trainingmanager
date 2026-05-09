@@ -2,8 +2,10 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback } from "react";
-import { MagnifyingGlassIcon } from "@heroicons/react/20/solid";
+import { ArrowUpTrayIcon, MagnifyingGlassIcon } from "@heroicons/react/20/solid";
 import InstructorFormDialog from "./instructor-form-dialog";
+import CsvImportDialog from "@/components/csv-import-dialog";
+import { importInstructorsCsv } from "./actions";
 
 type Props = {
   departments: string[];
@@ -97,8 +99,37 @@ export default function InstructorFilters({ departments }: Props) {
         Show archived
       </label>
 
-      {/* Add instructor button */}
-      <div className="ml-auto">
+      {/* Add / import instructors */}
+      <div className="ml-auto flex items-center gap-2">
+        <CsvImportDialog
+          entity="instructors"
+          description="Upsert instructors by email (case-insensitive). Rows with no email always insert. Existing instructors with a matching email will be updated."
+          columns={[
+            { key: "full_name", required: true, help: "Display name; max 200 chars" },
+            { key: "email", required: false, help: "Match key; valid email or blank" },
+            { key: "phone", required: false },
+            { key: "department", required: false, help: "Free-text label, e.g. Cardiology" },
+            { key: "location", required: false },
+            { key: "job_title", required: false },
+            { key: "start_date", required: false, help: "ISO date, e.g. 2025-04-15" },
+            { key: "annual_hours", required: false, help: "Integer 0–4000; default 1880" },
+            {
+              key: "status",
+              required: false,
+              help: "active / inactive / on_leave; default active",
+            },
+          ]}
+          serverAction={importInstructorsCsv}
+          trigger={
+            <button
+              type="button"
+              className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium"
+            >
+              <ArrowUpTrayIcon className="h-4 w-4" />
+              Import CSV
+            </button>
+          }
+        />
         <InstructorFormDialog
           mode="create"
           trigger={

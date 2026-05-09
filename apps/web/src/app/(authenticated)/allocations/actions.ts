@@ -14,6 +14,7 @@ import {
 } from "@arbor/shared";
 import type { AllocationBucket, AllocationGroup } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
+import { BUCKET_TEMPLATES } from "./templates";
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -145,6 +146,96 @@ export async function unarchiveBucket(id: string): Promise<ActionResult<{ id: st
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
   revalidatePath("/allocations");
   return { ok: true, data: { id } };
+}
+
+/**
+ * Apply a bucket template: archive every existing non-archived bucket,
+ * create the template's slate fresh, and set global allocation
+ * percentages to match. The template defines the entire slate so totals
+ * are guaranteed to sum to 100%.
+ *
+ * Buckets aren't hard-deleted — they're archived (soft delete) so any
+ * existing allocation rows pointing at them stay valid for historical
+ * reads. The user can restore them later from "Show archived".
+ */
+export async function applyBucketTemplate(
+  templateId: string,
+): Promise<ActionResult<{ created: number }>> {
+  const template = BUCKET_TEMPLATES.find((t) => t.id === templateId);
+  if (!template) {
+    return { ok: false, error: { code: "NOT_FOUND", message: "Unknown template" } };
+  }
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  // 1. Archive every active bucket — preserves history, hides from pickers.
+  const { error: archiveErr } = await c.supabase
+    .from("allocation_buckets")
+    .update({ is_archived: true })
+    .eq("org_id", c.orgId)
+    .eq("is_archived", false);
+  if (archiveErr) {
+    return { ok: false, error: { code: archiveErr.code, message: archiveErr.message } };
+  }
+
+  // 2. Insert the template's bucket slate. display_order matches array
+  //    order so the UI shows them in template-defined sequence.
+  const newRows = template.buckets.map((b, i) => ({
+    org_id: c.orgId,
+    department_id: c.departmentId,
+    name: b.name,
+    description: b.description,
+    color: b.color,
+    display_order: i,
+    is_archived: false,
+  }));
+  const { data: inserted, error: insertErr } = await c.supabase
+    .from("allocation_buckets")
+    .insert(newRows)
+    .select("id, name");
+  if (insertErr) {
+    const message =
+      insertErr.code === "23505"
+        ? "A bucket with one of the template's names already exists. Archive or rename it first."
+        : insertErr.message;
+    return { ok: false, error: { code: insertErr.code, message } };
+  }
+
+  // 3. Replace global_allocations with the template's percentages.
+  //    Older global rows for archived buckets are removed so the
+  //    Global tab shows a clean slate.
+  const { error: clearErr } = await c.supabase
+    .from("global_allocations")
+    .delete()
+    .eq("org_id", c.orgId);
+  if (clearErr) {
+    return { ok: false, error: { code: clearErr.code, message: clearErr.message } };
+  }
+
+  const idByName = new Map(inserted.map((b) => [b.name, b.id]));
+  const allocRows = template.buckets
+    .map((b) => {
+      const bucketId = idByName.get(b.name);
+      if (!bucketId) return null;
+      return {
+        org_id: c.orgId,
+        department_id: c.departmentId,
+        bucket_id: bucketId,
+        target_percent: b.percent,
+      };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+
+  if (allocRows.length > 0) {
+    const { error: allocErr } = await c.supabase.from("global_allocations").insert(allocRows);
+    if (allocErr) {
+      return { ok: false, error: { code: allocErr.code, message: allocErr.message } };
+    }
+  }
+
+  revalidatePath("/allocations");
+  return { ok: true, data: { created: inserted.length } };
 }
 
 export async function reorderBuckets(input: unknown): Promise<ActionResult<{ count: number }>> {
@@ -294,14 +385,12 @@ export async function addGroupMember(
   const c = await ctx();
   if (!c.ok) return c;
 
-  const { error } = await c.supabase
-    .from("allocation_group_members")
-    .insert({
-      group_id: groupId,
-      instructor_id: instructorId,
-      org_id: c.orgId,
-      department_id: c.departmentId,
-    });
+  const { error } = await c.supabase.from("allocation_group_members").insert({
+    group_id: groupId,
+    instructor_id: instructorId,
+    org_id: c.orgId,
+    department_id: c.departmentId,
+  });
 
   if (error) {
     const message = error.code === "23505" ? "Instructor is already in this group." : error.message;

@@ -9,10 +9,12 @@ import {
   ArchiveBoxIcon,
   ArrowUturnLeftIcon,
   PlusIcon,
+  ArrowUpTrayIcon,
 } from "@heroicons/react/20/solid";
 import SkillFormDialog from "./skill-form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
-import { archiveSkill, unarchiveSkill } from "./actions";
+import CsvImportDialog from "@/components/csv-import-dialog";
+import { archiveSkill, importSkillsCsv, unarchiveSkill } from "./actions";
 import { PROFICIENCY_VALUES } from "@arbor/shared";
 import type { Skill, Proficiency } from "@arbor/shared";
 
@@ -168,21 +170,48 @@ function LibraryTab({
           Show archived
         </label>
 
-        <SkillFormDialog
-          mode="create"
-          trigger={
-            <button
-              type="button"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
-            >
-              <PlusIcon className="h-4 w-4" />
-              Add skill
-            </button>
-          }
-          onSuccess={() => {
-            router.refresh();
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <CsvImportDialog
+            entity="skills"
+            description="Upsert skills by name (case-insensitive). Existing skills with a matching name will be updated; new names will be inserted."
+            columns={[
+              { key: "name", required: true, help: "Display name; max 200 chars" },
+              { key: "category", required: false, help: "Optional grouping label" },
+              { key: "description", required: false },
+              {
+                key: "is_certification",
+                required: false,
+                help: "true / yes / 1 — anything else is false",
+              },
+              { key: "certifying_authority", required: false, help: "Issuing body, if cert" },
+            ]}
+            serverAction={importSkillsCsv}
+            trigger={
+              <button
+                type="button"
+                className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium"
+              >
+                <ArrowUpTrayIcon className="h-4 w-4" />
+                Import CSV
+              </button>
+            }
+          />
+          <SkillFormDialog
+            mode="create"
+            trigger={
+              <button
+                type="button"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Add skill
+              </button>
+            }
+            onSuccess={() => {
+              router.refresh();
+            }}
+          />
+        </div>
       </div>
 
       {skills.length === 0 ? (

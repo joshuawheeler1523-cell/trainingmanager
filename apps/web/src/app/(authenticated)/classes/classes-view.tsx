@@ -2,10 +2,13 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
+import { ArrowUpTrayIcon } from "@heroicons/react/20/solid";
 import type { ColumnDef } from "@tanstack/react-table";
 import DataTable from "@/components/ui/data-table";
 import RecommendationsBanner from "@/components/recommendations-banner";
+import CsvImportDialog from "@/components/csv-import-dialog";
 import ClassFormDialog from "./class-form-dialog";
+import { importClassesCsv } from "./actions";
 import type { ClassWithHours, Instructor, Recommendation } from "@arbor/shared";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -122,18 +125,49 @@ export default function ClassesView({ classes, instructors, showDeleted, recomme
           />
           Show archived
         </label>
-        <ClassFormDialog
-          mode="create"
-          instructors={instructors}
-          trigger={
-            <button
-              type="button"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
-            >
-              + Add class
-            </button>
-          }
-        />
+        <div className="flex items-center gap-2">
+          <CsvImportDialog
+            entity="classes"
+            description="Upsert classes by name (case-insensitive). Existing classes with a matching name will be updated; new names will be inserted. Class skill requirements are not imported — add them on each class detail page."
+            columns={[
+              { key: "name", required: true, help: "Display name; max 200 chars" },
+              { key: "description", required: false },
+              {
+                key: "is_multi_day",
+                required: false,
+                help: "true / yes / 1 — default false",
+              },
+              { key: "total_days", required: false, help: "Default 1; ≥2 if is_multi_day" },
+              { key: "hours_per_day", required: false, help: "Numeric; default 0" },
+              { key: "offerings_per_year", required: false, help: "Integer; default 0" },
+              { key: "prep_hours_per_offering", required: false, help: "Numeric; default 0" },
+              { key: "logistics_hours_per_offering", required: false, help: "Numeric; default 0" },
+              { key: "status", required: false, help: "active or archived; default active" },
+            ]}
+            serverAction={importClassesCsv}
+            trigger={
+              <button
+                type="button"
+                className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium"
+              >
+                <ArrowUpTrayIcon className="h-4 w-4" />
+                Import CSV
+              </button>
+            }
+          />
+          <ClassFormDialog
+            mode="create"
+            instructors={instructors}
+            trigger={
+              <button
+                type="button"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+              >
+                + Add class
+              </button>
+            }
+          />
+        </div>
       </div>
       <DataTable data={classes} columns={columns} searchPlaceholder="Search classes…" />
     </div>

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
@@ -126,6 +127,142 @@ export async function archiveSkill(id: string): Promise<ActionResult<{ id: strin
 
   revalidatePath("/skills");
   return { ok: true, data: { id } };
+}
+
+// ── CSV import ──────────────────────────────────────────────────────────────
+
+type ImportRowResult = {
+  row: number;
+  action: "created" | "updated" | "failed";
+  message?: string;
+};
+type ImportResult = {
+  created: number;
+  updated: number;
+  failed: number;
+  results: ImportRowResult[];
+};
+
+// Lenient string-to-bool — CSVs come in as strings, so "true"/"yes"/"1" are
+// truthy and everything else (including empty) is false.
+const csvBool = z
+  .string()
+  .nullish()
+  .transform((s) => {
+    const v = (s ?? "").trim().toLowerCase();
+    return v === "true" || v === "yes" || v === "1" || v === "y";
+  });
+
+const csvSkillSchema = z.object({
+  name: z.string().trim().min(1, "name is required").max(200),
+  category: z
+    .string()
+    .nullish()
+    .transform((s) => s?.trim() || null),
+  description: z
+    .string()
+    .nullish()
+    .transform((s) => s?.trim() || null),
+  is_certification: csvBool,
+  certifying_authority: z
+    .string()
+    .nullish()
+    .transform((s) => s?.trim() || null),
+});
+
+export async function importSkillsCsv(rawRows: unknown): Promise<ActionResult<ImportResult>> {
+  if (!Array.isArray(rawRows)) {
+    return { ok: false, error: { code: "BAD_INPUT", message: "Expected an array of rows" } };
+  }
+
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
+  if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
+
+  // Pre-fetch existing skills by name (case-insensitive lookup) so we can
+  // decide create-vs-update without N round-trips.
+  const { data: existing, error: fetchErr } = await supabase
+    .from("skills")
+    .select("id, name")
+    .eq("org_id", orgId);
+  if (fetchErr) {
+    return { ok: false, error: { code: fetchErr.code, message: fetchErr.message } };
+  }
+  const byLowerName = new Map(existing.map((s) => [s.name.toLowerCase(), s.id] as const));
+
+  const results: ImportRowResult[] = [];
+  let created = 0;
+  let updated = 0;
+  let failed = 0;
+
+  for (let i = 0; i < rawRows.length; i++) {
+    const rowNum = i + 2; // +1 for 1-based, +1 for header row
+    const parsed = csvSkillSchema.safeParse(rawRows[i]);
+    if (!parsed.success) {
+      failed++;
+      results.push({
+        row: rowNum,
+        action: "failed",
+        message: parsed.error.errors[0]?.message ?? "Invalid row",
+      });
+      continue;
+    }
+
+    const existingId = byLowerName.get(parsed.data.name.toLowerCase());
+    if (existingId) {
+      const { error } = await supabase
+        .from("skills")
+        .update({
+          name: parsed.data.name,
+          category: parsed.data.category,
+          description: parsed.data.description,
+          is_certification: parsed.data.is_certification,
+          certifying_authority: parsed.data.certifying_authority,
+        })
+        .eq("id", existingId)
+        .eq("org_id", orgId);
+      if (error) {
+        failed++;
+        results.push({ row: rowNum, action: "failed", message: error.message });
+      } else {
+        updated++;
+        results.push({ row: rowNum, action: "updated" });
+      }
+    } else {
+      const { data: insertData, error } = await supabase
+        .from("skills")
+        .insert({
+          org_id: orgId,
+          department_id: departmentId,
+          name: parsed.data.name,
+          category: parsed.data.category,
+          description: parsed.data.description,
+          is_certification: parsed.data.is_certification,
+          certifying_authority: parsed.data.certifying_authority,
+          is_archived: false,
+        })
+        .select("id, name")
+        .single();
+      if (error) {
+        failed++;
+        results.push({ row: rowNum, action: "failed", message: error.message });
+      } else {
+        created++;
+        results.push({ row: rowNum, action: "created" });
+        // Track newly inserted name so a duplicate later in the same file
+        // updates rather than fails on the unique constraint.
+        byLowerName.set(insertData.name.toLowerCase(), insertData.id);
+      }
+    }
+  }
+
+  revalidatePath("/skills");
+  return { ok: true, data: { created, updated, failed, results } };
 }
 
 export async function unarchiveSkill(id: string): Promise<ActionResult<{ id: string }>> {

@@ -4,10 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import * as Dialog from "@radix-ui/react-dialog";
-import { SparklesIcon } from "@heroicons/react/20/solid";
 import SliderRow from "./slider-row";
 import { saveGlobalAllocations } from "./actions";
-import { BUCKET_TEMPLATES, applyTemplateToBuckets } from "./templates";
 import { sumSlate } from "@arbor/shared";
 import type { AllocationBucket, GlobalAllocation } from "@arbor/shared";
 
@@ -58,21 +56,6 @@ export default function GlobalTab({ buckets, globals, defaultUserCount }: Props)
     );
   }
 
-  function applyTemplate(templateId: string) {
-    const template = BUCKET_TEMPLATES.find((t) => t.id === templateId);
-    if (!template) return;
-    const result = applyTemplateToBuckets(template, activeBuckets);
-    setSlate(result.slate);
-    const unmatched = result.unmatchedBucketNames;
-    if (unmatched.length > 0) {
-      toast.success(`${template.label} applied`, {
-        description: `Set to 0%: ${unmatched.join(", ")}. Adjust as needed before saving.`,
-      });
-    } else {
-      toast.success(`${template.label} applied — review and save.`);
-    }
-  }
-
   function attemptSave() {
     if (!isHundred) {
       toast.error("Total must equal 100%.");
@@ -110,10 +93,6 @@ export default function GlobalTab({ buckets, globals, defaultUserCount }: Props)
 
   return (
     <div className="space-y-4">
-      {/* Templates — industry-benchmark presets that fill the slate.
-          User reviews and clicks Save defaults to commit. */}
-      <TemplatePicker onApply={applyTemplate} />
-
       {/* Live total */}
       <div
         className={`flex items-center justify-between rounded-xl border p-4 ${
@@ -219,95 +198,6 @@ export default function GlobalTab({ buckets, globals, defaultUserCount }: Props)
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </div>
-  );
-}
-
-function TemplatePicker({ onApply }: { onApply: (templateId: string) => void }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="border-border bg-background rounded-xl border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
-            <SparklesIcon className="h-4 w-4" style={{ color: "var(--highlight)" }} />
-            Apply a template
-          </p>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Industry-benchmark presets for healthcare education teams. Pick one to fill the sliders
-            below — adjust, then save.
-          </p>
-        </div>
-        <Dialog.Root open={open} onOpenChange={setOpen}>
-          <Dialog.Trigger asChild>
-            <button
-              type="button"
-              className="border-border text-foreground hover:bg-surface inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium"
-            >
-              Browse templates
-            </button>
-          </Dialog.Trigger>
-          <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
-            <Dialog.Content className="border-border bg-background fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border p-6 shadow-xl">
-              <Dialog.Title className="text-foreground text-base font-semibold">
-                Allocation templates
-              </Dialog.Title>
-              <Dialog.Description className="text-muted-foreground mt-1 text-xs">
-                Match against your bucket names is fuzzy (substring, case-insensitive). Buckets that
-                don&apos;t match a template category get 0% — adjust before saving.
-              </Dialog.Description>
-
-              <ul className="mt-4 space-y-3">
-                {BUCKET_TEMPLATES.map((t) => (
-                  <li key={t.id} className="border-border bg-surface rounded-lg border p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-foreground text-sm font-semibold">{t.label}</p>
-                        <p className="text-muted-foreground mt-1 text-xs">{t.description}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onApply(t.id);
-                          setOpen(false);
-                        }}
-                        className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 rounded-md px-3 py-1.5 text-sm font-medium"
-                      >
-                        Apply
-                      </button>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {t.shares.map((s) => (
-                        <span
-                          key={s.match}
-                          className="border-border bg-background inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs"
-                        >
-                          <span className="text-muted-foreground capitalize">{s.match}</span>
-                          <span className="text-foreground font-semibold tabular-nums">
-                            {s.percent}%
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-4 flex justify-end">
-                <Dialog.Close asChild>
-                  <button
-                    type="button"
-                    className="border-border text-foreground hover:bg-surface rounded-md border px-3 py-1.5 text-sm font-medium"
-                  >
-                    Close
-                  </button>
-                </Dialog.Close>
-              </div>
-            </Dialog.Content>
-          </Dialog.Portal>
-        </Dialog.Root>
-      </div>
     </div>
   );
 }

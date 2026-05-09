@@ -3,12 +3,14 @@
 import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import * as Dialog from "@radix-ui/react-dialog";
 import {
   PencilSquareIcon,
   ArchiveBoxIcon,
   ArrowUturnLeftIcon,
   PlusIcon,
   Bars3Icon,
+  SparklesIcon,
 } from "@heroicons/react/20/solid";
 import {
   DndContext,
@@ -27,7 +29,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import BucketFormDialog from "./bucket-form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
-import { archiveBucket, unarchiveBucket, reorderBuckets } from "./actions";
+import { applyBucketTemplate, archiveBucket, unarchiveBucket, reorderBuckets } from "./actions";
+import { BUCKET_TEMPLATES, type BucketTemplate } from "./templates";
 import type { AllocationBucket } from "@arbor/shared";
 
 type Props = {
@@ -218,9 +221,31 @@ export default function BucketsTab({ buckets }: Props) {
     });
   }
 
+  function handleApplyTemplate(template: BucketTemplate) {
+    startTransition(async () => {
+      const result = await applyBucketTemplate(template.id);
+      if (result.ok) {
+        toast.success(`${template.label} applied`, {
+          description: `Created ${String(result.data.created)} buckets with default percentages.`,
+        });
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  const hasActive = orderedActive.length > 0;
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {/* Empty-state template picker — prominent when there are no buckets
+          yet, since picking a template is the natural way to start. */}
+      {!hasActive && !showArchived && (
+        <TemplateGallery onApply={handleApplyTemplate} pending={pending} />
+      )}
+
+      <div className="flex items-center justify-between gap-2">
         <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs">
           <input
             type="checkbox"
@@ -232,21 +257,24 @@ export default function BucketsTab({ buckets }: Props) {
           />
           Show archived ({archived.length})
         </label>
-        <BucketFormDialog
-          mode="create"
-          trigger={
-            <button
-              type="button"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
-            >
-              <PlusIcon className="h-4 w-4" />
-              Add bucket
-            </button>
-          }
-          onSuccess={() => {
-            router.refresh();
-          }}
-        />
+        <div className="flex items-center gap-2">
+          {hasActive && <TemplatePickerDialog onApply={handleApplyTemplate} pending={pending} />}
+          <BucketFormDialog
+            mode="create"
+            trigger={
+              <button
+                type="button"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Add bucket
+              </button>
+            }
+            onSuccess={() => {
+              router.refresh();
+            }}
+          />
+        </div>
       </div>
 
       {(showArchived ? archived : orderedActive).length === 0 ? (
@@ -254,7 +282,7 @@ export default function BucketsTab({ buckets }: Props) {
           <p className="text-muted-foreground text-sm">
             {showArchived
               ? "No archived buckets."
-              : "No buckets yet — add your first allocation bucket."}
+              : "Pick a template above or add a bucket manually."}
           </p>
         </div>
       ) : (
@@ -319,5 +347,201 @@ export default function BucketsTab({ buckets }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+// ── Template UI ────────────────────────────────────────────────────────────
+
+function TemplateCard({
+  template,
+  pending,
+  onApply,
+  variant,
+}: {
+  template: BucketTemplate;
+  pending: boolean;
+  onApply: (t: BucketTemplate) => void;
+  variant: "gallery" | "dialog";
+}) {
+  return (
+    <div
+      className={`border-border ${variant === "gallery" ? "bg-background" : "bg-surface"} rounded-lg border p-4`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-foreground text-sm font-semibold">{template.label}</p>
+          <p className="text-muted-foreground mt-1 text-xs">{template.description}</p>
+        </div>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            onApply(template);
+          }}
+          className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+        >
+          Use this
+        </button>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {template.buckets.map((b) => (
+          <span
+            key={b.name}
+            className="border-border bg-background inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs"
+          >
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: b.color }}
+              aria-hidden
+            />
+            <span className="text-muted-foreground">{b.name}</span>
+            <span className="text-foreground font-semibold tabular-nums">{b.percent}%</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TemplateGallery({
+  onApply,
+  pending,
+}: {
+  onApply: (t: BucketTemplate) => void;
+  pending: boolean;
+}) {
+  return (
+    <section className="border-border bg-background rounded-xl border p-5">
+      <div className="flex items-center gap-2">
+        <SparklesIcon className="h-5 w-5" style={{ color: "var(--highlight)" }} />
+        <h3 className="text-foreground text-base font-semibold">Start with a template</h3>
+      </div>
+      <p className="text-muted-foreground mt-1 text-xs">
+        Industry-benchmark presets for healthcare education teams. Picking one creates the bucket
+        slate and sets default percentages — you can edit, archive, or add to it afterward.
+      </p>
+      <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {BUCKET_TEMPLATES.map((t) => (
+          <TemplateCard
+            key={t.id}
+            template={t}
+            pending={pending}
+            onApply={onApply}
+            variant="gallery"
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TemplatePickerDialog({
+  onApply,
+  pending,
+}: {
+  onApply: (t: BucketTemplate) => void;
+  pending: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pendingTemplate, setPendingTemplate] = useState<BucketTemplate | null>(null);
+
+  return (
+    <>
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Trigger asChild>
+          <button
+            type="button"
+            className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium"
+          >
+            <SparklesIcon className="h-4 w-4" style={{ color: "var(--highlight)" }} />
+            Apply template
+          </button>
+        </Dialog.Trigger>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
+          <Dialog.Content className="border-border bg-background fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border p-6 shadow-xl">
+            <Dialog.Title className="text-foreground text-base font-semibold">
+              Apply a template
+            </Dialog.Title>
+            <Dialog.Description className="text-destructive mt-1 text-xs">
+              Heads up: applying a template archives all of your current active buckets and replaces
+              them with the template&apos;s slate. Existing allocation rows stay intact against the
+              archived buckets.
+            </Dialog.Description>
+            <ul className="mt-4 space-y-3">
+              {BUCKET_TEMPLATES.map((t) => (
+                <li key={t.id}>
+                  <TemplateCard
+                    template={t}
+                    pending={pending}
+                    onApply={(tt) => {
+                      setPendingTemplate(tt);
+                    }}
+                    variant="dialog"
+                  />
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 flex justify-end">
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className="border-border text-foreground hover:bg-surface rounded-md border px-3 py-1.5 text-sm font-medium"
+                >
+                  Close
+                </button>
+              </Dialog.Close>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <Dialog.Root
+        open={pendingTemplate != null}
+        onOpenChange={(v) => {
+          if (!v) setPendingTemplate(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
+          <Dialog.Content className="border-border bg-background fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border p-6 shadow-xl">
+            <Dialog.Title className="text-foreground text-base font-semibold">
+              Apply {pendingTemplate?.label ?? "template"}?
+            </Dialog.Title>
+            <Dialog.Description className="text-muted-foreground mt-2 text-sm">
+              Your current active buckets will be archived. The template will create{" "}
+              {String(pendingTemplate?.buckets.length ?? 0)} new buckets and reset global allocation
+              percentages. Allocation rows pointing at archived buckets stay valid for historical
+              reads.
+            </Dialog.Description>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingTemplate(null);
+                }}
+                className="border-border text-foreground hover:bg-surface rounded-md border px-4 py-2 text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  if (pendingTemplate) {
+                    onApply(pendingTemplate);
+                    setPendingTemplate(null);
+                    setOpen(false);
+                  }
+                }}
+                className="bg-destructive text-destructive-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                Apply
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </>
   );
 }
