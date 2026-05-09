@@ -12,6 +12,7 @@ import {
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { isOrgAdmin } from "@/lib/auth/org-admin";
 import type { CapacityRow, Instructor } from "@arbor/shared";
 
 type AuditEntry = {
@@ -73,6 +74,7 @@ export default async function DashboardPage() {
     );
   }
 
+  const orgAdmin = await isOrgAdmin(orgId);
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const [
@@ -144,6 +146,30 @@ export default async function DashboardPage() {
       .select("class_id, assigned_offerings")
       .eq("org_id", orgId),
   ]);
+
+  // ── Org-admin rollup data ──────────────────────────────────────────────
+  // Only fetch when the viewer is an org admin; otherwise the data isn't
+  // visible (RLS) and we avoid the queries.
+  const [
+    { data: departments } = { data: null },
+    { data: projectsForRollup } = { data: null },
+    { data: trasForRollup } = { data: null },
+  ] = orgAdmin
+    ? await Promise.all([
+        supabase.from("departments").select("id, name").eq("org_id", orgId).order("name"),
+        supabase
+          .from("projects")
+          .select("id, department_id, status, deleted_at")
+          .eq("org_id", orgId)
+          .is("deleted_at", null)
+          .in("status", ["planning", "active"]),
+        supabase
+          .from("tras")
+          .select("id, department_id, status")
+          .eq("org_id", orgId)
+          .in("status", ["submitted", "approved"]),
+      ])
+    : [{ data: null }, { data: null }, { data: null }];
 
   const activeInstructors = (instructors ?? []) as Instructor[];
   const capacities = (capacityRows ?? []) as CapacityRow[];
@@ -248,6 +274,44 @@ export default async function DashboardPage() {
     const now = new Date(todayIso).getTime();
     return Math.max(0, Math.round((now - due) / 86_400_000));
   }
+
+  // ── Per-department rollup (org admins only) ────────────────────────────
+  type DeptRollup = {
+    id: string;
+    name: string;
+    instructorCount: number;
+    projectCount: number;
+    traCount: number;
+    avgUtilization: number | null;
+  };
+  const deptRollups: DeptRollup[] = orgAdmin
+    ? ((departments ?? []) as { id: string; name: string }[]).map((d) => {
+        const deptInstructors = activeInstructors.filter((i) => i.department_id === d.id);
+        const deptCapacities = capacities.filter(
+          (c) =>
+            deptInstructors.some((di) => di.id === c.instructor_id) && c.utilization_pct != null,
+        );
+        const avg =
+          deptCapacities.length > 0
+            ? deptCapacities.reduce((s, c) => s + (c.utilization_pct ?? 0), 0) /
+              deptCapacities.length
+            : null;
+        const projects = ((projectsForRollup ?? []) as { department_id: string }[]).filter(
+          (p) => p.department_id === d.id,
+        ).length;
+        const tras = ((trasForRollup ?? []) as { department_id: string }[]).filter(
+          (t) => t.department_id === d.id,
+        ).length;
+        return {
+          id: d.id,
+          name: d.name,
+          instructorCount: deptInstructors.length,
+          projectCount: projects,
+          traCount: tras,
+          avgUtilization: avg,
+        };
+      })
+    : [];
 
   return (
     <div>
@@ -494,6 +558,81 @@ export default async function DashboardPage() {
             </div>
           </div>
         </section>
+
+        {/* Org-admin rollup — only renders for org admins; one row per
+            department in the org with quick counts. Lets a CMO/director
+            see the whole org without leaving the dashboard. */}
+        {orgAdmin && deptRollups.length > 1 && (
+          <section className="border-border bg-background rounded-xl border p-5">
+            <div className="mb-4">
+              <h3 className="text-foreground text-base font-bold tracking-tight">
+                Departments overview
+              </h3>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Org-wide rollup. Visible to org admins only.{" "}
+                <Link href="/admin/departments" className="text-primary hover:underline">
+                  Manage departments →
+                </Link>
+              </p>
+            </div>
+
+            <div className="border-border overflow-hidden rounded-lg border">
+              <table className="w-full text-sm">
+                <thead className="border-border bg-surface border-b">
+                  <tr>
+                    <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
+                      Department
+                    </th>
+                    <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
+                      Instructors
+                    </th>
+                    <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
+                      Active projects
+                    </th>
+                    <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
+                      Open TRAs
+                    </th>
+                    <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
+                      Avg utilization
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-border divide-y">
+                  {deptRollups.map((d) => {
+                    const utilColor =
+                      d.avgUtilization == null
+                        ? "var(--muted-foreground)"
+                        : d.avgUtilization >= 95
+                          ? "var(--destructive)"
+                          : d.avgUtilization >= 80
+                            ? "var(--highlight)"
+                            : "var(--foreground)";
+                    return (
+                      <tr key={d.id} className="hover:bg-surface">
+                        <td className="text-foreground px-4 py-3 font-medium">{d.name}</td>
+                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
+                          {d.instructorCount}
+                        </td>
+                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
+                          {d.projectCount}
+                        </td>
+                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
+                          {d.traCount}
+                        </td>
+                        <td
+                          className="px-4 py-3 text-right text-sm font-semibold tabular-nums"
+                          style={{ color: utilColor }}
+                        >
+                          {d.avgUtilization == null ? "—" : `${d.avgUtilization.toFixed(0)}%`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         <div className="grid grid-cols-1 gap-6">
           {/* Recent activity */}

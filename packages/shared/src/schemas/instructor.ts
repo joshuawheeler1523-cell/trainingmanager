@@ -48,6 +48,7 @@ export type InstructorUpdate = z.infer<typeof instructorUpdateSchema>;
 export type Instructor = {
   id: string;
   org_id: string;
+  department_id: string;
   user_id: string | null;
   full_name: string;
   email: string | null;
