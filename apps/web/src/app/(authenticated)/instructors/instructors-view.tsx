@@ -18,7 +18,6 @@ import InstructorFilters from "./instructor-filters";
 import EmptyState from "@/components/ui/empty-state";
 import {
   type CapacityRow,
-  type ForecastWeek,
   type Instructor,
   type Recommendation,
   type WorkloadSource,
@@ -39,7 +38,6 @@ type Props = {
   departments: string[];
   capacityByInstructor: Map<string, CapacityRow>;
   sourceBreakdownByInstructor: Map<string, SourceBreakdown>;
-  forecastByInstructor: Map<string, ForecastWeek[]>;
   recommendations: Recommendation[];
   showDeleted: boolean;
 };

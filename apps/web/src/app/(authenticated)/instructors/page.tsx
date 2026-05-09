@@ -8,7 +8,6 @@ import {
   type CapacityRow,
   type ClassCoverageInput,
   type BucketConsumptionInput,
-  type ForecastWeek,
   type Instructor,
   type WorkloadRow,
   type WorkloadSource,
@@ -100,22 +99,6 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
     sourceBreakdownByInstructor.set(row.instructor_id, cur);
   }
 
-  // Forecast by instructor — fan-out RPC. Only fetch for instructors that
-  // have any workload, to keep this cheap on bigger orgs.
-  const today = new Date().toISOString().slice(0, 10);
-  const forecastByInstructor = new Map<string, ForecastWeek[]>();
-  const instructorsWithWorkload = list.filter((i) => sourceBreakdownByInstructor.has(i.id));
-  await Promise.all(
-    instructorsWithWorkload.map(async (i) => {
-      const { data } = await supabase.rpc("instructor_capacity_forecast", {
-        p_instructor_id: i.id,
-        p_start: today,
-        p_weeks: 8,
-      });
-      forecastByInstructor.set(i.id, data ?? []);
-    }),
-  );
-
   // Recommendations: capacity + class coverage + bucket consumption
   const classRequirementCounts = new Map<string, number>();
   for (const r of (classRequirementRows ?? []) as { class_id: string }[]) {
@@ -181,7 +164,6 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
       departments={departments}
       capacityByInstructor={capacityByInstructor}
       sourceBreakdownByInstructor={sourceBreakdownByInstructor}
-      forecastByInstructor={forecastByInstructor}
       recommendations={recommendations}
       showDeleted={showDeleted}
     />
