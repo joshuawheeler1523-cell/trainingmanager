@@ -4219,6 +4219,7 @@ export type Database = {
         Args: { p_table_name: string };
         Returns: undefined;
       };
+      current_instructor_id: { Args: { p_org_id: string }; Returns: string };
       current_user_id: { Args: never; Returns: string };
       default_department_for_org: {
         Args: { p_org_id: string };
@@ -4238,6 +4239,10 @@ export type Database = {
         Returns: Json;
       };
       get_pg_share_token: { Args: never; Returns: string };
+      has_any_role: {
+        Args: { p_org_id: string; p_roles: string[] };
+        Returns: boolean;
+      };
       impl_class_prereq_earliest: {
         Args: { p_class_id: string };
         Returns: string;
@@ -4264,7 +4269,10 @@ export type Database = {
         Args: { p_department_id: string };
         Returns: boolean;
       };
+      is_instructor: { Args: { p_org_id: string }; Returns: boolean };
+      is_manager: { Args: { p_org_id: string }; Returns: boolean };
       is_org_admin: { Args: { p_org_id: string }; Returns: boolean };
+      is_viewer: { Args: { p_org_id: string }; Returns: boolean };
       lookup_invitation_by_token: {
         Args: { p_token: string };
         Returns: {
@@ -4292,6 +4300,7 @@ export type Database = {
       set_share_token: { Args: { p_token: string }; Returns: undefined };
       user_department_ids: { Args: never; Returns: string[] };
       user_org_ids: { Args: never; Returns: string[] };
+      user_role_in_org: { Args: { p_org_id: string }; Returns: string };
     };
     Enums: {
       [_ in never]: never;
