@@ -105,9 +105,9 @@ Both paths are scoped per-link and revocable.
 - [x] Cannot create role values outside the canonical set (DB CHECK constraint).
 - [x] Anon paths use separate explicit policies; never share the authenticated SQL.
 - [x] No `SECURITY DEFINER` function elevates beyond what its caller needs (each one is documented with intent).
-- [ ] _(Future)_ pgtap test suite covers each (role × operation × table) intersection.
-- [ ] _(Future)_ E2E suite walks all three roles through 5 smoke flows.
-- [ ] _(Future)_ `docs/permissions.md` generated from JSDoc + policy metadata, CI-enforced no-drift.
+- [~] pgTAP test suite — sample coverage shipped (`supabase/tests/role_helpers.test.sql`, `rls_role_boundaries.test.sql`). Full (role × operation × table) matrix is documented; extending to every table is incremental work.
+- [~] E2E suite — manager path live (`apps/web/e2e/hospital-training-golden-path.spec.ts`, `three-roles.spec.ts`). Instructor + viewer specs scaffolded as `test.skip` pending dedicated test users (see `apps/web/e2e/README-roles.md`).
+- [x] `docs/permissions.md` generated from JSDoc + policy metadata; `pnpm permissions:check` is the drift guard.
 
 ## Reporting a vulnerability
 
