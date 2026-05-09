@@ -4,8 +4,9 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
 import DataTable from "@/components/ui/data-table";
+import RecommendationsBanner from "@/components/recommendations-banner";
 import ClassFormDialog from "./class-form-dialog";
-import type { ClassWithHours, Instructor } from "@arbor/shared";
+import type { ClassWithHours, Instructor, Recommendation } from "@arbor/shared";
 
 const STATUS_STYLES: Record<string, string> = {
   active: "bg-green-100 text-green-800",
@@ -84,9 +85,10 @@ type Props = {
   classes: ClassWithHours[];
   instructors: Instructor[];
   showDeleted: boolean;
+  recommendations: Recommendation[];
 };
 
-export default function ClassesView({ classes, instructors, showDeleted }: Props) {
+export default function ClassesView({ classes, instructors, showDeleted, recommendations }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
@@ -103,6 +105,11 @@ export default function ClassesView({ classes, instructors, showDeleted }: Props
 
   return (
     <div className="space-y-4">
+      <RecommendationsBanner
+        title="Coverage warnings"
+        recommendations={recommendations}
+        defaultExpanded={false}
+      />
       <div className="flex items-center justify-between">
         <label className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-sm">
           <input

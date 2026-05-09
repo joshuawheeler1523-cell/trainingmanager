@@ -3,7 +3,13 @@ import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import ClassesView from "./classes-view";
-import type { ClassWithHours, Instructor } from "@arbor/shared";
+import {
+  recommendUndercoveredClasses,
+  type ClassCoverageInput,
+  type ClassWithHours,
+  type Instructor,
+  type Recommendation,
+} from "@arbor/shared";
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
@@ -26,7 +32,7 @@ async function ClassContent({ searchParams }: { searchParams: SearchParams }) {
     classQuery = classQuery.is("deleted_at", null);
   }
 
-  const [{ data: classes }, { data: instructors }] = await Promise.all([
+  const [{ data: classes }, { data: instructors }, { data: requirementRows }] = await Promise.all([
     classQuery,
     supabase
       .from("instructors")
@@ -35,13 +41,39 @@ async function ClassContent({ searchParams }: { searchParams: SearchParams }) {
       .eq("status", "active")
       .is("deleted_at", null)
       .order("full_name"),
+    supabase
+      .from("class_skill_requirements")
+      .select("class_id")
+      .eq("org_id", orgId)
+      .eq("requirement", "required"),
   ]);
+
+  // Coverage warnings: a class is under-covered when 0 or 1 active
+  // instructors meet ALL its required skills. Run the qualified_… RPC
+  // only for classes that actually have requirements — classes with
+  // none can't be under-covered.
+  const requirementCounts = new Map<string, number>();
+  for (const r of (requirementRows ?? []) as { class_id: string }[]) {
+    requirementCounts.set(r.class_id, (requirementCounts.get(r.class_id) ?? 0) + 1);
+  }
+  const classList = (classes ?? []) as ClassWithHours[];
+  const classesWithRequirements = classList.filter(
+    (c) => !c.deleted_at && c.status === "active" && (requirementCounts.get(c.id) ?? 0) > 0,
+  );
+  const coverage: ClassCoverageInput[] = await Promise.all(
+    classesWithRequirements.map(async (c) => {
+      const { data } = await supabase.rpc("qualified_instructors_for_class", { p_class_id: c.id });
+      return { class_id: c.id, class_name: c.name, qualified_count: data?.length ?? 0 };
+    }),
+  );
+  const recommendations: Recommendation[] = recommendUndercoveredClasses(coverage);
 
   return (
     <ClassesView
-      classes={(classes ?? []) as ClassWithHours[]}
+      classes={classList}
       instructors={(instructors ?? []) as Instructor[]}
       showDeleted={showDeleted}
+      recommendations={recommendations}
     />
   );
 }

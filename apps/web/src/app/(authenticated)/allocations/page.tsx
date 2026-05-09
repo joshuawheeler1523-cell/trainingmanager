@@ -2,17 +2,20 @@ import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import AllocationsView from "./allocations-view";
-import type {
-  AdHocTask,
-  AllocationBucket,
-  AllocationGroup,
-  AllocationGroupMember,
-  GlobalAllocation,
-  GroupAllocation,
-  IndividualAllocation,
-  Instructor,
-  RecurringTask,
-  RecurringTaskAssignment,
+import {
+  recommendOverConsumedBuckets,
+  type AdHocTask,
+  type AllocationBucket,
+  type AllocationGroup,
+  type AllocationGroupMember,
+  type BucketConsumptionInput,
+  type GlobalAllocation,
+  type GroupAllocation,
+  type IndividualAllocation,
+  type Instructor,
+  type Recommendation,
+  type RecurringTask,
+  type RecurringTaskAssignment,
 } from "@arbor/shared";
 
 export default async function AllocationsPage() {
@@ -40,6 +43,7 @@ export default async function AllocationsPage() {
     { data: recurringRows },
     { data: recurringAssignmentRows },
     { data: adHocRows },
+    { data: bucketConsumptionRows },
   ] = await Promise.all([
     supabase.from("allocation_buckets").select("*").eq("org_id", orgId).order("display_order"),
     supabase.from("global_allocations").select("*").eq("org_id", orgId),
@@ -65,6 +69,7 @@ export default async function AllocationsPage() {
       .select("*")
       .eq("org_id", orgId)
       .order("created_at", { ascending: false }),
+    supabase.from("v_bucket_consumption").select("*").eq("org_id", orgId),
   ]);
 
   const buckets = (bucketRows ?? []) as AllocationBucket[];
@@ -94,6 +99,29 @@ export default async function AllocationsPage() {
       !instructorsCoveredByGroup.has(i.id),
   ).length;
 
+  // Bucket-overconsumption recs use the same buckets/globals already
+  // fetched, plus v_bucket_consumption for actual hours, normalized
+  // against total active org capacity.
+  const targetByBucket = new Map(globals.map((g) => [g.bucket_id, g.target_percent] as const));
+  const consumedByBucket = new Map(
+    ((bucketConsumptionRows ?? []) as { bucket_id: string | null; consumed_hours: number }[])
+      .filter((r): r is { bucket_id: string; consumed_hours: number } => r.bucket_id !== null)
+      .map((r) => [r.bucket_id, r.consumed_hours] as const),
+  );
+  const bucketConsumption: BucketConsumptionInput[] = buckets.map((b) => ({
+    bucket_id: b.id,
+    bucket_name: b.name,
+    target_percent: targetByBucket.get(b.id) ?? 0,
+    consumed_hours: consumedByBucket.get(b.id) ?? 0,
+  }));
+  const totalOrgAnnualHours = instructors
+    .filter((i) => i.status === "active")
+    .reduce((acc, i) => acc + i.annual_hours, 0);
+  const recommendations: Recommendation[] = recommendOverConsumedBuckets(
+    bucketConsumption,
+    totalOrgAnnualHours,
+  );
+
   return (
     <div>
       <PageHeader
@@ -112,6 +140,7 @@ export default async function AllocationsPage() {
         recurringTasks={recurringTasks}
         recurringAssignments={recurringAssignments}
         adHocTasks={adHocTasks}
+        recommendations={recommendations}
       />
     </div>
   );

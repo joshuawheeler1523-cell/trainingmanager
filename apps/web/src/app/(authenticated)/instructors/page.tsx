@@ -4,10 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import InstructorsView from "./instructors-view";
 import {
-  buildRecommendations,
+  recommendOverAllocatedInstructors,
   type CapacityRow,
-  type ClassCoverageInput,
-  type BucketConsumptionInput,
   type Instructor,
   type WorkloadRow,
   type WorkloadSource,
@@ -45,11 +43,6 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
     { data: deptRows },
     { data: capacityRows },
     { data: workloadRows },
-    { data: classRows },
-    { data: classRequirementRows },
-    { data: bucketRows },
-    { data: globalAllocationRows },
-    { data: bucketConsumptionRows },
   ] = await Promise.all([
     query,
     supabase
@@ -60,15 +53,6 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
       .not("department", "is", null),
     supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId),
     supabase.from("v_instructor_workload").select("*").eq("org_id", orgId),
-    supabase.from("classes").select("id, name").eq("org_id", orgId).is("deleted_at", null),
-    supabase
-      .from("class_skill_requirements")
-      .select("class_id")
-      .eq("org_id", orgId)
-      .eq("requirement", "required"),
-    supabase.from("allocation_buckets").select("id, name").eq("org_id", orgId),
-    supabase.from("global_allocations").select("bucket_id, target_percent").eq("org_id", orgId),
-    supabase.from("v_bucket_consumption").select("*").eq("org_id", orgId),
   ]);
 
   const list = (instructors ?? []) as Instructor[];
@@ -99,64 +83,12 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
     sourceBreakdownByInstructor.set(row.instructor_id, cur);
   }
 
-  // Recommendations: capacity + class coverage + bucket consumption
-  const classRequirementCounts = new Map<string, number>();
-  for (const r of (classRequirementRows ?? []) as { class_id: string }[]) {
-    classRequirementCounts.set(r.class_id, (classRequirementCounts.get(r.class_id) ?? 0) + 1);
-  }
-
-  // Only run coverage RPC for classes that have at least one required skill
-  const classesWithRequirements = ((classRows ?? []) as { id: string; name: string }[]).filter(
-    (c) => (classRequirementCounts.get(c.id) ?? 0) > 0,
+  // Only instructor-domain recommendations live on this page. Class
+  // coverage and bucket consumption recs surface on /classes and
+  // /allocations respectively, where the fix actually happens.
+  const recommendations = recommendOverAllocatedInstructors(
+    Array.from(capacityByInstructor.values()),
   );
-  const classCoverage: ClassCoverageInput[] = await Promise.all(
-    classesWithRequirements.map(async (c) => {
-      const { data } = await supabase.rpc("qualified_instructors_for_class", {
-        p_class_id: c.id,
-      });
-      return {
-        class_id: c.id,
-        class_name: c.name,
-        qualified_count: data?.length ?? 0,
-      };
-    }),
-  );
-
-  const bucketsById = new Map(
-    ((bucketRows ?? []) as { id: string; name: string }[]).map((b) => [b.id, b.name]),
-  );
-  const targetByBucket = new Map(
-    ((globalAllocationRows ?? []) as { bucket_id: string; target_percent: number }[]).map((g) => [
-      g.bucket_id,
-      g.target_percent,
-    ]),
-  );
-  const consumedByBucket = new Map(
-    ((bucketConsumptionRows ?? []) as { bucket_id: string | null; consumed_hours: number }[])
-      .filter((r): r is { bucket_id: string; consumed_hours: number } => r.bucket_id !== null)
-      .map((r) => [r.bucket_id, r.consumed_hours]),
-  );
-
-  const bucketConsumption: BucketConsumptionInput[] = Array.from(bucketsById.entries()).map(
-    ([bucketId, name]) => ({
-      bucket_id: bucketId,
-      bucket_name: name,
-      target_percent: targetByBucket.get(bucketId) ?? 0,
-      consumed_hours: consumedByBucket.get(bucketId) ?? 0,
-    }),
-  );
-
-  // Total org capacity for the bucket-overconsumption rule
-  const totalOrgAnnualHours = list
-    .filter((i) => i.status === "active")
-    .reduce((acc, i) => acc + i.annual_hours, 0);
-
-  const recommendations = buildRecommendations({
-    capacity: Array.from(capacityByInstructor.values()),
-    classCoverage,
-    bucketConsumption,
-    totalOrgAnnualHours,
-  });
 
   return (
     <InstructorsView

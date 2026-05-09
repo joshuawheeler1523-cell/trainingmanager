@@ -3,6 +3,7 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import BucketsTab from "./buckets-tab";
+import RecommendationsBanner from "@/components/recommendations-banner";
 
 // Buckets is the default landing tab — keep it eager so the first paint
 // is fully hydrated. Off-landing tabs lazy-load on demand.
@@ -21,6 +22,7 @@ import type {
   GroupAllocation,
   IndividualAllocation,
   Instructor,
+  Recommendation,
   RecurringTask,
   RecurringTaskAssignment,
 } from "@arbor/shared";
@@ -48,6 +50,7 @@ type Props = {
   recurringTasks: RecurringTask[];
   recurringAssignments: RecurringTaskAssignment[];
   adHocTasks: AdHocTask[];
+  recommendations: Recommendation[];
 };
 
 export default function AllocationsView(props: Props) {
@@ -76,7 +79,14 @@ export default function AllocationsView(props: Props) {
         </nav>
       </div>
 
-      <div className="p-6">
+      <div className="space-y-4 p-6">
+        {/* Bucket-overconsumption warnings live here — the fix (rebalancing
+            targets or reassigning hours) happens on this page. */}
+        <RecommendationsBanner
+          title="Bucket warnings"
+          recommendations={props.recommendations}
+          defaultExpanded={false}
+        />
         {tab === "buckets" && <BucketsTab buckets={props.buckets} />}
         {tab === "global" && (
           <GlobalTab

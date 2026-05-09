@@ -23,6 +23,8 @@ import {
   type WorkloadSource,
 } from "@arbor/shared";
 
+const RECS_TAB_LABEL = "Over-allocated instructors";
+
 type Tab = "roster" | "capacity" | "recommendations";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -590,90 +592,53 @@ function ActualVsProjectedTab({
 // ── Smart Recommendations ───────────────────────────────────────────────────
 
 function RecommendationsTab({ recommendations }: { recommendations: Recommendation[] }) {
-  const [expandedKind, setExpandedKind] = useState<string | null>(null);
-
   if (recommendations.length === 0) {
     return (
       <div className="border-border bg-surface rounded-xl border border-dashed p-10 text-center">
         <CheckCircleIcon className="mx-auto h-8 w-8 text-emerald-500" />
         <p className="text-foreground mt-3 text-sm font-medium">All clear</p>
         <p className="text-muted-foreground mt-1 text-xs">
-          No utilization, coverage, or bucket-consumption issues detected right now.
+          No instructors are over-allocated right now. Class-coverage and bucket-consumption
+          warnings live on the Classes and Allocations pages.
         </p>
       </div>
     );
   }
 
-  const grouped: Record<Recommendation["kind"], Recommendation[]> = {
-    instructor_over_allocated: [],
-    class_single_qualified: [],
-    bucket_over_consumed: [],
-  };
-  for (const r of recommendations) grouped[r.kind].push(r);
-
-  const SECTIONS: { kind: Recommendation["kind"]; label: string }[] = [
-    { kind: "instructor_over_allocated", label: "Over-allocated instructors" },
-    { kind: "class_single_qualified", label: "Under-covered classes" },
-    { kind: "bucket_over_consumed", label: "Over-consumed buckets" },
-  ];
-
   return (
     <div className="space-y-3">
       <div className="border-border bg-background rounded-xl border p-4">
-        <p className="text-foreground text-sm font-medium">Smart Recommendations</p>
+        <p className="text-foreground text-sm font-medium">{RECS_TAB_LABEL}</p>
         <p className="text-muted-foreground mt-1 text-xs">
-          Rule-based for v1. Each recommendation links to the relevant detail page so you can act.
+          Instructors at 95%+ utilization. Class-coverage and bucket-consumption warnings live on
+          the Classes and Allocations pages.
         </p>
       </div>
-
-      {SECTIONS.map(({ kind, label }) => {
-        const items = grouped[kind];
-        if (items.length === 0) return null;
-        const isOpen = expandedKind === kind || expandedKind === null;
-        return (
-          <section key={kind} className="border-border bg-background rounded-xl border">
-            <button
-              type="button"
-              onClick={() => {
-                setExpandedKind(expandedKind === kind ? null : kind);
-              }}
-              className="hover:bg-surface flex w-full items-center justify-between px-4 py-3"
-            >
-              <span className="text-foreground text-sm font-semibold">
-                {label} ({items.length})
-              </span>
-              <span className="text-muted-foreground text-xs">{isOpen ? "Hide" : "Show"}</span>
-            </button>
-            {isOpen && (
-              <ul className="divide-border border-border divide-y border-t">
-                {items.map((r) => {
-                  const Icon = r.severity === "critical" ? XCircleIcon : ExclamationTriangleIcon;
-                  const iconCls = r.severity === "critical" ? "text-destructive" : "text-amber-500";
-                  return (
-                    <li key={r.id} className="px-4 py-3">
-                      <div className="flex items-start gap-3">
-                        <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${iconCls}`} />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-foreground text-sm font-medium">{r.title}</p>
-                          <p className="text-muted-foreground mt-0.5 text-xs">{r.body}</p>
-                          {r.link && (
-                            <Link
-                              href={r.link}
-                              className="text-primary mt-1.5 inline-block text-xs font-medium hover:underline"
-                            >
-                              Open →
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-        );
-      })}
+      <ul className="border-border bg-background divide-border divide-y rounded-xl border">
+        {recommendations.map((r) => {
+          const Icon = r.severity === "critical" ? XCircleIcon : ExclamationTriangleIcon;
+          const iconCls = r.severity === "critical" ? "text-destructive" : "text-amber-500";
+          return (
+            <li key={r.id} className="px-4 py-3">
+              <div className="flex items-start gap-3">
+                <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${iconCls}`} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-foreground text-sm font-medium">{r.title}</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">{r.body}</p>
+                  {r.link && (
+                    <Link
+                      href={r.link}
+                      className="text-primary mt-1.5 inline-block text-xs font-medium hover:underline"
+                    >
+                      Open →
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
