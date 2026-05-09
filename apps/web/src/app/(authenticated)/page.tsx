@@ -13,6 +13,7 @@ import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
+import { Label } from "@/components/labels";
 import type { CapacityRow, Instructor } from "@arbor/shared";
 
 export default async function DashboardPage() {
@@ -277,7 +278,11 @@ export default async function DashboardPage() {
             <QuickAction
               href="/instructors"
               icon={<UserPlusIcon className="h-4 w-4" />}
-              label="Add Instructor"
+              label={
+                <>
+                  Add <Label kind="entity.instructor" />
+                </>
+              }
             />
             <QuickAction
               href="/tras"
@@ -680,7 +685,7 @@ function QuickAction({
 }: {
   href: string;
   icon: React.ReactNode;
-  label: string;
+  label: React.ReactNode;
 }) {
   return (
     <Link

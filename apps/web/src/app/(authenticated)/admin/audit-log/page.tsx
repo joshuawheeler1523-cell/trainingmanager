@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import PageHeader from "@/components/ui/page-header";
-import OrgAdminGuard from "@/components/org-admin-guard";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import AuditLogFilters from "./audit-log-filters";
@@ -83,19 +82,19 @@ async function AuditLogContent({ searchParams }: { searchParams: SearchParams })
 }
 
 export default function AuditLogPage({ searchParams }: { searchParams: SearchParams }) {
+  // Manager-only via the /admin/layout.tsx RoleGuard wrapper; no redundant
+  // guard needed inside the page.
   return (
-    <OrgAdminGuard>
-      <div>
-        <PageHeader
-          title="Audit Log"
-          description="A record of every change made to your organization's data."
-        />
-        <div className="p-6">
-          <Suspense fallback={<div className="bg-surface h-64 animate-pulse rounded-lg" />}>
-            <AuditLogContent searchParams={searchParams} />
-          </Suspense>
-        </div>
+    <div>
+      <PageHeader
+        title="Audit Log"
+        description="A record of every change made to your organization's data."
+      />
+      <div className="p-6">
+        <Suspense fallback={<div className="bg-surface h-64 animate-pulse rounded-lg" />}>
+          <AuditLogContent searchParams={searchParams} />
+        </Suspense>
       </div>
-    </OrgAdminGuard>
+    </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   TOGGLEABLE_MODULES,
 } from "@arbor/shared";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentRole, type Role } from "@/lib/auth/role";
 
 export type ModuleFlags = Record<ToggleableModule, boolean>;
 
@@ -16,12 +17,15 @@ export interface OrgIdentity {
   presetKey: PresetKey;
   labels: LabelMap;
   modules: ModuleFlags;
+  /** Caller's role in this org. NULL if not a member (orphan / public path). */
+  role: Role | null;
 }
 
 /**
  * Resolves the org's workspace identity in one round-trip pair:
  *   • organizations.preset_key + role_labels + entity_labels
  *   • feature_flags rows for each module.* key
+ *   • current caller's role in the org
  *
  * Cached per-request via React.cache so layout, page, and helpers share the
  * same fetch. Returns sensible defaults if the row is missing (orphan org_id).
@@ -29,7 +33,7 @@ export interface OrgIdentity {
 export const getOrgIdentity = cache(async (orgId: string): Promise<OrgIdentity> => {
   const supabase = await createClient();
 
-  const [{ data: org }, { data: flags }] = await Promise.all([
+  const [{ data: org }, { data: flags }, role] = await Promise.all([
     supabase
       .from("organizations")
       .select("preset_key, role_labels, entity_labels")
@@ -40,6 +44,7 @@ export const getOrgIdentity = cache(async (orgId: string): Promise<OrgIdentity> 
       .select("key, enabled")
       .eq("org_id", orgId)
       .in("key", TOGGLEABLE_MODULES),
+    getCurrentRole(orgId),
   ]);
 
   const presetKey = org?.preset_key ?? "hospital_training";
@@ -63,5 +68,5 @@ export const getOrgIdentity = cache(async (orgId: string): Promise<OrgIdentity> 
     }
   }
 
-  return { presetKey, labels, modules };
+  return { presetKey, labels, modules, role };
 });

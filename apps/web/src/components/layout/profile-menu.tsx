@@ -4,6 +4,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import Link from "next/link";
 import { UserCircleIcon } from "@heroicons/react/24/outline";
 import { logout } from "@/app/(authenticated)/actions";
+import { useCurrentRole, Label } from "@/components/labels";
 
 type Props = {
   email: string;
@@ -12,6 +13,8 @@ type Props = {
 };
 
 export default function ProfileMenu({ email, name, isAdmin }: Props) {
+  const role = useCurrentRole();
+
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
@@ -28,10 +31,21 @@ export default function ProfileMenu({ email, name, isAdmin }: Props) {
         <DropdownMenu.Content
           align="end"
           sideOffset={6}
-          className="border-border bg-background animate-in fade-in-0 zoom-in-95 z-50 min-w-[200px] rounded-lg border p-1 shadow-lg"
+          className="border-border bg-background animate-in fade-in-0 zoom-in-95 z-50 min-w-[220px] rounded-lg border p-1 shadow-lg"
         >
-          <div className="text-muted-foreground border-border mb-1 border-b px-3 py-2 text-xs">
-            {email}
+          <div className="border-border mb-1 border-b px-3 py-2">
+            <p className="text-foreground text-sm font-medium">{name}</p>
+            <p className="text-muted-foreground mt-0.5 truncate text-xs">{email}</p>
+            {role && (
+              <p className="text-muted-foreground mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide">
+                <span
+                  className="bg-primary/10 text-primary rounded px-1.5 py-0.5"
+                  aria-label={`Role: ${role}`}
+                >
+                  <Label kind={`role.${role}`} />
+                </span>
+              </p>
+            )}
           </div>
 
           <DropdownMenu.Item asChild>
