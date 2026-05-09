@@ -7,6 +7,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
 import { instructorInsertSchema, instructorUpdateSchema } from "@arbor/shared";
 import type { Instructor } from "@arbor/shared";
+import { useLabel } from "@/components/labels";
 import { createInstructor, updateInstructor } from "./actions";
 
 type CreateProps = {
@@ -64,6 +65,7 @@ type FormValues = {
 
 export default function InstructorFormDialog(props: Props) {
   const [open, setOpen] = useState(false);
+  const entityLabel = useLabel("entity.instructor", { lower: true });
 
   const isEdit = props.mode === "edit";
   const defaultValues = isEdit
@@ -110,7 +112,7 @@ export default function InstructorFormDialog(props: Props) {
       : await createInstructor(data);
 
     if (result.ok) {
-      toast.success(isEdit ? "Instructor updated" : "Instructor added");
+      toast.success(isEdit ? `${entityLabel} updated` : `${entityLabel} added`);
       setOpen(false);
       reset();
       props.onSuccess?.(result.data);
@@ -132,7 +134,7 @@ export default function InstructorFormDialog(props: Props) {
         <Dialog.Overlay className="data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 fixed inset-0 z-50 bg-black/40" />
         <Dialog.Content className="border-border bg-background data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border p-6 shadow-xl">
           <Dialog.Title className="text-foreground text-base font-semibold">
-            {isEdit ? "Edit instructor" : "Add instructor"}
+            {isEdit ? `Edit ${entityLabel}` : `Add ${entityLabel}`}
           </Dialog.Title>
 
           <form
@@ -288,7 +290,7 @@ export default function InstructorFormDialog(props: Props) {
                 disabled={isSubmitting}
                 className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
               >
-                {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Add instructor"}
+                {isSubmitting ? "Saving…" : isEdit ? "Save changes" : `Add ${entityLabel}`}
               </button>
             </div>
           </form>

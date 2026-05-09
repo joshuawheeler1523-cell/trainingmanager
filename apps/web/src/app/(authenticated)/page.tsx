@@ -327,7 +327,11 @@ export default async function DashboardPage() {
           <KpiCard
             href="/instructors"
             icon={<UserGroupIcon className="h-4 w-4" />}
-            label="Active instructors"
+            label={
+              <>
+                Active <Label kind="entity.instructor" plural lower />
+              </>
+            }
             value={instructorCount.toString()}
             sub="across all departments"
             tone="ok"
@@ -646,7 +650,7 @@ function KpiCard({
 }: {
   href: string;
   icon: React.ReactNode;
-  label: string;
+  label: React.ReactNode;
   value: string;
   sub: string;
   tone: KpiTone;

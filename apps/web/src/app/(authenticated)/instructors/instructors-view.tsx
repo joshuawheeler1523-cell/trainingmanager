@@ -16,14 +16,13 @@ import {
 import InstructorCard from "./instructor-card";
 import InstructorFilters from "./instructor-filters";
 import EmptyState from "@/components/ui/empty-state";
+import { Label } from "@/components/labels";
 import {
   type CapacityRow,
   type Instructor,
   type Recommendation,
   type WorkloadSource,
 } from "@arbor/shared";
-
-const RECS_TAB_LABEL = "Over-allocated instructors";
 
 type Tab = "roster" | "capacity" | "recommendations";
 
@@ -229,11 +228,27 @@ function RosterTab({
       <>
         <InstructorFilters departments={departments} />
         <EmptyState
-          title={showDeleted ? "No archived instructors" : "No instructors yet"}
+          title={
+            showDeleted ? (
+              <>
+                No archived <Label kind="entity.instructor" plural lower />
+              </>
+            ) : (
+              <>
+                No <Label kind="entity.instructor" plural lower /> yet
+              </>
+            )
+          }
           description={
-            showDeleted
-              ? "Archived instructors will appear here."
-              : "Add your first instructor to get started."
+            showDeleted ? (
+              <>
+                Archived <Label kind="entity.instructor" plural lower /> will appear here.
+              </>
+            ) : (
+              <>
+                Add your first <Label kind="entity.instructor" lower /> to get started.
+              </>
+            )
           }
         />
       </>
@@ -248,7 +263,7 @@ function RosterTab({
       <div className="flex items-center justify-between gap-3">
         <p className="text-muted-foreground text-xs">
           {sorted.length} of {instructors.length}{" "}
-          {instructors.length === 1 ? "instructor" : "instructors"}
+          <Label kind="entity.instructor" plural={instructors.length !== 1} lower />
         </p>
         <div className="border-input inline-flex overflow-hidden rounded-md border">
           <button
@@ -286,7 +301,11 @@ function RosterTab({
 
       {sorted.length === 0 ? (
         <EmptyState
-          title="No instructors match the current filter"
+          title={
+            <>
+              No <Label kind="entity.instructor" plural lower /> match the current filter
+            </>
+          }
           description="Try clearing the utilization filter."
         />
       ) : view === "cards" ? (
@@ -598,8 +617,8 @@ function RecommendationsTab({ recommendations }: { recommendations: Recommendati
         <CheckCircleIcon className="mx-auto h-8 w-8 text-emerald-500" />
         <p className="text-foreground mt-3 text-sm font-medium">All clear</p>
         <p className="text-muted-foreground mt-1 text-xs">
-          No instructors are over-allocated right now. Class-coverage and bucket-consumption
-          warnings live on the Classes and Allocations pages.
+          No <Label kind="entity.instructor" plural lower /> are over-allocated right now.
+          Class-coverage and bucket-consumption warnings live on the Classes and Allocations pages.
         </p>
       </div>
     );
@@ -608,10 +627,12 @@ function RecommendationsTab({ recommendations }: { recommendations: Recommendati
   return (
     <div className="space-y-3">
       <div className="border-border bg-background rounded-xl border p-4">
-        <p className="text-foreground text-sm font-medium">{RECS_TAB_LABEL}</p>
+        <p className="text-foreground text-sm font-medium">
+          Over-allocated <Label kind="entity.instructor" plural />
+        </p>
         <p className="text-muted-foreground mt-1 text-xs">
-          Instructors at 95%+ utilization. Class-coverage and bucket-consumption warnings live on
-          the Classes and Allocations pages.
+          <Label kind="entity.instructor" plural /> at 95%+ utilization. Class-coverage and
+          bucket-consumption warnings live on the Classes and Allocations pages.
         </p>
       </div>
       <ul className="border-border bg-background divide-border divide-y rounded-xl border">

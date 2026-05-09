@@ -1,6 +1,7 @@
 "use client";
 
 import type { WorkloadDataset } from "@arbor/shared";
+import { Label } from "@/components/labels";
 
 const BAND_BADGE: Record<
   NonNullable<WorkloadDataset["rows"][number]["utilization_band"]>,
@@ -18,7 +19,9 @@ export default function WorkloadView({ data }: { data: WorkloadDataset }) {
       <table className="w-full text-sm">
         <thead className="bg-surface text-muted-foreground text-xs">
           <tr>
-            <Th className="w-1/5">Instructor</Th>
+            <Th className="w-1/5">
+              <Label kind="entity.instructor" />
+            </Th>
             <Th>Available</Th>
             <Th>Assigned</Th>
             <Th>Utilization</Th>

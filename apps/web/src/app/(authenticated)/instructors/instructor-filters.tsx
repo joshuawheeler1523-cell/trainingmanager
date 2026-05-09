@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import { ArrowUpTrayIcon, MagnifyingGlassIcon } from "@heroicons/react/20/solid";
 import InstructorFormDialog from "./instructor-form-dialog";
 import CsvImportDialog from "@/components/csv-import-dialog";
+import { Label } from "@/components/labels";
 import { importInstructorsCsv } from "./actions";
 
 type Props = {
@@ -137,7 +138,7 @@ export default function InstructorFilters({ departments }: Props) {
               type="button"
               className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90"
             >
-              Add instructor
+              Add <Label kind="entity.instructor" />
             </button>
           }
         />

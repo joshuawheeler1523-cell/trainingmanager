@@ -1,13 +1,15 @@
 "use client";
 
 import type { SkillGapDataset } from "@arbor/shared";
+import { Label, useLabel } from "@/components/labels";
 
 export default function SkillGapView({ data }: { data: SkillGapDataset }) {
+  const instructorPlural = useLabel("entity.instructor", { plural: true, lower: true });
   return (
     <div className="space-y-6">
       <Section
         title={`Insufficient coverage (${data.insufficient_coverage.length.toString()})`}
-        empty="Every skill has at least the threshold of qualified instructors."
+        empty={`Every skill has at least the threshold of qualified ${instructorPlural}.`}
         emptyTone="emerald"
       >
         {data.insufficient_coverage.length > 0 && (
@@ -45,7 +47,9 @@ export default function SkillGapView({ data }: { data: SkillGapDataset }) {
           <table className="w-full text-sm">
             <thead className="bg-surface text-muted-foreground text-xs">
               <tr>
-                <Th>Instructor</Th>
+                <Th>
+                  <Label kind="entity.instructor" />
+                </Th>
                 <Th>Skill</Th>
                 <Th>Expires</Th>
                 <Th>Days remaining</Th>

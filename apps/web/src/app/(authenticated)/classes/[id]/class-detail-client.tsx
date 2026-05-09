@@ -29,6 +29,7 @@ import {
 } from "@/app/(authenticated)/skills/actions";
 import { PROFICIENCY_VALUES, REQUIREMENT_VALUES } from "@arbor/shared";
 import type { ClassWithHours, Instructor, Skill, Proficiency, Requirement } from "@arbor/shared";
+import { Label, useLabel } from "@/components/labels";
 import type { Assignment, RequirementRow } from "./page";
 
 type AuditEntry = {
@@ -53,12 +54,9 @@ type Props = {
 
 type Tab = "overview" | "instructors" | "skills" | "audit";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "instructors", label: "Instructors" },
-  { id: "skills", label: "Skill Requirements" },
-  { id: "audit", label: "Audit" },
-];
+// Tab labels are computed inside the component now so the "instructors" tab
+// can carry the org's terminology label. Constant kept as a fallback shape.
+type TabDef = { id: Tab; label: React.ReactNode };
 
 function OverviewTab({ cls }: { cls: ClassWithHours }) {
   const fields: { label: string; value: string | null | undefined }[] = [
@@ -154,6 +152,7 @@ function InstructorsTab({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [addingId, setAddingId] = useState("");
+  const instructorLower = useLabel("entity.instructor", { lower: true });
 
   const assignedIds = new Set(assignments.map((a) => a.instructor_id));
   const available = allInstructors.filter((i) => !assignedIds.has(i.id));
@@ -244,9 +243,9 @@ function InstructorsTab({
                   setAddingId(e.target.value);
                 }}
                 className="border-input bg-background text-foreground focus:ring-ring rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-1"
-                aria-label="Select instructor to add"
+                aria-label={`Select ${instructorLower} to add`}
               >
-                <option value="">Select instructor to add…</option>
+                <option value="">Select to add…</option>
                 {available.map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.full_name}
@@ -297,7 +296,9 @@ function InstructorsTab({
 
       {assignments.length === 0 ? (
         <div className="border-border bg-surface rounded-xl border border-dashed p-10 text-center">
-          <p className="text-muted-foreground text-sm">No instructors assigned yet.</p>
+          <p className="text-muted-foreground text-sm">
+            No <Label kind="entity.instructor" plural lower /> assigned yet.
+          </p>
         </div>
       ) : (
         <div className="border-border bg-background overflow-hidden rounded-xl border">
@@ -305,7 +306,7 @@ function InstructorsTab({
             <thead className="border-border bg-surface border-b">
               <tr>
                 <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
-                  Instructor
+                  <Label kind="entity.instructor" />
                 </th>
                 <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
                   Role
@@ -863,6 +864,14 @@ export default function ClassDetailClient({
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [pending, startTransition] = useTransition();
+  const instructorPlural = useLabel("entity.instructor", { plural: true });
+
+  const TABS: TabDef[] = [
+    { id: "overview", label: "Overview" },
+    { id: "instructors", label: instructorPlural },
+    { id: "skills", label: "Skill Requirements" },
+    { id: "audit", label: "Audit" },
+  ];
 
   const isDeleted = !!cls.deleted_at;
 

@@ -1,6 +1,7 @@
 "use client";
 
 import type { CoverageDataset } from "@arbor/shared";
+import { Label } from "@/components/labels";
 
 export default function CoverageView({ data }: { data: CoverageDataset }) {
   return (
@@ -13,7 +14,9 @@ export default function CoverageView({ data }: { data: CoverageDataset }) {
             <Th>Target</Th>
             <Th>Assigned</Th>
             <Th>Coverage</Th>
-            <Th>Qualified instructors</Th>
+            <Th>
+              Qualified <Label kind="entity.instructor" plural lower />
+            </Th>
             <Th>Flags</Th>
           </tr>
         </thead>

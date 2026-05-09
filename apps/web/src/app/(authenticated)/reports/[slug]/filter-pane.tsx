@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReportSlug } from "@arbor/shared";
+import { useLabel } from "@/components/labels";
 
 // One filter pane component per report slug, sharing a small set of
 // primitives. Filters are stored as untyped Record<string, unknown> on the
@@ -18,6 +19,8 @@ type Props = {
 };
 
 export default function FilterPane({ slug, buckets, instructors, value, onChange }: Props) {
+  const instructorPlural = useLabel("entity.instructor", { plural: true });
+
   function setField(key: string, v: unknown) {
     onChange({ ...value, [key]: v });
   }
@@ -54,7 +57,7 @@ export default function FilterPane({ slug, buckets, instructors, value, onChange
       {slug === "workload" && (
         <>
           <MultiSelect
-            label="Instructors"
+            label={instructorPlural}
             options={instructors.map((i) => ({ value: i.id, label: i.full_name }))}
             value={(value.instructor_ids as string[] | undefined) ?? []}
             onChange={(next) => {
