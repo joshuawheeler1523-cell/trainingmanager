@@ -64,6 +64,6 @@ export async function switchDepartment(formData: FormData) {
     maxAge: 60 * 60 * 24 * 365,
   });
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
   redirect(returnPath);
 }
