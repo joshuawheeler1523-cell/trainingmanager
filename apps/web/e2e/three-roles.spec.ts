@@ -6,27 +6,14 @@ import { test, expect } from "./fixtures/auth";
  * Walks each role (manager, instructor, viewer) through smoke flows that
  * exercise their RLS scope + UI gating.
  *
- * STATUS: only the manager path runs today. The instructor + viewer paths
- * are skipped pending dedicated test users. To enable them:
- *   1. Create auth.users rows for e2e-instructor@arbor.local and
- *      e2e-viewer@arbor.local (use Supabase Studio → Authentication → Users).
- *   2. Add org_memberships rows with role='instructor' and role='viewer'
- *      respectively, both for the Mercy Health (Demo) org.
- *   3. For the instructor user: link to an instructors row by setting
- *      instructors.user_id = the new auth user's id.
- *   4. Add the credentials to apps/web/.env.local:
- *        E2E_INSTRUCTOR_EMAIL=...
- *        E2E_INSTRUCTOR_PASSWORD=...
- *        E2E_VIEWER_EMAIL=...
- *        E2E_VIEWER_PASSWORD=...
- *   5. Remove the .skip on the test.describe blocks below.
- *
- * The manager path uses the existing E2E_TEST_EMAIL/PASSWORD test user
- * (promoted to manager in migration 20260510000008).
+ * Setup: run `pnpm seed:e2e-users` once to provision the instructor + viewer
+ * test users (idempotent), then add the printed credentials to
+ * apps/web/.env.local. Without those env vars set, the instructor + viewer
+ * suites skip themselves at runtime.
  */
 
 test.describe("Manager", () => {
-  test("can reach /admin and /admin/settings/workspace", async ({ authedPage: page }) => {
+  test("can reach /admin and /admin/settings/workspace", async ({ managerPage: page }) => {
     await page.goto("/admin");
     await expect(page.getByRole("heading", { name: /organization administration/i })).toBeVisible();
 
@@ -34,30 +21,69 @@ test.describe("Manager", () => {
     await expect(page.getByRole("heading", { name: /workspace identity/i })).toBeVisible();
   });
 
-  test("sees Add Instructor / Manager-only actions in the UI", async ({ authedPage: page }) => {
+  test("sees Add Instructor / manager-only actions in the UI", async ({ managerPage: page }) => {
     await page.goto("/instructors");
     await expect(page.getByRole("button", { name: /add instructor/i })).toBeVisible();
   });
 
-  test("profile menu shows Manager role badge", async ({ authedPage: page }) => {
+  test("profile menu shows Manager role badge", async ({ managerPage: page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: /profile menu/i }).click();
     await expect(page.getByLabel(/role: manager/i)).toBeVisible();
   });
 });
 
-test.describe.skip("Instructor (needs E2E_INSTRUCTOR_* env vars)", () => {
-  // TODO: implement after instructor test user is provisioned.
-  // - Cannot reach /admin (403 page)
-  // - Profile menu shows Instructor role badge
-  // - Can navigate to /instructors but Add button is gated
-  // - Can edit own instructor row (phone, notes) but not status
+test.describe("Instructor", () => {
+  test("blocked from /admin (403 page)", async ({ instructorPage: page }) => {
+    await page.goto("/admin");
+    // RoleGuard renders the 403 surface with "Access denied".
+    await expect(page.getByRole("heading", { name: /access denied/i })).toBeVisible();
+  });
+
+  test("blocked from /admin/settings/workspace", async ({ instructorPage: page }) => {
+    await page.goto("/admin/settings/workspace");
+    await expect(page.getByRole("heading", { name: /access denied/i })).toBeVisible();
+  });
+
+  test("profile menu shows Instructor role badge", async ({ instructorPage: page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /profile menu/i }).click();
+    await expect(page.getByLabel(/role: instructor/i)).toBeVisible();
+  });
+
+  test("can navigate /instructors but admin nav item is hidden", async ({
+    instructorPage: page,
+  }) => {
+    await page.goto("/instructors");
+    // Page renders; "Add instructor" button visibility is implementation-
+    // dependent (RLS will block the action even if button shown).
+    await expect(page.getByRole("heading", { name: /^instructors$/i })).toBeVisible();
+    // Admin link should NOT appear in the sidebar for instructors.
+    const adminLink = page.getByRole("link", { name: /organization admin/i });
+    await expect(adminLink).toHaveCount(0);
+  });
 });
 
-test.describe.skip("Viewer (needs E2E_VIEWER_* env vars)", () => {
-  // TODO: implement after viewer test user is provisioned.
-  // - Cannot reach /admin (403)
-  // - Profile menu shows Viewer role badge
-  // - All forms render with read-only banner
-  // - Cannot click Add buttons (gated by RoleGate / RoleGuard)
+test.describe("Viewer", () => {
+  test("blocked from /admin (403 page)", async ({ viewerPage: page }) => {
+    await page.goto("/admin");
+    await expect(page.getByRole("heading", { name: /access denied/i })).toBeVisible();
+  });
+
+  test("profile menu shows Viewer role badge", async ({ viewerPage: page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /profile menu/i }).click();
+    await expect(page.getByLabel(/role: viewer/i)).toBeVisible();
+  });
+
+  test("can read /instructors page", async ({ viewerPage: page }) => {
+    await page.goto("/instructors");
+    await expect(page.getByRole("heading", { name: /^instructors$/i })).toBeVisible();
+  });
+
+  test("admin nav item hidden in sidebar", async ({ viewerPage: page }) => {
+    await page.goto("/");
+    const adminLink = page.getByRole("link", { name: /organization admin/i });
+    await expect(adminLink).toHaveCount(0);
+  });
 });
