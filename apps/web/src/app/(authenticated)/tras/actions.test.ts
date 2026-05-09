@@ -13,11 +13,17 @@ vi.mock("@/lib/auth/current-org", () => ({
   getCurrentOrgId: mockGetCurrentOrgId,
 }));
 
+const mockGetCurrentDepartmentId = vi.fn();
+vi.mock("@/lib/auth/current-department", () => ({
+  getCurrentDepartmentId: mockGetCurrentDepartmentId,
+}));
+
 const { createTra, addDeliverable, submitTra, approveTra } = await import("./actions");
-const { computeDeliverableEstimatedHours, traUrgencyToProjectPriority } =
+const { computeDeliverableEstimatedHours, traPriorityToProjectPriority } =
   await import("@arbor/shared");
 
 const ORG_ID = "aaaaaaaa-0000-0000-0000-000000000000";
+const DEPT_ID = "dddddddd-0000-0000-0000-000000000000";
 const TRA_ID = "bbbbbbbb-0000-0000-0000-000000000000";
 const DELIVERABLE_TYPE_ID = "cccccccc-0000-0000-0000-000000000000";
 
@@ -32,6 +38,7 @@ function makeInsertChain(result: { data?: unknown; error?: unknown }) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetCurrentOrgId.mockResolvedValue(ORG_ID);
+  mockGetCurrentDepartmentId.mockResolvedValue(DEPT_ID);
 });
 
 describe("createTra", () => {
@@ -41,17 +48,17 @@ describe("createTra", () => {
     if (!result.ok) expect(result.error.code).toBe("VALIDATION");
   });
 
-  it("rejects an invalid stakeholder email", async () => {
-    const result = await createTra({
-      project_name: "X",
-      stakeholder_email: "not-an-email",
-    });
+  it("rejects an unknown priority", async () => {
+    const result = await createTra({ project_name: "X", priority: "yesterday" });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.field).toBe("stakeholder_email");
+    if (!result.ok) expect(result.error.code).toBe("VALIDATION");
   });
 
-  it("rejects an unknown urgency", async () => {
-    const result = await createTra({ project_name: "X", urgency: "yesterday" });
+  it("rejects an unknown needed_by_driver", async () => {
+    const result = await createTra({
+      project_name: "X",
+      needed_by_driver: "asap",
+    });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("VALIDATION");
   });
@@ -264,11 +271,11 @@ describe("computeDeliverableEstimatedHours (DOD: estimates compute correctly)", 
   });
 });
 
-describe("traUrgencyToProjectPriority", () => {
-  it("maps each urgency to the right priority", () => {
-    expect(traUrgencyToProjectPriority("low")).toBe("low");
-    expect(traUrgencyToProjectPriority("standard")).toBe("medium");
-    expect(traUrgencyToProjectPriority("high")).toBe("high");
-    expect(traUrgencyToProjectPriority("urgent")).toBe("critical");
+describe("traPriorityToProjectPriority", () => {
+  it("maps each TRA priority to the right project priority", () => {
+    expect(traPriorityToProjectPriority("nice_to_have")).toBe("low");
+    expect(traPriorityToProjectPriority("important")).toBe("medium");
+    expect(traPriorityToProjectPriority("regulatory")).toBe("high");
+    expect(traPriorityToProjectPriority(null)).toBe("medium");
   });
 });

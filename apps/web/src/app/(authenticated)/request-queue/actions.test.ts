@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -11,6 +11,11 @@ vi.mock("@/lib/supabase/server", () => ({
 const mockGetCurrentOrgId = vi.fn();
 vi.mock("@/lib/auth/current-org", () => ({
   getCurrentOrgId: mockGetCurrentOrgId,
+}));
+
+const mockGetCurrentDepartmentId = vi.fn();
+vi.mock("@/lib/auth/current-department", () => ({
+  getCurrentDepartmentId: mockGetCurrentDepartmentId,
 }));
 
 const { createRequest, updateRequestStatus, assignRequestInstructor, createIntakeLink } =
@@ -39,6 +44,7 @@ function makeUpsertChain(result: { data?: unknown; error?: unknown }) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetCurrentOrgId.mockResolvedValue(ORG_ID);
+  mockGetCurrentDepartmentId.mockResolvedValue("dddddddd-0000-0000-0000-000000000000");
 });
 
 describe("createRequest", () => {
@@ -181,7 +187,7 @@ describe("createIntakeLink", () => {
 });
 
 describe("publicSubmitSchema (anonymous form)", () => {
-  // Lightweight import test — the actual public submission uses an
+  // Lightweight import test â€” the actual public submission uses an
   // unauthenticated Supabase client which we don't mock here.
   it("requires name + email + title", async () => {
     const { publicSubmitSchema } = await import("@arbor/shared");

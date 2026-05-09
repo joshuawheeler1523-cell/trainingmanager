@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -11,6 +11,11 @@ vi.mock("@/lib/supabase/server", () => ({
 const mockGetCurrentOrgId = vi.fn();
 vi.mock("@/lib/auth/current-org", () => ({
   getCurrentOrgId: mockGetCurrentOrgId,
+}));
+
+const mockGetCurrentDepartmentId = vi.fn();
+vi.mock("@/lib/auth/current-department", () => ({
+  getCurrentDepartmentId: mockGetCurrentDepartmentId,
 }));
 
 const {
@@ -63,6 +68,7 @@ function makeUpsertChain(result: { data?: unknown; error?: unknown }) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetCurrentOrgId.mockResolvedValue(ORG_ID);
+  mockGetCurrentDepartmentId.mockResolvedValue("dddddddd-0000-0000-0000-000000000000");
 });
 
 describe("createProject", () => {
@@ -280,7 +286,7 @@ describe("projectPercentComplete + effectiveTaskPercent (pure helpers)", () => {
   });
 });
 
-describe("updateTask (Gantt drag → date update)", () => {
+describe("updateTask (Gantt drag â†’ date update)", () => {
   it("rejects an invalid percent_complete on update", async () => {
     const result = await updateTask(TASK_ID, PROJECT_ID, { percent_complete: 200 });
     expect(result.ok).toBe(false);
@@ -449,7 +455,7 @@ describe("diffTaskImport (pure)", () => {
 
     const importedRows = [
       {
-        // unchanged → no entry
+        // unchanged â†’ no entry
         id: "t-existing",
         name: "Existing",
         description: null,
@@ -461,7 +467,7 @@ describe("diffTaskImport (pure)", () => {
         percent_complete: 30,
       },
       {
-        // status changed → update
+        // status changed â†’ update
         id: "t-existing", // same id, but the test array uses a different ID below
         name: "Existing",
         description: null,

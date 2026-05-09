@@ -73,7 +73,25 @@
       "mcp__claude_ai_Supabase__list_migrations",
       "mcp__claude_ai_Supabase__list_tables",
       "mcp__supabase__generate_typescript_types",
-      "mcp__supabase__get_logs"
+      "mcp__supabase__get_logs",
+      "Bash(supabase gen *)",
+      "Read(//tmp/**)",
+      "Bash(grep -v '^Initialising\\\\|^A new version\\\\|^We recommend' /tmp/db_types_raw.ts)",
+      "Read(//c/c/Users/joshu/Documents/my-arbor/apps/web/src/lib/supabase/**)",
+      "Bash(gh run *)",
+      "Bash(gh api *)",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(rm C:/Users/joshu/Documents/my-arbor/apps/web/e2e/screenshot.spec.ts)",
+      "Bash(rm -rf C:/Users/joshu/Documents/my-arbor/apps/web/e2e-snaps)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\joshu\\\\Documents\\\\my-arbor\\\\supabase\\\\migrations\" -Filter \"*.sql\")",
+      "Bash(Select-Object Name)",
+      "Bash(Sort-Object Name)",
+      "Bash(rm C:/Users/joshu/Documents/my-arbor/apps/web/scripts/tune-utilization.mjs)",
+      "Bash(rmdir C:/Users/joshu/Documents/my-arbor/apps/web/scripts)",
+      "Bash(rm C:/Users/joshu/Documents/my-arbor/apps/web/scripts/tune-at-risk.mjs)",
+      "Bash(where.exe supabase *)",
+      "Bash(grep *)",
+      "PowerShell(Out-File *)"
     ]
   }
 }

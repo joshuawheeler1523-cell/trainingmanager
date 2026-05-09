@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -15,6 +15,11 @@ vi.mock("@/lib/supabase/server", () => ({
 const mockGetCurrentOrgId = vi.fn();
 vi.mock("@/lib/auth/current-org", () => ({
   getCurrentOrgId: mockGetCurrentOrgId,
+}));
+
+const mockGetCurrentDepartmentId = vi.fn();
+vi.mock("@/lib/auth/current-department", () => ({
+  getCurrentDepartmentId: mockGetCurrentDepartmentId,
 }));
 
 const { createClass, softDeleteClass, assignInstructorToClass } = await import("./actions");
@@ -42,6 +47,7 @@ function makeUpsertChain(result: { data?: unknown; error?: unknown }) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetCurrentOrgId.mockResolvedValue(ORG_ID);
+  mockGetCurrentDepartmentId.mockResolvedValue("dddddddd-0000-0000-0000-000000000000");
 });
 
 describe("createClass", () => {
@@ -117,7 +123,7 @@ describe("createClass", () => {
     if (!result.ok) expect(result.error.code).toBe("NO_ORG");
   });
 
-  // Regression: zodResolver on the client normalizes "" → null on optional fields,
+  // Regression: zodResolver on the client normalizes "" â†’ null on optional fields,
   // then this server action re-parses the same payload. Schema must accept null.
   it("accepts null for all optional fields (idempotent re-parse)", async () => {
     const row = {

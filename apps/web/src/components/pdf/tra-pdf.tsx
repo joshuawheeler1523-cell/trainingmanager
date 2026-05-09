@@ -148,10 +148,10 @@ export default function TraPdf({ orgName, tra, deliverables, deliverableTypes }:
 
   const fields: { label: string; value: string }[] = [
     ["Requesting department", tra.requesting_department ?? "—"],
-    ["Stakeholder", tra.stakeholder_name ?? "—"],
-    ["Stakeholder email", tra.stakeholder_email ?? "—"],
-    ["Target audience", tra.target_audience ?? "—"],
-    ["Urgency", tra.urgency],
+    ["Requestor", tra.requestor_name ?? "—"],
+    ["Executive sponsor", tra.executive_sponsor ?? "—"],
+    ["Needed by", tra.needed_by_date ?? "—"],
+    ["Priority", tra.priority ?? "—"],
     ["Status", tra.status],
   ].map(([label, value]) => ({ label: label as string, value: value as string }));
 
@@ -183,17 +183,17 @@ export default function TraPdf({ orgName, tra, deliverables, deliverableTypes }:
           </View>
         </View>
 
-        {tra.description && (
+        {tra.business_problem && (
           <View style={styles.section}>
-            <Text style={styles.sectionHeading}>Description</Text>
-            <Text style={styles.prose}>{tra.description}</Text>
+            <Text style={styles.sectionHeading}>Business problem</Text>
+            <Text style={styles.prose}>{tra.business_problem}</Text>
           </View>
         )}
 
-        {tra.business_justification && (
+        {tra.cost_of_inaction && (
           <View style={styles.section}>
-            <Text style={styles.sectionHeading}>Business justification</Text>
-            <Text style={styles.prose}>{tra.business_justification}</Text>
+            <Text style={styles.sectionHeading}>Cost of inaction</Text>
+            <Text style={styles.prose}>{tra.cost_of_inaction}</Text>
           </View>
         )}
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -11,6 +11,11 @@ vi.mock("@/lib/supabase/server", () => ({
 const mockGetCurrentOrgId = vi.fn();
 vi.mock("@/lib/auth/current-org", () => ({
   getCurrentOrgId: mockGetCurrentOrgId,
+}));
+
+const mockGetCurrentDepartmentId = vi.fn();
+vi.mock("@/lib/auth/current-department", () => ({
+  getCurrentDepartmentId: mockGetCurrentDepartmentId,
 }));
 
 const {
@@ -49,6 +54,7 @@ function makeUpdateChain(result: { data?: unknown; error?: unknown }) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetCurrentOrgId.mockResolvedValue(ORG_ID);
+  mockGetCurrentDepartmentId.mockResolvedValue("dddddddd-0000-0000-0000-000000000000");
 });
 
 describe("createImplementation", () => {
@@ -283,9 +289,9 @@ describe("training-planner pure helpers", () => {
 
   it("implementationCompletion clamps each class to its own need", async () => {
     const { implementationCompletion } = await import("@arbor/shared");
-    // Class A needs 5 sessions, has 5 ⇒ 100%.
-    // Class B needs 10, has 3 ⇒ 30%.
-    // Combined: (5 + 3) / (5 + 10) = 8/15 ≈ 53%.
+    // Class A needs 5 sessions, has 5 â‡’ 100%.
+    // Class B needs 10, has 3 â‡’ 30%.
+    // Combined: (5 + 3) / (5 + 10) = 8/15 â‰ˆ 53%.
     const result = implementationCompletion({
       classes: [
         { id: "a", total_people_to_train: 60, expected_learners_per_session: 12 },

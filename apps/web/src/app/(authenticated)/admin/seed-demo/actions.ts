@@ -570,11 +570,9 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           department_id: deptId,
           project_name: "Sepsis Bundle Rollout — Phase 1",
           requesting_department: "Quality & Patient Safety",
-          stakeholder_name: "Dr. Elise Mwangi",
-          stakeholder_email: "elise.mwangi@example.org",
-          urgency: "high",
+          priority: "regulatory",
           status: "draft",
-          description:
+          business_problem:
             "Update inpatient training around the new sepsis bundle order set ahead of regulatory review.",
           total_estimated_hours: 0,
         },
@@ -583,11 +581,9 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           department_id: deptId,
           project_name: "Cerner-to-Epic Migration Education",
           requesting_department: "Clinical Informatics",
-          stakeholder_name: "Tomás Rivera",
-          stakeholder_email: "tomas.rivera@example.org",
-          urgency: "urgent",
+          priority: "important",
           status: "submitted",
-          description:
+          business_problem:
             "12-week curriculum for inpatient nursing, ED, and surgical staff to migrate from Cerner to Epic.",
           total_estimated_hours: 0,
         },
@@ -596,10 +592,9 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           department_id: deptId,
           project_name: "Pediatric Pain Assessment Refresh",
           requesting_department: "Pediatrics",
-          stakeholder_name: "Dr. Aanya Khanna",
-          urgency: "standard",
+          priority: "important",
           status: "approved",
-          description: "Quarterly refresher covering FLACC and CRIES tools.",
+          business_problem: "Quarterly refresher covering FLACC and CRIES tools.",
           total_estimated_hours: 0,
         },
         {
@@ -607,10 +602,9 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           department_id: deptId,
           project_name: "Robotics Console Recertification",
           requesting_department: "Surgery",
-          stakeholder_name: "Priya Chandrasekaran",
-          urgency: "high",
+          priority: "important",
           status: "converted",
-          description: "Quarterly recert for da Vinci console operators.",
+          business_problem: "Quarterly recert for da Vinci console operators.",
           total_estimated_hours: 0,
         },
       ])

@@ -5,8 +5,8 @@ import Link from "next/link";
 import { PlusIcon } from "@heroicons/react/20/solid";
 import EmptyState from "@/components/ui/empty-state";
 import TraFormDialog from "./tra-form-dialog";
-import { TRA_STATUS_VALUES } from "@arbor/shared";
-import type { Tra, TraStatus } from "@arbor/shared";
+import { TRA_PRIORITY_VALUES, TRA_STATUS_VALUES } from "@arbor/shared";
+import type { Tra, TraPriority, TraStatus } from "@arbor/shared";
 
 type Props = {
   tras: Tra[];
@@ -21,13 +21,27 @@ const STATUS_BADGE: Record<TraStatus, string> = {
   rejected: "bg-destructive/10 text-destructive",
 };
 
+const PRIORITY_BADGE: Record<TraPriority, string> = {
+  nice_to_have: "bg-surface text-muted-foreground",
+  important: "bg-primary/10 text-primary",
+  regulatory: "bg-destructive/10 text-destructive",
+};
+
+const PRIORITY_LABEL: Record<TraPriority, string> = {
+  nice_to_have: "Nice to have",
+  important: "Important",
+  regulatory: "Regulatory",
+};
+
 export default function TrasView({ tras, departments }: Props) {
   const [statusFilter, setStatusFilter] = useState<TraStatus | "all">("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState<TraPriority | "all">("all");
 
   const filtered = useMemo(() => {
     return tras.filter((t) => {
       if (statusFilter !== "all" && t.status !== statusFilter) return false;
+      if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
       if (departmentFilter !== "all") {
         if (departmentFilter === "_none" && t.requesting_department !== null) return false;
         if (departmentFilter !== "_none" && t.requesting_department !== departmentFilter)
@@ -35,7 +49,7 @@ export default function TrasView({ tras, departments }: Props) {
       }
       return true;
     });
-  }, [tras, statusFilter, departmentFilter]);
+  }, [tras, statusFilter, priorityFilter, departmentFilter]);
 
   const inputCls =
     "border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-xs";
@@ -58,6 +72,24 @@ export default function TrasView({ tras, departments }: Props) {
               {TRA_STATUS_VALUES.map((s) => (
                 <option key={s} value={s} className="capitalize">
                   {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <p className="text-muted-foreground mb-1 text-xs font-medium">Priority</p>
+            <select
+              aria-label="Filter by priority"
+              value={priorityFilter}
+              onChange={(e) => {
+                setPriorityFilter(e.target.value as TraPriority | "all");
+              }}
+              className={inputCls}
+            >
+              <option value="all">All</option>
+              {TRA_PRIORITY_VALUES.map((p) => (
+                <option key={p} value={p}>
+                  {PRIORITY_LABEL[p]}
                 </option>
               ))}
             </select>
@@ -124,11 +156,20 @@ export default function TrasView({ tras, departments }: Props) {
                   {t.status}
                 </span>
               </div>
-              {t.requesting_department && (
-                <p className="text-muted-foreground mt-1 truncate text-xs">
-                  {t.requesting_department}
-                </p>
-              )}
+              <div className="mt-1 flex items-center gap-2">
+                {t.priority && (
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${PRIORITY_BADGE[t.priority]}`}
+                  >
+                    {PRIORITY_LABEL[t.priority]}
+                  </span>
+                )}
+                {t.requesting_department && (
+                  <p className="text-muted-foreground truncate text-xs">
+                    {t.requesting_department}
+                  </p>
+                )}
+              </div>
               <div className="border-border mt-4 flex items-baseline justify-between border-t pt-3">
                 <span className="text-muted-foreground text-xs">Estimated</span>
                 <span className="text-foreground text-base font-semibold tabular-nums">

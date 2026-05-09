@@ -10,21 +10,44 @@ import {
   SparklesIcon,
 } from "@heroicons/react/20/solid";
 import PageHeader from "@/components/ui/page-header";
-import StepInfo from "./step-info";
-import StepDeliverables from "./step-deliverables";
-import StepReview from "./step-review";
-import StepDocument from "./step-document";
+import Step1Basics from "./step-1-basics";
+import Step2Need from "./step-2-need";
+import Step3Audience from "./step-3-audience";
+import Step4BusinessCase from "./step-4-business-case";
+import Step5LearningDesign from "./step-5-learning-design";
+import Step6Logistics from "./step-6-logistics";
+import Step7Sustainment from "./step-7-sustainment";
+import Step8Approvals from "./step-8-approvals";
+import Step9Review from "./step-9-review";
 import AiAssistantPanel from "./ai-assistant-panel";
 import { submitTra, approveTra, rejectTra, convertTraToProject } from "../actions";
-import type { DeliverableType, Tra, TraDeliverable, TraStatus } from "@arbor/shared";
+import type {
+  DeliverableType,
+  Tra,
+  TraApproval,
+  TraAudienceRole,
+  TraDeliverable,
+  TraEvaluationPlan,
+  TraKpi,
+  TraObjective,
+  TraSme,
+  TraStakeholder,
+  TraStatus,
+  TraSuccessCriteria,
+} from "@arbor/shared";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 const STEPS: { id: Step; label: string }[] = [
-  { id: 1, label: "Project information" },
-  { id: 2, label: "Deliverables" },
-  { id: 3, label: "Review & calculate" },
-  { id: 4, label: "Generate document" },
+  { id: 1, label: "Basics" },
+  { id: 2, label: "The need" },
+  { id: 3, label: "Audience" },
+  { id: 4, label: "Business case" },
+  { id: 5, label: "Learning design" },
+  { id: 6, label: "Logistics" },
+  { id: 7, label: "Sustainment" },
+  { id: 8, label: "Approvals" },
+  { id: 9, label: "Review & generate" },
 ];
 
 const STATUS_BADGE: Record<TraStatus, string> = {
@@ -37,6 +60,14 @@ const STATUS_BADGE: Record<TraStatus, string> = {
 
 type Props = {
   tra: Tra;
+  stakeholders: TraStakeholder[];
+  audienceRoles: TraAudienceRole[];
+  kpis: TraKpi[];
+  successCriteria: TraSuccessCriteria[];
+  objectives: TraObjective[];
+  smes: TraSme[];
+  evaluationPlan: TraEvaluationPlan[];
+  approvals: TraApproval[];
   deliverables: TraDeliverable[];
   deliverableTypes: DeliverableType[];
   aiAssistantEnabled: boolean;
@@ -44,6 +75,14 @@ type Props = {
 
 export default function TraWizard({
   tra,
+  stakeholders,
+  audienceRoles,
+  kpis,
+  successCriteria,
+  objectives,
+  smes,
+  evaluationPlan,
+  approvals,
   deliverables,
   deliverableTypes,
   aiAssistantEnabled,
@@ -137,9 +176,9 @@ export default function TraWizard({
 
       {/* Step indicator */}
       <div className="border-border bg-background border-b px-6 py-3">
-        <ol className="flex flex-wrap gap-2">
+        <ol className="flex flex-wrap gap-1.5">
           {STEPS.map((s) => (
-            <li key={s.id} className="flex items-center gap-2">
+            <li key={s.id} className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => {
@@ -158,35 +197,43 @@ export default function TraWizard({
                 </span>
                 <span>{s.label}</span>
               </button>
-              {s.id < STEPS.length && (
-                <ChevronRightIcon className="text-muted-foreground h-3 w-3" />
-              )}
             </li>
           ))}
         </ol>
       </div>
 
       <div className="p-6">
-        {step === 1 && <StepInfo tra={tra} disabled={isLocked} />}
-        {step === 2 && (
-          <StepDeliverables
-            traId={tra.id}
-            deliverables={deliverables}
-            deliverableTypes={deliverableTypes}
-            disabled={isLocked}
-          />
-        )}
+        {step === 1 && <Step1Basics tra={tra} stakeholders={stakeholders} disabled={isLocked} />}
+        {step === 2 && <Step2Need tra={tra} disabled={isLocked} />}
         {step === 3 && (
-          <StepReview
-            tra={tra}
-            deliverables={deliverables}
-            deliverableTypes={deliverableTypes}
-            disabled={isLocked}
-          />
+          <Step3Audience tra={tra} audienceRoles={audienceRoles} disabled={isLocked} />
         )}
         {step === 4 && (
-          <StepDocument
+          <Step4BusinessCase
             tra={tra}
+            kpis={kpis}
+            successCriteria={successCriteria}
+            disabled={isLocked}
+          />
+        )}
+        {step === 5 && (
+          <Step5LearningDesign
+            tra={tra}
+            objectives={objectives}
+            smes={smes}
+            evaluationPlan={evaluationPlan}
+            deliverables={deliverables}
+            deliverableTypes={deliverableTypes}
+            disabled={isLocked}
+          />
+        )}
+        {step === 6 && <Step6Logistics tra={tra} disabled={isLocked} />}
+        {step === 7 && <Step7Sustainment tra={tra} disabled={isLocked} />}
+        {step === 8 && <Step8Approvals traId={tra.id} approvals={approvals} disabled={isLocked} />}
+        {step === 9 && (
+          <Step9Review
+            tra={tra}
+            objectives={objectives}
             deliverables={deliverables}
             deliverableTypes={deliverableTypes}
             pending={pending}
@@ -194,6 +241,9 @@ export default function TraWizard({
             onApprove={handleApprove}
             onReject={handleReject}
             onConvert={handleConvert}
+            goToStep={(n) => {
+              setStep(n as Step);
+            }}
           />
         )}
       </div>
@@ -216,7 +266,7 @@ export default function TraWizard({
         </span>
         <button
           type="button"
-          disabled={step === 4}
+          disabled={step === STEPS.length}
           onClick={() => {
             setStep((s) => (s + 1) as Step);
           }}

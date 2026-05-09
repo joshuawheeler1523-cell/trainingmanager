@@ -1,4 +1,4 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+﻿export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -3324,6 +3324,122 @@ export type Database = {
           },
         ];
       };
+      tra_approvals: {
+        Row: {
+          approval_type: string;
+          created_at: string;
+          department_id: string;
+          id: string;
+          name: string | null;
+          org_id: string;
+          signed_at: string | null;
+          tra_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          approval_type: string;
+          created_at?: string;
+          department_id: string;
+          id?: string;
+          name?: string | null;
+          org_id: string;
+          signed_at?: string | null;
+          tra_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          approval_type?: string;
+          created_at?: string;
+          department_id?: string;
+          id?: string;
+          name?: string | null;
+          org_id?: string;
+          signed_at?: string | null;
+          tra_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tra_approvals_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_approvals_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_approvals_tra_id_fkey";
+            columns: ["tra_id"];
+            isOneToOne: false;
+            referencedRelation: "tras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tra_audience_roles: {
+        Row: {
+          created_at: string;
+          department_id: string;
+          headcount: number | null;
+          id: string;
+          org_id: string;
+          position: number;
+          role: string | null;
+          tra_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          department_id: string;
+          headcount?: number | null;
+          id?: string;
+          org_id: string;
+          position?: number;
+          role?: string | null;
+          tra_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          department_id?: string;
+          headcount?: number | null;
+          id?: string;
+          org_id?: string;
+          position?: number;
+          role?: string | null;
+          tra_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tra_audience_roles_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_audience_roles_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_audience_roles_tra_id_fkey";
+            columns: ["tra_id"];
+            isOneToOne: false;
+            referencedRelation: "tras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tra_deliverables: {
         Row: {
           complexity_multiplier: number;
@@ -3407,72 +3523,516 @@ export type Database = {
           },
         ];
       };
-      tras: {
+      tra_evaluation_plan: {
         Row: {
-          adjustments_notes: string | null;
-          ai_assistant_used: boolean;
-          business_justification: string | null;
-          converted_to_project_id: string | null;
           created_at: string;
-          created_by: string | null;
           department_id: string;
-          description: string | null;
+          id: string;
+          kirkpatrick_level: number;
+          measurement_method: string | null;
+          org_id: string;
+          tra_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          department_id: string;
+          id?: string;
+          kirkpatrick_level: number;
+          measurement_method?: string | null;
+          org_id: string;
+          tra_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          department_id?: string;
+          id?: string;
+          kirkpatrick_level?: number;
+          measurement_method?: string | null;
+          org_id?: string;
+          tra_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tra_evaluation_plan_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_evaluation_plan_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_evaluation_plan_tra_id_fkey";
+            columns: ["tra_id"];
+            isOneToOne: false;
+            referencedRelation: "tras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tra_kpis: {
+        Row: {
+          baseline: string | null;
+          created_at: string;
+          department_id: string;
+          id: string;
+          metric: string | null;
+          org_id: string;
+          position: number;
+          target: string | null;
+          tra_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          baseline?: string | null;
+          created_at?: string;
+          department_id: string;
+          id?: string;
+          metric?: string | null;
+          org_id: string;
+          position?: number;
+          target?: string | null;
+          tra_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          baseline?: string | null;
+          created_at?: string;
+          department_id?: string;
+          id?: string;
+          metric?: string | null;
+          org_id?: string;
+          position?: number;
+          target?: string | null;
+          tra_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tra_kpis_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_kpis_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_kpis_tra_id_fkey";
+            columns: ["tra_id"];
+            isOneToOne: false;
+            referencedRelation: "tras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tra_objectives: {
+        Row: {
+          created_at: string;
+          department_id: string;
           id: string;
           org_id: string;
+          position: number;
+          text: string | null;
+          tra_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          department_id: string;
+          id?: string;
+          org_id: string;
+          position?: number;
+          text?: string | null;
+          tra_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          department_id?: string;
+          id?: string;
+          org_id?: string;
+          position?: number;
+          text?: string | null;
+          tra_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tra_objectives_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_objectives_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_objectives_tra_id_fkey";
+            columns: ["tra_id"];
+            isOneToOne: false;
+            referencedRelation: "tras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tra_smes: {
+        Row: {
+          availability_hours: number | null;
+          created_at: string;
+          department_id: string;
+          email: string | null;
+          id: string;
+          name: string | null;
+          org_id: string;
+          position: number;
+          tra_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          availability_hours?: number | null;
+          created_at?: string;
+          department_id: string;
+          email?: string | null;
+          id?: string;
+          name?: string | null;
+          org_id: string;
+          position?: number;
+          tra_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          availability_hours?: number | null;
+          created_at?: string;
+          department_id?: string;
+          email?: string | null;
+          id?: string;
+          name?: string | null;
+          org_id?: string;
+          position?: number;
+          tra_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tra_smes_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_smes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_smes_tra_id_fkey";
+            columns: ["tra_id"];
+            isOneToOne: false;
+            referencedRelation: "tras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tra_stakeholders: {
+        Row: {
+          created_at: string;
+          decision_rights: string | null;
+          department_id: string;
+          email: string | null;
+          id: string;
+          name: string | null;
+          org_id: string;
+          position: number;
+          role: string | null;
+          tra_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          decision_rights?: string | null;
+          department_id: string;
+          email?: string | null;
+          id?: string;
+          name?: string | null;
+          org_id: string;
+          position?: number;
+          role?: string | null;
+          tra_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          decision_rights?: string | null;
+          department_id?: string;
+          email?: string | null;
+          id?: string;
+          name?: string | null;
+          org_id?: string;
+          position?: number;
+          role?: string | null;
+          tra_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tra_stakeholders_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_stakeholders_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_stakeholders_tra_id_fkey";
+            columns: ["tra_id"];
+            isOneToOne: false;
+            referencedRelation: "tras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tra_success_criteria: {
+        Row: {
+          checkpoint: string;
+          created_at: string;
+          criteria: string | null;
+          department_id: string;
+          id: string;
+          measurement_owner: string | null;
+          org_id: string;
+          tra_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          checkpoint: string;
+          created_at?: string;
+          criteria?: string | null;
+          department_id: string;
+          id?: string;
+          measurement_owner?: string | null;
+          org_id: string;
+          tra_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          checkpoint?: string;
+          created_at?: string;
+          criteria?: string | null;
+          department_id?: string;
+          id?: string;
+          measurement_owner?: string | null;
+          org_id?: string;
+          tra_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tra_success_criteria_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_success_criteria_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tra_success_criteria_tra_id_fkey";
+            columns: ["tra_id"];
+            isOneToOne: false;
+            referencedRelation: "tras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tras: {
+        Row: {
+          accessibility_needs: string | null;
+          adjustments_notes: string | null;
+          ai_assistant_used: boolean;
+          assessment_approaches: string[];
+          audience_languages: string[];
+          audience_locations: string[];
+          budget_range: string | null;
+          business_problem: string | null;
+          constraints_notes: string | null;
+          content_owner: string | null;
+          converted_to_project_id: string | null;
+          cost_of_inaction: string | null;
+          created_at: string;
+          created_by: string | null;
+          current_behavior: string | null;
+          delivery_cadence: string | null;
+          department_id: string;
+          desired_behavior: string | null;
+          estimated_seat_time_hours: number | null;
+          executive_sponsor: string | null;
+          existing_content: string | null;
+          feedback_mechanism: string | null;
+          funding_source: string | null;
+          id: string;
+          localization_needs: string | null;
+          needed_by_date: string | null;
+          needed_by_driver: string | null;
+          org_id: string;
+          pilot_group: string | null;
+          prerequisite_knowledge: string | null;
+          prior_attempts: string | null;
+          priority: string | null;
           project_name: string;
+          recommended_modalities: string[];
+          reinforcement_plan: string | null;
           requesting_department: string | null;
-          stakeholder_email: string | null;
-          stakeholder_name: string | null;
+          requestor_department: string | null;
+          requestor_name: string | null;
+          requestor_role: string | null;
+          review_cadence: string | null;
+          root_cause_answer: string | null;
+          root_cause_justification: string | null;
           status: string;
-          target_audience: string | null;
+          submitted_at: string | null;
+          tech_access: string | null;
+          technology_requirements: string | null;
           total_estimated_hours: number;
           updated_at: string;
           updated_by: string | null;
-          urgency: string;
+          wcag_target: string | null;
         };
         Insert: {
+          accessibility_needs?: string | null;
           adjustments_notes?: string | null;
           ai_assistant_used?: boolean;
-          business_justification?: string | null;
+          assessment_approaches?: string[];
+          audience_languages?: string[];
+          audience_locations?: string[];
+          budget_range?: string | null;
+          business_problem?: string | null;
+          constraints_notes?: string | null;
+          content_owner?: string | null;
           converted_to_project_id?: string | null;
+          cost_of_inaction?: string | null;
           created_at?: string;
           created_by?: string | null;
+          current_behavior?: string | null;
+          delivery_cadence?: string | null;
           department_id: string;
-          description?: string | null;
+          desired_behavior?: string | null;
+          estimated_seat_time_hours?: number | null;
+          executive_sponsor?: string | null;
+          existing_content?: string | null;
+          feedback_mechanism?: string | null;
+          funding_source?: string | null;
           id?: string;
+          localization_needs?: string | null;
+          needed_by_date?: string | null;
+          needed_by_driver?: string | null;
           org_id: string;
+          pilot_group?: string | null;
+          prerequisite_knowledge?: string | null;
+          prior_attempts?: string | null;
+          priority?: string | null;
           project_name: string;
+          recommended_modalities?: string[];
+          reinforcement_plan?: string | null;
           requesting_department?: string | null;
-          stakeholder_email?: string | null;
-          stakeholder_name?: string | null;
+          requestor_department?: string | null;
+          requestor_name?: string | null;
+          requestor_role?: string | null;
+          review_cadence?: string | null;
+          root_cause_answer?: string | null;
+          root_cause_justification?: string | null;
           status?: string;
-          target_audience?: string | null;
+          submitted_at?: string | null;
+          tech_access?: string | null;
+          technology_requirements?: string | null;
           total_estimated_hours?: number;
           updated_at?: string;
           updated_by?: string | null;
-          urgency?: string;
+          wcag_target?: string | null;
         };
         Update: {
+          accessibility_needs?: string | null;
           adjustments_notes?: string | null;
           ai_assistant_used?: boolean;
-          business_justification?: string | null;
+          assessment_approaches?: string[];
+          audience_languages?: string[];
+          audience_locations?: string[];
+          budget_range?: string | null;
+          business_problem?: string | null;
+          constraints_notes?: string | null;
+          content_owner?: string | null;
           converted_to_project_id?: string | null;
+          cost_of_inaction?: string | null;
           created_at?: string;
           created_by?: string | null;
+          current_behavior?: string | null;
+          delivery_cadence?: string | null;
           department_id?: string;
-          description?: string | null;
+          desired_behavior?: string | null;
+          estimated_seat_time_hours?: number | null;
+          executive_sponsor?: string | null;
+          existing_content?: string | null;
+          feedback_mechanism?: string | null;
+          funding_source?: string | null;
           id?: string;
+          localization_needs?: string | null;
+          needed_by_date?: string | null;
+          needed_by_driver?: string | null;
           org_id?: string;
+          pilot_group?: string | null;
+          prerequisite_knowledge?: string | null;
+          prior_attempts?: string | null;
+          priority?: string | null;
           project_name?: string;
+          recommended_modalities?: string[];
+          reinforcement_plan?: string | null;
           requesting_department?: string | null;
-          stakeholder_email?: string | null;
-          stakeholder_name?: string | null;
+          requestor_department?: string | null;
+          requestor_name?: string | null;
+          requestor_role?: string | null;
+          review_cadence?: string | null;
+          root_cause_answer?: string | null;
+          root_cause_justification?: string | null;
           status?: string;
-          target_audience?: string | null;
+          submitted_at?: string | null;
+          tech_access?: string | null;
+          technology_requirements?: string | null;
           total_estimated_hours?: number;
           updated_at?: string;
           updated_by?: string | null;
-          urgency?: string;
+          wcag_target?: string | null;
         };
         Relationships: [
           {
