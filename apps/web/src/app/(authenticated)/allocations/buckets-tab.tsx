@@ -287,25 +287,15 @@ export default function BucketsTab({ buckets }: Props) {
         </div>
       ) : (
         <div className="border-border bg-background overflow-hidden rounded-xl border">
-          <table className="w-full text-sm">
-            <thead className="border-border bg-surface border-b">
-              <tr>
-                <th className="w-8 px-2 py-2.5" />
-                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
-                  Name
-                </th>
-                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
-                  Description
-                </th>
-                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
-                  Order
-                </th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody className="divide-border divide-y">
-              {showArchived ? (
-                archived.map((b) => (
+          {/* DndContext wraps the entire table (including <thead>) so dnd-kit's
+              hidden screen-reader announcement <div> is rendered as a sibling
+              of the table, not inside <tbody> (HTML disallows non-<tr> children
+              of <tbody>; React DOM warns "<tbody> cannot contain a nested <div>"). */}
+          {showArchived ? (
+            <table className="w-full text-sm">
+              <BucketTableHead />
+              <tbody className="divide-border divide-y">
+                {archived.map((b) => (
                   <SortableRow
                     key={b.id}
                     bucket={b}
@@ -316,17 +306,22 @@ export default function BucketsTab({ buckets }: Props) {
                       router.refresh();
                     }}
                   />
-                ))
-              ) : (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={orderedActive.map((b) => b.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={orderedActive.map((b) => b.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <table className="w-full text-sm">
+                  <BucketTableHead />
+                  <tbody className="divide-border divide-y">
                     {orderedActive.map((b) => (
                       <SortableRow
                         key={b.id}
@@ -339,14 +334,32 @@ export default function BucketsTab({ buckets }: Props) {
                         }}
                       />
                     ))}
-                  </SortableContext>
-                </DndContext>
-              )}
-            </tbody>
-          </table>
+                  </tbody>
+                </table>
+              </SortableContext>
+            </DndContext>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+// Shared table head used by both the active (sortable) and archived tables
+// so the columns stay aligned.
+function BucketTableHead() {
+  return (
+    <thead className="border-border bg-surface border-b">
+      <tr>
+        <th className="w-8 px-2 py-2.5" />
+        <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">Name</th>
+        <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
+          Description
+        </th>
+        <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">Order</th>
+        <th className="px-4 py-2.5" />
+      </tr>
+    </thead>
   );
 }
 
