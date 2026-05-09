@@ -1,10 +1,14 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 export const CURRENT_ORG_COOKIE = "current_org_id";
 
-export async function getCurrentOrgId(): Promise<string | null> {
+// React.cache() dedupes within a single request. Layout, page, and
+// helpers all call this — without the cache they'd each run the auth
+// roundtrip + the org_memberships query, multiplying latency.
+export const getCurrentOrgId = cache(async (): Promise<string | null> => {
   const [cookieStore, supabase] = await Promise.all([cookies(), createClient()]);
 
   const {
@@ -36,4 +40,4 @@ export async function getCurrentOrgId(): Promise<string | null> {
     .maybeSingle();
 
   return fallback?.org_id ?? null;
-}
+});

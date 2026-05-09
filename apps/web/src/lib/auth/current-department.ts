@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "./current-org";
@@ -17,7 +18,7 @@ export const CURRENT_DEPARTMENT_COOKIE = "current_department_id";
  * Org admins implicitly have access to every department in their org, so
  * step 1's lookup uses an OR with org_admin status.
  */
-export async function getCurrentDepartmentId(): Promise<string | null> {
+export const getCurrentDepartmentId = cache(async (): Promise<string | null> => {
   const [cookieStore, supabase, orgId] = await Promise.all([
     cookies(),
     createClient(),
@@ -65,7 +66,7 @@ export async function getCurrentDepartmentId(): Promise<string | null> {
     .maybeSingle();
 
   return anyMembership?.department_id ?? null;
-}
+});
 
 async function userIsOrgAdmin(
   supabase: Awaited<ReturnType<typeof createClient>>,

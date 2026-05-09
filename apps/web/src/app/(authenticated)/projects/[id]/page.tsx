@@ -49,8 +49,20 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
       .order("sort_order")
       .order("created_at"),
     supabase.from("project_team_members").select("*").eq("project_id", id).eq("org_id", orgId),
-    supabase.from("task_assignments").select("*").eq("org_id", orgId),
-    supabase.from("task_action_items").select("*").eq("org_id", orgId).order("sort_order"),
+    // Inner-join filter through tasks so we only fetch rows for this
+    // project. Without the join, every row in the org came back and was
+    // filtered client-side — fine for tiny demos, painful for real orgs.
+    supabase
+      .from("task_assignments")
+      .select("*, task:tasks!inner(project_id)")
+      .eq("org_id", orgId)
+      .eq("task.project_id", id),
+    supabase
+      .from("task_action_items")
+      .select("*, task:tasks!inner(project_id)")
+      .eq("org_id", orgId)
+      .eq("task.project_id", id)
+      .order("sort_order"),
     supabase
       .from("instructors")
       .select("*")
@@ -64,7 +76,14 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
       .eq("project_id", id)
       .eq("org_id", orgId)
       .order("due_date"),
-    supabase.from("task_dependencies").select("*").eq("org_id", orgId),
+    // Dependencies are scoped via the predecessor task — both endpoints
+    // are constrained to tasks within the same project by the data model,
+    // so filtering on predecessor.project_id is sufficient.
+    supabase
+      .from("task_dependencies")
+      .select("*, predecessor:tasks!task_dependencies_predecessor_id_fkey!inner(project_id)")
+      .eq("org_id", orgId)
+      .eq("predecessor.project_id", id),
     supabase
       .from("dependencies")
       .select("*")
@@ -75,20 +94,12 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
 
   const tasksList = (tasks ?? []) as Task[];
   const teamList = (teamMembers ?? []) as ProjectTeamMember[];
-  const assignmentsAll = (taskAssignments ?? []) as TaskAssignment[];
-  const actionItemsAll = (actionItems ?? []) as TaskActionItem[];
+  const projectAssignments = (taskAssignments ?? []) as TaskAssignment[];
+  const projectActionItems = (actionItems ?? []) as TaskActionItem[];
   const instructorList = (instructors ?? []) as Instructor[];
   const milestonesList = (milestones ?? []) as Milestone[];
-  const dependenciesAll = (dependencies ?? []) as TaskDependency[];
+  const projectDependencies = (dependencies ?? []) as TaskDependency[];
   const externalDepList = (externalDeps ?? []) as ExternalDependency[];
-
-  const taskIds = new Set(tasksList.map((t) => t.id));
-  const projectAssignments = assignmentsAll.filter((a) => taskIds.has(a.task_id));
-  const projectActionItems = actionItemsAll.filter((a) => taskIds.has(a.task_id));
-  // Dependencies belong to this project iff both endpoints are in its task set.
-  const projectDependencies = dependenciesAll.filter(
-    (d) => taskIds.has(d.predecessor_id) && taskIds.has(d.successor_id),
-  );
 
   const percentComplete = projectPercentComplete(tasksList);
 

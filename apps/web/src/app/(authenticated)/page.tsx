@@ -30,37 +30,36 @@ export default async function DashboardPage() {
   const orgAdmin = await isOrgAdmin(orgId);
   const todayIso = new Date().toISOString().slice(0, 10);
 
+  // Single query each for tras/projects — returning rows with id +
+  // department_id + status. The widgets needing counts compute them
+  // client-side; the org-admin rollup uses the same rows. Saves 2-3
+  // round-trips compared to separate count + rollup queries.
   const [
     { data: instructors },
     { data: capacityRows },
-    { count: trasToReview },
-    { count: trasApproved },
-    { count: activeProjectCount },
+    { data: trasOpenRows },
+    { data: activeProjectRows },
     { data: overdueMilestoneRows },
     { data: conflictSessionRows },
     { data: classRows },
     { data: classAssignmentRows },
+    { data: departments },
   ] = await Promise.all([
     supabase
       .from("instructors")
-      .select("*")
+      .select("id, full_name, department, department_id, annual_hours, status")
       .eq("org_id", orgId)
       .is("deleted_at", null)
       .eq("status", "active"),
     supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId),
     supabase
       .from("tras")
-      .select("id", { count: "exact", head: true })
+      .select("id, department_id, status")
       .eq("org_id", orgId)
-      .eq("status", "submitted"),
-    supabase
-      .from("tras")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", orgId)
-      .eq("status", "approved"),
+      .in("status", ["submitted", "approved"]),
     supabase
       .from("projects")
-      .select("id", { count: "exact", head: true })
+      .select("id, department_id, status")
       .eq("org_id", orgId)
       .is("deleted_at", null)
       .in("status", ["planning", "active"]),
@@ -91,31 +90,30 @@ export default async function DashboardPage() {
       .from("class_instructor_assignments")
       .select("class_id, assigned_offerings")
       .eq("org_id", orgId),
+    // Departments table is only used by the org-admin rollup. Skip the
+    // round-trip when the viewer isn't an admin.
+    orgAdmin
+      ? supabase.from("departments").select("id, name").eq("org_id", orgId).order("name")
+      : Promise.resolve({ data: null }),
   ]);
 
-  // ── Org-admin rollup data ──────────────────────────────────────────────
-  // Only fetch when the viewer is an org admin; otherwise the data isn't
-  // visible (RLS) and we avoid the queries.
-  const [
-    { data: departments } = { data: null },
-    { data: projectsForRollup } = { data: null },
-    { data: trasForRollup } = { data: null },
-  ] = orgAdmin
-    ? await Promise.all([
-        supabase.from("departments").select("id, name").eq("org_id", orgId).order("name"),
-        supabase
-          .from("projects")
-          .select("id, department_id, status, deleted_at")
-          .eq("org_id", orgId)
-          .is("deleted_at", null)
-          .in("status", ["planning", "active"]),
-        supabase
-          .from("tras")
-          .select("id, department_id, status")
-          .eq("org_id", orgId)
-          .in("status", ["submitted", "approved"]),
-      ])
-    : [{ data: null }, { data: null }, { data: null }];
+  // Compute counts from the fetched rows instead of separate count queries.
+  const trasOpenList = (trasOpenRows ?? []) as {
+    id: string;
+    department_id: string;
+    status: string;
+  }[];
+  const trasToReview = trasOpenList.filter((t) => t.status === "submitted").length;
+  const trasApproved = trasOpenList.filter((t) => t.status === "approved").length;
+  const activeProjectList = (activeProjectRows ?? []) as {
+    id: string;
+    department_id: string;
+    status: string;
+  }[];
+  const activeProjectCount = activeProjectList.length;
+  // Rollup uses the same rows.
+  const projectsForRollup = activeProjectList;
+  const trasForRollup = trasOpenList;
 
   const activeInstructors = (instructors ?? []) as Instructor[];
   const capacities = (capacityRows ?? []) as CapacityRow[];
@@ -126,7 +124,7 @@ export default async function DashboardPage() {
     if (withVal.length === 0) return 0;
     return withVal.reduce((acc, c) => acc + (c.utilization_pct ?? 0), 0) / withVal.length;
   })();
-  const trasNeedingAttention = (trasToReview ?? 0) + (trasApproved ?? 0);
+  const trasNeedingAttention = trasToReview + trasApproved;
 
   // Department lookup so the capacity widget can show context per row.
   const deptByInstructorId = new Map(activeInstructors.map((i) => [i.id, i.department ?? null]));
@@ -251,12 +249,8 @@ export default async function DashboardPage() {
             ? deptCapacities.reduce((s, c) => s + (c.utilization_pct ?? 0), 0) /
               deptCapacities.length
             : null;
-        const projects = ((projectsForRollup ?? []) as { department_id: string }[]).filter(
-          (p) => p.department_id === d.id,
-        ).length;
-        const tras = ((trasForRollup ?? []) as { department_id: string }[]).filter(
-          (t) => t.department_id === d.id,
-        ).length;
+        const projects = projectsForRollup.filter((p) => p.department_id === d.id).length;
+        const tras = trasForRollup.filter((t) => t.department_id === d.id).length;
         return {
           id: d.id,
           name: d.name,
@@ -313,7 +307,7 @@ export default async function DashboardPage() {
             sub={
               trasNeedingAttention === 0
                 ? "All caught up"
-                : `${String(trasToReview ?? 0)} to review · ${String(trasApproved ?? 0)} ready to convert`
+                : `${String(trasToReview)} to review · ${String(trasApproved)} ready to convert`
             }
             tone={trasNeedingAttention >= 5 ? "warning" : trasNeedingAttention > 0 ? "info" : "ok"}
           />
@@ -321,7 +315,7 @@ export default async function DashboardPage() {
             href="/projects"
             icon={<BriefcaseIcon className="h-4 w-4" />}
             label="Active projects"
-            value={(activeProjectCount ?? 0).toString()}
+            value={activeProjectCount.toString()}
             sub="planning or in flight"
             tone="ok"
           />
