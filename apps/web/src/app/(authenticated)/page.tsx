@@ -15,53 +15,6 @@ import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isOrgAdmin } from "@/lib/auth/org-admin";
 import type { CapacityRow, Instructor } from "@arbor/shared";
 
-type AuditEntry = {
-  id: number;
-  operation: string;
-  table_name: string;
-  record_id: string;
-  changed_fields: string[] | null;
-  occurred_at: string;
-  actor_id: string | null;
-};
-
-const RECORD_LINK: Record<string, (id: string) => string> = {
-  instructors: (id) => `/instructors/${id}`,
-  classes: (id) => `/classes/${id}`,
-  skills: () => `/skills`,
-  allocation_buckets: () => `/allocations`,
-  global_allocations: () => `/allocations`,
-  allocation_groups: () => `/allocations`,
-  group_allocations: () => `/allocations`,
-  individual_allocations: () => `/allocations`,
-  recurring_tasks: () => `/allocations`,
-  ad_hoc_tasks: () => `/allocations`,
-};
-
-function recordLink(table: string, id: string): string | null {
-  return RECORD_LINK[table]?.(id) ?? null;
-}
-
-function describeOperation(table: string, op: string): string {
-  const verb = op === "INSERT" ? "added" : op === "UPDATE" ? "updated" : "deleted";
-  // Pretty-print table name (instructors → instructor)
-  const noun = table.replace(/_/g, " ").replace(/s$/, "");
-  return `${verb} ${noun}`;
-}
-
-function formatRelative(iso: string): string {
-  const then = new Date(iso).getTime();
-  const diffMs = Date.now() - then;
-  const min = Math.floor(diffMs / 60_000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${String(min)}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${String(hr)}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 7) return `${String(day)}d ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
 export default async function DashboardPage() {
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
 
@@ -80,7 +33,6 @@ export default async function DashboardPage() {
   const [
     { data: instructors },
     { data: capacityRows },
-    { data: auditRows },
     { count: trasToReview },
     { count: trasApproved },
     { count: activeProjectCount },
@@ -96,12 +48,6 @@ export default async function DashboardPage() {
       .is("deleted_at", null)
       .eq("status", "active"),
     supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId),
-    supabase
-      .from("audit_log")
-      .select("id, operation, table_name, record_id, changed_fields, occurred_at, actor_id")
-      .eq("org_id", orgId)
-      .order("occurred_at", { ascending: false })
-      .limit(10),
     supabase
       .from("tras")
       .select("id", { count: "exact", head: true })
@@ -173,7 +119,6 @@ export default async function DashboardPage() {
 
   const activeInstructors = (instructors ?? []) as Instructor[];
   const capacities = (capacityRows ?? []) as CapacityRow[];
-  const recentActivity = (auditRows ?? []) as AuditEntry[];
 
   const instructorCount = activeInstructors.length;
   const avgUtilization = (() => {
@@ -275,6 +220,16 @@ export default async function DashboardPage() {
     return Math.max(0, Math.round((now - due) / 86_400_000));
   }
 
+  // ── Department capacity totals ─────────────────────────────────────────
+  // Sum across active instructors visible to the user (RLS already scopes
+  // to current department for non-admins; for org admins it's org-wide).
+  const totalAvailableHours = capacities.reduce((s, c) => s + c.annual_hours, 0);
+  const totalAssignedHours = capacities.reduce((s, c) => s + c.assigned_hours, 0);
+  const freeHours = Math.max(0, totalAvailableHours - totalAssignedHours);
+  const overflowHours = Math.max(0, totalAssignedHours - totalAvailableHours);
+  const utilizationPct =
+    totalAvailableHours > 0 ? (totalAssignedHours / totalAvailableHours) * 100 : 0;
+
   // ── Per-department rollup (org admins only) ────────────────────────────
   type DeptRollup = {
     id: string;
@@ -321,6 +276,33 @@ export default async function DashboardPage() {
       />
 
       <div className="space-y-6 p-6">
+        {/* Quick actions — top of page so common starts are one click away */}
+        <section className="border-border bg-background rounded-xl border p-4">
+          <h3 className="text-foreground mb-3 text-sm font-semibold">Quick actions</h3>
+          <div className="flex flex-wrap gap-2">
+            <QuickAction
+              href="/instructors"
+              icon={<UserPlusIcon className="h-4 w-4" />}
+              label="Add Instructor"
+            />
+            <QuickAction
+              href="/tras"
+              icon={<DocumentPlusIcon className="h-4 w-4" />}
+              label="New TRA"
+            />
+            <QuickAction
+              href="/projects"
+              icon={<FolderPlusIcon className="h-4 w-4" />}
+              label="New Project"
+            />
+            <QuickAction
+              href="/training-planner"
+              icon={<CalendarDaysIcon className="h-4 w-4" />}
+              label="New Implementation"
+            />
+          </div>
+        </section>
+
         {/* KPI strip */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <KpiCard
@@ -369,32 +351,15 @@ export default async function DashboardPage() {
           />
         </div>
 
-        {/* Quick actions */}
-        <section className="border-border bg-background rounded-xl border p-4">
-          <h3 className="text-foreground mb-3 text-sm font-semibold">Quick actions</h3>
-          <div className="flex flex-wrap gap-2">
-            <QuickAction
-              href="/instructors"
-              icon={<UserPlusIcon className="h-4 w-4" />}
-              label="Add Instructor"
-            />
-            <QuickAction
-              href="/tras"
-              icon={<DocumentPlusIcon className="h-4 w-4" />}
-              label="New TRA"
-            />
-            <QuickAction
-              href="/projects"
-              icon={<FolderPlusIcon className="h-4 w-4" />}
-              label="New Project"
-            />
-            <QuickAction
-              href="/training-planner"
-              icon={<CalendarDaysIcon className="h-4 w-4" />}
-              label="New Implementation"
-            />
-          </div>
-        </section>
+        {/* Department capacity — total available vs assigned vs free */}
+        <CapacityChartCard
+          totalAvailableHours={totalAvailableHours}
+          totalAssignedHours={totalAssignedHours}
+          freeHours={freeHours}
+          overflowHours={overflowHours}
+          utilizationPct={utilizationPct}
+          instructorCount={instructorCount}
+        />
 
         {/* Capacity health — full width */}
         <section className="border-border bg-background rounded-xl border p-5">
@@ -634,54 +599,7 @@ export default async function DashboardPage() {
           </section>
         )}
 
-        <div className="grid grid-cols-1 gap-6">
-          {/* Recent activity */}
-          <section className="border-border bg-background rounded-xl border p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-foreground text-sm font-semibold">Recent activity</h3>
-              <Link
-                href="/admin/audit-log"
-                className="text-primary text-xs font-medium hover:underline"
-              >
-                View all →
-              </Link>
-            </div>
-            {recentActivity.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No recent changes.</p>
-            ) : (
-              <ul className="divide-border divide-y">
-                {recentActivity.map((e) => {
-                  const link = recordLink(e.table_name, e.record_id);
-                  const description = describeOperation(e.table_name, e.operation);
-                  return (
-                    <li key={e.id} className="flex items-start justify-between gap-3 py-2">
-                      <div className="min-w-0">
-                        <p className="text-foreground text-sm">
-                          Someone {description}{" "}
-                          {link ? (
-                            <Link href={link} className="text-primary font-medium hover:underline">
-                              read more
-                            </Link>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">({e.table_name})</span>
-                          )}
-                        </p>
-                        {e.changed_fields && e.changed_fields.length > 0 && (
-                          <p className="text-muted-foreground mt-0.5 text-xs">
-                            Fields: {e.changed_fields.join(", ")}
-                          </p>
-                        )}
-                      </div>
-                      <span className="text-muted-foreground shrink-0 text-xs">
-                        {formatRelative(e.occurred_at)}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-        </div>
+        {/* Recent activity moved to /admin/audit-log; not on the dashboard. */}
       </div>
     </div>
   );
@@ -890,6 +808,137 @@ function CapacityRowItem({ row }: { row: CapacityRowWithDept }) {
       <span className="text-right text-sm font-semibold tabular-nums" style={{ color: band.fg }}>
         {pct.toFixed(0)}%
       </span>
+    </div>
+  );
+}
+
+/**
+ * Aggregate capacity for the visible scope (current department, or org-wide
+ * for org admins). Shows total available, total assigned, and free hours
+ * with a horizontal stacked bar so a manager can see at a glance how much
+ * room remains to take on more work.
+ */
+function CapacityChartCard({
+  totalAvailableHours,
+  totalAssignedHours,
+  freeHours,
+  overflowHours,
+  utilizationPct,
+  instructorCount,
+}: {
+  totalAvailableHours: number;
+  totalAssignedHours: number;
+  freeHours: number;
+  overflowHours: number;
+  utilizationPct: number;
+  instructorCount: number;
+}) {
+  // Bar width: assigned portion (up to 100%) + an overflow bar tacked on
+  // beyond that for over-allocation. Capped at 130% so the rendering
+  // doesn't run off the card.
+  const assignedClamped = Math.min(utilizationPct, 100);
+  const overflowPct = utilizationPct > 100 ? Math.min(utilizationPct - 100, 30) : 0;
+
+  const headlineColor =
+    utilizationPct >= 95
+      ? "var(--destructive)"
+      : utilizationPct >= 80
+        ? "var(--highlight)"
+        : "var(--foreground)";
+
+  return (
+    <section className="border-border bg-background rounded-xl border p-5">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h3 className="text-foreground text-base font-bold tracking-tight">
+            Department capacity
+          </h3>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Annual hours across {instructorCount.toString()} active instructor
+            {instructorCount === 1 ? "" : "s"}.
+          </p>
+        </div>
+        <p
+          className="text-2xl font-bold tabular-nums tracking-tight"
+          style={{ color: headlineColor }}
+        >
+          {utilizationPct.toFixed(0)}% utilized
+        </p>
+      </div>
+
+      {/* Stacked bar — assigned (primary) + overflow (destructive) on the
+          background canvas of total available capacity. */}
+      <div
+        className="relative h-3 overflow-hidden rounded-full"
+        style={{ backgroundColor: "color-mix(in oklab, var(--border) 70%, transparent)" }}
+        aria-hidden="true"
+      >
+        <div
+          className="absolute inset-y-0 left-0 h-full rounded-l-full"
+          style={{
+            width: `${String(assignedClamped)}%`,
+            backgroundColor: "var(--primary)",
+          }}
+        />
+        {overflowPct > 0 && (
+          <div
+            className="absolute inset-y-0 h-full"
+            style={{
+              left: "100%",
+              width: `${String(overflowPct)}%`,
+              backgroundColor: "var(--destructive)",
+              transform: "translateX(-1px)",
+            }}
+          />
+        )}
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <CapacityStat
+          label="Total available"
+          value={totalAvailableHours}
+          dotColor="color-mix(in oklab, var(--border) 70%, transparent)"
+        />
+        <CapacityStat label="Assigned" value={totalAssignedHours} dotColor="var(--primary)" />
+        <CapacityStat
+          label={overflowHours > 0 ? "Over-assigned" : "Free to assign"}
+          value={overflowHours > 0 ? overflowHours : freeHours}
+          dotColor={overflowHours > 0 ? "var(--destructive)" : "var(--accent)"}
+          highlight={overflowHours > 0}
+        />
+      </div>
+    </section>
+  );
+}
+
+function CapacityStat({
+  label,
+  value,
+  dotColor,
+  highlight,
+}: {
+  label: string;
+  value: number;
+  dotColor: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ backgroundColor: dotColor }}
+        />
+        <p className="text-muted-foreground text-xs font-medium">{label}</p>
+      </div>
+      <p
+        className="mt-1 text-xl font-bold tabular-nums"
+        style={{ color: highlight ? "var(--destructive)" : "var(--foreground)" }}
+      >
+        {Math.round(value).toLocaleString()}
+        <span className="text-muted-foreground ml-1 text-xs font-normal">h</span>
+      </p>
     </div>
   );
 }
