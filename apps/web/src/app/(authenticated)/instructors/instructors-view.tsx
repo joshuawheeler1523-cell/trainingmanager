@@ -132,27 +132,45 @@ function RosterTab({
   sourceBreakdownByInstructor: Map<string, SourceBreakdown>;
   showDeleted: boolean;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const sp = useSearchParams();
   const utilizationFilter = sp.get("utilization");
-  const view: View = sp.get("view") === "rows" ? "rows" : "cards";
-  const sortKey: SortKey = (sp.get("sort") as SortKey | null) ?? "name";
-  const sortDir: SortDir = sp.get("dir") === "desc" ? "desc" : "asc";
+
+  // View / sort are pure presentation — toggling them shouldn't trigger
+  // a server round-trip, so keep them in local state. We seed from the
+  // URL on first render and persist back via history.replaceState so the
+  // URL stays shareable without re-running the page server component.
+  const [view, setViewState] = useState<View>(() => (sp.get("view") === "rows" ? "rows" : "cards"));
+  const [sortKey, setSortKeyState] = useState<SortKey>(
+    () => (sp.get("sort") as SortKey | null) ?? "name",
+  );
+  const [sortDir, setSortDirState] = useState<SortDir>(() =>
+    sp.get("dir") === "desc" ? "desc" : "asc",
+  );
+
+  function syncUrl(updates: { view?: View; sort?: SortKey; dir?: SortDir }) {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (updates.view !== undefined) {
+      if (updates.view === "cards") params.delete("view");
+      else params.set("view", updates.view);
+    }
+    if (updates.sort !== undefined) params.set("sort", updates.sort);
+    if (updates.dir !== undefined) params.set("dir", updates.dir);
+    const qs = params.toString();
+    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", url);
+  }
 
   function setView(next: View) {
-    const params = new URLSearchParams(sp.toString());
-    if (next === "cards") params.delete("view");
-    else params.set("view", next);
-    router.push(`${pathname}?${params.toString()}`);
+    setViewState(next);
+    syncUrl({ view: next });
   }
 
   function setSort(key: SortKey) {
-    const params = new URLSearchParams(sp.toString());
     const nextDir: SortDir = sortKey === key && sortDir === "asc" ? "desc" : "asc";
-    params.set("sort", key);
-    params.set("dir", nextDir);
-    router.push(`${pathname}?${params.toString()}`);
+    setSortKeyState(key);
+    setSortDirState(nextDir);
+    syncUrl({ sort: key, dir: nextDir });
   }
 
   const filtered = useMemo(() => {
