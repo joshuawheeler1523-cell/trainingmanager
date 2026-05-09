@@ -15,10 +15,10 @@ type Props = {
 
 const STATUS_BADGE: Record<TraStatus, string> = {
   draft: "bg-surface text-muted-foreground",
-  submitted: "bg-primary/10 text-primary",
-  approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  documented: "bg-primary/10 text-primary",
   converted: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-  rejected: "bg-destructive/10 text-destructive",
+  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  cancelled: "bg-destructive/10 text-destructive",
 };
 
 const PRIORITY_BADGE: Record<TraPriority, string> = {
@@ -37,9 +37,12 @@ export default function TrasView({ tras, departments }: Props) {
   const [statusFilter, setStatusFilter] = useState<TraStatus | "all">("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState<TraPriority | "all">("all");
+  const [showArchived, setShowArchived] = useState(false);
 
   const filtered = useMemo(() => {
     return tras.filter((t) => {
+      const archived = t.archived_at != null;
+      if (showArchived !== archived) return false;
       if (statusFilter !== "all" && t.status !== statusFilter) return false;
       if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
       if (departmentFilter !== "all") {
@@ -49,7 +52,9 @@ export default function TrasView({ tras, departments }: Props) {
       }
       return true;
     });
-  }, [tras, statusFilter, priorityFilter, departmentFilter]);
+  }, [tras, statusFilter, priorityFilter, departmentFilter, showArchived]);
+
+  const archivedCount = useMemo(() => tras.filter((t) => t.archived_at != null).length, [tras]);
 
   const inputCls =
     "border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-xs";
@@ -113,6 +118,17 @@ export default function TrasView({ tras, departments }: Props) {
               ))}
             </select>
           </div>
+          <label className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-xs">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => {
+                setShowArchived(e.target.checked);
+              }}
+              className="border-input rounded"
+            />
+            Show archived ({archivedCount})
+          </label>
         </div>
 
         <TraFormDialog

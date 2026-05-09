@@ -110,10 +110,13 @@ export async function updateTra(id: string, input: unknown): Promise<ActionResul
 }
 
 // ── status transitions ─────────────────────────────────────────────────────
+// No approval workflow. The lifecycle is:
+//   draft → documented → (converted | completed | cancelled)
+// Plus a separate archived_at flag for soft-hide independent of status.
 
 async function setTraStatus(
   traId: string,
-  next: "submitted" | "approved" | "rejected",
+  next: "documented" | "completed" | "cancelled" | "draft",
   allowedFrom: string[],
 ): Promise<ActionResult<Tra>> {
   const c = await ctx();
@@ -139,7 +142,9 @@ async function setTraStatus(
   }
 
   const update: TablesUpdate<"tras"> = { status: next };
-  if (next === "submitted") {
+  // submitted_at lives on for backwards-compat as the documented_at
+  // stamp — set the first time we move out of draft, never overwritten.
+  if (next === "documented" && cur.submitted_at == null) {
     update.submitted_at = new Date().toISOString();
   }
 
@@ -157,16 +162,55 @@ async function setTraStatus(
   return { ok: true, data: data as Tra };
 }
 
-export async function submitTra(traId: string): Promise<ActionResult<Tra>> {
-  return setTraStatus(traId, "submitted", ["draft"]);
+export async function markTraDocumented(traId: string): Promise<ActionResult<Tra>> {
+  return setTraStatus(traId, "documented", ["draft"]);
 }
 
-export async function approveTra(traId: string): Promise<ActionResult<Tra>> {
-  return setTraStatus(traId, "approved", ["submitted"]);
+export async function markTraComplete(traId: string): Promise<ActionResult<Tra>> {
+  return setTraStatus(traId, "completed", ["documented", "converted"]);
 }
 
-export async function rejectTra(traId: string): Promise<ActionResult<Tra>> {
-  return setTraStatus(traId, "rejected", ["submitted", "draft"]);
+export async function cancelTra(traId: string): Promise<ActionResult<Tra>> {
+  // From any active state — the user is bailing on this request.
+  return setTraStatus(traId, "cancelled", ["draft", "documented", "converted"]);
+}
+
+export async function reopenTra(traId: string): Promise<ActionResult<Tra>> {
+  // Send a cancelled or completed TRA back to documented so the user can
+  // act on it again. Converted TRAs stay tied to their project.
+  return setTraStatus(traId, "documented", ["cancelled", "completed"]);
+}
+
+export async function archiveTra(traId: string): Promise<ActionResult<Tra>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+  const { data, error } = await c.supabase
+    .from("tras")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", traId)
+    .eq("org_id", c.orgId)
+    .select()
+    .single();
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidatePath("/tras");
+  revalidatePath(`/tras/${traId}`);
+  return { ok: true, data: data as Tra };
+}
+
+export async function unarchiveTra(traId: string): Promise<ActionResult<Tra>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+  const { data, error } = await c.supabase
+    .from("tras")
+    .update({ archived_at: null })
+    .eq("id", traId)
+    .eq("org_id", c.orgId)
+    .select()
+    .single();
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidatePath("/tras");
+  revalidatePath(`/tras/${traId}`);
+  return { ok: true, data: data as Tra };
 }
 
 // ── deliverables ────────────────────────────────────────────────────────────
@@ -499,12 +543,12 @@ export async function convertTraToProject(
       data: { project_id: tra.converted_to_project_id, task_count: 0 },
     };
   }
-  if (tra.status !== "approved") {
+  if (tra.status !== "documented") {
     return {
       ok: false,
       error: {
         code: "INVALID_TRANSITION",
-        message: "Only approved TRAs can be converted to projects.",
+        message: "Only documented TRAs can be converted to projects.",
       },
     };
   }

@@ -4,12 +4,14 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  ArchiveBoxIcon,
   ArrowDownTrayIcon,
-  CheckBadgeIcon,
+  ArrowUturnLeftIcon,
+  CheckCircleIcon,
+  DocumentCheckIcon,
   ExclamationTriangleIcon,
-  PaperAirplaneIcon,
   RocketLaunchIcon,
-  XMarkIcon,
+  XCircleIcon,
 } from "@heroicons/react/20/solid";
 import {
   listSubmitGaps,
@@ -26,9 +28,13 @@ type Props = {
   deliverables: TraDeliverable[];
   deliverableTypes: DeliverableType[];
   pending: boolean;
-  onSubmit: () => void;
-  onApprove: () => void;
-  onReject: () => void;
+  isArchived: boolean;
+  onDocument: () => void;
+  onComplete: () => void;
+  onCancel: () => void;
+  onReopen: () => void;
+  onArchive: () => void;
+  onUnarchive: () => void;
   onConvert: () => void;
   goToStep: (step: number) => void;
 };
@@ -39,9 +45,13 @@ export default function Step9Review({
   deliverables,
   deliverableTypes,
   pending,
-  onSubmit,
-  onApprove,
-  onReject,
+  isArchived,
+  onDocument,
+  onComplete,
+  onCancel,
+  onReopen,
+  onArchive,
+  onUnarchive,
   onConvert,
   goToStep,
 }: Props) {
@@ -91,22 +101,34 @@ export default function Step9Review({
     });
   }
 
-  const canSubmit = tra.status === "draft";
-  const canApproveOrReject = tra.status === "submitted";
-  const canConvert = tra.status === "approved";
-  const isLocked = tra.status === "converted";
+  // What's available depends on current status.
+  const showDocument = tra.status === "draft";
+  const showConvert = tra.status === "documented";
+  const showComplete = tra.status === "documented" || tra.status === "converted";
+  const showCancel =
+    tra.status === "draft" || tra.status === "documented" || tra.status === "converted";
+  const showReopen = tra.status === "completed" || tra.status === "cancelled";
+
+  const statusBlurb = (() => {
+    switch (tra.status) {
+      case "draft":
+        return "Still editing. Mark as documented when the request is captured.";
+      case "documented":
+        return "Captured and ready. Convert to a project to start work, or mark complete if no project is needed.";
+      case "converted":
+        return "Tied to a project. Mark complete when the training has been delivered.";
+      case "completed":
+        return "Training delivered. Reopen if the request needs another round.";
+      case "cancelled":
+        return "Not being pursued. Reopen if you want to act on it again.";
+    }
+  })();
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       {/* Status / actions */}
       <div className="border-border bg-background flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3">
-        <p className="text-muted-foreground text-xs">
-          {isLocked
-            ? "This TRA has been converted to a project."
-            : tra.status === "rejected"
-              ? "This TRA was rejected. Edit the form and resubmit if you want another review."
-              : "Review the summary, fix any gaps, then submit / approve / convert."}
-        </p>
+        <p className="text-muted-foreground text-xs">{statusBlurb}</p>
         <div className="flex flex-wrap items-center gap-2">
           <a
             href={`/api/tras/${tra.id}/pdf`}
@@ -118,65 +140,104 @@ export default function Step9Review({
             Export PDF
           </a>
 
-          {canSubmit && (
+          {showDocument && (
             <button
               type="button"
               disabled={pending}
-              onClick={onSubmit}
+              onClick={onDocument}
               className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
             >
-              <PaperAirplaneIcon className="h-4 w-4" />
-              {gaps.length > 0 ? "Submit anyway" : "Submit for approval"}
+              <DocumentCheckIcon className="h-4 w-4" />
+              Mark as documented
             </button>
           )}
 
-          {canApproveOrReject && (
-            <>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={onReject}
-                className="border-border text-destructive hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-              >
-                <XMarkIcon className="h-4 w-4" />
-                Reject
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={onApprove}
-                className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-              >
-                <CheckBadgeIcon className="h-4 w-4" />
-                Approve
-              </button>
-            </>
+          {showConvert && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={onConvert}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+            >
+              <RocketLaunchIcon className="h-4 w-4" />
+              Convert to project
+            </button>
           )}
 
-          <button
-            type="button"
-            disabled={!canConvert || pending}
-            onClick={onConvert}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-          >
-            <RocketLaunchIcon className="h-4 w-4" />
-            Convert to project
-          </button>
+          {showComplete && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={onComplete}
+              className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+            >
+              <CheckCircleIcon className="h-4 w-4" />
+              Mark complete
+            </button>
+          )}
+
+          {showCancel && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={onCancel}
+              className="border-border text-destructive hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+            >
+              <XCircleIcon className="h-4 w-4" />
+              Cancel
+            </button>
+          )}
+
+          {showReopen && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={onReopen}
+              className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+            >
+              <ArrowUturnLeftIcon className="h-4 w-4" />
+              Reopen
+            </button>
+          )}
+
+          {isArchived ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={onUnarchive}
+              className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+            >
+              <ArrowUturnLeftIcon className="h-4 w-4" />
+              Unarchive
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={onArchive}
+              className="border-border text-muted-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+            >
+              <ArchiveBoxIcon className="h-4 w-4" />
+              Archive
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Gap banner — non-blocking, listed by section */}
-      {canSubmit && gaps.length > 0 && (
+      {/* Gap banner — non-blocking, listed by section. Only shown while
+          drafting; once a TRA is documented the gaps stop being noisy. */}
+      {tra.status === "draft" && gaps.length > 0 && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
           <div className="flex items-start gap-2">
             <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
             <div className="min-w-0">
               <p className="text-foreground text-sm font-medium">
-                {gaps.length} field{gaps.length === 1 ? "" : "s"} typically required before
-                submitting
+                {gaps.length} field{gaps.length === 1 ? "" : "s"} typically expected before marking
+                documented
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
-                You can still submit — the reviewer will see what&apos;s missing.
+                You can mark it documented anyway — the gaps just sit visible to anyone reading
+                later.
               </p>
               <ul className="mt-2 space-y-0.5">
                 {gaps.map((g) => (
@@ -263,14 +324,14 @@ export default function Step9Review({
           onChange={(e) => {
             setAdjustments(e.target.value);
           }}
-          disabled={isLocked || adjustmentsPending}
+          disabled={adjustmentsPending}
           placeholder="e.g. Includes 20% buffer for stakeholder reviews. Excludes localization."
           className="border-input bg-background text-foreground focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 disabled:opacity-50"
         />
         <div className="mt-3 flex justify-end">
           <button
             type="button"
-            disabled={isLocked || adjustmentsPending || !dirty}
+            disabled={adjustmentsPending || !dirty}
             onClick={handleApply}
             className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
           >

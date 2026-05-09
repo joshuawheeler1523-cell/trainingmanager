@@ -582,7 +582,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           project_name: "Cerner-to-Epic Migration Education",
           requesting_department: "Clinical Informatics",
           priority: "important",
-          status: "submitted",
+          status: "documented",
           business_problem:
             "12-week curriculum for inpatient nursing, ED, and surgical staff to migrate from Cerner to Epic.",
           total_estimated_hours: 0,
@@ -593,7 +593,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           project_name: "Pediatric Pain Assessment Refresh",
           requesting_department: "Pediatrics",
           priority: "important",
-          status: "approved",
+          status: "documented",
           business_problem: "Quarterly refresher covering FLACC and CRIES tools.",
           total_estimated_hours: 0,
         },

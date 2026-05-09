@@ -3882,6 +3882,7 @@ export type Database = {
           accessibility_needs: string | null;
           adjustments_notes: string | null;
           ai_assistant_used: boolean;
+          archived_at: string | null;
           assessment_approaches: string[];
           audience_languages: string[];
           audience_locations: string[];
@@ -3934,6 +3935,7 @@ export type Database = {
           accessibility_needs?: string | null;
           adjustments_notes?: string | null;
           ai_assistant_used?: boolean;
+          archived_at?: string | null;
           assessment_approaches?: string[];
           audience_languages?: string[];
           audience_locations?: string[];
@@ -3986,6 +3988,7 @@ export type Database = {
           accessibility_needs?: string | null;
           adjustments_notes?: string | null;
           ai_assistant_used?: boolean;
+          archived_at?: string | null;
           assessment_approaches?: string[];
           audience_languages?: string[];
           audience_locations?: string[];

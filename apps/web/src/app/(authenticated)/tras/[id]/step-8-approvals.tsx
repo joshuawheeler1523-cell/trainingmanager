@@ -88,7 +88,8 @@ export default function Step8Approvals({ traId, approvals, disabled }: Props) {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <p className="text-muted-foreground text-sm">
-        Sign-offs land here. Leave dates blank if approval is pending.
+        Document who endorsed this — names and dates. Approvals don&apos;t gate any action;
+        they&apos;re recorded here so the audit trail is in one place.
       </p>
 
       <div className="space-y-2">

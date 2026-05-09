@@ -20,7 +20,15 @@ import Step7Sustainment from "./step-7-sustainment";
 import Step8Approvals from "./step-8-approvals";
 import Step9Review from "./step-9-review";
 import AiAssistantPanel from "./ai-assistant-panel";
-import { submitTra, approveTra, rejectTra, convertTraToProject } from "../actions";
+import {
+  archiveTra,
+  cancelTra,
+  convertTraToProject,
+  markTraComplete,
+  markTraDocumented,
+  reopenTra,
+  unarchiveTra,
+} from "../actions";
 import type {
   DeliverableType,
   Tra,
@@ -52,10 +60,10 @@ const STEPS: { id: Step; label: string }[] = [
 
 const STATUS_BADGE: Record<TraStatus, string> = {
   draft: "bg-surface text-muted-foreground",
-  submitted: "bg-primary/10 text-primary",
-  approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  documented: "bg-primary/10 text-primary",
   converted: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-  rejected: "bg-destructive/10 text-destructive",
+  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  cancelled: "bg-destructive/10 text-destructive",
 };
 
 type Props = {
@@ -92,13 +100,21 @@ export default function TraWizard({
   const [aiOpen, setAiOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const isLocked = tra.status === "converted" || tra.status === "approved";
+  // Locked = no further editing. Converted ties to a project; completed
+  // and cancelled are terminal end-states. Reopen sends them back to
+  // documented if the user changes their mind.
+  const isLocked =
+    tra.status === "converted" || tra.status === "completed" || tra.status === "cancelled";
+  const isArchived = tra.archived_at != null;
 
-  function handleSubmit() {
+  function runAction(
+    label: string,
+    fn: () => Promise<{ ok: true; data: Tra } | { ok: false; error: { message: string } }>,
+  ) {
     startTransition(async () => {
-      const r = await submitTra(tra.id);
+      const r = await fn();
       if (r.ok) {
-        toast.success("Submitted for approval");
+        toast.success(label);
         router.refresh();
       } else {
         toast.error(r.error.message);
@@ -106,28 +122,23 @@ export default function TraWizard({
     });
   }
 
-  function handleApprove() {
-    startTransition(async () => {
-      const r = await approveTra(tra.id);
-      if (r.ok) {
-        toast.success("TRA approved");
-        router.refresh();
-      } else {
-        toast.error(r.error.message);
-      }
-    });
+  function handleDocument() {
+    runAction("Marked as documented", () => markTraDocumented(tra.id));
   }
-
-  function handleReject() {
-    startTransition(async () => {
-      const r = await rejectTra(tra.id);
-      if (r.ok) {
-        toast.success("TRA rejected");
-        router.refresh();
-      } else {
-        toast.error(r.error.message);
-      }
-    });
+  function handleComplete() {
+    runAction("Marked complete", () => markTraComplete(tra.id));
+  }
+  function handleCancel() {
+    runAction("Cancelled", () => cancelTra(tra.id));
+  }
+  function handleReopen() {
+    runAction("Reopened", () => reopenTra(tra.id));
+  }
+  function handleArchive() {
+    runAction("Archived", () => archiveTra(tra.id));
+  }
+  function handleUnarchive() {
+    runAction("Restored", () => unarchiveTra(tra.id));
   }
 
   function handleConvert() {
@@ -237,9 +248,13 @@ export default function TraWizard({
             deliverables={deliverables}
             deliverableTypes={deliverableTypes}
             pending={pending}
-            onSubmit={handleSubmit}
-            onApprove={handleApprove}
-            onReject={handleReject}
+            isArchived={isArchived}
+            onDocument={handleDocument}
+            onComplete={handleComplete}
+            onCancel={handleCancel}
+            onReopen={handleReopen}
+            onArchive={handleArchive}
+            onUnarchive={handleUnarchive}
             onConvert={handleConvert}
             goToStep={(n) => {
               setStep(n as Step);

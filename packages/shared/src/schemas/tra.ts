@@ -15,10 +15,10 @@ const csvOptionalEmail = z
 
 export const TRA_STATUS_VALUES = [
   "draft",
-  "submitted",
-  "approved",
+  "documented",
   "converted",
-  "rejected",
+  "completed",
+  "cancelled",
 ] as const;
 export type TraStatus = (typeof TRA_STATUS_VALUES)[number];
 
@@ -283,6 +283,7 @@ export type Tra = {
   adjustments_notes: string | null;
   converted_to_project_id: string | null;
   ai_assistant_used: boolean;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;

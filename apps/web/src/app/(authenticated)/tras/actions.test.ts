@@ -18,7 +18,8 @@ vi.mock("@/lib/auth/current-department", () => ({
   getCurrentDepartmentId: mockGetCurrentDepartmentId,
 }));
 
-const { createTra, addDeliverable, submitTra, approveTra } = await import("./actions");
+const { createTra, addDeliverable, markTraDocumented, markTraComplete, cancelTra } =
+  await import("./actions");
 const { computeDeliverableEstimatedHours, traPriorityToProjectPriority } =
   await import("@arbor/shared");
 
@@ -151,9 +152,9 @@ describe("addDeliverable", () => {
   });
 });
 
-describe("submitTra / approveTra (status transitions)", () => {
+describe("status transitions", () => {
   function makeReadAndUpdateChain(opts: {
-    cur: { id: string; status: string } | null;
+    cur: { id: string; status: string; submitted_at: string | null } | null;
     next: { id: string; status: string };
   }) {
     let call = 0;
@@ -177,38 +178,49 @@ describe("submitTra / approveTra (status transitions)", () => {
     };
   }
 
-  it("rejects submitTra when current status is 'submitted'", async () => {
+  it("rejects markTraDocumented when current status is already 'documented'", async () => {
     mockFrom.mockImplementation(
       makeReadAndUpdateChain({
-        cur: { id: TRA_ID, status: "submitted" },
-        next: { id: TRA_ID, status: "submitted" },
+        cur: { id: TRA_ID, status: "documented", submitted_at: null },
+        next: { id: TRA_ID, status: "documented" },
       }),
     );
-    const result = await submitTra(TRA_ID);
+    const result = await markTraDocumented(TRA_ID);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_TRANSITION");
   });
 
-  it("approveTra rejects when status is not 'submitted'", async () => {
+  it("markTraComplete rejects when current status is 'draft'", async () => {
     mockFrom.mockImplementation(
       makeReadAndUpdateChain({
-        cur: { id: TRA_ID, status: "draft" },
-        next: { id: TRA_ID, status: "approved" },
+        cur: { id: TRA_ID, status: "draft", submitted_at: null },
+        next: { id: TRA_ID, status: "completed" },
       }),
     );
-    const result = await approveTra(TRA_ID);
+    const result = await markTraComplete(TRA_ID);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_TRANSITION");
   });
 
-  it("submitTra succeeds from draft", async () => {
+  it("markTraDocumented succeeds from draft", async () => {
     mockFrom.mockImplementation(
       makeReadAndUpdateChain({
-        cur: { id: TRA_ID, status: "draft" },
-        next: { id: TRA_ID, status: "submitted" },
+        cur: { id: TRA_ID, status: "draft", submitted_at: null },
+        next: { id: TRA_ID, status: "documented" },
       }),
     );
-    const result = await submitTra(TRA_ID);
+    const result = await markTraDocumented(TRA_ID);
+    expect(result.ok).toBe(true);
+  });
+
+  it("cancelTra succeeds from documented", async () => {
+    mockFrom.mockImplementation(
+      makeReadAndUpdateChain({
+        cur: { id: TRA_ID, status: "documented", submitted_at: null },
+        next: { id: TRA_ID, status: "cancelled" },
+      }),
+    );
+    const result = await cancelTra(TRA_ID);
     expect(result.ok).toBe(true);
   });
 
@@ -216,10 +228,10 @@ describe("submitTra / approveTra (status transitions)", () => {
     mockFrom.mockImplementation(
       makeReadAndUpdateChain({
         cur: null,
-        next: { id: TRA_ID, status: "submitted" },
+        next: { id: TRA_ID, status: "documented" },
       }),
     );
-    const result = await submitTra(TRA_ID);
+    const result = await markTraDocumented(TRA_ID);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("NOT_FOUND");
   });
