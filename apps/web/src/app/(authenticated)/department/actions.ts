@@ -34,7 +34,7 @@ export async function switchDepartment(formData: FormData) {
     .maybeSingle();
   if (!dept) redirect("/");
 
-  // Caller must be a member OR an org admin.
+  // Caller must be a department member OR a manager.
   const { data: orgMembership } = await supabase
     .from("org_memberships")
     .select("role")
@@ -42,9 +42,9 @@ export async function switchDepartment(formData: FormData) {
     .eq("org_id", orgId)
     .not("accepted_at", "is", null)
     .maybeSingle();
-  const isOrgAdmin = orgMembership?.role === "org_admin";
+  const isManager = orgMembership?.role === "manager";
 
-  if (!isOrgAdmin) {
+  if (!isManager) {
     const { data: deptMembership } = await supabase
       .from("department_memberships")
       .select("id")

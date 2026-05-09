@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import { isOrgAdmin } from "@/lib/auth/org-admin";
+import { isManager } from "@/lib/auth/role";
 import OrgSwitcherClient from "./org-switcher-client";
 
 export default async function OrgSwitcher() {
@@ -14,7 +14,7 @@ export default async function OrgSwitcher() {
       .select("org_id")
       .not("accepted_at", "is", null)
       .then((r) => r.data),
-    isOrgAdmin(currentOrgId),
+    isManager(currentOrgId),
   ]);
 
   if (!memberships?.length) return null;

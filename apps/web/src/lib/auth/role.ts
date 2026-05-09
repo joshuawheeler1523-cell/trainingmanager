@@ -30,6 +30,30 @@ export const getCurrentRole = cache(async (orgId: string): Promise<Role | null> 
   return isRole(data) ? data : null;
 });
 
+/** Returns true when the current user holds manager role in the given org. */
+export const isManager = cache(async (orgId: string): Promise<boolean> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("is_manager", { p_org_id: orgId });
+  if (error || !data) return false;
+  return true;
+});
+
+/** Returns true when the current user holds instructor role in the given org. */
+export const isInstructor = cache(async (orgId: string): Promise<boolean> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("is_instructor", { p_org_id: orgId });
+  if (error || !data) return false;
+  return true;
+});
+
+/** Returns true when the current user holds viewer role in the given org. */
+export const isViewer = cache(async (orgId: string): Promise<boolean> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("is_viewer", { p_org_id: orgId });
+  if (error || !data) return false;
+  return true;
+});
+
 /**
  * Asserts the caller's role in `orgId` is one of `roles`. Returns the resolved role.
  * Throws RoleForbiddenError otherwise. Server actions wrap this in their ctx() helper.

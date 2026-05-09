@@ -12,7 +12,7 @@ import {
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import { isOrgAdmin } from "@/lib/auth/org-admin";
+import { isManager } from "@/lib/auth/role";
 import type { CapacityRow, Instructor } from "@arbor/shared";
 
 export default async function DashboardPage() {
@@ -27,7 +27,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const orgAdmin = await isOrgAdmin(orgId);
+  const orgAdmin = await isManager(orgId);
   const todayIso = new Date().toISOString().slice(0, 10);
 
   // Single query each for tras/projects — returning rows with id +

@@ -1,7 +1,7 @@
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import { isOrgAdmin } from "@/lib/auth/org-admin";
+import { isManager } from "@/lib/auth/role";
 import TicketsView, { type TicketRow } from "./tickets-view";
 
 export default async function TicketsPage() {
@@ -19,7 +19,7 @@ export default async function TicketsPage() {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const admin = await isOrgAdmin(orgId);
+  const admin = await isManager(orgId);
 
   // Admins see every ticket in their org; users see their own. The RLS
   // policy enforces this server-side; we just decide which copy to show.

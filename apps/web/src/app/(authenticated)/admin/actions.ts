@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import { isOrgAdmin } from "@/lib/auth/org-admin";
+import { isManager } from "@/lib/auth/role";
 import { inviteEmailHtml, inviteEmailText, sendEmail } from "@/lib/email";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 
@@ -33,8 +33,8 @@ async function ctx() {
   if (!orgId) {
     return { ok: false as const, error: { code: "NO_ORG", message: "No active organization" } };
   }
-  if (!(await isOrgAdmin(orgId))) {
-    return { ok: false as const, error: { code: "FORBIDDEN", message: "Org admin only" } };
+  if (!(await isManager(orgId))) {
+    return { ok: false as const, error: { code: "FORBIDDEN", message: "Manager only" } };
   }
   return { ok: true as const, supabase, orgId };
 }
@@ -58,7 +58,7 @@ async function appOrigin(): Promise<string> {
 
 const inviteSchema = z.object({
   email: z.string().email("Must be a valid email"),
-  role: z.enum(["member", "org_admin"]).default("member"),
+  role: z.enum(["manager", "instructor", "viewer"]).default("instructor"),
   visibility: z.enum(["full", "limited"]).default("full"),
 });
 
@@ -177,7 +177,7 @@ export async function revokeInvitation(
 // ── team management ────────────────────────────────────────────────────────
 
 const memberPatchSchema = z.object({
-  role: z.enum(["member", "org_admin"]).optional(),
+  role: z.enum(["manager", "instructor", "viewer"]).optional(),
   visibility: z.enum(["full", "limited"]).optional(),
   display_name: z
     .string()
@@ -196,13 +196,13 @@ export async function updateMember(
   const c = await ctx();
   if (!c.ok) return c;
 
-  // Last-admin guard: if demoting an admin, ensure another admin exists.
-  if (parsed.data.role === "member") {
-    const { count: adminCount } = await c.supabase
+  // Last-manager guard: if demoting a manager, ensure another manager exists.
+  if (parsed.data.role && parsed.data.role !== "manager") {
+    const { count: managerCount } = await c.supabase
       .from("org_memberships")
       .select("*", { count: "exact", head: true })
       .eq("org_id", c.orgId)
-      .eq("role", "org_admin")
+      .eq("role", "manager")
       .not("accepted_at", "is", null);
     const { data: target } = await c.supabase
       .from("org_memberships")
@@ -210,10 +210,10 @@ export async function updateMember(
       .eq("id", membershipId)
       .eq("org_id", c.orgId)
       .maybeSingle();
-    if (target?.role === "org_admin" && (adminCount ?? 0) <= 1) {
+    if (target?.role === "manager" && (managerCount ?? 0) <= 1) {
       return {
         ok: false,
-        error: { code: "LAST_ADMIN", message: "Cannot demote the last admin" },
+        error: { code: "LAST_MANAGER", message: "Cannot demote the last manager" },
       };
     }
   }
@@ -242,24 +242,24 @@ export async function removeMember(membershipId: string): Promise<ActionResult<{
   const c = await ctx();
   if (!c.ok) return c;
 
-  // Block removing the last admin.
+  // Block removing the last manager.
   const { data: target } = await c.supabase
     .from("org_memberships")
     .select("role, user_id")
     .eq("id", membershipId)
     .eq("org_id", c.orgId)
     .maybeSingle();
-  if (target?.role === "org_admin") {
-    const { count: adminCount } = await c.supabase
+  if (target?.role === "manager") {
+    const { count: managerCount } = await c.supabase
       .from("org_memberships")
       .select("*", { count: "exact", head: true })
       .eq("org_id", c.orgId)
-      .eq("role", "org_admin")
+      .eq("role", "manager")
       .not("accepted_at", "is", null);
-    if ((adminCount ?? 0) <= 1) {
+    if ((managerCount ?? 0) <= 1) {
       return {
         ok: false,
-        error: { code: "LAST_ADMIN", message: "Cannot remove the last admin" },
+        error: { code: "LAST_MANAGER", message: "Cannot remove the last manager" },
       };
     }
   }

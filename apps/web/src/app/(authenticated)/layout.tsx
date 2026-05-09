@@ -5,7 +5,7 @@ import OrgSwitcher from "@/components/OrgSwitcher";
 import DepartmentSwitcher from "@/components/DepartmentSwitcher";
 import AppShell from "@/components/layout/app-shell";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import { isOrgAdmin } from "@/lib/auth/org-admin";
+import { isManager } from "@/lib/auth/role";
 
 export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -29,7 +29,7 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
       .eq("recipient_id", user.id)
       .order("created_at", { ascending: false })
       .limit(10),
-    orgId ? isOrgAdmin(orgId) : Promise.resolve(false),
+    orgId ? isManager(orgId) : Promise.resolve(false),
   ]);
 
   return (

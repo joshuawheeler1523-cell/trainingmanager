@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeftIcon } from "@heroicons/react/20/solid";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import { isOrgAdmin } from "@/lib/auth/org-admin";
+import { isManager } from "@/lib/auth/role";
 import TicketThread from "./ticket-thread";
 
 type Params = Promise<{ id: string }>;
@@ -16,7 +16,7 @@ export default async function TicketDetailPage({ params }: { params: Params }) {
   const [{ data: ticket }, { data: messages }, admin] = await Promise.all([
     supabase.from("support_tickets").select("*").eq("id", id).maybeSingle(),
     supabase.from("support_ticket_messages").select("*").eq("ticket_id", id).order("created_at"),
-    isOrgAdmin(orgId),
+    isManager(orgId),
   ]);
 
   if (!ticket) notFound();

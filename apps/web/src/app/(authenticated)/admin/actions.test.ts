@@ -25,12 +25,12 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 const mockGetCurrentOrgId = vi.fn();
-const mockIsOrgAdmin = vi.fn();
+const mockIsManager = vi.fn();
 vi.mock("@/lib/auth/current-org", () => ({
   getCurrentOrgId: mockGetCurrentOrgId,
 }));
-vi.mock("@/lib/auth/org-admin", () => ({
-  isOrgAdmin: mockIsOrgAdmin,
+vi.mock("@/lib/auth/role", () => ({
+  isManager: mockIsManager,
 }));
 
 // Mock just sendEmail so the action doesn't try to hit the network.
@@ -68,7 +68,7 @@ function makeInsertChain(result: { data?: unknown; error?: unknown }) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetCurrentOrgId.mockResolvedValue(ORG_ID);
-  mockIsOrgAdmin.mockResolvedValue(true);
+  mockIsManager.mockResolvedValue(true);
   mockGetUser.mockResolvedValue({
     data: { user: { email: "admin@example.com", user_metadata: {} } },
   });
@@ -86,8 +86,8 @@ describe("inviteUser", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("returns FORBIDDEN when caller isn't org admin", async () => {
-    mockIsOrgAdmin.mockResolvedValue(false);
+  it("returns FORBIDDEN when caller isn't manager", async () => {
+    mockIsManager.mockResolvedValue(false);
     const result = await inviteUser({ email: "x@y.com" });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("FORBIDDEN");
@@ -133,20 +133,20 @@ describe("revokeInvitation + resendInvitation", () => {
   });
 
   it("resend rejects FORBIDDEN for non-admin", async () => {
-    mockIsOrgAdmin.mockResolvedValue(false);
+    mockIsManager.mockResolvedValue(false);
     const result = await resendInvitation(INVITE_ID);
     expect(result.ok).toBe(false);
   });
 });
 
-describe("updateMember last-admin guard", () => {
-  it("rejects demoting the last admin", async () => {
+describe("updateMember last-manager guard", () => {
+  it("rejects demoting the last manager", async () => {
     let countChainCalls = 0;
     mockFrom.mockImplementation(() => ({
       select: vi.fn().mockImplementation((_arg, opts?: { count?: string; head?: boolean }) => {
         if (opts?.head) {
           countChainCalls++;
-          // First call returns the count of admins (1).
+          // First call returns the count of managers (1).
           return {
             eq: vi.fn().mockReturnThis(),
             not: vi.fn().mockResolvedValue({ count: 1, error: null }),
@@ -156,22 +156,22 @@ describe("updateMember last-admin guard", () => {
         return {
           eq: vi.fn().mockReturnThis(),
           maybeSingle: vi.fn().mockResolvedValue({
-            data: { role: "org_admin" },
+            data: { role: "manager" },
             error: null,
           }),
         };
       }),
       update: vi.fn(),
     }));
-    const result = await updateMember(MEMBER_ID, { role: "member" });
+    const result = await updateMember(MEMBER_ID, { role: "instructor" });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("LAST_ADMIN");
+    if (!result.ok) expect(result.error.code).toBe("LAST_MANAGER");
     expect(countChainCalls).toBeGreaterThan(0);
   });
 });
 
-describe("removeMember last-admin guard", () => {
-  it("rejects removing the last admin", async () => {
+describe("removeMember last-manager guard", () => {
+  it("rejects removing the last manager", async () => {
     mockFrom.mockImplementation(() => ({
       select: vi.fn().mockImplementation((_arg, opts?: { count?: string; head?: boolean }) => {
         if (opts?.head) {
@@ -183,7 +183,7 @@ describe("removeMember last-admin guard", () => {
         return {
           eq: vi.fn().mockReturnThis(),
           maybeSingle: vi.fn().mockResolvedValue({
-            data: { role: "org_admin", user_id: "u" },
+            data: { role: "manager", user_id: "u" },
             error: null,
           }),
         };
@@ -192,7 +192,7 @@ describe("removeMember last-admin guard", () => {
     }));
     const result = await removeMember(MEMBER_ID);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("LAST_ADMIN");
+    if (!result.ok) expect(result.error.code).toBe("LAST_MANAGER");
   });
 });
 

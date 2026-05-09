@@ -10,13 +10,13 @@ type Dept = { id: string; name: string };
 type Props = {
   departments: Dept[];
   currentDepartmentId: string | null;
-  isOrgAdmin: boolean;
+  isManager: boolean;
 };
 
 export default function DepartmentSwitcherClient({
   departments,
   currentDepartmentId,
-  isOrgAdmin,
+  isManager,
 }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -72,7 +72,7 @@ export default function DepartmentSwitcherClient({
               </button>
             </form>
           ))}
-          {isOrgAdmin && (
+          {isManager && (
             <>
               <hr className="border-border my-1" />
               <a

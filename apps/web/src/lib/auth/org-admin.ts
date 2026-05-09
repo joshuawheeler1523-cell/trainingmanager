@@ -1,11 +1,9 @@
 import "server-only";
-import { cache } from "react";
-import { createClient } from "@/lib/supabase/server";
+import { isManager } from "./role";
 
-/** Returns true when the current user holds org_admin role in the given org. */
-export const isOrgAdmin = cache(async (orgId: string): Promise<boolean> => {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("is_org_admin", { p_org_id: orgId });
-  if (error || !data) return false;
-  return true;
-});
+/**
+ * @deprecated Phase 2 of the permissions overhaul renamed `org_admin` → `manager`.
+ * Use `isManager` from `@/lib/auth/role` directly. This re-export is kept for one
+ * migration cycle and will be removed in Phase 7.
+ */
+export const isOrgAdmin = isManager;

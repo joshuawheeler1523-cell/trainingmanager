@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import { isOrgAdmin } from "@/lib/auth/org-admin";
+import { isManager } from "@/lib/auth/role";
 
 function Forbidden() {
   return (
@@ -8,7 +8,7 @@ function Forbidden() {
       <p className="text-muted-foreground text-sm font-medium uppercase tracking-widest">403</p>
       <h1 className="text-foreground text-2xl font-semibold">Access denied</h1>
       <p className="text-muted-foreground max-w-sm text-sm">
-        You need org admin permissions to view this page.
+        You need manager permissions to view this page.
       </p>
       <Link
         href="/"
@@ -24,7 +24,7 @@ export default async function OrgAdminGuard({ children }: { children: React.Reac
   const orgId = await getCurrentOrgId();
   if (!orgId) return <Forbidden />;
 
-  const admin = await isOrgAdmin(orgId);
+  const admin = await isManager(orgId);
   if (!admin) return <Forbidden />;
 
   return <>{children}</>;

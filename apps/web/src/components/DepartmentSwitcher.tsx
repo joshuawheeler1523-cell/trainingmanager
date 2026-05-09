@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
-import { isOrgAdmin } from "@/lib/auth/org-admin";
+import { isManager } from "@/lib/auth/role";
 import DepartmentSwitcherClient from "./department-switcher-client";
 
 export default async function DepartmentSwitcher() {
@@ -13,13 +13,13 @@ export default async function DepartmentSwitcher() {
 
   if (!currentOrgId) return null;
 
-  const orgAdmin = await isOrgAdmin(currentOrgId);
+  const manager = await isManager(currentOrgId);
 
-  // Departments visible to this user in the current org. Org admins see all
+  // Departments visible to this user in the current org. Managers see all
   // departments in the org; everyone else only sees the ones they're a
   // member of.
   let departments: { id: string; name: string }[] = [];
-  if (orgAdmin) {
+  if (manager) {
     const { data } = await supabase
       .from("departments")
       .select("id, name")
@@ -49,7 +49,7 @@ export default async function DepartmentSwitcher() {
     <DepartmentSwitcherClient
       departments={departments}
       currentDepartmentId={currentDepartmentId}
-      isOrgAdmin={orgAdmin}
+      isManager={manager}
     />
   );
 }
