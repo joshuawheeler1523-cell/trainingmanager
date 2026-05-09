@@ -12,6 +12,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
+import { writeAuditDenial } from "@/lib/auth/audit-denial";
 import type { Json } from "@/lib/supabase/database.types";
 
 type ActionResult<T> =
@@ -33,12 +34,13 @@ function validationError(err: {
   };
 }
 
-async function ctx() {
+async function ctx(action: string) {
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) {
     return { ok: false as const, error: { code: "NO_ORG", message: "No active organization" } };
   }
   if (!(await isManager(orgId))) {
+    await writeAuditDenial(orgId, "workspace_settings", action, "not_manager");
     return { ok: false as const, error: { code: "FORBIDDEN", message: "Manager only" } };
   }
   return { ok: true as const, supabase, orgId };
@@ -86,7 +88,7 @@ export async function applyWorkspacePresetAction(
   const parsed = applyPresetSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const c = await ctx();
+  const c = await ctx("applyWorkspacePreset");
   if (!c.ok) return c;
 
   const preset = PRESETS[parsed.data.presetKey];
@@ -146,7 +148,7 @@ export async function updateLabelOverridesAction(
   const parsed = updateLabelOverridesSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const c = await ctx();
+  const c = await ctx("updateLabelOverrides");
   if (!c.ok) return c;
 
   // Strip undefined fields from each label entry so we don't write
@@ -198,7 +200,7 @@ export async function setModuleFlagAction(
   const parsed = moduleToggleSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const c = await ctx();
+  const c = await ctx("setModuleFlag");
   if (!c.ok) return c;
 
   const { error } = await c.supabase.from("feature_flags").upsert(

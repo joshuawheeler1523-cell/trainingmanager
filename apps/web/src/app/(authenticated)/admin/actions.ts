@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
+import { writeAuditDenial } from "@/lib/auth/audit-denial";
 import { inviteEmailHtml, inviteEmailText, sendEmail } from "@/lib/email";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 
@@ -28,12 +29,19 @@ function validationError(err: {
   };
 }
 
-async function ctx() {
+/**
+ * Resolves the current org and verifies the caller holds the manager role.
+ * On FORBIDDEN, writes a DENIED entry to audit_log so unauthorized attempts
+ * are queryable. On NO_ORG (no active org cookie), returns without logging
+ * since there's no org to attribute the denial to.
+ */
+async function ctx(action: string) {
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) {
     return { ok: false as const, error: { code: "NO_ORG", message: "No active organization" } };
   }
   if (!(await isManager(orgId))) {
+    await writeAuditDenial(orgId, "admin", action, "not_manager");
     return { ok: false as const, error: { code: "FORBIDDEN", message: "Manager only" } };
   }
   return { ok: true as const, supabase, orgId };
@@ -62,13 +70,14 @@ const inviteSchema = z.object({
   visibility: z.enum(["full", "limited"]).default("full"),
 });
 
+/** @requiredRole manager */
 export async function inviteUser(
   input: unknown,
 ): Promise<ActionResult<{ id: string; acceptUrl: string; emailDelivered: boolean }>> {
   const parsed = inviteSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const c = await ctx();
+  const c = await ctx("inviteUser");
   if (!c.ok) return c;
 
   // Insert the invitation row first; the trigger generates the token.
@@ -114,10 +123,11 @@ export async function inviteUser(
   };
 }
 
+/** @requiredRole manager */
 export async function resendInvitation(
   invitationId: string,
 ): Promise<ActionResult<{ acceptUrl: string; emailDelivered: boolean }>> {
-  const c = await ctx();
+  const c = await ctx("resendInvitation");
   if (!c.ok) return c;
 
   // Bump expires_at so the link is valid for another 7 days.
@@ -158,10 +168,11 @@ export async function resendInvitation(
   };
 }
 
+/** @requiredRole manager */
 export async function revokeInvitation(
   invitationId: string,
 ): Promise<ActionResult<{ id: string }>> {
-  const c = await ctx();
+  const c = await ctx("revokeInvitation");
   if (!c.ok) return c;
 
   const { error } = await c.supabase
@@ -186,6 +197,7 @@ const memberPatchSchema = z.object({
     .optional(),
 });
 
+/** @requiredRole manager */
 export async function updateMember(
   membershipId: string,
   input: unknown,
@@ -193,7 +205,7 @@ export async function updateMember(
   const parsed = memberPatchSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const c = await ctx();
+  const c = await ctx("updateMember");
   if (!c.ok) return c;
 
   // Last-manager guard: if demoting a manager, ensure another manager exists.
@@ -238,8 +250,9 @@ export async function updateMember(
   return { ok: true, data: { id: membershipId } };
 }
 
+/** @requiredRole manager */
 export async function removeMember(membershipId: string): Promise<ActionResult<{ id: string }>> {
-  const c = await ctx();
+  const c = await ctx("removeMember");
   if (!c.ok) return c;
 
   // Block removing the last manager.
@@ -296,11 +309,12 @@ const settingsSchema = z.object({
   request_aging_days: z.coerce.number().int().min(1).max(60).optional(),
 });
 
+/** @requiredRole manager */
 export async function updateOrgSettings(input: unknown): Promise<ActionResult<{ id: string }>> {
   const parsed = settingsSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const c = await ctx();
+  const c = await ctx("updateOrgSettings");
   if (!c.ok) return c;
 
   // Read current settings jsonb so we can merge.
@@ -352,13 +366,14 @@ const flagSchema = z.object({
   enabled: z.coerce.boolean(),
 });
 
+/** @requiredRole manager */
 export async function setFeatureFlag(
   input: unknown,
 ): Promise<ActionResult<{ key: string; enabled: boolean }>> {
   const parsed = flagSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const c = await ctx();
+  const c = await ctx("setFeatureFlag");
   if (!c.ok) return c;
 
   const { error } = await c.supabase.from("feature_flags").upsert(
