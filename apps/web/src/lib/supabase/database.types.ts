@@ -100,30 +100,42 @@ export type Database = {
       };
       agencies: {
         Row: {
+          billing_address: string | null;
+          billing_email: string | null;
           created_at: string;
           created_by: string | null;
+          default_revenue_share_pct: number;
           id: string;
           name: string;
+          payment_terms_days: number;
           slug: string;
           updated_at: string;
           updated_by: string | null;
           version: number;
         };
         Insert: {
+          billing_address?: string | null;
+          billing_email?: string | null;
           created_at?: string;
           created_by?: string | null;
+          default_revenue_share_pct?: number;
           id?: string;
           name: string;
+          payment_terms_days?: number;
           slug: string;
           updated_at?: string;
           updated_by?: string | null;
           version?: number;
         };
         Update: {
+          billing_address?: string | null;
+          billing_email?: string | null;
           created_at?: string;
           created_by?: string | null;
+          default_revenue_share_pct?: number;
           id?: string;
           name?: string;
+          payment_terms_days?: number;
           slug?: string;
           updated_at?: string;
           updated_by?: string | null;
@@ -339,6 +351,83 @@ export type Database = {
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      arbor_invoices: {
+        Row: {
+          agency_id: string;
+          created_at: string;
+          created_by: string | null;
+          due_at: string;
+          id: string;
+          invoice_number: string;
+          issued_at: string;
+          line_items: Json;
+          notes: string | null;
+          paid_amount_cents: number | null;
+          paid_at: string | null;
+          paid_method: Database["public"]["Enums"]["payment_method"] | null;
+          paid_reference: string | null;
+          payment_provider: string;
+          period_end: string;
+          period_start: string;
+          status: Database["public"]["Enums"]["invoice_status"];
+          total_cents: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          agency_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          due_at: string;
+          id?: string;
+          invoice_number: string;
+          issued_at?: string;
+          line_items?: Json;
+          notes?: string | null;
+          paid_amount_cents?: number | null;
+          paid_at?: string | null;
+          paid_method?: Database["public"]["Enums"]["payment_method"] | null;
+          paid_reference?: string | null;
+          payment_provider?: string;
+          period_end: string;
+          period_start: string;
+          status?: Database["public"]["Enums"]["invoice_status"];
+          total_cents: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          agency_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          due_at?: string;
+          id?: string;
+          invoice_number?: string;
+          issued_at?: string;
+          line_items?: Json;
+          notes?: string | null;
+          paid_amount_cents?: number | null;
+          paid_at?: string | null;
+          paid_method?: Database["public"]["Enums"]["payment_method"] | null;
+          paid_reference?: string | null;
+          payment_provider?: string;
+          period_end?: string;
+          period_start?: string;
+          status?: Database["public"]["Enums"]["invoice_status"];
+          total_cents?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "arbor_invoices_agency_id_fkey";
+            columns: ["agency_id"];
+            isOneToOne: false;
+            referencedRelation: "agencies";
             referencedColumns: ["id"];
           },
         ];
@@ -623,6 +712,75 @@ export type Database = {
           },
           {
             foreignKeyName: "classes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      client_contracts: {
+        Row: {
+          agency_id: string;
+          annual_contract_value_cents: number;
+          contract_end: string | null;
+          contract_start: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          notes: string | null;
+          org_id: string;
+          pricing_tier: Database["public"]["Enums"]["contract_pricing_tier"];
+          revenue_share_pct: number | null;
+          status: Database["public"]["Enums"]["contract_status"];
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          agency_id: string;
+          annual_contract_value_cents: number;
+          contract_end?: string | null;
+          contract_start: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          notes?: string | null;
+          org_id: string;
+          pricing_tier: Database["public"]["Enums"]["contract_pricing_tier"];
+          revenue_share_pct?: number | null;
+          status?: Database["public"]["Enums"]["contract_status"];
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          agency_id?: string;
+          annual_contract_value_cents?: number;
+          contract_end?: string | null;
+          contract_start?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          notes?: string | null;
+          org_id?: string;
+          pricing_tier?: Database["public"]["Enums"]["contract_pricing_tier"];
+          revenue_share_pct?: number | null;
+          status?: Database["public"]["Enums"]["contract_status"];
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "client_contracts_agency_id_fkey";
+            columns: ["agency_id"];
+            isOneToOne: false;
+            referencedRelation: "agencies";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_contracts_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -4325,6 +4483,22 @@ export type Database = {
         };
         Returns: undefined;
       };
+      calculate_period_rev_share: {
+        Args: {
+          p_agency_id: string;
+          p_period_end: string;
+          p_period_start: string;
+        };
+        Returns: {
+          annual_value_cents: number;
+          contract_id: string;
+          effective_share_pct: number;
+          org_id: string;
+          org_name: string;
+          period_share_cents: number;
+          pricing_tier: Database["public"]["Enums"]["contract_pricing_tier"];
+        }[];
+      };
       current_agency_id: { Args: never; Returns: string };
       current_instructor_id: { Args: { p_org_id: string }; Returns: string };
       current_user_id: { Args: never; Returns: string };
@@ -4400,6 +4574,7 @@ export type Database = {
       };
       mark_all_notifications_read: { Args: never; Returns: number };
       mark_notification_read: { Args: { p_id: string }; Returns: number };
+      next_invoice_number: { Args: never; Returns: string };
       notify_aging_requests: { Args: never; Returns: undefined };
       notify_expiring_certifications: { Args: never; Returns: undefined };
       proficiency_rank: { Args: { p_proficiency: string }; Returns: number };
@@ -4415,6 +4590,10 @@ export type Database = {
       user_role_in_org: { Args: { p_org_id: string }; Returns: string };
     };
     Enums: {
+      contract_pricing_tier: "small" | "medium" | "large" | "enterprise";
+      contract_status: "trial" | "active" | "expired" | "cancelled";
+      invoice_status: "draft" | "sent" | "paid" | "overdue" | "void" | "cancelled";
+      payment_method: "check" | "wire" | "ach" | "zelle" | "paypal" | "other";
       workspace_preset_key:
         | "hospital_training"
         | "corporate_ld"
@@ -4549,6 +4728,10 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      contract_pricing_tier: ["small", "medium", "large", "enterprise"],
+      contract_status: ["trial", "active", "expired", "cancelled"],
+      invoice_status: ["draft", "sent", "paid", "overdue", "void", "cancelled"],
+      payment_method: ["check", "wire", "ach", "zelle", "paypal", "other"],
       workspace_preset_key: [
         "hospital_training",
         "corporate_ld",
