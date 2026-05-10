@@ -23,25 +23,40 @@ This builds on top of the permissions + workspace identity work shipped on 2026-
 
 ## 2. Strategic decisions (locked)
 
-| Decision            | Choice                                                      | Rationale                                                                                                                      |
-| ------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Hierarchy           | **Two tiers**: Arbor → Agency → Client orgs                 | Cleanest mental model. Every client org belongs to one agency. Three tiers add complexity for marginal benefit.                |
-| Billing flow        | **Agency pays Arbor; agency bills its clients separately**  | Cleanest financially. Arbor doesn't see client invoices. Agency owns the customer relationship.                                |
-| Custom domains      | **Bring your own domain (BYOD)**                            | Enterprise expectation. `app.consultingfirm.com` not `<firm>.arbor.app`. Higher engineering lift but required for credibility. |
-| Compliance priority | **SOC 2 Type II first**                                     | Standard enterprise sales gate. HIPAA can follow once SOC 2 controls are in place (most controls overlap).                     |
-| Branding scope      | **Agency-only** (uniform across all client orgs in agency)  | Simplest model. Client-org override can be added in v2 if a large client demands it.                                           |
-| SSO scope           | **Per client org**                                          | Each hospital/customer brings its own IdP (Okta, AzureAD, Google Workspace). Standard enterprise pattern.                      |
-| API shape           | **REST + outbound webhooks (v1)**                           | Consulting firms expect REST; webhooks let them push to their CRM/PMP without polling. GraphQL deferred.                       |
-| Pricing model       | **Per-seat + tiered packages (Starter / Pro / Enterprise)** | Standard B2B SaaS. Tiers gate features (SSO behind Pro, custom domain behind Pro+).                                            |
+| Decision            | Choice                                                          | Rationale                                                                                                                                                                                        |
+| ------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Hierarchy           | **Two tiers**: Arbor → Agency → Client orgs                     | Cleanest mental model. Every client org belongs to one agency. Three tiers add complexity for marginal benefit.                                                                                  |
+| Billing flow        | **Consultant collects from hospital, pays Arbor a rev share %** | Consultant invoices hospital for the full annual amount. Arbor invoices the consultant for accumulated rev share monthly. No Stripe Connect / marketplace plumbing needed for v1.                |
+| Custom domains      | **Bring your own domain (BYOD)**                                | Enterprise expectation. `app.consultingfirm.com` not `<firm>.arbor.app`. Higher engineering lift but required for credibility.                                                                   |
+| Compliance priority | **SOC 2 Type II first**                                         | Standard enterprise sales gate. HIPAA can follow once SOC 2 controls are in place (most controls overlap).                                                                                       |
+| Branding scope      | **Agency-only** (uniform across all client orgs in agency)      | Simplest model. Client-org override can be added in v2 if a large client demands it.                                                                                                             |
+| SSO scope           | **Per client org**                                              | Each hospital/customer brings its own IdP (Okta, AzureAD, Google Workspace). Standard enterprise pattern.                                                                                        |
+| API shape           | **REST + outbound webhooks (v1)**                               | Consulting firms expect REST; webhooks let them push to their CRM/PMP without polling. GraphQL deferred.                                                                                         |
+| Feature tiering     | **NONE — every customer gets every feature**                    | No Starter/Pro/Enterprise feature gates. SSO, custom domain, API, webhooks all available to every client org. Pricing is the only tier.                                                          |
+| Pricing model       | **Annual flat tiers by team size, with revenue share to Arbor** | Healthcare buyers expect fixed annual cost; matches how Epic/Cerner/Workday sell. Tiers: Small / Medium / Large / Enterprise based on active user count. Arbor takes a fixed % of each contract. |
+
+### Pricing tier definition
+
+Tier is based on **active end-user count per client org** (anyone with an `org_memberships` row, regardless of role).
+
+| Tier           | Active users | Recommended retail (consultant → hospital) | Arbor's share (30%) |
+| -------------- | ------------ | ------------------------------------------ | ------------------- |
+| **Small**      | < 25         | $30,000 / year                             | $9,000              |
+| **Medium**     | 25–100       | $50,000 / year                             | $15,000             |
+| **Large**      | 100–500      | $75,000 / year                             | $22,500             |
+| **Enterprise** | 500+         | $100,000+ (custom)                         | negotiated          |
+
+The consultant sets actual retail; Arbor's share is the configured percentage of whatever the consultant invoiced. Tier is recalculated annually at renewal based on the prior year's average active user count; mid-year tier upgrades supported with prorated invoicing.
 
 ### Recommendations needing future confirmation
 
-| Open item                               | Recommendation                                                                      | When to decide                      |
-| --------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------- |
-| Pricing per seat ($)                    | $5 (Starter), $10 (Pro), $20 (Enterprise) — wholesale to agency, agency marks up    | Before Phase 5 (billing) ships      |
-| Data residency                          | US-only at v1; EU/Canada via separate Supabase project later if a customer requires | Before SOC 2 audit begins (Phase 7) |
-| Agency-admin can create new client orgs | Yes (self-serve provisioning); agency owns the budget so they own the headcount     | Phase 1                             |
-| HIPAA timing                            | Phase 7b (after SOC 2 controls land); BAA gates required                            | After SOC 2 baseline is in place    |
+| Open item                               | Recommendation                                                                           | When to decide                      |
+| --------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------- |
+| Revenue share %                         | 30% to Arbor / 70% to consultant — standard B2B reseller channel split                   | Before Phase 5 (billing) ships      |
+| 90-day rev-share onramp                 | First 10 agencies: zero up-front; flip to standard 30/70 after 90 days OR first contract | Before launching agency program     |
+| Data residency                          | US-only at v1; EU/Canada via separate Supabase project later if a customer requires      | Before SOC 2 audit begins (Phase 7) |
+| Agency-admin can create new client orgs | Yes (self-serve provisioning); agency owns the budget so they own the headcount          | Phase 1                             |
+| HIPAA timing                            | Phase 7b (after SOC 2 controls land); BAA gates required                                 | After SOC 2 baseline is in place    |
 
 ---
 
@@ -51,13 +66,14 @@ This builds on top of the permissions + workspace identity work shipped on 2026-
 
 **New tables:**
 
-- `agencies` (id, slug, name, custom_domain, branding fields, billing fields, plan_tier, created_at, etc.)
+- `agencies` (id, slug, name, custom_domain, branding fields, default_revenue_share_pct, stripe_customer_id, created_at, etc.)
 - `agency_memberships` (agency_id, user_id, role: 'agency_admin' | 'agency_member', accepted_at)
 - `sso_configs` (org_id, provider_type, idp_metadata_xml, idp_entity_id, attribute_mapping, enabled)
 - `api_keys` (org_id, key_hash, name, scopes[], last_used_at, expires_at, created_by)
 - `webhook_endpoints` (org_id, url, secret, events[], enabled, last_delivered_at)
 - `webhook_deliveries` (endpoint_id, event_type, payload, response_status, attempted_at) — append-only delivery log
-- `subscriptions` (agency_id, stripe_customer_id, stripe_subscription_id, plan_tier, seat_count, current_period_end, status)
+- `client_contracts` (org_id, agency_id, pricing_tier: 'small'/'medium'/'large'/'enterprise', annual_contract_value_cents, revenue_share_pct, contract_start, contract_end, status: 'trial'/'active'/'expired'/'cancelled') — one row per agency-client deal; the source of truth for what Arbor will bill the agency
+- `arbor_invoices` (agency_id, stripe_invoice_id, period_start, period_end, total_cents, status, line_items jsonb) — Arbor's monthly bill to the agency, summing rev-share owed across all the agency's active client_contracts
 - `billing_events` (agency_id, stripe_event_id, event_type, payload, processed_at) — Stripe webhook idempotency
 
 **Schema additions to existing tables:**
@@ -184,23 +200,27 @@ Most customers can live without SCIM initially. WorkOS provides this if Phase 4 
 
 **Acceptance**: a hospital admin uploads their AzureAD SAML metadata, enables SSO. A user from that hospital signs in via SAML, lands authenticated, sees their org content per their existing membership. No password ever entered.
 
-### Phase 5 — Stripe billing + plan tiers (3 sessions)
+### Phase 5 — Stripe billing + revenue share to Arbor (1.5 sessions)
 
-- Migration: `subscriptions`, `billing_events` tables
-- Stripe products + prices configured (Starter / Pro / Enterprise)
-- Server-side: `lib/billing/` — Stripe customer + subscription helpers (server-only, service-role)
-- Webhook handler: `/api/stripe/webhook` — handles `customer.subscription.created`, `updated`, `deleted`, `invoice.payment_succeeded`, `invoice.payment_failed`. Idempotent via `stripe_event_id`.
-- Per-seat metering: cron job (Supabase scheduled) that runs daily; counts distinct active org_memberships across all client orgs in each agency; reports usage to Stripe via meter events
-- App: `/agency/billing` — current plan, seat count, monthly bill estimate, link to Stripe Customer Portal
-- Plan tier feature gates:
-  - Starter: 1 client org max, no SSO, no custom domain, no API
-  - Pro: unlimited client orgs, SSO, custom domain, API
-  - Enterprise: same as Pro + SOC 2 reports + dedicated support contact
-- Feature-flag check helpers: `requireFeature('sso')`, `requireFeature('custom_domain')`, `requireFeature('api')` — return 403 + clear "Upgrade to Pro" CTA when missing
-- Trial period: 14-day free trial of Pro tier on agency creation, auto-downgrade to paid Pro at end of trial
-- Failed-payment handling: 7-day grace period, then read-only mode (banner: "Payment failed; restore access by updating billing")
+This phase is dramatically simpler than v1 of this plan because:
 
-**Acceptance**: agency creates account, gets 14-day Pro trial. Adds a credit card via Stripe Portal. After trial, Stripe charges based on seat count. Downgrading to Starter blocks Pro features with upgrade prompts.
+- **No feature tier gates** — every customer gets every capability, so no `requireFeature()` plumbing.
+- **No per-seat metering** — pricing is annual flat per client_contract; no daily count cron.
+- **No Stripe Connect / marketplace** — consultant collects from hospital, Arbor invoices the consultant for accumulated rev share.
+
+What ships:
+
+- Migration: `client_contracts`, `arbor_invoices`, `billing_events` tables
+- App: `/agency/clients` — agency_admin form to record each client deal: client_org, pricing tier (Small / Medium / Large / Enterprise), annual contract value the consultant invoiced the hospital for, contract start/end dates. Saving creates a `client_contracts` row.
+- App: `/agency/billing` — current month's accumulated rev share (live calculation: sum of (annual_contract_value × revenue_share_pct ÷ 12) across all active contracts), prior invoices history, link to Stripe Customer Portal.
+- Server-side: `lib/billing/` — Stripe customer creation per agency, monthly invoice creation
+- Cron job (Supabase scheduled, monthly on the 1st): for each agency, sum the rev share owed across all `status='active'` client_contracts → create + send a Stripe invoice → write `arbor_invoices` row
+- Webhook handler: `/api/stripe/webhook` — handles `invoice.payment_succeeded`, `invoice.payment_failed`. Updates `arbor_invoices.status`. Idempotent via `stripe_event_id`.
+- Tier auto-recalculation (monthly cron): for each `status='active'` client_contract, count active org_memberships in the org; if the count would push the org into a higher tier, emit a notification to the agency_admin (does NOT auto-bill at the higher tier — agency confirms upgrade at next renewal or accepts a mid-term proration).
+- Failed-payment handling: 30-day grace period (longer than per-seat SaaS norm because invoices are bigger and B2B AP cycles take time), then "billing hold" status with a banner — agency_admin can still log in, but cannot create new client_contracts until the prior invoice is paid.
+- Trial: not via Stripe — handled by `client_contracts.status = 'trial'` with no rev-share-owed during the trial period (default 90 days for the first contract per agency, configurable).
+
+**Acceptance**: agency_admin records a $50k Medium-tier contract with Hospital X. On the 1st of next month, Stripe invoice is created for $1,250 ($50k × 30% ÷ 12). When the agency pays the invoice, status flips to paid and audit_log records the event.
 
 ### Phase 6 — Public REST API + webhooks (3 sessions)
 
@@ -298,7 +318,7 @@ After all phases:
 - `supabase/migrations/<phase2>_agency_branding.sql`
 - `supabase/migrations/<phase3>_custom_domains.sql`
 - `supabase/migrations/<phase4>_sso_configs.sql`
-- `supabase/migrations/<phase5>_subscriptions.sql`
+- `supabase/migrations/<phase5>_client_contracts_and_invoices.sql`
 - `supabase/migrations/<phase6>_api_webhooks.sql`
 - `supabase/migrations/<phase8>_data_retention.sql`
 
@@ -325,7 +345,8 @@ After all phases:
 
 ### Background jobs (Supabase Edge Functions or scheduled SQL)
 
-- Daily seat count → Stripe meter event
+- Monthly Arbor invoice generation (1st of month) — sums rev share owed across each agency's active client_contracts → creates Stripe invoice
+- Tier auto-recalculation (monthly) — flags client_contracts whose active user count crossed a tier boundary
 - Webhook delivery worker
 - Audit log retention purge
 - Demo environment reset
@@ -365,7 +386,7 @@ Each phase has a per-phase acceptance check above. Final acceptance for "we can 
 | 2 (Branding)       | Drop new columns on agencies; revert layout to hardcoded brand.                                                                                  |
 | 3 (Custom domains) | Drop `custom_domain` columns; remove Vercel domains via API; users revert to `app.arbor.app`.                                                    |
 | 4 (SSO)            | Drop `sso_configs`; users fall back to email/password/magic-link.                                                                                |
-| 5 (Billing)        | Pause Stripe subscriptions (don't delete); revert app feature gates to always-true. Refunds handled manually.                                    |
+| 5 (Billing)        | Pause monthly invoice cron; existing Stripe invoices remain (no auto-refund). client_contracts table retained for forensic + reactivation value. |
 | 6 (API/webhooks)   | Disable `/api/v1/*` routes; in-flight webhook deliveries finish; tables retained for forensic value.                                             |
 | 7 (SOC 2)          | Audit-related code is mostly additive (logging, alerts); no rollback needed.                                                                     |
 | 8 (Data export)    | Disable export route; retention purge cron stays (it's safe).                                                                                    |
@@ -383,7 +404,9 @@ Every phase ships with a `down.sql` for migrations.
 - **Agency-level SSO** (one IdP for the whole agency, not per client org). v1 is per-client-org SSO only.
 - **Native mobile apps**. Responsive web is the surface.
 - **i18n / multi-language**. English only.
-- **Direct-to-client billing** (client orgs pay Arbor). v1 is agency-pays-Arbor only.
+- **Direct hospital-to-Arbor billing** (Stripe Connect / marketplace). v1 is consultant-collects-from-hospital-pays-Arbor only.
+- **Feature tiering** (Starter/Pro/Enterprise feature gates). EXPLICITLY DROPPED — every customer gets every feature; pricing varies by team-size tier only.
+- **Per-seat metering**. v1 uses annual flat tier per client_contract.
 - **Marketplace / template store**. v1 ships the workspace presets we already built; no template upload by users.
 - **Custom field types per intake**. v1 ships fixed field shapes.
 - **EU data residency**. v1 is US-only; EU added later via separate Supabase project.
@@ -422,54 +445,54 @@ Phase 8 (data export) — independent; can land any time after Phase 1
 
 ## 12. Key risks + mitigations
 
-| Risk                                            | Impact                       | Mitigation                                                                                                                                 |
-| ----------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Custom domain provisioning fails for a customer | Stuck onboarding             | Document manual cert path; have on-call rotation; Vercel support has SLA on Pro plan                                                       |
-| Stripe webhook drops an event                   | Subscription state drifts    | Idempotent processing via `stripe_event_id`; nightly reconciliation cron compares Stripe state to DB                                       |
-| SOC 2 audit fails first attempt                 | 3-6 month delay              | Use Vanta/Drata to pre-validate before audit; conduct internal mock audit first                                                            |
-| Per-seat metering miscount                      | Over- or under-charging      | Daily reconciliation: count distinct active memberships, compare to Stripe meter events; alert on >5% discrepancy                          |
-| Agency goes bankrupt with active clients        | Orphaned client orgs         | Contractual: agency must give 30-day notice; if not, Arbor takes over billing direct-to-client temporarily                                 |
-| RLS misconfiguration leaks data across agencies | Catastrophic trust failure   | Comprehensive pgTAP suite (extends today's): every (role × op × table) tested; agency_admin tested for cross-agency isolation specifically |
-| Hospital IdP returns unexpected SAML attributes | SSO broken for that customer | Customer-specific attribute mapping in `sso_configs.attribute_mapping`; test SAML round-trip required before enabling                      |
-| Trial-to-paid conversion <expected              | Burn extends                 | Track conversion in onboarding; A/B test pricing; outbound CSM motion for trials at day 7                                                  |
+| Risk                                            | Impact                         | Mitigation                                                                                                                                                                                                          |
+| ----------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Custom domain provisioning fails for a customer | Stuck onboarding               | Document manual cert path; have on-call rotation; Vercel support has SLA on Pro plan                                                                                                                                |
+| Stripe webhook drops an event                   | Subscription state drifts      | Idempotent processing via `stripe_event_id`; nightly reconciliation cron compares Stripe state to DB                                                                                                                |
+| SOC 2 audit fails first attempt                 | 3-6 month delay                | Use Vanta/Drata to pre-validate before audit; conduct internal mock audit first                                                                                                                                     |
+| Consultant underreports contract value          | Arbor under-collects rev share | Quarterly true-up: agency_admin certifies the year's contract values in writing; auditable signature recorded in audit_log. Plus: cross-check active user count → suggested tier; flag mismatches for human review. |
+| Agency goes bankrupt with active clients        | Orphaned client orgs           | Contractual: agency must give 30-day notice; if not, Arbor takes over billing direct-to-client temporarily                                                                                                          |
+| RLS misconfiguration leaks data across agencies | Catastrophic trust failure     | Comprehensive pgTAP suite (extends today's): every (role × op × table) tested; agency_admin tested for cross-agency isolation specifically                                                                          |
+| Hospital IdP returns unexpected SAML attributes | SSO broken for that customer   | Customer-specific attribute mapping in `sso_configs.attribute_mapping`; test SAML round-trip required before enabling                                                                                               |
+| Trial-to-paid conversion <expected              | Burn extends                   | Track conversion in onboarding; A/B test pricing; outbound CSM motion for trials at day 7                                                                                                                           |
 
 ---
 
 ## 13. Open items requiring decision before kickoff
 
-1. **Pricing per seat in dollars** — recommendation: $5/$10/$20 (Starter/Pro/Enterprise) wholesale. Confirm before Phase 5.
-2. **SOC 2 vendor** — Vanta vs Drata vs Secureframe. Recommendation: Drata. Confirm before Phase 7 starts (engineering work can proceed regardless).
-3. **SSO implementation** — Supabase native SAML vs WorkOS. Recommendation: Supabase first; switch to WorkOS if customers require OIDC or SCIM. Confirm at Phase 4 start.
-4. **Trial length** — 14 days vs 30 days. Recommendation: 14 days; can extend per agency on request via admin tool.
-5. **Free tier** — should there be one? Recommendation: NO; consulting firms aren't price-sensitive; a free tier attracts wrong audience + adds support load. Confirm.
+1. **Revenue share %** — recommendation: 30% to Arbor / 70% to consultant. Standard B2B reseller channel split. Confirm before Phase 5 ships.
+2. **Tier price points** — recommendation: $30k Small / $50k Medium / $75k Large retail. These are sticker prices the consultant uses with hospitals; the consultant can negotiate down. Arbor's share = `actual_contract_value × 30%`. Confirm before launching.
+3. **90-day rev-share onramp for first 10 agencies** — recommendation: zero up-front, first contract per agency is the trial period; flip to standard 30/70 after. Confirm before launching agency program.
+4. **SOC 2 vendor** — Vanta vs Drata vs Secureframe. Recommendation: Drata. Confirm before Phase 7 starts (engineering can proceed regardless).
+5. **SSO implementation** — Supabase native SAML vs WorkOS. Recommendation: Supabase first; switch to WorkOS if customers require OIDC or SCIM. Confirm at Phase 4 start.
 6. **Demo environment auto-reset cadence** — nightly vs weekly. Recommendation: nightly for fresh demos; weekly is fine if the env is stable.
 
 ---
 
 ## 14. Estimated total effort
 
-| Item                                   | Effort                                                  |
-| -------------------------------------- | ------------------------------------------------------- |
-| Phase 1: Agency tier                   | 3 sessions                                              |
-| Phase 2: Branding                      | 2 sessions                                              |
-| Phase 3: Custom domains                | 2 sessions                                              |
-| Phase 4: SSO per client                | 3 sessions                                              |
-| Phase 5: Billing + tiers               | 3 sessions                                              |
-| Phase 6: REST API + webhooks           | 3 sessions                                              |
-| Phase 7: SOC 2 controls                | 3 sessions (engineering; audit takes 6+ months elapsed) |
-| Phase 8: Data export + retention       | 1.5 sessions                                            |
-| Phase 9: Self-serve onboarding         | 2 sessions                                              |
-| **Engineering total**                  | **~22 sessions = 10–12 weeks**                          |
-| **SOC 2 audit elapsed**                | **6–12 months running in parallel**                     |
-| **First reseller customer realistic**  | **3–4 months from start (without SOC 2)**               |
-| **First enterprise reseller customer** | **9–12 months from start (with SOC 2)**                 |
+| Item                                                        | Effort                                                  |
+| ----------------------------------------------------------- | ------------------------------------------------------- |
+| Phase 1: Agency tier                                        | 3 sessions                                              |
+| Phase 2: Branding                                           | 2 sessions                                              |
+| Phase 3: Custom domains                                     | 2 sessions                                              |
+| Phase 4: SSO per client                                     | 3 sessions                                              |
+| Phase 5: Billing (rev share, no feature gates, no metering) | 1.5 sessions                                            |
+| Phase 6: REST API + webhooks                                | 3 sessions                                              |
+| Phase 7: SOC 2 controls                                     | 3 sessions (engineering; audit takes 6+ months elapsed) |
+| Phase 8: Data export + retention                            | 1.5 sessions                                            |
+| Phase 9: Self-serve onboarding                              | 2 sessions                                              |
+| **Engineering total**                                       | **~20.5 sessions = 9–11 weeks**                         |
+| **SOC 2 audit elapsed**                                     | **6–12 months running in parallel**                     |
+| **First reseller customer realistic**                       | **3–4 months from start (without SOC 2)**               |
+| **First enterprise reseller customer**                      | **9–12 months from start (with SOC 2)**                 |
 
 ---
 
 ## 15. Execution sequence (when approved)
 
 1. Update `MEMORY.md` with pointer to this doc + status
-2. Confirm the 6 open items in §13
+2. Confirm the 6 open items in §13 (most can wait until their phase)
 3. Begin **Phase 1**: agency tier foundation
 4. After each phase: `pnpm build`, run pgTAP, run vitest, run e2e (including hospital training golden path), push, regenerate types, commit + tag
 5. From Phase 5 onward: Stripe test mode for development; production Stripe keys gated to deploy preview workflow
