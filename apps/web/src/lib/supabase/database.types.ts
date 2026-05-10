@@ -105,6 +105,10 @@ export type Database = {
           billing_email: string | null;
           created_at: string;
           created_by: string | null;
+          custom_domain: string | null;
+          custom_domain_pending: string | null;
+          custom_domain_verification_token: string | null;
+          custom_domain_verified_at: string | null;
           default_revenue_share_pct: number;
           email_from_address: string | null;
           email_from_name: string | null;
@@ -126,6 +130,10 @@ export type Database = {
           billing_email?: string | null;
           created_at?: string;
           created_by?: string | null;
+          custom_domain?: string | null;
+          custom_domain_pending?: string | null;
+          custom_domain_verification_token?: string | null;
+          custom_domain_verified_at?: string | null;
           default_revenue_share_pct?: number;
           email_from_address?: string | null;
           email_from_name?: string | null;
@@ -147,6 +155,10 @@ export type Database = {
           billing_email?: string | null;
           created_at?: string;
           created_by?: string | null;
+          custom_domain?: string | null;
+          custom_domain_pending?: string | null;
+          custom_domain_verification_token?: string | null;
+          custom_domain_verified_at?: string | null;
           default_revenue_share_pct?: number;
           email_from_address?: string | null;
           email_from_name?: string | null;
@@ -4592,6 +4604,14 @@ export type Database = {
       is_instructor: { Args: { p_org_id: string }; Returns: boolean };
       is_manager: { Args: { p_org_id: string }; Returns: boolean };
       is_viewer: { Args: { p_org_id: string }; Returns: boolean };
+      lookup_agency_by_domain: {
+        Args: { p_host: string };
+        Returns: {
+          id: string;
+          name: string;
+          slug: string;
+        }[];
+      };
       lookup_invitation_by_token: {
         Args: { p_token: string };
         Returns: {

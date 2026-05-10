@@ -73,6 +73,9 @@ export default async function AgencyLayout({ children }: { children: React.React
           <Link href="/agency/branding" className="text-foreground hover:text-primary font-medium">
             Branding
           </Link>
+          <Link href="/agency/domain" className="text-foreground hover:text-primary font-medium">
+            Domain
+          </Link>
           <Link href="/" className="text-muted-foreground hover:text-foreground">
             ← Back to workspace
           </Link>
