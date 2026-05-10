@@ -261,7 +261,8 @@ The audit itself is paperwork + observed-behavior over time. Engineering work to
 - **Backups**: enable Supabase point-in-time recovery (Pro plan feature); document RTO/RPO; quarterly restore drill
 - **Access controls**: implement IP allowlisting on Supabase admin (production); MFA required for all human access to prod
 - **Audit logging**: already in place (audit_log table); add log retention policy (5 years recommended); add anomaly detection (e.g. alert on `DENIED` spikes)
-- **Vulnerability management**: enable Snyk or GitHub Dependabot; SLA for high/critical CVEs
+- **Vulnerability management**: enable GitHub Dependabot (free); SLA for high/critical CVEs documented in Drata
+- **Vendor**: **Drata** (locked). ~$15K/year subscription + ~$15K-$25K partner auditor (Sensiba, Prescient, or A-LIGN). Total ~$30K-$40K for first Type II report. ~6 months elapsed from Drata onboarding → report-in-hand. Drata auto-collects evidence from Vercel + Supabase + GitHub via official integrations.
 - **Incident response**: write runbook (`docs/runbooks/incident-response.md`); conduct quarterly tabletop exercise
 - **Change management**: require PR review for all prod changes; automated test coverage gates
 - **Vendor management**: maintain `docs/vendors.md` listing every subprocessor (Supabase, Vercel, Resend, Stripe, etc.) with their compliance posture
@@ -463,7 +464,7 @@ Phase 8 (data export) — independent; can land any time after Phase 1
 1. **Revenue share %** — recommendation: 30% to Arbor / 70% to consultant. Standard B2B reseller channel split. Confirm before Phase 5 ships.
 2. **Tier price points** — recommendation: $30k Small / $50k Medium / $75k Large retail. These are sticker prices the consultant uses with hospitals; the consultant can negotiate down. Arbor's share = `actual_contract_value × 30%`. Confirm before launching.
 3. **90-day rev-share onramp for first 10 agencies** — recommendation: zero up-front, first contract per agency is the trial period; flip to standard 30/70 after. Confirm before launching agency program.
-4. **SOC 2 vendor** — Vanta vs Drata vs Secureframe. Recommendation: Drata. Confirm before Phase 7 starts (engineering can proceed regardless).
+4. **SOC 2 vendor** — ✅ LOCKED: **Drata**. Better engineering UX, $10-15K vs $15-25K for Vanta, official Supabase integration cuts manual evidence work by ~40%, and we're not at the scale where Vanta's healthcare brand recognition matters yet. Total all-in for first SOC 2 Type II: ~$30K-$40K (Drata + partner auditor) over ~6 months from kickoff. Switch to Vanta later only if a major hospital deal specifically requires it.
 5. **SSO implementation** — Supabase native SAML vs WorkOS. Recommendation: Supabase first; switch to WorkOS if customers require OIDC or SCIM. Confirm at Phase 4 start.
 6. **Demo environment auto-reset cadence** — nightly vs weekly. Recommendation: nightly for fresh demos; weekly is fine if the env is stable.
 
