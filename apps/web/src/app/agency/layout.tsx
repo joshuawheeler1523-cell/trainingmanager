@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgencyId, isAgencyAdmin } from "@/lib/auth/agency";
+import { brandCssVars, getCurrentBrand } from "@/lib/brand";
 
 /**
  * Layout for the agency console (`/agency/*`).
@@ -38,18 +40,38 @@ export default async function AgencyLayout({ children }: { children: React.React
     .eq("id", agencyId)
     .maybeSingle();
 
+  const brand = await getCurrentBrand();
+
   return (
-    <div className="bg-canvas flex min-h-screen flex-col">
+    <div className="bg-canvas flex min-h-screen flex-col" style={brandCssVars(brand)}>
       <header className="border-border bg-background flex items-center justify-between border-b px-6 py-3">
-        <div>
-          <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-            Agency Console
-          </p>
-          <h1 className="text-foreground text-lg font-bold">{agency?.name ?? "Agency"}</h1>
+        <div className="flex items-center gap-4">
+          {brand.logoUrl && (
+            <Image
+              src={brand.logoUrl}
+              alt={`${brand.name} logo`}
+              width={120}
+              height={40}
+              className="max-h-10 w-auto object-contain"
+              unoptimized
+            />
+          )}
+          <div>
+            <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+              Agency Console
+            </p>
+            <h1 className="text-foreground text-lg font-bold">{agency?.name ?? "Agency"}</h1>
+          </div>
         </div>
         <nav className="flex items-center gap-4 text-sm">
           <Link href="/agency" className="text-foreground hover:text-primary font-medium">
             Dashboard
+          </Link>
+          <Link href="/agency/billing" className="text-foreground hover:text-primary font-medium">
+            Billing
+          </Link>
+          <Link href="/agency/branding" className="text-foreground hover:text-primary font-medium">
+            Branding
           </Link>
           <Link href="/" className="text-muted-foreground hover:text-foreground">
             ← Back to workspace

@@ -12,7 +12,8 @@ const RESEND_API_URL = "https://api.resend.com/emails";
 
 // "From" defaults to onboarding@resend.dev which Resend allows on every
 // account. Override via RESEND_FROM_EMAIL once the org's verified domain
-// is set up.
+// is set up. Per-call `from` overrides both — used by agency-branded mail
+// where the agency's email_from_address has been configured.
 function fromAddress(): string {
   return process.env.RESEND_FROM_EMAIL ?? "Arbor <onboarding@resend.dev>";
 }
@@ -23,6 +24,7 @@ export type SendEmailArgs = {
   html: string;
   text?: string;
   replyTo?: string;
+  from?: string;
 };
 
 export type SendEmailResult =
@@ -44,7 +46,7 @@ export async function sendEmail(args: SendEmailArgs): Promise<SendEmailResult> {
   }
 
   const body: Record<string, unknown> = {
-    from: fromAddress(),
+    from: args.from ?? fromAddress(),
     to: args.to,
     subject: args.subject,
     html: args.html,
@@ -77,16 +79,27 @@ export async function sendEmail(args: SendEmailArgs): Promise<SendEmailResult> {
 // templates feature is deferred). Plain HTML keeps this readable in any
 // mail client without needing MJML or react-email.
 
+export type EmailBrand = {
+  primaryColor: string;
+  logoUrl: string | null;
+};
+
 export function inviteEmailHtml(args: {
   orgName: string;
   inviterName: string | null;
   acceptUrl: string;
+  brand?: EmailBrand;
 }): string {
   const inviter = args.inviterName ?? "An admin";
   const safeOrg = escapeHtml(args.orgName);
   const safeInviter = escapeHtml(inviter);
+  const primary = args.brand?.primaryColor ?? "#2563eb";
+  const logoBlock = args.brand?.logoUrl
+    ? `<div style="margin:0 0 24px;"><img src="${escapeHtml(args.brand.logoUrl)}" alt="" style="max-height:48px;max-width:240px;object-fit:contain;" /></div>`
+    : "";
   return `
     <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
+      ${logoBlock}
       <h2 style="font-size:18px;margin:0 0 12px;">${safeInviter} invited you to ${safeOrg}</h2>
       <p style="font-size:14px;line-height:1.5;color:#475569;">
         Click the button below to accept the invitation and sign in. The link is
@@ -94,13 +107,13 @@ export function inviteEmailHtml(args: {
       </p>
       <p style="margin:24px 0;">
         <a href="${args.acceptUrl}"
-           style="background:#2563eb;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;">
+           style="background:${primary};color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;">
           Accept invitation
         </a>
       </p>
       <p style="font-size:12px;color:#64748b;">
         If the button doesn't work, paste this URL into your browser:<br/>
-        <a href="${args.acceptUrl}" style="color:#2563eb;word-break:break-all;">${args.acceptUrl}</a>
+        <a href="${args.acceptUrl}" style="color:${primary};word-break:break-all;">${args.acceptUrl}</a>
       </p>
     </div>
   `;

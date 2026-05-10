@@ -8,6 +8,7 @@ import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
 import { writeAuditDenial } from "@/lib/auth/audit-denial";
 import { inviteEmailHtml, inviteEmailText, sendEmail } from "@/lib/email";
+import { brandFromHeader, getBrandForOrg } from "@/lib/brand";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 
 type ActionResult<T> =
@@ -97,9 +98,10 @@ export async function inviteUser(
   const origin = await appOrigin();
   const acceptUrl = `${origin}/accept-invite/${invite.token}`;
 
-  const [{ data: org }, { data: userData }] = await Promise.all([
+  const [{ data: org }, { data: userData }, brand] = await Promise.all([
     c.supabase.from("organizations").select("name").eq("id", c.orgId).maybeSingle(),
     c.supabase.auth.getUser(),
+    getBrandForOrg(c.orgId),
   ]);
   const user = userData.user;
   const orgName = org?.name ?? "Your organization";
@@ -108,8 +110,14 @@ export async function inviteUser(
   const sendResult = await sendEmail({
     to: invite.email,
     subject: `${inviterName ?? "An admin"} invited you to ${orgName}`,
-    html: inviteEmailHtml({ orgName, inviterName, acceptUrl }),
+    html: inviteEmailHtml({
+      orgName,
+      inviterName,
+      acceptUrl,
+      brand: { primaryColor: brand.primaryColor, logoUrl: brand.logoUrl },
+    }),
     text: inviteEmailText({ orgName, inviterName, acceptUrl }),
+    ...(brand.source === "agency" ? { from: brandFromHeader(brand) } : {}),
   });
 
   revalidateAdmin();
@@ -143,9 +151,10 @@ export async function resendInvitation(
 
   const origin = await appOrigin();
   const acceptUrl = `${origin}/accept-invite/${invite.token}`;
-  const [{ data: org }, { data: userData }] = await Promise.all([
+  const [{ data: org }, { data: userData }, brand] = await Promise.all([
     c.supabase.from("organizations").select("name").eq("id", c.orgId).maybeSingle(),
     c.supabase.auth.getUser(),
+    getBrandForOrg(c.orgId),
   ]);
   const user = userData.user;
   const orgName = org?.name ?? "Your organization";
@@ -154,8 +163,14 @@ export async function resendInvitation(
   const sendResult = await sendEmail({
     to: invite.email,
     subject: `Reminder: ${orgName} invitation`,
-    html: inviteEmailHtml({ orgName, inviterName, acceptUrl }),
+    html: inviteEmailHtml({
+      orgName,
+      inviterName,
+      acceptUrl,
+      brand: { primaryColor: brand.primaryColor, logoUrl: brand.logoUrl },
+    }),
     text: inviteEmailText({ orgName, inviterName, acceptUrl }),
+    ...(brand.source === "agency" ? { from: brandFromHeader(brand) } : {}),
   });
 
   revalidateAdmin();

@@ -1,4 +1,4 @@
-﻿export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -100,42 +100,63 @@ export type Database = {
       };
       agencies: {
         Row: {
+          accent_color: string | null;
           billing_address: string | null;
           billing_email: string | null;
           created_at: string;
           created_by: string | null;
           default_revenue_share_pct: number;
+          email_from_address: string | null;
+          email_from_name: string | null;
+          favicon_url: string | null;
           id: string;
+          logo_url: string | null;
           name: string;
           payment_terms_days: number;
+          primary_color: string | null;
+          secondary_color: string | null;
           slug: string;
           updated_at: string;
           updated_by: string | null;
           version: number;
         };
         Insert: {
+          accent_color?: string | null;
           billing_address?: string | null;
           billing_email?: string | null;
           created_at?: string;
           created_by?: string | null;
           default_revenue_share_pct?: number;
+          email_from_address?: string | null;
+          email_from_name?: string | null;
+          favicon_url?: string | null;
           id?: string;
+          logo_url?: string | null;
           name: string;
           payment_terms_days?: number;
+          primary_color?: string | null;
+          secondary_color?: string | null;
           slug: string;
           updated_at?: string;
           updated_by?: string | null;
           version?: number;
         };
         Update: {
+          accent_color?: string | null;
           billing_address?: string | null;
           billing_email?: string | null;
           created_at?: string;
           created_by?: string | null;
           default_revenue_share_pct?: number;
+          email_from_address?: string | null;
+          email_from_name?: string | null;
+          favicon_url?: string | null;
           id?: string;
+          logo_url?: string | null;
           name?: string;
           payment_terms_days?: number;
+          primary_color?: string | null;
+          secondary_color?: string | null;
           slug?: string;
           updated_at?: string;
           updated_by?: string | null;
@@ -4518,6 +4539,18 @@ export type Database = {
       generate_implementation_schedule: {
         Args: { p_implementation_id: string };
         Returns: Json;
+      };
+      generate_monthly_invoices_for_period: {
+        Args: { p_period_end: string; p_period_start: string };
+        Returns: {
+          agency_id: string;
+          invoice_id: string;
+          invoice_number: string;
+          line_count: number;
+          skip_reason: string;
+          skipped: boolean;
+          total_cents: number;
+        }[];
       };
       get_pg_share_token: { Args: never; Returns: string };
       has_agency_role: {
