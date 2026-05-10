@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authApiRequest, problemResponse } from "@/lib/api-keys";
+import { decodeCursor } from "@/lib/api-cursor";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -28,17 +29,11 @@ export async function GET(req: Request) {
     .limit(limit);
 
   if (cursor) {
-    try {
-      const decoded = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
-        ts: string;
-        id: string;
-      };
-      query = query.or(
-        `created_at.lt.${decoded.ts},and(created_at.eq.${decoded.ts},id.lt.${decoded.id})`,
-      );
-    } catch {
-      return problemResponse(400, "invalid_cursor");
-    }
+    const decoded = decodeCursor(cursor);
+    if (!decoded) return problemResponse(400, "invalid_cursor");
+    query = query.or(
+      `created_at.lt.${decoded.ts},and(created_at.eq.${decoded.ts},id.lt.${decoded.id})`,
+    );
   }
 
   const { data, error } = await query;

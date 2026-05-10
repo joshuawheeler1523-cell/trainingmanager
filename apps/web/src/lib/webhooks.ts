@@ -1,5 +1,7 @@
 import "server-only";
 import { createHmac, randomBytes } from "node:crypto";
+import { lookup as dnsLookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/database.types";
 
@@ -30,6 +32,77 @@ function signPayload(secret: string, body: string, unixSeconds: number): string 
   const mac = createHmac("sha256", secret);
   mac.update(`${unixSeconds.toString()}.${body}`);
   return mac.digest("hex");
+}
+
+/**
+ * Returns true if the IP is on a network we should never POST customer
+ * webhook traffic to. Blocks IPv4 RFC1918, link-local (169.254/16),
+ * loopback, CGNAT (100.64/10), and IPv6 unique local + loopback.
+ *
+ * Without this guard, a customer-supplied webhook URL like
+ * https://169.254.169.254/latest/meta-data/iam/security-credentials/
+ * lets them exfiltrate Vercel/Supabase IAM credentials via
+ * webhook_deliveries.response_body, which the manager UI displays.
+ */
+function isBlockedIp(ip: string): boolean {
+  const v = isIP(ip);
+  if (v === 4) {
+    const parts = ip.split(".").map((p) => parseInt(p, 10));
+    const [a = 0, b = 0] = parts;
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+    if (a === 0) return true;
+    return false;
+  }
+  if (v === 6) {
+    const lower = ip.toLowerCase();
+    if (lower === "::1" || lower === "::") return true;
+    if (lower.startsWith("fc") || lower.startsWith("fd")) return true; // ULA
+    if (lower.startsWith("fe80:")) return true; // link-local
+    if (lower.startsWith("::ffff:")) {
+      // IPv4-mapped — re-check the v4 portion
+      return isBlockedIp(lower.slice("::ffff:".length));
+    }
+    return false;
+  }
+  return false;
+}
+
+/**
+ * Resolves the webhook URL's host to an IP and rejects any that map to
+ * private/internal address space. Returns null on success, or an error
+ * message string to record on the delivery row.
+ */
+async function checkWebhookUrlSafe(rawUrl: string): Promise<string | null> {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return "invalid_url";
+  }
+  if (parsed.protocol !== "https:") return "non_https_blocked";
+
+  // If the host is already a literal IP, check directly. Otherwise resolve.
+  let ips: string[];
+  if (isIP(parsed.hostname)) {
+    ips = [parsed.hostname];
+  } else {
+    try {
+      const records = await dnsLookup(parsed.hostname, { all: true });
+      ips = records.map((r) => r.address);
+    } catch {
+      return "dns_lookup_failed";
+    }
+  }
+  if (ips.length === 0) return "dns_no_records";
+  for (const ip of ips) {
+    if (isBlockedIp(ip)) return `blocked_internal_ip:${ip}`;
+  }
+  return null;
 }
 
 export type EmitArgs = {
@@ -109,6 +182,21 @@ export async function deliverDelivery(deliveryId: string): Promise<void> {
     return;
   }
 
+  // SSRF guard — re-checked at delivery time (not just at registration)
+  // because DNS records can change after the endpoint was registered.
+  const ssrfBlock = await checkWebhookUrlSafe(ep.url);
+  if (ssrfBlock) {
+    await admin
+      .from("webhook_deliveries")
+      .update({
+        status: "failed",
+        response_body: `URL rejected by SSRF guard: ${ssrfBlock}`,
+        next_attempt_at: null,
+      })
+      .eq("id", row.id);
+    return;
+  }
+
   const body = JSON.stringify(row.payload);
   const ts = Math.floor(Date.now() / 1000);
   const sig = signPayload(ep.signing_secret, body, ts);
@@ -119,6 +207,9 @@ export async function deliverDelivery(deliveryId: string): Promise<void> {
   try {
     const res = await fetch(ep.url, {
       method: "POST",
+      // redirect: 'manual' so we don't follow a 302 to an internal address
+      // after passing the initial SSRF check.
+      redirect: "manual",
       headers: {
         "Content-Type": "application/json",
         "X-Arbor-Signature": `t=${ts.toString()},sig=${sig}`,

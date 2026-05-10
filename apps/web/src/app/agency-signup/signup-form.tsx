@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { createAgencySignupAction } from "./actions";
 
@@ -14,13 +14,22 @@ export default function SignupForm() {
   const [adminEmail, setAdminEmail] = useState("");
   const [adminFullName, setAdminFullName] = useState("");
   const [done, setDone] = useState<{ email: string; emailSent: boolean } | null>(null);
+  // Tracks whether the user has manually edited the slug. Once they have,
+  // we stop auto-deriving from the name. The previous closure-based
+  // comparison was buggy: it compared against `agencyName` (stale state),
+  // so the auto-update raced and broke after the first keystroke.
+  const slugManuallyEdited = useRef(false);
 
-  // Auto-derive slug from agency name
   const handleNameChange = (v: string) => {
     setAgencyName(v);
-    if (!agencySlug || agencySlug === slugify(agencyName)) {
+    if (!slugManuallyEdited.current) {
       setAgencySlug(slugify(v));
     }
+  };
+
+  const handleSlugChange = (v: string) => {
+    slugManuallyEdited.current = true;
+    setAgencySlug(v.toLowerCase().replace(/[^a-z0-9-]/g, "-"));
   };
 
   const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
@@ -86,7 +95,7 @@ export default function SignupForm() {
             required
             value={agencySlug}
             onChange={(e) => {
-              setAgencySlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"));
+              handleSlugChange(e.target.value);
             }}
             placeholder="acme-training"
             className={fieldClass}

@@ -33,6 +33,9 @@ export default async function AgencyBrandingPage() {
       </div>
 
       <BrandingForm
+        // Remount on any persisted change so the form's local state never
+        // diverges from what the server thinks the brand currently is.
+        key={`${agency.logo_url ?? ""}|${agency.primary_color ?? ""}|${agency.secondary_color ?? ""}|${agency.accent_color ?? ""}|${agency.email_from_name ?? ""}|${agency.email_from_address ?? ""}`}
         agencyId={agency.id}
         initial={{
           logoUrl: agency.logo_url,

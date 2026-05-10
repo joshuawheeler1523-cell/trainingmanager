@@ -38,11 +38,14 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
     e: React.SyntheticEvent<HTMLFormElement>,
     mode: "magic" | "password",
   ) => {
+    // Always preventDefault so a missing email or pre-validation bail-out
+    // doesn't trigger a native form submit (the form has no action= and
+    // the browser would do a full-page reload to the same URL).
+    e.preventDefault();
     const form = e.currentTarget;
     const email = (new FormData(form).get("email") as string | null)?.trim() ?? "";
-    if (!email.includes("@")) return; // let native validation catch it
+    if (!email.includes("@")) return; // native required + type=email handle the message
 
-    e.preventDefault();
     startSsoCheck(async () => {
       const sso = await discoverSsoForEmail(email);
       if (sso) {

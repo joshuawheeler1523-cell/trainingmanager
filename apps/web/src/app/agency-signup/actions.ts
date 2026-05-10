@@ -64,31 +64,54 @@ export async function createAgencySignupAction(
     };
   }
 
-  // Resolve / create the auth user via admin API. inviteUserByEmail is
-  // idempotent on the email — if the user already exists we still want to
-  // proceed and link them to the new agency (assuming they consent by
-  // clicking the resulting magic link).
-  let userId: string;
-  const { data: existingUsers } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-  const existing = existingUsers.users.find(
+  // Reject signups for emails that already have an account. Previous
+  // behavior silently auto-joined the existing user as agency_admin —
+  // a consent bypass: a hostile signup could attach any victim's email
+  // to a new agency they'd never asked to join. The right flow for an
+  // existing user is to sign in first, then accept an explicit
+  // invitation from the agency-side member-management UI (future work).
+  //
+  // Lookup uses the paginated listUsers API filtered by email — the
+  // earlier `perPage: 200` was a silent cap that truncated past 200
+  // users. There's no `getUserByEmail` helper, but `listUsers({ email })`
+  // accepts a server-side filter param.
+  const { data: emailLookup, error: lookupErr } = await admin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1,
+    // @ts-expect-error — supabase-js types omit the `email` filter, but
+    // the underlying GoTrue admin endpoint accepts it
+    email: parsed.data.adminEmail,
+  });
+  if (lookupErr) {
+    return { ok: false, error: { code: "LOOKUP_FAILED", message: lookupErr.message } };
+  }
+  const conflictingUser = emailLookup.users.find(
     (u) => u.email?.toLowerCase() === parsed.data.adminEmail.toLowerCase(),
   );
-  if (existing) {
-    userId = existing.id;
-  } else {
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
-      email: parsed.data.adminEmail,
-      email_confirm: false,
-      user_metadata: { full_name: parsed.data.adminFullName },
-    });
-    if (createErr) {
-      return {
-        ok: false,
-        error: { code: "USER_CREATE_FAILED", message: createErr.message },
-      };
-    }
-    userId = created.user.id;
+  if (conflictingUser) {
+    return {
+      ok: false,
+      error: {
+        code: "EMAIL_TAKEN",
+        message:
+          "An account with that email already exists. Sign in first, then we'll connect you to a new agency.",
+        field: "adminEmail",
+      },
+    };
   }
+
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    email: parsed.data.adminEmail,
+    email_confirm: false,
+    user_metadata: { full_name: parsed.data.adminFullName },
+  });
+  if (createErr) {
+    return {
+      ok: false,
+      error: { code: "USER_CREATE_FAILED", message: createErr.message },
+    };
+  }
+  const userId = created.user.id;
 
   // Create the agency
   const { data: agencyRow, error: agencyErr } = await admin

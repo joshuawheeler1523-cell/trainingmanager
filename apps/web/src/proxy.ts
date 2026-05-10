@@ -43,11 +43,19 @@ export async function proxy(request: NextRequest) {
   // server components (e.g. login page) can scope branding without re-running
   // the lookup. Skip on localhost + *.vercel.app to dodge a needless RPC.
   const rawHost = request.headers.get("host")?.toLowerCase();
-  const host = rawHost?.split(":")[0] ?? null;
+  // Strip port. Bracketed IPv6 hosts ([::1]:3000) just won't match an
+  // agency — we don't host on raw IPs.
+  const host = rawHost?.replace(/:\d+$/, "") ?? null;
   let agencyMatch: HostMatch | null = null;
-  if (host && host !== "localhost" && !host.endsWith(".vercel.app")) {
+  if (host && host !== "localhost" && !host.endsWith(".vercel.app") && !host.startsWith("[")) {
     agencyMatch = await lookupAgencyByHost(host);
   }
+  // Always clear any inbound x-agency-* headers so an attacker can't
+  // spoof them via a request to a non-agency host. Then set them only
+  // when the host actually matched a verified agency.
+  request.headers.delete("x-agency-id");
+  request.headers.delete("x-agency-slug");
+  request.headers.delete("x-agency-name");
   if (agencyMatch) {
     request.headers.set("x-agency-id", agencyMatch.agencyId);
     request.headers.set("x-agency-slug", agencyMatch.slug);
