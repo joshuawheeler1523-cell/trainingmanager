@@ -98,6 +98,80 @@ export type Database = {
           },
         ];
       };
+      agencies: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          name: string;
+          slug: string;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          name: string;
+          slug: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          name?: string;
+          slug?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [];
+      };
+      agency_memberships: {
+        Row: {
+          accepted_at: string | null;
+          agency_id: string;
+          created_at: string;
+          id: string;
+          invited_at: string | null;
+          role: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          agency_id: string;
+          created_at?: string;
+          id?: string;
+          invited_at?: string | null;
+          role?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          accepted_at?: string | null;
+          agency_id?: string;
+          created_at?: string;
+          id?: string;
+          invited_at?: string | null;
+          role?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agency_memberships_agency_id_fkey";
+            columns: ["agency_id"];
+            isOneToOne: false;
+            referencedRelation: "agencies";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       allocation_buckets: {
         Row: {
           color: string;
@@ -2269,6 +2343,7 @@ export type Database = {
       };
       organizations: {
         Row: {
+          agency_id: string | null;
           billing_tier: string | null;
           created_at: string;
           created_by: string | null;
@@ -2287,6 +2362,7 @@ export type Database = {
           version: number;
         };
         Insert: {
+          agency_id?: string | null;
           billing_tier?: string | null;
           created_at?: string;
           created_by?: string | null;
@@ -2305,6 +2381,7 @@ export type Database = {
           version?: number;
         };
         Update: {
+          agency_id?: string | null;
           billing_tier?: string | null;
           created_at?: string;
           created_by?: string | null;
@@ -2322,7 +2399,15 @@ export type Database = {
           updated_by?: string | null;
           version?: number;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "organizations_agency_id_fkey";
+            columns: ["agency_id"];
+            isOneToOne: false;
+            referencedRelation: "agencies";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       project_team_members: {
         Row: {
@@ -4224,6 +4309,7 @@ export type Database = {
     };
     Functions: {
       accept_invitation: { Args: { p_token: string }; Returns: string };
+      agency_org_ids: { Args: { p_agency_id: string }; Returns: string[] };
       apply_standard_triggers: {
         Args: { p_table_name: string };
         Returns: undefined;
@@ -4239,6 +4325,7 @@ export type Database = {
         };
         Returns: undefined;
       };
+      current_agency_id: { Args: never; Returns: string };
       current_instructor_id: { Args: { p_org_id: string }; Returns: string };
       current_user_id: { Args: never; Returns: string };
       default_department_for_org: {
@@ -4259,6 +4346,10 @@ export type Database = {
         Returns: Json;
       };
       get_pg_share_token: { Args: never; Returns: string };
+      has_agency_role: {
+        Args: { p_agency_id: string; p_roles: string[] };
+        Returns: boolean;
+      };
       has_any_role: {
         Args: { p_org_id: string; p_roles: string[] };
         Returns: boolean;
@@ -4285,13 +4376,14 @@ export type Database = {
           weekly_capacity: number;
         }[];
       };
+      is_agency_admin: { Args: { p_agency_id: string }; Returns: boolean };
+      is_agency_member: { Args: { p_agency_id: string }; Returns: boolean };
       is_department_admin: {
         Args: { p_department_id: string };
         Returns: boolean;
       };
       is_instructor: { Args: { p_org_id: string }; Returns: boolean };
       is_manager: { Args: { p_org_id: string }; Returns: boolean };
-      is_org_admin: { Args: { p_org_id: string }; Returns: boolean };
       is_viewer: { Args: { p_org_id: string }; Returns: boolean };
       lookup_invitation_by_token: {
         Args: { p_token: string };

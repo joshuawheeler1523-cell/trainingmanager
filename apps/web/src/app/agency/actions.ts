@@ -1,0 +1,182 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { PRESETS, TOGGLEABLE_MODULES, type PresetKey } from "@arbor/shared";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentAgencyId, isAgencyAdmin } from "@/lib/auth/agency";
+import { writeAuditDenial } from "@/lib/auth/audit-denial";
+import { toSlug } from "@/lib/utils/slug";
+import type { Json } from "@/lib/supabase/database.types";
+
+type ActionResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: { code: string; message: string; field?: string } };
+
+function validationError(err: {
+  errors: Array<{ message: string; path: (string | number)[] }>;
+}): ActionResult<never> {
+  const first = err.errors[0];
+  const field = first?.path.join(".");
+  return {
+    ok: false,
+    error: {
+      code: "VALIDATION",
+      message: first?.message ?? "Invalid input",
+      ...(field ? { field } : {}),
+    },
+  };
+}
+
+const PRESET_KEY_VALUES: [PresetKey, ...PresetKey[]] = [
+  "hospital_training",
+  "corporate_ld",
+  "emr_analyst",
+  "clinical_informatics",
+  "software_engineering",
+  "consulting",
+  "creative_agency",
+  "custom",
+];
+
+const createClientOrgSchema = z.object({
+  name: z.string().min(1, "Organization name is required").max(200),
+  slug: z
+    .string()
+    .min(2, "Slug must be at least 2 characters")
+    .max(64)
+    .regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only")
+    .optional(),
+  presetKey: z.enum(PRESET_KEY_VALUES).default("hospital_training"),
+});
+
+/**
+ * Provisions a new client org under the caller's agency.
+ *
+ * Flow:
+ *   1. Validate input + verify caller is agency_admin
+ *   2. Use admin client (service role) to bypass org-level RLS for the
+ *      cross-cutting setup work (insert org, default department, manager
+ *      membership, feature flags)
+ *   3. Insert organizations row with agency_id set + preset_key
+ *   4. Create the default "General" department (matches the existing
+ *      auto-creation pattern in 20260508120000_add_departments.sql)
+ *   5. Add the agency_admin as manager of the new org so they can
+ *      configure it. They can later remove themselves once the hospital's
+ *      manager is invited and accepts.
+ *   6. Seed module feature_flags from the preset's manifest
+ *   7. Write an audit_log entry with the new org_id
+ *
+ * @requiredAgencyRole agency_admin
+ */
+export async function createClientOrgAction(
+  input: unknown,
+): Promise<ActionResult<{ orgId: string; slug: string }>> {
+  const parsed = createClientOrgSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const agencyId = await getCurrentAgencyId();
+  if (!agencyId) {
+    return { ok: false, error: { code: "NO_AGENCY", message: "Not a member of any agency" } };
+  }
+  if (!(await isAgencyAdmin(agencyId))) {
+    await writeAuditDenial(agencyId, "agency", "createClientOrg", "not_agency_admin");
+    return { ok: false, error: { code: "FORBIDDEN", message: "Agency admin only" } };
+  }
+
+  // Resolve the calling user (we'll add them as a manager of the new org).
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: { code: "UNAUTHENTICATED", message: "Sign in required" } };
+  }
+
+  const slug = parsed.data.slug ?? toSlug(parsed.data.name);
+  const preset = PRESETS[parsed.data.presetKey];
+  const admin = createAdminClient();
+
+  // 1. Insert the org with agency_id set + preset.
+  const { data: org, error: orgErr } = await admin
+    .from("organizations")
+    .insert({
+      name: parsed.data.name,
+      slug,
+      agency_id: agencyId,
+      preset_key: parsed.data.presetKey,
+      role_labels: preset.roleLabels as unknown as Json,
+      entity_labels: preset.entityLabels as unknown as Json,
+    })
+    .select("id, slug")
+    .single();
+  if (orgErr) {
+    return {
+      ok: false,
+      error: { code: orgErr.code, message: orgErr.message },
+    };
+  }
+
+  // 2. Create the default "General" department for the new org.
+  const { data: dept, error: deptErr } = await admin
+    .from("departments")
+    .insert({
+      org_id: org.id,
+      name: "General",
+      slug: "general",
+      description: "Default department for the organization.",
+    })
+    .select("id")
+    .single();
+  if (deptErr) {
+    // Best-effort cleanup
+    await admin.from("organizations").delete().eq("id", org.id);
+    return {
+      ok: false,
+      error: { code: deptErr.code, message: deptErr.message },
+    };
+  }
+
+  // 3. Add the calling agency_admin as manager of the new org.
+  const nowIso = new Date().toISOString();
+  await admin.from("org_memberships").insert({
+    org_id: org.id,
+    user_id: user.id,
+    role: "manager",
+    accepted_at: nowIso,
+  });
+  await admin.from("department_memberships").insert({
+    department_id: dept.id,
+    user_id: user.id,
+    role: "admin",
+    accepted_at: nowIso,
+  });
+
+  // 4. Seed module feature flags from the preset.
+  const moduleRows = TOGGLEABLE_MODULES.map((key) => ({
+    org_id: org.id,
+    key,
+    enabled: preset.modules[key],
+  }));
+  await admin.from("feature_flags").insert(moduleRows);
+
+  // 5. Audit log entry — the org is the relevant context.
+  await admin.from("audit_log").insert({
+    org_id: org.id,
+    actor_id: user.id,
+    operation: "AGENCY_PROVISIONED_CLIENT_ORG",
+    table_name: "organizations",
+    record_id: org.id,
+    changed_fields: null,
+    old_values: null,
+    new_values: {
+      agency_id: agencyId,
+      preset_key: parsed.data.presetKey,
+      slug: org.slug,
+    },
+  });
+
+  revalidatePath("/agency");
+  return { ok: true, data: { orgId: org.id, slug: org.slug } };
+}
