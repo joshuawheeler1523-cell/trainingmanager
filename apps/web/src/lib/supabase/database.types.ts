@@ -388,6 +388,53 @@ export type Database = {
           },
         ];
       };
+      api_keys: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          key_hash: string;
+          key_prefix: string;
+          last_used_at: string | null;
+          name: string;
+          org_id: string;
+          revoked_at: string | null;
+          scopes: string[];
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          key_hash: string;
+          key_prefix: string;
+          last_used_at?: string | null;
+          name: string;
+          org_id: string;
+          revoked_at?: string | null;
+          scopes?: string[];
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          key_hash?: string;
+          key_prefix?: string;
+          last_used_at?: string | null;
+          name?: string;
+          org_id?: string;
+          revoked_at?: string | null;
+          scopes?: string[];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       arbor_invoices: {
         Row: {
           agency_id: string;
@@ -4433,6 +4480,113 @@ export type Database = {
           },
           {
             foreignKeyName: "tras_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      webhook_deliveries: {
+        Row: {
+          attempts: number;
+          created_at: string;
+          delivered_at: string | null;
+          endpoint_id: string;
+          event_type: string;
+          id: string;
+          next_attempt_at: string | null;
+          org_id: string;
+          payload: Json;
+          response_body: string | null;
+          response_code: number | null;
+          status: string;
+        };
+        Insert: {
+          attempts?: number;
+          created_at?: string;
+          delivered_at?: string | null;
+          endpoint_id: string;
+          event_type: string;
+          id?: string;
+          next_attempt_at?: string | null;
+          org_id: string;
+          payload: Json;
+          response_body?: string | null;
+          response_code?: number | null;
+          status?: string;
+        };
+        Update: {
+          attempts?: number;
+          created_at?: string;
+          delivered_at?: string | null;
+          endpoint_id?: string;
+          event_type?: string;
+          id?: string;
+          next_attempt_at?: string | null;
+          org_id?: string;
+          payload?: Json;
+          response_body?: string | null;
+          response_code?: number | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_endpoint_id_fkey";
+            columns: ["endpoint_id"];
+            isOneToOne: false;
+            referencedRelation: "webhook_endpoints";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "webhook_deliveries_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      webhook_endpoints: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          enabled: boolean;
+          events: string[];
+          id: string;
+          org_id: string;
+          signing_secret: string;
+          updated_at: string;
+          url: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          enabled?: boolean;
+          events?: string[];
+          id?: string;
+          org_id: string;
+          signing_secret: string;
+          updated_at?: string;
+          url: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          enabled?: boolean;
+          events?: string[];
+          id?: string;
+          org_id?: string;
+          signing_secret?: string;
+          updated_at?: string;
+          url?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "webhook_endpoints_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
