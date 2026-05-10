@@ -71,9 +71,14 @@ export async function emitWebhookEvent(args: EmitArgs): Promise<void> {
       .single();
     if (!row) continue;
 
-    // Inline delivery (don't await — we don't want webhooks blocking
-    // the parent server action). Errors are recorded on the row.
-    void deliverDelivery(row.id);
+    // Inline delivery, awaited. The earlier "void deliverDelivery(...)"
+    // was unsafe on Vercel: the serverless function dies the moment the
+    // parent action's response flushes, killing any unawaited fetch
+    // before it starts. The 10s per-attempt timeout inside deliverDelivery
+    // fits comfortably inside the 30s server-action budget; if a customer
+    // ever subscribes to enough endpoints that this matters, switch to
+    // Next's waitUntil() to extend the response lifetime.
+    await deliverDelivery(row.id);
   }
 }
 
