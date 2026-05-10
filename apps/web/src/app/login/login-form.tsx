@@ -1,10 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import {
+  discoverSsoForEmail,
   sendMagicLink,
   signInWithPassword,
+  startSsoSignIn,
   type MagicLinkState,
   type PasswordState,
 } from "./actions";
@@ -26,6 +28,35 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
     signInWithPassword,
     {},
   );
+  const [ssoChecking, startSsoCheck] = useTransition();
+
+  // SSO check happens on form submit: we look up the email's domain in
+  // sso_configs first; if a provider id is registered + enabled we
+  // dispatch to the IdP via signInWithSSO, otherwise we fall through to
+  // the magic-link / password flow the user picked.
+  const handleEmailSubmit = (
+    e: React.SyntheticEvent<HTMLFormElement>,
+    mode: "magic" | "password",
+  ) => {
+    const form = e.currentTarget;
+    const email = (new FormData(form).get("email") as string | null)?.trim() ?? "";
+    if (!email.includes("@")) return; // let native validation catch it
+
+    e.preventDefault();
+    startSsoCheck(async () => {
+      const sso = await discoverSsoForEmail(email);
+      if (sso) {
+        await startSsoSignIn(sso.providerId);
+        return;
+      }
+      // No SSO — submit the original form action.
+      if (mode === "magic") {
+        magicAction(new FormData(form));
+      } else {
+        passAction(new FormData(form));
+      }
+    });
+  };
 
   const accent = brand.isAgency ? brand.primaryColor : "#8FA68E";
 
@@ -135,7 +166,12 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
               </header>
 
               {mode === "magic" ? (
-                <form action={magicAction} className="space-y-5">
+                <form
+                  onSubmit={(e) => {
+                    handleEmailSubmit(e, "magic");
+                  }}
+                  className="space-y-5"
+                >
                   <Field
                     id="login-magic-email"
                     name="email"
@@ -144,12 +180,21 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
                     autoComplete="email"
                   />
                   {magicState.status === "error" && <ErrorText>{magicState.message}</ErrorText>}
-                  <PrimaryButton pending={magicPending} pendingLabel="Sending…" brand={brand}>
+                  <PrimaryButton
+                    pending={magicPending || ssoChecking}
+                    pendingLabel={ssoChecking ? "Checking…" : "Sending…"}
+                    brand={brand}
+                  >
                     Send magic link
                   </PrimaryButton>
                 </form>
               ) : (
-                <form action={passAction} className="space-y-5">
+                <form
+                  onSubmit={(e) => {
+                    handleEmailSubmit(e, "password");
+                  }}
+                  className="space-y-5"
+                >
                   <Field
                     id="login-password-email"
                     name="email"
@@ -165,7 +210,11 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
                     autoComplete="current-password"
                   />
                   {passState.error && <ErrorText>{passState.error}</ErrorText>}
-                  <PrimaryButton pending={passPending} pendingLabel="Signing in…" brand={brand}>
+                  <PrimaryButton
+                    pending={passPending || ssoChecking}
+                    pendingLabel={ssoChecking ? "Checking…" : "Signing in…"}
+                    brand={brand}
+                  >
                     Sign in
                   </PrimaryButton>
                 </form>

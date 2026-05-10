@@ -3212,6 +3212,50 @@ export type Database = {
           },
         ];
       };
+      sso_configs: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          display_name: string | null;
+          email_domain: string;
+          enabled: boolean;
+          id: string;
+          org_id: string;
+          supabase_provider_id: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          display_name?: string | null;
+          email_domain: string;
+          enabled?: boolean;
+          id?: string;
+          org_id: string;
+          supabase_provider_id?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          display_name?: string | null;
+          email_domain?: string;
+          enabled?: boolean;
+          id?: string;
+          org_id?: string;
+          supabase_provider_id?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sso_configs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       support_ticket_messages: {
         Row: {
           author_id: string | null;
@@ -4673,6 +4717,13 @@ export type Database = {
           org_name: string;
           role: string;
           visibility: string;
+        }[];
+      };
+      lookup_sso_for_email_domain: {
+        Args: { p_domain: string };
+        Returns: {
+          display_name: string;
+          provider_id: string;
         }[];
       };
       mark_all_notifications_read: { Args: never; Returns: number };
