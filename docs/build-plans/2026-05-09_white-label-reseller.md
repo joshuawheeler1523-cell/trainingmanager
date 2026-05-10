@@ -200,27 +200,42 @@ Most customers can live without SCIM initially. WorkOS provides this if Phase 4 
 
 **Acceptance**: a hospital admin uploads their AzureAD SAML metadata, enables SSO. A user from that hospital signs in via SAML, lands authenticated, sees their org content per their existing membership. No password ever entered.
 
-### Phase 5 — Stripe billing + revenue share to Arbor (1.5 sessions)
+### Phase 5 — Manual billing + invoice records + PDF generation (2 sessions)
 
-This phase is dramatically simpler than v1 of this plan because:
+**No Stripe.** Arbor (you) bills agencies manually. The platform records everything (contracts, monthly rev share, invoices, payments) and produces professional invoice PDFs you download + email + chase collections on yourself.
 
-- **No feature tier gates** — every customer gets every capability, so no `requireFeature()` plumbing.
-- **No per-seat metering** — pricing is annual flat per client_contract; no daily count cron.
-- **No Stripe Connect / marketplace** — consultant collects from hospital, Arbor invoices the consultant for accumulated rev share.
+Why manual: avoids $600+/yr Stripe fees, removes a vendor + integration to maintain, sufficient for low-volume early-stage agency partnerships. **Forward-compatible**: `arbor_invoices.payment_provider` defaults to `'manual'` and could become `'stripe'` later without restructuring.
 
 What ships:
 
-- Migration: `client_contracts`, `arbor_invoices`, `billing_events` tables
-- App: `/agency/clients` — agency_admin form to record each client deal: client_org, pricing tier (Small / Medium / Large / Enterprise), annual contract value the consultant invoiced the hospital for, contract start/end dates. Saving creates a `client_contracts` row.
-- App: `/agency/billing` — current month's accumulated rev share (live calculation: sum of (annual_contract_value × revenue_share_pct ÷ 12) across all active contracts), prior invoices history, link to Stripe Customer Portal.
-- Server-side: `lib/billing/` — Stripe customer creation per agency, monthly invoice creation
-- Cron job (Supabase scheduled, monthly on the 1st): for each agency, sum the rev share owed across all `status='active'` client_contracts → create + send a Stripe invoice → write `arbor_invoices` row
-- Webhook handler: `/api/stripe/webhook` — handles `invoice.payment_succeeded`, `invoice.payment_failed`. Updates `arbor_invoices.status`. Idempotent via `stripe_event_id`.
-- Tier auto-recalculation (monthly cron): for each `status='active'` client_contract, count active org_memberships in the org; if the count would push the org into a higher tier, emit a notification to the agency_admin (does NOT auto-bill at the higher tier — agency confirms upgrade at next renewal or accepts a mid-term proration).
-- Failed-payment handling: 30-day grace period (longer than per-seat SaaS norm because invoices are bigger and B2B AP cycles take time), then "billing hold" status with a banner — agency_admin can still log in, but cannot create new client_contracts until the prior invoice is paid.
-- Trial: not via Stripe — handled by `client_contracts.status = 'trial'` with no rev-share-owed during the trial period (default 90 days for the first contract per agency, configurable).
+- Migration `client_contracts` table: agency_id, org_id (the client), pricing_tier (small/medium/large/enterprise), annual_contract_value_cents, revenue_share_pct, contract_start, contract_end, status (trial/active/expired/cancelled), notes
+- Migration `arbor_invoices` table: id, invoice_number (sequential `ARB-YYYY-NNNNN`), agency_id, period_start, period_end, issued_at, due_at, total_cents, status (draft/sent/paid/overdue/void/cancelled), payment_provider (default `manual`), paid_at, paid_method (check/wire/ach/other), paid_reference (check #, wire confirmation, etc.), line_items jsonb (snapshot of contracts billed in this period), notes
+- Migration `agencies` columns: billing_email, billing_address, payment_terms_days (default 30)
+- Server actions:
+  - `createClientContract` (agency_admin): record a new agency-client deal
+  - `updateClientContract` / `cancelClientContract`
+  - `generateInvoiceNow` (Arbor admin only — see below): manually trigger invoice generation for a single agency outside the monthly cron
+  - `markInvoicePaid` (Arbor admin only): record payment metadata
+  - `markInvoiceVoid` (Arbor admin only): for cancellations or corrections
+- App `/agency/clients` (agency_admin only): record + edit client contracts; see current rev-share-owed for the period
+- App `/agency/billing` (agency_admin only): current period's accumulated rev share (live calculation), invoice history, payment status. Read-only — agency_admins see what they owe but can't create/modify invoices themselves.
+- App `/agency/billing/[invoiceId]` — single invoice view with full line items
+- API route `/api/agency/invoices/[id]/pdf` — generates invoice PDF using existing pdf-lib pattern from TRA route. Includes Arbor branding, agency bill-to details, line items, payment instructions, due date, invoice number.
+- Cron (Supabase Edge Function or scheduled SQL, runs 1st of each month at 09:00 UTC): for each agency, sums rev share owed across all `status='active'` client_contracts for the prior month → creates `arbor_invoices` row with status='draft' → notifies you (Arbor) via email
+- "Mark as paid" flow: you receive payment outside the platform → log in to Arbor admin → click invoice → fill in payment date + method + reference → status flips to 'paid' + audit_log entry written
+- Tier auto-recalculation: same as before — monthly cron flags contracts whose active user count crossed a tier boundary; emits a notification (does not auto-upgrade)
+- Trial period: `client_contracts.status='trial'` skipped in invoice generation. First contract per agency defaults to 90-day trial; configurable.
 
-**Acceptance**: agency_admin records a $50k Medium-tier contract with Hospital X. On the 1st of next month, Stripe invoice is created for $1,250 ($50k × 30% ÷ 12). When the agency pays the invoice, status flips to paid and audit_log records the event.
+**Decisions baked into v1** (push back if any are wrong):
+
+- Invoice numbering: sequential `ARB-YYYY-NNNNN` across all agencies (e.g. `ARB-2026-00001`). Audit-friendly + simple.
+- Payment terms: Net 30 default, per-agency override.
+- Arbor billing entity (your name, address, payment instructions): configured via `ARBOR_BILLING_*` env vars rendered into every PDF + email.
+- No automated email sending in v1: you download PDF + email manually. (Optional Phase 5b: send-invoice action that emails the PDF via Resend.)
+
+**Where Arbor admin powers live**: `markInvoicePaid` and `generateInvoiceNow` are NOT agency_admin operations — they're Arbor-internal. v1 implementation: gate by an `ARBOR_ADMIN_USER_IDS` env var (comma-separated user UUIDs). A proper Arbor admin role + console can land in v2.
+
+**Acceptance**: agency_admin records a $50k Medium-tier contract for Hospital X. On the 1st of next month, an invoice for $1,250 ($50k × 30% ÷ 12) is auto-created with status='draft' and you receive a notification. You review, click the invoice, download the PDF, email it to the agency. Two weeks later they Zelle you $1,250. You log in, click the invoice, click "Mark paid", enter date + method='zelle' + reference='confirmation #'. Status flips to 'paid'. Audit log captures everything.
 
 ### Phase 6 — Public REST API + webhooks (3 sessions)
 
