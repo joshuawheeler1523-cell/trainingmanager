@@ -821,6 +821,56 @@ export type Database = {
           },
         ];
       };
+      data_exports: {
+        Row: {
+          completed_at: string | null;
+          error_message: string | null;
+          id: string;
+          org_id: string;
+          requested_at: string;
+          requested_by: string | null;
+          row_count: number | null;
+          size_bytes: number | null;
+          status: string;
+          storage_path: string | null;
+          table_count: number | null;
+        };
+        Insert: {
+          completed_at?: string | null;
+          error_message?: string | null;
+          id?: string;
+          org_id: string;
+          requested_at?: string;
+          requested_by?: string | null;
+          row_count?: number | null;
+          size_bytes?: number | null;
+          status?: string;
+          storage_path?: string | null;
+          table_count?: number | null;
+        };
+        Update: {
+          completed_at?: string | null;
+          error_message?: string | null;
+          id?: string;
+          org_id?: string;
+          requested_at?: string;
+          requested_by?: string | null;
+          row_count?: number | null;
+          size_bytes?: number | null;
+          status?: string;
+          storage_path?: string | null;
+          table_count?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "data_exports_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       deliverable_types: {
         Row: {
           created_at: string;
