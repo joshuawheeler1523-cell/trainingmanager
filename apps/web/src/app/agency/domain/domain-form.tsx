@@ -9,6 +9,29 @@ import {
   verifyAgencyDomainAction,
 } from "./actions";
 
+/**
+ * Maps Vercel's verification reason codes to plain-English errors so
+ * the user sees actionable guidance instead of internal jargon.
+ */
+function humanizeVerifyReason(reason: string | undefined): string {
+  switch (reason) {
+    case "txt_record_missing":
+    case "missing_txt_record":
+      return "DNS TXT record not found yet. Add the record shown above and try again in a few minutes.";
+    case "incorrect_cname":
+    case "missing_cname":
+      return "DNS CNAME isn't pointing to Vercel yet. Double-check the record above and wait for DNS to propagate (up to an hour).";
+    case "a_record_mismatch":
+    case "incorrect_a_record":
+      return "DNS A record doesn't match Vercel's IP. Verify the value above and wait for propagation.";
+    case "pending":
+    case undefined:
+      return "Not verified yet. DNS can take a few minutes to propagate — try again shortly.";
+    default:
+      return `Not verified yet. Reason: ${reason}. Check your DNS records and retry in a few minutes.`;
+  }
+}
+
 const fieldClass =
   "border-input bg-background text-foreground w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
@@ -48,14 +71,12 @@ export default function DomainForm({
         return;
       }
       if (result.data.verified) {
-        toast.success("Domain verified! 🎉");
+        toast.success("Domain verified");
         router.refresh();
       } else if (result.data.degraded) {
         toast.error("Vercel API isn't configured — can't verify.");
       } else {
-        toast.error(
-          `Not verified yet (${result.data.reason ?? "pending"}). Try again in a minute.`,
-        );
+        toast.error(humanizeVerifyReason(result.data.reason));
       }
     });
   };

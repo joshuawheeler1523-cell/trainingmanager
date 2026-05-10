@@ -28,7 +28,12 @@ export default function MarkPaidForm({
 
   const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const cents = Math.round(parseFloat(paidAmountDollars) * 100);
+    const dollars = parseFloat(paidAmountDollars);
+    if (!Number.isFinite(dollars) || dollars < 0) {
+      toast.error("Enter a valid payment amount");
+      return;
+    }
+    const cents = Math.round(dollars * 100);
     startTransition(async () => {
       const result = await markInvoicePaidAction({
         invoiceId,

@@ -208,16 +208,24 @@ export default function SsoConfigList({ configs }: { configs: Config[] }) {
             active when this is set AND Enabled is on.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-sm">
+        <label
+          className={`flex items-center gap-2 text-sm ${providerId.trim() ? "" : "opacity-50"}`}
+        >
           <input
             type="checkbox"
-            checked={enabled}
+            checked={enabled && Boolean(providerId.trim())}
+            disabled={!providerId.trim()}
             onChange={(e) => {
               setEnabled(e.target.checked);
             }}
             className="h-4 w-4"
           />
-          <span className="text-foreground">Enable for this domain</span>
+          <span className="text-foreground">
+            Enable for this domain
+            {!providerId.trim() && (
+              <span className="text-muted-foreground ml-1 text-xs">(provider id required)</span>
+            )}
+          </span>
         </label>
         <div>
           <button

@@ -45,8 +45,15 @@ export default function NewContractForm({
       toast.error("Invalid annual value");
       return;
     }
-    const sharePct =
-      revShareOverridePct.trim() === "" ? null : Math.round(parseFloat(revShareOverridePct) * 100);
+    let sharePct: number | null = null;
+    if (revShareOverridePct.trim() !== "") {
+      const pct = parseFloat(revShareOverridePct);
+      if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+        toast.error("Rev share % must be between 0 and 100");
+        return;
+      }
+      sharePct = Math.round(pct * 100);
+    }
 
     startTransition(async () => {
       const result = await createClientContractAction({

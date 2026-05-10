@@ -34,14 +34,16 @@ export async function hashApiKey(full: string): Promise<string> {
  * Performs a narrow lookup by key_prefix first (indexed) so we typically
  * bcrypt-compare against one row.
  */
-export async function verifyApiKey(full: string): Promise<{ orgId: string; keyId: string } | null> {
+export type VerifiedKey = { orgId: string; keyId: string; scopes: string[] };
+
+export async function verifyApiKey(full: string): Promise<VerifiedKey | null> {
   if (!full.startsWith("arbor_") || full.length < KEY_PREFIX_LENGTH + SECRET_LENGTH) return null;
   const prefix = full.slice(0, KEY_PREFIX_LENGTH);
 
   const admin = createAdminClient();
   const { data: candidates } = await admin
     .from("api_keys")
-    .select("id, org_id, key_hash")
+    .select("id, org_id, key_hash, scopes")
     .eq("key_prefix", prefix)
     .is("revoked_at", null);
   if (!candidates || candidates.length === 0) return null;
@@ -53,7 +55,7 @@ export async function verifyApiKey(full: string): Promise<{ orgId: string; keyId
         .from("api_keys")
         .update({ last_used_at: new Date().toISOString() })
         .eq("id", cand.id);
-      return { orgId: cand.org_id, keyId: cand.id };
+      return { orgId: cand.org_id, keyId: cand.id, scopes: cand.scopes };
     }
   }
   return null;
@@ -61,11 +63,17 @@ export async function verifyApiKey(full: string): Promise<{ orgId: string; keyId
 
 /**
  * Extracts the bearer token from a Request and verifies it. Returns
- * { orgId, keyId } on success or a Response (401) on failure.
+ * { orgId, keyId, scopes } on success or a Response (401/403) on failure.
+ *
+ * `requiredScope` is checked against the key's scopes array. Default
+ * issuance is ['read','write']; a future UI can issue read-only keys
+ * for safer integrations and they'll be blocked from write endpoints
+ * automatically.
  */
 export async function authApiRequest(
   req: Request,
-): Promise<{ orgId: string; keyId: string } | Response> {
+  requiredScope: "read" | "write" = "read",
+): Promise<VerifiedKey | Response> {
   const auth = req.headers.get("authorization") ?? req.headers.get("Authorization");
   if (!auth || !auth.startsWith("Bearer ")) {
     return new Response(
@@ -85,6 +93,17 @@ export async function authApiRequest(
         status: 401,
         headers: { "Content-Type": "application/problem+json" },
       },
+    );
+  }
+  if (!result.scopes.includes(requiredScope)) {
+    return new Response(
+      JSON.stringify({
+        type: "about:blank",
+        title: "insufficient_scope",
+        status: 403,
+        detail: `This API key does not have the '${requiredScope}' scope`,
+      }),
+      { status: 403, headers: { "Content-Type": "application/problem+json" } },
     );
   }
   return result;

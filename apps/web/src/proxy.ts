@@ -7,22 +7,29 @@ const SUPABASE_URL = process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? "";
 const SUPABASE_ANON_KEY = process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"] ?? "";
 
 // White-Label Phase 3: per-isolate cache of {host → agency} mappings.
-// Custom-domain rows change rarely so a small LRU is plenty.
+// Custom-domain rows change rarely, but a long-lived isolate would keep
+// stale mappings indefinitely after an agency removes/changes their
+// domain. 60s TTL bounds that risk to a minute of brand mis-routing
+// after a removal — acceptable since the alternative is one Supabase
+// round-trip per request.
 type HostMatch = { agencyId: string; slug: string; name: string };
-const HOST_CACHE = new Map<string, HostMatch | null>();
+type CacheEntry = { value: HostMatch | null; expiresAt: number };
+const HOST_CACHE = new Map<string, CacheEntry>();
 const HOST_CACHE_MAX = 256;
+const HOST_CACHE_TTL_MS = 60_000;
 
 function setCached(host: string, value: HostMatch | null): void {
   if (HOST_CACHE.size >= HOST_CACHE_MAX) {
     const firstKey = HOST_CACHE.keys().next().value;
     if (firstKey !== undefined) HOST_CACHE.delete(firstKey);
   }
-  HOST_CACHE.set(host, value);
+  HOST_CACHE.set(host, { value, expiresAt: Date.now() + HOST_CACHE_TTL_MS });
 }
 
 async function lookupAgencyByHost(host: string): Promise<HostMatch | null> {
   const cached = HOST_CACHE.get(host);
-  if (cached !== undefined) return cached;
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (cached) HOST_CACHE.delete(host);
 
   const client = createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },

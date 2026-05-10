@@ -19,14 +19,24 @@ export default async function AgencyDashboardPage() {
 
   // Pull every org belonging to this agency (RLS lets agency_admin SELECT).
   // Plus seat counts via a separate aggregation.
-  const [{ data: orgs }, { data: memberships }] = await Promise.all([
-    supabase
-      .from("organizations")
-      .select("id, name, slug, preset_key, created_at")
-      .eq("agency_id", agencyId)
-      .order("name"),
-    supabase.from("org_memberships").select("org_id, role").not("accepted_at", "is", null),
-  ]);
+  const { data: orgs } = await supabase
+    .from("organizations")
+    .select("id, name, slug, preset_key, created_at")
+    .eq("agency_id", agencyId)
+    .order("name");
+
+  const orgIds = (orgs ?? []).map((o) => o.id);
+  // Scope the membership query to just this agency's orgs. RLS already
+  // restricts what's visible, but explicitly limiting avoids shipping
+  // unrelated rows over the wire and dodges any future RLS regression.
+  const { data: memberships } =
+    orgIds.length > 0
+      ? await supabase
+          .from("org_memberships")
+          .select("org_id, role")
+          .in("org_id", orgIds)
+          .not("accepted_at", "is", null)
+      : { data: [] };
 
   // Group memberships by org_id for seat counting.
   const seatsByOrg = new Map<
