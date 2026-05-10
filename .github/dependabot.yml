@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # JavaScript dependencies (the monorepo's pnpm workspaces)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      # Group safe minor/patch bumps to keep PR noise down. Major bumps
+      # come through individually so each one gets a deliberate review.
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    labels:
+      - "dependencies"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "github-actions"

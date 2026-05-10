@@ -2632,6 +2632,7 @@ export type Database = {
       organizations: {
         Row: {
           agency_id: string | null;
+          audit_log_retention_days: number | null;
           billing_tier: string | null;
           created_at: string;
           created_by: string | null;
@@ -2651,6 +2652,7 @@ export type Database = {
         };
         Insert: {
           agency_id?: string | null;
+          audit_log_retention_days?: number | null;
           billing_tier?: string | null;
           created_at?: string;
           created_by?: string | null;
@@ -2670,6 +2672,7 @@ export type Database = {
         };
         Update: {
           agency_id?: string | null;
+          audit_log_retention_days?: number | null;
           billing_tier?: string | null;
           created_at?: string;
           created_by?: string | null;
@@ -4886,6 +4889,13 @@ export type Database = {
       notify_aging_requests: { Args: never; Returns: undefined };
       notify_expiring_certifications: { Args: never; Returns: undefined };
       proficiency_rank: { Args: { p_proficiency: string }; Returns: number };
+      purge_expired_audit_logs: {
+        Args: { p_default_retention_days?: number };
+        Returns: {
+          deleted_count: number;
+          org_id: string;
+        }[];
+      };
       qualified_instructors_for_class: {
         Args: { p_class_id: string };
         Returns: {
