@@ -13,6 +13,7 @@ import {
 import GroupFormDialog from "./group-form-dialog";
 import SliderRow from "./slider-row";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
+import { useLabel } from "@/components/labels";
 import { addGroupMember, removeGroupMember, saveGroupAllocations, deleteGroup } from "./actions";
 import { sumSlate } from "@arbor/shared";
 import type {
@@ -196,6 +197,8 @@ function GroupDetail({
   };
   const [memberSearch, setMemberSearch] = useState("");
   const [pickToAdd, setPickToAdd] = useState("");
+  const instructorPlural = useLabel("entity.instructor", { plural: true, lower: true });
+  const instructorLower = useLabel("entity.instructor", { lower: true });
 
   const initialSlate = useMemo(() => {
     const byBucket = new Map(groupAllocations.map((g) => [g.bucket_id, g.target_percent]));
@@ -344,8 +347,8 @@ function GroupDetail({
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="search"
-            aria-label="Search instructors to add"
-            placeholder="Search instructors…"
+            aria-label={`Search ${instructorPlural} to add`}
+            placeholder={`Search ${instructorPlural}…`}
             value={memberSearch}
             onChange={(e) => {
               setMemberSearch(e.target.value);
@@ -359,7 +362,7 @@ function GroupDetail({
             }}
             className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-sm"
           >
-            <option value="">Pick instructor…</option>
+            <option value="">Pick {instructorLower}…</option>
             {available.map((i) => (
               <option key={i.id} value={i.id}>
                 {i.full_name}

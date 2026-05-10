@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import { classInputSchema } from "@arbor/shared";
 import type { Class, ClassInput, Instructor } from "@arbor/shared";
+import { useLabel } from "@/components/labels";
 import { createClass, updateClass, assignInstructorToClass } from "./actions";
 
 // Frequency presets that auto-fill offerings_per_year. Numbers reflect
@@ -48,7 +49,8 @@ type EditProps = {
 };
 type Props = CreateProps | EditProps;
 
-const STEPS = ["Basic info", "Time settings", "Instructors"] as const;
+// STEPS labels are computed inside the component now so the third step's
+// label can carry the org's terminology override (Instructors → Analysts etc).
 type Step = 0 | 1 | 2;
 
 function Label({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
@@ -289,6 +291,7 @@ function StepInstructors({
   setAssignments: (a: AssignmentDraft[]) => void;
 }) {
   const [selectedId, setSelectedId] = useState("");
+  const instructorLower = useLabel("entity.instructor", { lower: true });
 
   const assignedIds = new Set(assignments.map((a) => a.instructorId));
   const available = instructors.filter((i) => !assignedIds.has(i.id));
@@ -390,7 +393,7 @@ function StepInstructors({
             }}
             className="border-input bg-background text-foreground focus:ring-ring flex-1 rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2"
           >
-            <option value="">Select instructor…</option>
+            <option value="">Select {instructorLower}…</option>
             {available.map((i) => (
               <option key={i.id} value={i.id}>
                 {i.full_name}
@@ -417,6 +420,7 @@ export default function ClassFormDialog(props: Props) {
   const [step, setStep] = useState<Step>(0);
   const [assignments, setAssignments] = useState<AssignmentDraft[]>([]);
   const isEdit = props.mode === "edit";
+  const instructorPlural = useLabel("entity.instructor", { plural: true });
 
   const defaultValues: Partial<ClassInput> = isEdit
     ? {
@@ -499,6 +503,7 @@ export default function ClassFormDialog(props: Props) {
     props.onSuccess?.(result.data);
   }
 
+  const STEPS = ["Basic info", "Time settings", instructorPlural] as const;
   const stepTitle = isEdit ? "Edit class" : STEPS[step];
 
   return (

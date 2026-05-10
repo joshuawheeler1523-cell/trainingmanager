@@ -20,6 +20,7 @@ import {
   assignRequestInstructor,
   unassignRequestInstructor,
 } from "./actions";
+import { Label } from "@/components/labels";
 
 type Props = {
   request: EducationRequest;
@@ -236,10 +237,12 @@ export default function RequestSheet({ request, assignments, instructors, onClos
             {/* Assignments */}
             <section className="mb-6">
               <h3 className="text-foreground mb-2 text-sm font-semibold">
-                Assigned instructors ({assignments.length})
+                Assigned <Label kind="entity.instructor" plural lower /> ({assignments.length})
               </h3>
               {assignments.length === 0 ? (
-                <p className="text-muted-foreground text-xs">No instructors assigned yet.</p>
+                <p className="text-muted-foreground text-xs">
+                  No <Label kind="entity.instructor" plural lower /> assigned yet.
+                </p>
               ) : (
                 <ul className="border-border divide-border divide-y rounded-md border">
                   {assignments.map((a) => (

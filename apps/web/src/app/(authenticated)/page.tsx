@@ -397,7 +397,8 @@ export default async function DashboardPage() {
 
           <p className="text-muted-foreground border-border mt-5 border-t pt-3 text-xs">
             <span className="text-foreground font-medium tabular-nums">{balancedCount}</span>{" "}
-            instructor{balancedCount === 1 ? "" : "s"} in the balanced range (40–79%).
+            <Label kind="entity.instructor" plural={balancedCount !== 1} lower /> in the balanced
+            range (40–79%).
           </p>
         </section>
 
@@ -552,7 +553,7 @@ export default async function DashboardPage() {
                       Department
                     </th>
                     <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
-                      Instructors
+                      <Label kind="entity.instructor" plural />
                     </th>
                     <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
                       Active projects

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { PlusIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/20/solid";
 import AdHocFormDialog from "./adhoc-form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
+import { Label, useLabel } from "@/components/labels";
 import { setAdHocTaskStatus, deleteAdHocTask } from "./task-actions";
 import { ADHOC_STATUS_VALUES } from "@arbor/shared";
 import type { AdHocTask, AdHocStatus, AllocationBucket, Instructor } from "@arbor/shared";
@@ -26,6 +27,7 @@ const STATUS_BADGE: Record<AdHocStatus, string> = {
 export default function AdHocTab({ tasks, buckets, instructors }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const instructorLower = useLabel("entity.instructor", { lower: true });
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<AdHocStatus | "all">("all");
@@ -118,9 +120,11 @@ export default function AdHocTab({ tasks, buckets, instructors }: Props) {
             </select>
           </div>
           <div>
-            <p className="text-muted-foreground mb-1 text-xs font-medium">Instructor</p>
+            <p className="text-muted-foreground mb-1 text-xs font-medium">
+              <Label kind="entity.instructor" />
+            </p>
             <select
-              aria-label="Filter by instructor"
+              aria-label={`Filter by ${instructorLower}`}
               value={instructorFilter}
               onChange={(e) => {
                 setInstructorFilter(e.target.value);

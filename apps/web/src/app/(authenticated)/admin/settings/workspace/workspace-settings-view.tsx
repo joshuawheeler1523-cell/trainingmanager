@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   DEFAULT_LABELS,
   PRESET_LIST,
+  PRESETS,
   type LabelKind,
   type LabelOverrides,
   type PresetKey,
@@ -59,7 +60,17 @@ export default function WorkspaceSettingsView({ initial }: { initial: WorkspaceI
       const result = await applyWorkspacePresetAction({ presetKey: target, overwriteLabels });
       if (result.ok) {
         toast.success(`Preset applied: ${target.replace("_", " ")}`);
+        // Sync local state to the preset's manifest. router.refresh() re-runs
+        // server components but useState retains its initial value across
+        // re-renders, so without this the modules + label fields in this
+        // form would still show the prior values until a hard reload.
+        const preset = PRESETS[target];
         setPresetKey(target);
+        setModules(preset.modules);
+        if (overwriteLabels) {
+          setRoleLabels(preset.roleLabels);
+          setEntityLabels(preset.entityLabels);
+        }
         router.refresh();
       } else {
         toast.error(result.error.message);
