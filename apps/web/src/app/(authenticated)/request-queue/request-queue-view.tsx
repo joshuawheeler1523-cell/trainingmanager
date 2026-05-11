@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -12,20 +13,26 @@ import {
   useDroppable,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import { ClipboardDocumentIcon, CheckIcon, PlusIcon, LinkIcon } from "@heroicons/react/20/solid";
 import RequestSheet from "./request-sheet";
+import NewRequestDialog from "./new-request-dialog";
 import {
+  publicIntakeUrl,
   REQUEST_KANBAN_STATUS_VALUES,
   type EducationRequest,
   type EducationRequestAssignment,
   type Instructor,
+  type PublicIntakeLink,
   type RequestStatus,
 } from "@arbor/shared";
-import { updateRequestStatus } from "./actions";
+import { createIntakeLink, updateRequestStatus } from "./actions";
 
 type Props = {
   requests: EducationRequest[];
   assignments: EducationRequestAssignment[];
   instructors: Instructor[];
+  intakeLinks: PublicIntakeLink[];
+  origin: string;
 };
 
 const URGENCY_BADGE: Record<string, string> = {
@@ -46,10 +53,52 @@ const COLUMN_LABELS: Record<RequestStatus, string> = {
   rejected: "Rejected",
 };
 
-export default function RequestQueueView({ requests, assignments, instructors }: Props) {
+export default function RequestQueueView({
+  requests,
+  assignments,
+  instructors,
+  intakeLinks,
+  origin,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openId, setOpenId] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const activeLink = intakeLinks[0] ?? null;
+
+  async function copyShareLink() {
+    if (!activeLink) return;
+    const url = publicIntakeUrl(origin, activeLink.token);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+      toast.success("Link copied — share it with stakeholders");
+    } catch {
+      toast.error("Couldn't copy. Manage links in admin to copy manually.");
+    }
+  }
+
+  function quickCreateLink() {
+    startTransition(async () => {
+      const result = await createIntakeLink({ label: null, expires_at: null });
+      if (result.ok) {
+        const url = publicIntakeUrl(origin, result.data.token);
+        try {
+          await navigator.clipboard.writeText(url);
+          toast.success("Intake link created and copied to clipboard");
+        } catch {
+          toast.success("Intake link created — copy it from Admin → Intake links");
+        }
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
 
   // Local optimistic copy of the per-request status so drags feel instant.
   const [statusOverride, setStatusOverride] = useState<Record<string, RequestStatus>>({});
@@ -117,6 +166,63 @@ export default function RequestQueueView({ requests, assignments, instructors }:
 
   return (
     <div className="space-y-4 p-6">
+      <div className="border-border bg-background flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <LinkIcon className="text-muted-foreground h-4 w-4 shrink-0" />
+          {activeLink ? (
+            <>
+              <span className="text-muted-foreground text-xs">External intake form:</span>
+              <code className="bg-surface text-foreground truncate rounded px-2 py-0.5 text-xs">
+                {publicIntakeUrl(origin, activeLink.token)}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  void copyShareLink();
+                }}
+                className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 text-xs"
+                aria-label="Copy intake link"
+              >
+                {copied ? (
+                  <CheckIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <ClipboardDocumentIcon className="h-4 w-4" />
+                )}
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-muted-foreground text-xs">No external intake link yet.</span>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={quickCreateLink}
+                className="text-primary hover:text-primary/80 text-xs font-medium disabled:opacity-50"
+              >
+                Create one
+              </button>
+            </>
+          )}
+          <Link
+            href="/admin/intake-links"
+            className="text-muted-foreground hover:text-foreground ml-auto whitespace-nowrap text-xs underline-offset-4 hover:underline sm:ml-2"
+          >
+            Manage links →
+          </Link>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setShowCreate(true);
+          }}
+          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex shrink-0 items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium"
+        >
+          <PlusIcon className="h-4 w-4" />
+          New request
+        </button>
+      </div>
+
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-6">
           {REQUEST_KANBAN_STATUS_VALUES.map((status) => (
@@ -142,6 +248,14 @@ export default function RequestQueueView({ requests, assignments, instructors }:
           instructors={instructors}
           onClose={() => {
             setOpenId(null);
+          }}
+        />
+      )}
+
+      {showCreate && (
+        <NewRequestDialog
+          onClose={() => {
+            setShowCreate(false);
           }}
         />
       )}
