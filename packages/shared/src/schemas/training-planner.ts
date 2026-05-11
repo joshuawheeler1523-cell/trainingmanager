@@ -267,6 +267,7 @@ export type ImplSession = {
   learners_count: number;
   status: SessionStatus;
   conflict_status: SessionConflict;
+  conflict_reason: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

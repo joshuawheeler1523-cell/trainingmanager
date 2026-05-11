@@ -2032,6 +2032,7 @@ export type Database = {
       };
       impl_sessions: {
         Row: {
+          conflict_reason: string | null;
           conflict_status: string;
           created_at: string;
           created_by: string | null;
@@ -2051,6 +2052,7 @@ export type Database = {
           updated_by: string | null;
         };
         Insert: {
+          conflict_reason?: string | null;
           conflict_status?: string;
           created_at?: string;
           created_by?: string | null;
@@ -2070,6 +2072,7 @@ export type Database = {
           updated_by?: string | null;
         };
         Update: {
+          conflict_reason?: string | null;
           conflict_status?: string;
           created_at?: string;
           created_by?: string | null;

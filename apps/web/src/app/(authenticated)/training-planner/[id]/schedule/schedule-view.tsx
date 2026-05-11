@@ -437,6 +437,17 @@ function SessionDrawer({
               {session.status} · {session.conflict_status} conflict ·{" "}
               {session.learners_count.toString()} learners
             </p>
+            {session.conflict_status !== "none" && session.conflict_reason && (
+              <p
+                className={`mt-1 text-xs ${
+                  session.conflict_status === "full"
+                    ? "text-rose-600 dark:text-rose-400"
+                    : "text-amber-600 dark:text-amber-400"
+                }`}
+              >
+                {session.conflict_reason}
+              </p>
+            )}
           </div>
           <button
             type="button"
