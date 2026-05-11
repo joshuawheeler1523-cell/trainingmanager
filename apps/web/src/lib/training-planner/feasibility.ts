@@ -55,7 +55,12 @@ export type Recommendation =
   | { kind: "add_trainer_hours_per_week"; hours: number }
   | { kind: "add_rooms"; count: number }
   | { kind: "extend_window_weeks"; weeks: number }
-  | { kind: "reduce_per_session_to"; learners: number; extraSessions: number };
+  | {
+      kind: "reduce_per_session_to";
+      className: string;
+      learners: number;
+      extraSessions: number;
+    };
 
 export type FeasibilityVerdict = "feasible" | "tight" | "infeasible";
 
@@ -944,30 +949,36 @@ function buildRecommendations(args: {
     }
   }
 
-  // 4) Per-session-reduction rec — only if there's any sessionsNeeded > 1 and a real gap
-  if (
-    (args.trainerUtilizationPct !== null && args.trainerUtilizationPct >= 100) ||
-    (args.roomUtilizationPct !== null && args.roomUtilizationPct >= 100)
-  ) {
-    // Find the largest per-session class and propose halving it
-    const largestPer = args.classes.reduce(
-      (m, c) => (c.expected_learners_per_session > m ? c.expected_learners_per_session : m),
-      0,
+  // 4) Per-session-reduction rec — ONLY when at least one class is blocked
+  // because no room has enough seats. Splitting a class into smaller groups
+  // adds sessions, so it's counter-productive for an aggregate-hours
+  // deficit (it makes the trainer/room hour problem strictly worse). It's
+  // only the right lever when the seats are the constraint and the planner
+  // would rather break up a 24-person class into two 12s to fit the
+  // existing breakout rooms.
+  const maxRoomSeats = args.rooms.reduce((m, r) => Math.max(m, r.seat_capacity), 0);
+  for (const cf of args.classFeas) {
+    if (cf.roomCapacityOk) continue;
+    const cls = args.classes.find((c) => c.id === cf.classId);
+    if (!cls) continue;
+    // Seat-only blocker check: there is no room that fits the current
+    // per-session, but some room could fit a smaller group.
+    const seatsBlocked = !args.rooms.some(
+      (r) => r.seat_capacity >= cls.expected_learners_per_session,
     );
-    if (largestPer >= 4) {
-      const newPer = Math.max(1, Math.floor(largestPer / 2));
-      // Naive extra-sessions calculation: doubling sessions for affected classes
-      const extra = args.classes
-        .filter((c) => c.expected_learners_per_session === largestPer)
-        .reduce(
-          (acc, c) =>
-            acc +
-            (Math.ceil(c.total_people_to_train / newPer) -
-              Math.ceil(c.total_people_to_train / largestPer)),
-          0,
-        );
-      if (extra > 0)
-        recs.push({ kind: "reduce_per_session_to", learners: newPer, extraSessions: extra });
+    if (!seatsBlocked) continue;
+    if (maxRoomSeats <= 0 || maxRoomSeats >= cls.expected_learners_per_session) continue;
+    const newPer = maxRoomSeats;
+    const extra =
+      Math.ceil(cls.total_people_to_train / newPer) -
+      Math.ceil(cls.total_people_to_train / cls.expected_learners_per_session);
+    if (extra > 0) {
+      recs.push({
+        kind: "reduce_per_session_to",
+        className: cls.name,
+        learners: newPer,
+        extraSessions: extra,
+      });
     }
   }
 

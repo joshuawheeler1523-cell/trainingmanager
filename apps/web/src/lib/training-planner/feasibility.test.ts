@@ -270,7 +270,37 @@ describe("recommendations math", () => {
     expect(result.recommendations.some((r) => r.kind === "add_trainer_hours_per_week")).toBe(true);
   });
 
-  it("includes a reduce_per_session_to recommendation when per-session is large", () => {
+  it("recommends reduce_per_session_to when no room has enough seats but a smaller group would fit", () => {
+    // Class needs 30 per session; biggest room has 12 seats → seat blocker.
+    // Reducing to 12 lets it fit the existing room.
+    const result = computeFeasibility({
+      implementation: baseImpl,
+      rooms: [makeRoom({ seat_capacity: 12 })],
+      trainers: [makeTrainer()],
+      classes: [
+        makeClass({
+          name: "Big Class",
+          hours_per_session: 2,
+          expected_learners_per_session: 30,
+          total_people_to_train: 60,
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    const rec = result.recommendations.find((r) => r.kind === "reduce_per_session_to");
+    expect(rec).toBeDefined();
+    if (rec?.kind === "reduce_per_session_to") {
+      expect(rec.className).toBe("Big Class");
+      expect(rec.learners).toBe(12);
+      // 60 / 12 = 5 sessions; was 60 / 30 = 2 sessions; extra = 3
+      expect(rec.extraSessions).toBe(3);
+    }
+  });
+
+  it("does NOT recommend reduce_per_session_to when the gap is hours, not seats", () => {
+    // Room has enough seats; the gap is purely trainer-hours. Splitting
+    // the class would add sessions and make the hours problem worse.
     const result = computeFeasibility({
       implementation: baseImpl,
       rooms: [makeRoom({ seat_capacity: 40 })],
@@ -278,14 +308,15 @@ describe("recommendations math", () => {
       classes: [
         makeClass({
           hours_per_session: 4,
-          expected_learners_per_session: 40, // large per-session
+          expected_learners_per_session: 40,
           total_people_to_train: 400,
         }),
       ],
       classTrainers: [classTrainer("c1", "t1")],
       prereqs: [],
     });
-    expect(result.recommendations.some((r) => r.kind === "reduce_per_session_to")).toBe(true);
+    expect(result.trainerUtilizationPct ?? 0).toBeGreaterThanOrEqual(100);
+    expect(result.recommendations.some((r) => r.kind === "reduce_per_session_to")).toBe(false);
   });
 });
 

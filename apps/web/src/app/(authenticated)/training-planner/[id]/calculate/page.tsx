@@ -383,7 +383,7 @@ function recommendationLabel(r: Recommendation): string {
     case "extend_window_weeks":
       return `Extend the training window by ${r.weeks.toString()} week${r.weeks === 1 ? "" : "s"}.`;
     case "reduce_per_session_to":
-      return `Reduce per-session learners to ${r.learners.toString()} (adds ~${r.extraSessions.toString()} sessions but lowers room-size requirement).`;
+      return `Reduce "${r.className}" learners per session to ${r.learners.toString()} so it fits an existing room (adds ${r.extraSessions.toString()} session${r.extraSessions === 1 ? "" : "s"}).`;
   }
 }
 
