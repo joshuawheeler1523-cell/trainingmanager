@@ -23,6 +23,8 @@ type FormValues = {
   go_live_date: string;
   linked_project_id: string;
   linked_tra_id: string;
+  lunch_break_start_minutes: number;
+  lunch_break_length_minutes: number;
 };
 
 const fieldClass =
@@ -46,6 +48,8 @@ export default function SetupForm({ implementation, projects, tras }: Props) {
       go_live_date: implementation.go_live_date ?? "",
       linked_project_id: implementation.linked_project_id ?? "",
       linked_tra_id: implementation.linked_tra_id ?? "",
+      lunch_break_start_minutes: implementation.lunch_break_start_minutes,
+      lunch_break_length_minutes: implementation.lunch_break_length_minutes,
     },
   });
 
@@ -170,6 +174,53 @@ export default function SetupForm({ implementation, projects, tras }: Props) {
               </option>
             ))}
           </select>
+        </div>
+      </div>
+
+      <div className="border-border border-t pt-4">
+        <p className="text-foreground text-sm font-semibold">Daily schedule</p>
+        <p className="text-muted-foreground mb-2 text-xs">
+          Used by the scheduler to leave room for lunch. Per-room day start times are configured on
+          the Rooms step.
+        </p>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label
+              htmlFor="lunch_break_start_minutes"
+              className="text-foreground mb-1 block text-xs font-medium"
+            >
+              Lunch start (minutes from local midnight)
+            </label>
+            <input
+              id="lunch_break_start_minutes"
+              type="number"
+              min={0}
+              max={1439}
+              step={15}
+              {...register("lunch_break_start_minutes", { valueAsNumber: true })}
+              className={fieldClass}
+            />
+            <p className="text-muted-foreground mt-1 text-[11px]">
+              720 = 12:00 noon · 750 = 12:30 PM
+            </p>
+          </div>
+          <div>
+            <label
+              htmlFor="lunch_break_length_minutes"
+              className="text-foreground mb-1 block text-xs font-medium"
+            >
+              Lunch length (minutes; 0 disables)
+            </label>
+            <input
+              id="lunch_break_length_minutes"
+              type="number"
+              min={0}
+              max={240}
+              step={15}
+              {...register("lunch_break_length_minutes", { valueAsNumber: true })}
+              className={fieldClass}
+            />
+          </div>
         </div>
       </div>
 

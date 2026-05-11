@@ -15,9 +15,6 @@
 //   - Quantitative recommendations to close any gap
 //
 // What we DON'T model here yet (deferred to later phases of the overhaul):
-//   - Per-room business-hours start time (Phase C) — assumes 09:00
-//   - Lunch break (Phase C)
-//   - Equipment matching (Phase C) — assumes no equipment constraint
 //   - Go-live buffer (Phase D) — uses window_end as the cutoff
 //
 // All inputs are read-only. No DB calls. Pure functions, tested independently.
@@ -108,6 +105,20 @@ function weekKey(d: Date): string {
   const monday = new Date(d);
   monday.setUTCDate(d.getUTCDate() + offset);
   return fmtDate(monday);
+}
+
+/** Subset check: every tag in `required` appears in `available`. */
+function tagsContainAll(available: string[], required: string[]): boolean {
+  if (required.length === 0) return true;
+  const set = new Set(available);
+  for (const t of required) if (!set.has(t)) return false;
+  return true;
+}
+
+function tagSetContainsAll(available: Set<string>, required: string[]): boolean {
+  if (required.length === 0) return true;
+  for (const t of required) if (!available.has(t)) return false;
+  return true;
 }
 
 /**
@@ -220,16 +231,25 @@ function classFeasibilityRow(
   const sn = sessionsNeeded(c);
   const totalHours = sn * c.hours_per_session;
 
-  // Room capacity: at least one room with enough seats AND at least one day open
+  // Room capacity: at least one room with enough seats, at least one open day,
+  // and an equipment-tag superset for the class's required set.
   const roomCapacityOk = rooms.some(
     (r) =>
-      r.seat_capacity >= c.expected_learners_per_session && r.available_days_of_week.length > 0,
+      r.seat_capacity >= c.expected_learners_per_session &&
+      r.available_days_of_week.length > 0 &&
+      tagsContainAll(r.equipment_tags, c.required_equipment_tags),
   );
   if (!roomCapacityOk) {
     if (rooms.length === 0) {
       blockers.push("No rooms defined.");
-    } else {
+    } else if (!rooms.some((r) => r.seat_capacity >= c.expected_learners_per_session)) {
       blockers.push(`No room with ${c.expected_learners_per_session.toString()}+ seats.`);
+    } else if (c.required_equipment_tags.length > 0) {
+      blockers.push(
+        `No room has all required equipment (${c.required_equipment_tags.join(", ")}).`,
+      );
+    } else {
+      blockers.push("No eligible room.");
     }
   }
 
@@ -290,9 +310,9 @@ type TrainerState = {
   daysOfWeek: Set<number>; // intersection of available days across rooms
   hoursPerWeek: number;
   hoursAssigned: number;
-  nextFree: Date;
-  weeklyUsed: Map<string, number>;
   maxConcurrent: number;
+  weeklyUsed: Map<string, number>;
+  nextFree: Date;
 };
 
 type RoomState = {
@@ -300,10 +320,14 @@ type RoomState = {
   name: string;
   seatCapacity: number;
   hoursPerDay: number;
+  startHourLocal: number;
   daysOfWeek: Set<number>;
+  equipmentTags: Set<string>;
   hoursAssigned: number;
   nextFree: Date;
 };
+
+type LunchWindow = { startHr: number; endHr: number } | null;
 
 function pickBestFitRoom(rooms: RoomState[], perSession: number): RoomState | null {
   // Best-fit = smallest seat_capacity that meets demand. Leaves larger
@@ -349,24 +373,35 @@ function pickLeastLoadedTrainer(
   return best;
 }
 
-function snapToWorkingDay(t: Date, daysOfWeek: Set<number>, windowEnd: Date): Date | null {
+function snapToWorkingDay(
+  t: Date,
+  daysOfWeek: Set<number>,
+  windowEnd: Date,
+  startHourLocal: number,
+): Date | null {
   // Advance cursor forward until it lands on a working day. If cursor is
-  // already on a working day and its hour is >= 9, keep it (sessions stack
-  // back-to-back inside the same day). If hour < 9, snap up to 09:00 same
-  // day. End-of-day overflow (cursor past room's hours_per_day) is handled
-  // by the caller's room daily-hours check, not here.
+  // already on a working day and its hour is >= startHourLocal, keep it
+  // (sessions stack back-to-back inside the same day). If hour <
+  // startHourLocal, snap up to start same day. End-of-day overflow is
+  // handled by the caller's room daily-hours check, not here.
   const cursor = new Date(t);
   for (let i = 0; i < 366; i++) {
     if (cursor > windowEnd) return null;
     if (daysOfWeek.has(cursor.getUTCDay())) {
       const hour = cursor.getUTCHours() + cursor.getUTCMinutes() / 60;
-      if (hour < 9) cursor.setUTCHours(9, 0, 0, 0);
+      if (hour < startHourLocal) setHourOfDay(cursor, startHourLocal);
       return cursor;
     }
     cursor.setUTCDate(cursor.getUTCDate() + 1);
-    cursor.setUTCHours(9, 0, 0, 0);
+    setHourOfDay(cursor, startHourLocal);
   }
   return null;
+}
+
+function setHourOfDay(d: Date, hourLocal: number): void {
+  const hours = Math.floor(hourLocal);
+  const minutes = Math.round((hourLocal - hours) * 60);
+  d.setUTCHours(hours, minutes, 0, 0);
 }
 
 // ── Main entry ─────────────────────────────────────────────────────────────
@@ -564,41 +599,60 @@ function simulate(args: {
     return emptySim(rooms, trainers);
   }
   const windowStart = parseUtcDate(impl.window_start_date);
-  windowStart.setUTCHours(9, 0, 0, 0);
+  windowStart.setUTCHours(0, 0, 0, 0);
   const windowEnd = parseUtcDate(impl.window_end_date);
   windowEnd.setUTCHours(23, 59, 59, 999);
 
+  const lunch: LunchWindow =
+    impl.lunch_break_length_minutes > 0
+      ? {
+          startHr: impl.lunch_break_start_minutes / 60,
+          endHr: (impl.lunch_break_start_minutes + impl.lunch_break_length_minutes) / 60,
+        }
+      : null;
+
   const roomState = new Map<string, RoomState>(
-    rooms.map((r) => [
-      r.id,
-      {
-        id: r.id,
-        name: r.name,
-        seatCapacity: r.seat_capacity,
-        hoursPerDay: r.available_hours_per_day,
-        daysOfWeek: new Set(r.available_days_of_week),
-        hoursAssigned: 0,
-        nextFree: new Date(windowStart),
-      },
-    ]),
+    rooms.map((r) => {
+      const start = new Date(windowStart);
+      setHourOfDay(start, r.start_hour_local);
+      return [
+        r.id,
+        {
+          id: r.id,
+          name: r.name,
+          seatCapacity: r.seat_capacity,
+          hoursPerDay: r.available_hours_per_day,
+          startHourLocal: r.start_hour_local,
+          daysOfWeek: new Set(r.available_days_of_week),
+          equipmentTags: new Set(r.equipment_tags),
+          hoursAssigned: 0,
+          nextFree: start,
+        },
+      ];
+    }),
   );
   const trainerState = new Map<string, TrainerState>(
-    trainers.map((t) => [
-      t.id,
-      {
-        id: t.id,
-        name: t.name,
-        // Trainers don't have their own days_of_week; they take the union of
-        // their candidate rooms' days. The slate-step is per-class so this is
-        // approximated as "all days a room exists for."
-        daysOfWeek: new Set(rooms.flatMap((r) => r.available_days_of_week)),
-        hoursPerWeek: t.availability_hours_per_week,
-        hoursAssigned: 0,
-        nextFree: new Date(windowStart),
-        weeklyUsed: new Map(),
-        maxConcurrent: t.max_concurrent_sessions,
-      },
-    ]),
+    trainers.map((t) => {
+      const start = new Date(windowStart);
+      // Use earliest room start as the trainer's day starts there too. If no
+      // rooms exist (degenerate state) default to 09:00.
+      const earliestRoomStart =
+        rooms.length > 0 ? Math.min(...rooms.map((r) => r.start_hour_local)) : 9;
+      setHourOfDay(start, earliestRoomStart);
+      return [
+        t.id,
+        {
+          id: t.id,
+          name: t.name,
+          daysOfWeek: new Set(rooms.flatMap((r) => r.available_days_of_week)),
+          hoursPerWeek: t.availability_hours_per_week,
+          hoursAssigned: 0,
+          nextFree: start,
+          weeklyUsed: new Map(),
+          maxConcurrent: t.max_concurrent_sessions,
+        },
+      ];
+    }),
   );
 
   const lastSessionEndByClass = new Map<string, Date>();
@@ -620,7 +674,9 @@ function simulate(args: {
       .map((tid) => trainerState.get(tid))
       .filter((s): s is TrainerState => !!s);
     const eligibleRooms = [...roomState.values()].filter(
-      (r) => r.seatCapacity >= c.expected_learners_per_session,
+      (r) =>
+        r.seatCapacity >= c.expected_learners_per_session &&
+        tagSetContainsAll(r.equipmentTags, c.required_equipment_tags),
     );
 
     // Prereq earliest = max of "latest-ending session" across prereq classes.
@@ -646,33 +702,55 @@ function simulate(args: {
         let candidate = new Date(
           Math.max(earliest.getTime(), room.nextFree.getTime(), trainer.nextFree.getTime()),
         );
-        // Snap to a working day open for the room
-        const snapped = snapToWorkingDay(candidate, room.daysOfWeek, windowEnd);
+        // Snap to a working day open for the room, respecting room's start hour
+        const snapped = snapToWorkingDay(
+          candidate,
+          room.daysOfWeek,
+          windowEnd,
+          room.startHourLocal,
+        );
         if (!snapped) break;
         candidate = snapped;
+
+        // Lunch push: if the proposed slot overlaps the lunch window, push
+        // start to lunch end. Re-snap to ensure we didn't blow past the day.
+        if (lunch) {
+          const candHr = candidate.getUTCHours() + candidate.getUTCMinutes() / 60;
+          if (candHr < lunch.endHr && candHr + c.hours_per_session > lunch.startHr) {
+            setHourOfDay(candidate, lunch.endHr);
+          }
+        }
 
         // Trainer weekly cap check
         const wk = weekKey(candidate);
         const used = trainer.weeklyUsed.get(wk) ?? 0;
         if (used + c.hours_per_session > trainer.hoursPerWeek + 1e-6) {
-          // Push trainer's nextFree to next Monday 09:00 so we try a fresh week
+          // Push trainer's nextFree to next Monday at room start so we try a fresh week
           const nextMonday = new Date(candidate);
           const dow = nextMonday.getUTCDay();
           const advance = dow === 0 ? 1 : 8 - dow;
           nextMonday.setUTCDate(nextMonday.getUTCDate() + advance);
-          nextMonday.setUTCHours(9, 0, 0, 0);
+          setHourOfDay(nextMonday, room.startHourLocal);
           trainer.nextFree = nextMonday;
           continue;
         }
 
-        // Room daily-hours cap check — does this slot still fit within the room's
-        // hours_per_day? Slot index is candidate.hour - 9 (Phase A simplification).
-        const slotHour = candidate.getUTCHours() + candidate.getUTCMinutes() / 60;
-        if (slotHour + c.hours_per_session > 9 + room.hoursPerDay + 1e-6) {
-          // Push room to next day 09:00
+        // Room daily-hours cap check. Day spans [startHour, startHour + hours_per_day],
+        // plus lunch length if lunch falls inside that span.
+        const slotHr = candidate.getUTCHours() + candidate.getUTCMinutes() / 60;
+        const dayEndHr =
+          room.startHourLocal +
+          room.hoursPerDay +
+          (lunch &&
+          lunch.startHr >= room.startHourLocal &&
+          lunch.startHr < room.startHourLocal + room.hoursPerDay
+            ? lunch.endHr - lunch.startHr
+            : 0);
+        if (slotHr + c.hours_per_session > dayEndHr + 1e-6) {
+          // Push room to next day at its start hour
           const nextDay = new Date(candidate);
           nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-          nextDay.setUTCHours(9, 0, 0, 0);
+          setHourOfDay(nextDay, room.startHourLocal);
           room.nextFree = nextDay;
           continue;
         }

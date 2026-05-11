@@ -40,6 +40,8 @@ export const implementationInsertSchema = z.object({
   go_live_date: emptyToNull,
   linked_project_id: optionalUuid,
   linked_tra_id: optionalUuid,
+  lunch_break_start_minutes: z.coerce.number().int().min(0).max(1439).default(720),
+  lunch_break_length_minutes: z.coerce.number().int().min(0).max(240).default(60),
 });
 
 // Setup-step validation: dates required to leave Step 1.
@@ -51,6 +53,8 @@ export const implementationSetupSchema = z.object({
   go_live_date: z.string().min(1, "Go-live date is required"),
   linked_project_id: optionalUuid,
   linked_tra_id: optionalUuid,
+  lunch_break_start_minutes: z.coerce.number().int().min(0).max(1439).default(720),
+  lunch_break_length_minutes: z.coerce.number().int().min(0).max(240).default(60),
 });
 
 export const implementationUpdateSchema = implementationInsertSchema.partial().extend({
@@ -74,6 +78,8 @@ export type Implementation = {
   linked_tra_id: string | null;
   status: ImplStatus;
   current_step: number;
+  lunch_break_start_minutes: number;
+  lunch_break_length_minutes: number;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
@@ -90,6 +96,9 @@ export const implRoomInsertSchema = z.object({
   seat_capacity: z.coerce.number().int().min(1, "At least 1 seat"),
   available_hours_per_day: z.coerce.number().min(0.5).max(24).default(8),
   available_days_of_week: z.array(z.coerce.number().int().min(0).max(6)).default([1, 2, 3, 4, 5]),
+  start_hour_local: z.coerce.number().min(0).max(23.99).default(9.0),
+  timezone: emptyToNull,
+  equipment_tags: z.array(z.string().min(1).max(60)).default([]),
   equipment_notes: emptyToNull,
   sort_order: z.coerce.number().int().default(0),
 });
@@ -108,6 +117,9 @@ export type ImplRoom = {
   seat_capacity: number;
   available_hours_per_day: number;
   available_days_of_week: number[];
+  start_hour_local: number;
+  timezone: string | null;
+  equipment_tags: string[];
   equipment_notes: string | null;
   sort_order: number;
   created_at: string;
@@ -183,6 +195,7 @@ export const implClassInsertSchema = z.object({
   hours_per_session: z.coerce.number().min(0.25, "Must be at least 0.25 hours"),
   expected_learners_per_session: z.coerce.number().int().min(1, "At least 1 learner"),
   total_people_to_train: z.coerce.number().int().min(0).default(0),
+  required_equipment_tags: z.array(z.string().min(1).max(60)).default([]),
   required_equipment_notes: emptyToNull,
   sort_order: z.coerce.number().int().default(0),
 });
@@ -202,6 +215,7 @@ export type ImplClass = {
   hours_per_session: number;
   expected_learners_per_session: number;
   total_people_to_train: number;
+  required_equipment_tags: string[];
   required_equipment_notes: string | null;
   sort_order: number;
   created_at: string;

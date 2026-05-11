@@ -1,4 +1,4 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+﻿export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -1806,6 +1806,7 @@ export type Database = {
           name: string;
           org_id: string;
           required_equipment_notes: string | null;
+          required_equipment_tags: string[];
           sort_order: number;
           total_people_to_train: number;
           updated_at: string;
@@ -1824,6 +1825,7 @@ export type Database = {
           name: string;
           org_id: string;
           required_equipment_notes?: string | null;
+          required_equipment_tags?: string[];
           sort_order?: number;
           total_people_to_train?: number;
           updated_at?: string;
@@ -1842,6 +1844,7 @@ export type Database = {
           name?: string;
           org_id?: string;
           required_equipment_notes?: string | null;
+          required_equipment_tags?: string[];
           sort_order?: number;
           total_people_to_train?: number;
           updated_at?: string;
@@ -1950,6 +1953,7 @@ export type Database = {
           created_by: string | null;
           department_id: string;
           equipment_notes: string | null;
+          equipment_tags: string[];
           id: string;
           implementation_id: string;
           location: string | null;
@@ -1957,6 +1961,8 @@ export type Database = {
           org_id: string;
           seat_capacity: number;
           sort_order: number;
+          start_hour_local: number;
+          timezone: string | null;
           updated_at: string;
           updated_by: string | null;
         };
@@ -1967,6 +1973,7 @@ export type Database = {
           created_by?: string | null;
           department_id: string;
           equipment_notes?: string | null;
+          equipment_tags?: string[];
           id?: string;
           implementation_id: string;
           location?: string | null;
@@ -1974,6 +1981,8 @@ export type Database = {
           org_id: string;
           seat_capacity: number;
           sort_order?: number;
+          start_hour_local?: number;
+          timezone?: string | null;
           updated_at?: string;
           updated_by?: string | null;
         };
@@ -1984,6 +1993,7 @@ export type Database = {
           created_by?: string | null;
           department_id?: string;
           equipment_notes?: string | null;
+          equipment_tags?: string[];
           id?: string;
           implementation_id?: string;
           location?: string | null;
@@ -1991,6 +2001,8 @@ export type Database = {
           org_id?: string;
           seat_capacity?: number;
           sort_order?: number;
+          start_hour_local?: number;
+          timezone?: string | null;
           updated_at?: string;
           updated_by?: string | null;
         };
@@ -2220,6 +2232,8 @@ export type Database = {
           id: string;
           linked_project_id: string | null;
           linked_tra_id: string | null;
+          lunch_break_length_minutes: number;
+          lunch_break_start_minutes: number;
           name: string;
           org_id: string;
           status: string;
@@ -2240,6 +2254,8 @@ export type Database = {
           id?: string;
           linked_project_id?: string | null;
           linked_tra_id?: string | null;
+          lunch_break_length_minutes?: number;
+          lunch_break_start_minutes?: number;
           name: string;
           org_id: string;
           status?: string;
@@ -2260,6 +2276,8 @@ export type Database = {
           id?: string;
           linked_project_id?: string | null;
           linked_tra_id?: string | null;
+          lunch_break_length_minutes?: number;
+          lunch_break_start_minutes?: number;
           name?: string;
           org_id?: string;
           status?: string;

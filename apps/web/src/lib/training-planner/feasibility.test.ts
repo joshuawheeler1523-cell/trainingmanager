@@ -23,6 +23,9 @@ const baseImpl: Implementation = {
   linked_tra_id: null,
   status: "draft",
   current_step: 6,
+  // Lunch defaults match the new SQL CHECK constraints: 720 = noon, 60 mins
+  lunch_break_start_minutes: 720,
+  lunch_break_length_minutes: 60,
   deleted_at: null,
   created_at: "2026-05-01T00:00:00Z",
   updated_at: "2026-05-01T00:00:00Z",
@@ -41,6 +44,9 @@ function makeRoom(over: Partial<ImplRoom> = {}): ImplRoom {
     seat_capacity: over.seat_capacity ?? 20,
     available_hours_per_day: over.available_hours_per_day ?? 8,
     available_days_of_week: over.available_days_of_week ?? [1, 2, 3, 4, 5],
+    start_hour_local: over.start_hour_local ?? 9,
+    timezone: over.timezone ?? null,
+    equipment_tags: over.equipment_tags ?? [],
     equipment_notes: null,
     sort_order: 0,
     created_at: "2026-05-01T00:00:00Z",
@@ -79,6 +85,7 @@ function makeClass(over: Partial<ImplClass> = {}): ImplClass {
     hours_per_session: over.hours_per_session ?? 2,
     expected_learners_per_session: over.expected_learners_per_session ?? 10,
     total_people_to_train: over.total_people_to_train ?? 30,
+    required_equipment_tags: over.required_equipment_tags ?? [],
     required_equipment_notes: null,
     sort_order: over.sort_order ?? 0,
     created_at: "2026-05-01T00:00:00Z",
@@ -404,6 +411,153 @@ describe("resource-pointer simulation", () => {
     expect(result.unscheduledSessions).toBe(0);
     // A: 2 sessions × 2h on day 1 (9-11, 11-13); B: 1 session × 2h starting >= 13:00 day 1
     expect(result.estimatedCompletionDate).toBe("2026-06-01");
+  });
+});
+
+// ── Phase C: business hours, lunch, equipment ──────────────────────────────
+
+describe("business hours (start_hour_local)", () => {
+  it("anchors the first session at the room's start hour", () => {
+    const result = computeFeasibility({
+      implementation: { ...baseImpl, window_end_date: "2026-06-07" },
+      rooms: [makeRoom({ start_hour_local: 7 })],
+      trainers: [makeTrainer()],
+      classes: [
+        makeClass({
+          hours_per_session: 2,
+          expected_learners_per_session: 10,
+          total_people_to_train: 10, // 1 session
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    expect(result.estimatedCompletionDate).toBe("2026-06-01");
+    expect(result.unscheduledSessions).toBe(0);
+    // Hours assigned should equal the single session's duration.
+    const r = result.roomUtilization[0];
+    expect(r?.hoursAssigned).toBe(2);
+  });
+
+  it("rejects sessions that don't fit even with a late start hour", () => {
+    // start at 9, 8 work hours/day → day ends at 17. 9-hour session can't fit.
+    const result = computeFeasibility({
+      implementation: { ...baseImpl, window_end_date: "2026-06-05" },
+      rooms: [makeRoom({ start_hour_local: 9, available_hours_per_day: 8 })],
+      trainers: [makeTrainer()],
+      classes: [
+        makeClass({
+          hours_per_session: 9,
+          expected_learners_per_session: 10,
+          total_people_to_train: 10,
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    expect(result.unscheduledSessions).toBe(1);
+  });
+});
+
+describe("lunch break", () => {
+  it("pushes a session past lunch when it would otherwise overlap", () => {
+    // Lunch 12:00–13:00. 2-hour sessions stack 9-11, 11-13 → second one overlaps lunch.
+    // With lunch enabled, sequence should be 9-11, then 13-15.
+    const result = computeFeasibility({
+      implementation: {
+        ...baseImpl,
+        window_end_date: "2026-06-05",
+        lunch_break_start_minutes: 720, // 12:00
+        lunch_break_length_minutes: 60,
+      },
+      rooms: [makeRoom({ start_hour_local: 9, available_hours_per_day: 8 })],
+      trainers: [makeTrainer()],
+      classes: [
+        makeClass({
+          hours_per_session: 2,
+          expected_learners_per_session: 10,
+          total_people_to_train: 40, // 4 sessions
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    expect(result.unscheduledSessions).toBe(0);
+    // 4 sessions × 2h with one lunch push = 9-11, 13-15, 15-17, then next day 9-11.
+    // (slot 2 at 11 overlaps 12-13; pushed to 13.) Completion on day 2.
+    expect(result.estimatedCompletionDate).toBe("2026-06-02");
+  });
+
+  it("ignores lunch when length is 0", () => {
+    const result = computeFeasibility({
+      implementation: {
+        ...baseImpl,
+        window_end_date: "2026-06-02",
+        lunch_break_start_minutes: 720,
+        lunch_break_length_minutes: 0,
+      },
+      rooms: [makeRoom({ available_hours_per_day: 8 })],
+      trainers: [makeTrainer()],
+      classes: [
+        makeClass({
+          hours_per_session: 2,
+          expected_learners_per_session: 10,
+          total_people_to_train: 40, // 4 sessions
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    expect(result.unscheduledSessions).toBe(0);
+    // All 4 sessions stack back-to-back on day 1: 9-11, 11-13, 13-15, 15-17.
+    expect(result.estimatedCompletionDate).toBe("2026-06-01");
+  });
+});
+
+describe("equipment tags", () => {
+  it("excludes rooms that don't satisfy required tags", () => {
+    const result = computeFeasibility({
+      implementation: baseImpl,
+      rooms: [
+        makeRoom({ id: "no-equip", equipment_tags: ["projector"] }),
+        makeRoom({ id: "has-equip", equipment_tags: ["projector", "iv-pump"] }),
+      ],
+      trainers: [makeTrainer()],
+      classes: [makeClass({ required_equipment_tags: ["iv-pump"] })],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    // Only has-equip should pick up sessions.
+    const used = result.roomUtilization.find((r) => r.id === "has-equip");
+    const notUsed = result.roomUtilization.find((r) => r.id === "no-equip");
+    expect(used?.hoursAssigned ?? 0).toBeGreaterThan(0);
+    expect(notUsed?.hoursAssigned ?? 0).toBe(0);
+  });
+
+  it("blocks a class with no equipment-matching room and surfaces the recommendation", () => {
+    const result = computeFeasibility({
+      implementation: baseImpl,
+      rooms: [makeRoom({ equipment_tags: ["projector"] })],
+      trainers: [makeTrainer()],
+      classes: [makeClass({ required_equipment_tags: ["iv-pump"] })],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    const cf = result.classFeasibility[0];
+    expect(cf?.roomCapacityOk).toBe(false);
+    expect(cf?.blockers.some((b) => b.toLowerCase().includes("equipment"))).toBe(true);
+  });
+
+  it("passes when class has no equipment requirement (all rooms eligible)", () => {
+    const result = computeFeasibility({
+      implementation: baseImpl,
+      rooms: [makeRoom({ equipment_tags: [] })],
+      trainers: [makeTrainer()],
+      classes: [makeClass({ required_equipment_tags: [] })],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    expect(result.classFeasibility[0]?.roomCapacityOk).toBe(true);
   });
 });
 

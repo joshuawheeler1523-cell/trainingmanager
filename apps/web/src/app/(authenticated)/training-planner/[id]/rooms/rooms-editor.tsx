@@ -100,12 +100,14 @@ export default function RoomsEditor({ implementationId, rooms }: Props) {
           <table className="w-full text-sm">
             <thead className="bg-surface text-muted-foreground text-xs">
               <tr>
-                <Th className="w-1/4">Name</Th>
+                <Th className="w-1/5">Name</Th>
                 <Th>Location</Th>
-                <Th>Capacity</Th>
+                <Th>Seats</Th>
                 <Th>Hrs/day</Th>
+                <Th>Start</Th>
                 <Th>Days</Th>
-                <Th>Equipment</Th>
+                <Th>Equipment tags</Th>
+                <Th>Notes</Th>
                 <Th className="w-12" />
               </tr>
             </thead>
@@ -166,6 +168,22 @@ export default function RoomsEditor({ implementationId, rooms }: Props) {
                     />
                   </td>
                   <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min={0}
+                      max={23.5}
+                      defaultValue={r.start_hour_local}
+                      disabled={pending}
+                      onBlur={(e) => {
+                        const v = Number(e.target.value);
+                        if (v !== r.start_hour_local) handleUpdate(r, { start_hour_local: v });
+                      }}
+                      aria-label="Day start (24h)"
+                      className={fieldClass + " w-20 tabular-nums"}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
                     <div className="flex gap-0.5">
                       {DAYS.map((d) => {
                         const active = r.available_days_of_week.includes(d.num);
@@ -192,6 +210,21 @@ export default function RoomsEditor({ implementationId, rooms }: Props) {
                   </td>
                   <td className="px-3 py-2">
                     <input
+                      defaultValue={r.equipment_tags.join(", ")}
+                      disabled={pending}
+                      onBlur={(e) => {
+                        const next = parseTagList(e.target.value);
+                        if (!arraysEqual(next, r.equipment_tags)) {
+                          handleUpdate(r, { equipment_tags: next });
+                        }
+                      }}
+                      placeholder="e.g. iv-pump, projector"
+                      aria-label="Equipment tags (comma-separated)"
+                      className={fieldClass + " w-full"}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
                       defaultValue={r.equipment_notes ?? ""}
                       disabled={pending}
                       onBlur={(e) => {
@@ -199,7 +232,7 @@ export default function RoomsEditor({ implementationId, rooms }: Props) {
                           handleUpdate(r, { equipment_notes: e.target.value || null });
                         }
                       }}
-                      placeholder="e.g. IV pump simulator"
+                      placeholder="free-text notes"
                       className={fieldClass + " w-full"}
                     />
                   </td>
@@ -309,4 +342,21 @@ function Th({ children, className }: { children?: React.ReactNode; className?: s
       {children}
     </th>
   );
+}
+
+function parseTagList(input: string): string[] {
+  return Array.from(
+    new Set(
+      input
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter((s) => s.length > 0),
+    ),
+  );
+}
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }

@@ -151,11 +151,12 @@ export default function ClassesEditor({
           <table className="w-full text-sm">
             <thead className="bg-surface text-muted-foreground text-xs">
               <tr>
-                <Th className="w-1/4">Name</Th>
+                <Th className="w-1/5">Name</Th>
                 <Th>Module</Th>
                 <Th>Hrs/session</Th>
                 <Th>Per session</Th>
                 <Th>Total people</Th>
+                <Th>Equipment</Th>
                 <Th>Sessions</Th>
                 <Th>Trainers</Th>
                 <Th>Prereqs</Th>
@@ -239,6 +240,21 @@ export default function ClassesEditor({
                           }
                         }}
                         className={fieldClass + " w-20 tabular-nums"}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        defaultValue={c.required_equipment_tags.join(", ")}
+                        disabled={pending}
+                        onBlur={(e) => {
+                          const next = parseTagList(e.target.value);
+                          if (!arraysEqual(next, c.required_equipment_tags)) {
+                            handleUpdate(c, { required_equipment_tags: next });
+                          }
+                        }}
+                        placeholder="e.g. iv-pump"
+                        aria-label="Required equipment tags (comma-separated)"
+                        className={fieldClass + " w-32"}
                       />
                     </td>
                     <td className="text-foreground px-3 py-2 text-xs font-medium tabular-nums">
@@ -394,6 +410,23 @@ export default function ClassesEditor({
       )}
     </div>
   );
+}
+
+function parseTagList(input: string): string[] {
+  return Array.from(
+    new Set(
+      input
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter((s) => s.length > 0),
+    ),
+  );
+}
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
