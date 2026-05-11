@@ -6,19 +6,32 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 10
+    # Lower limit — minor/patch group is one PR, occasional security
+    # patches outside the group are the rest.
+    open-pull-requests-limit: 5
     groups:
-      # Group safe minor/patch bumps to keep PR noise down. Major bumps
-      # come through individually so each one gets a deliberate review.
+      # Group safe minor/patch bumps into one PR to keep noise down.
       minor-and-patch:
         applies-to: version-updates
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # Don't auto-PR major version bumps. They almost always carry
+      # breaking changes (zod 3→4, vitest 2→4, hookform/resolvers 3→5
+      # etc.) and need real testing — not a one-line PR auto-merged on
+      # Monday.
+      #
+      # When you want a major bump:
+      #   pnpm --filter web update <package> --latest
+      # then run build + lint + test + a manual smoke before committing.
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
     labels:
       - "dependencies"
 
-  # GitHub Actions
+  # GitHub Actions — CI-only, low-risk, auto-PR everything.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
