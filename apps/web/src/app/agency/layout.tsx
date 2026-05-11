@@ -4,6 +4,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgencyId, isAgencyAdmin } from "@/lib/auth/agency";
 import { brandCssVars, getCurrentBrand } from "@/lib/brand";
+import SuspendedBanner from "@/components/suspended-banner";
 
 /**
  * Layout for the agency console (`/agency/*`).
@@ -36,9 +37,13 @@ export default async function AgencyLayout({ children }: { children: React.React
   // Pull the agency name for the header.
   const { data: agency } = await supabase
     .from("agencies")
-    .select("id, name, slug")
+    .select("id, name, slug, suspended_at, suspended_reason")
     .eq("id", agencyId)
     .maybeSingle();
+
+  if (agency?.suspended_at) {
+    return <SuspendedBanner scope="agency" reason={agency.suspended_reason} />;
+  }
 
   const brand = await getCurrentBrand();
 
