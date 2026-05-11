@@ -546,6 +546,15 @@ export type ScheduleGenResult = {
   sessions: number;
   conflicts: number;
   capacity_gaps: { class_id: string; class_name: string; session_index: number; reason: string }[];
+  // Populated by the generator when capacity_gaps is non-empty. All fields
+  // are optional because the SQL may emit an empty object {} when the
+  // aggregate deficit isn't positive (e.g., gap is due to weekly distribution
+  // or prereq sequencing, not raw hours).
+  recommendations?: {
+    trainer_hours_per_week_to_add?: number;
+    trainers_to_add?: number;
+    weeks_to_extend?: number;
+  };
 };
 
 export async function generateSchedule(

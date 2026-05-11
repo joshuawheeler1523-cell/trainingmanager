@@ -103,10 +103,46 @@ export default function GenerateButton({ implementationId, ready, existingSessio
                       </li>
                     )}
                   </ul>
-                  <p className="mt-2">
-                    Suggestions: add more trainers / rooms, reduce learners per session, or extend
-                    the window.
-                  </p>
+                  {result.recommendations && Object.keys(result.recommendations).length > 0 && (
+                    <div className="mt-2">
+                      <p className="font-semibold">To close the gap, pick one:</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {result.recommendations.trainers_to_add != null &&
+                          result.recommendations.trainers_to_add > 0 && (
+                            <li>
+                              • Add{" "}
+                              <span className="font-medium tabular-nums">
+                                {result.recommendations.trainers_to_add.toString()}
+                              </span>{" "}
+                              more trainer
+                              {result.recommendations.trainers_to_add === 1 ? "" : "s"}.
+                            </li>
+                          )}
+                        {result.recommendations.trainer_hours_per_week_to_add != null &&
+                          result.recommendations.trainer_hours_per_week_to_add > 0 && (
+                            <li>
+                              • Add{" "}
+                              <span className="font-medium tabular-nums">
+                                {result.recommendations.trainer_hours_per_week_to_add.toString()}{" "}
+                                h/wk
+                              </span>{" "}
+                              of trainer capacity across the team.
+                            </li>
+                          )}
+                        {result.recommendations.weeks_to_extend != null &&
+                          result.recommendations.weeks_to_extend > 0 && (
+                            <li>
+                              • Extend the window by{" "}
+                              <span className="font-medium tabular-nums">
+                                {result.recommendations.weeks_to_extend.toString()} week
+                                {result.recommendations.weeks_to_extend === 1 ? "" : "s"}
+                              </span>
+                              .
+                            </li>
+                          )}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
