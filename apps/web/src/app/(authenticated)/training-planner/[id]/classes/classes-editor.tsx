@@ -24,6 +24,8 @@ import {
 
 type Props = {
   implementationId: string;
+  windowStartDate: string | null;
+  windowEndDate: string | null;
   classes: ImplClass[];
   modules: ImplModule[];
   trainers: ImplTrainer[];
@@ -34,8 +36,23 @@ type Props = {
 const fieldClass =
   "border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
+// Standard FTE basis: 40 trainer hours per week. Used to translate class
+// demand-hours into FTE-equivalents and integer trainer/room counts.
+const FTE_HOURS_PER_WEEK = 40;
+
+function computeWindowWeeks(start: string | null, end: string | null): number {
+  if (!start || !end) return 0;
+  const s = new Date(start + "T00:00:00Z");
+  const e = new Date(end + "T00:00:00Z");
+  if (e < s) return 0;
+  const days = Math.floor((e.getTime() - s.getTime()) / 86400000) + 1;
+  return Math.max(1, Math.ceil(days / 7));
+}
+
 export default function ClassesEditor({
   implementationId,
+  windowStartDate,
+  windowEndDate,
   classes,
   modules,
   trainers,
@@ -128,8 +145,19 @@ export default function ClassesEditor({
     });
   }
 
+  const windowWeeks = computeWindowWeeks(windowStartDate, windowEndDate);
+  const fteDenominator = windowWeeks * FTE_HOURS_PER_WEEK; // 0 when window unset
+
   const totalSessions = classes.reduce((acc, c) => acc + sessionsNeeded(c), 0);
   const totalHours = classes.reduce((acc, c) => acc + sessionsNeeded(c) * c.hours_per_session, 0);
+  // Aggregate FTE / rooms computed from total hours (not summed per-class)
+  // so the bottom-line is honest about resource sharing across classes —
+  // summing per-class rounding-ups would inflate.
+  const totalTrainerFte = fteDenominator > 0 ? totalHours / fteDenominator : null;
+  const totalRoomsNeeded =
+    fteDenominator > 0
+      ? Math.max(totalHours > 0 ? 1 : 0, Math.ceil(totalHours / fteDenominator))
+      : null;
 
   const open = openClassId ? (classMap.get(openClassId) ?? null) : null;
 
@@ -158,7 +186,10 @@ export default function ClassesEditor({
                 <Th>Total people</Th>
                 <Th>Equipment</Th>
                 <Th>Sessions</Th>
-                <Th>Trainers</Th>
+                <Th>Hours</Th>
+                <Th>Trainer FTE</Th>
+                <Th>Rooms</Th>
+                <Th>Slate</Th>
                 <Th>Prereqs</Th>
                 <Th className="w-12" />
               </tr>
@@ -166,6 +197,12 @@ export default function ClassesEditor({
             <tbody className="divide-border divide-y">
               {classes.map((c) => {
                 const sessions = sessionsNeeded(c);
+                const hours = sessions * c.hours_per_session;
+                const trainerFte = fteDenominator > 0 ? hours / fteDenominator : null;
+                const roomsNeeded =
+                  fteDenominator > 0
+                    ? Math.max(hours > 0 ? 1 : 0, Math.ceil(hours / fteDenominator))
+                    : null;
                 const trainerCount = (trainersByClass.get(c.id) ?? []).length;
                 const prereqCount = (prereqsByClass.get(c.id) ?? []).length;
                 return (
@@ -261,6 +298,15 @@ export default function ClassesEditor({
                       {sessions.toString()}
                     </td>
                     <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+                      {hours.toFixed(1)}
+                    </td>
+                    <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+                      {trainerFte == null ? "—" : trainerFte.toFixed(2)}
+                    </td>
+                    <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+                      {roomsNeeded == null ? "—" : roomsNeeded.toString()}
+                    </td>
+                    <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
                       {trainerCount.toString()}
                     </td>
                     <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
@@ -284,11 +330,39 @@ export default function ClassesEditor({
               })}
             </tbody>
           </table>
-          <div className="bg-surface text-muted-foreground border-border border-t px-3 py-2 text-xs">
-            Total sessions needed:{" "}
-            <span className="text-foreground font-medium">{totalSessions.toString()}</span> · Total
-            trainer hours required:{" "}
-            <span className="text-foreground font-medium">{totalHours.toFixed(1)}h</span>
+          <div className="bg-surface text-muted-foreground border-border space-y-1 border-t px-3 py-2 text-xs">
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <span>
+                Total sessions:{" "}
+                <span className="text-foreground font-medium tabular-nums">
+                  {totalSessions.toString()}
+                </span>
+              </span>
+              <span>
+                Total hours:{" "}
+                <span className="text-foreground font-medium tabular-nums">
+                  {totalHours.toFixed(1)}
+                </span>
+              </span>
+              <span>
+                Total trainer FTE:{" "}
+                <span className="text-foreground font-medium tabular-nums">
+                  {totalTrainerFte == null ? "—" : totalTrainerFte.toFixed(2)}
+                </span>
+              </span>
+              <span>
+                Rooms needed in parallel:{" "}
+                <span className="text-foreground font-medium tabular-nums">
+                  {totalRoomsNeeded == null ? "—" : totalRoomsNeeded.toString()}
+                </span>
+              </span>
+            </div>
+            <p className="text-[11px] italic">
+              FTE = total hours ÷ ({FTE_HOURS_PER_WEEK.toString()}h/wk ×{" "}
+              {windowWeeks > 0 ? windowWeeks.toString() + " window weeks" : "set window dates"}).
+              Rooms = ceil(hours ÷ same denominator), i.e. the minimum rooms running in parallel
+              full-time to absorb the load.
+            </p>
           </div>
         </div>
       )}
