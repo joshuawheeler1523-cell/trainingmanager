@@ -101,10 +101,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Authenticated on /login: send home
-  if (user && pathname === "/login") {
+  // Authenticated visits to / or /login go to the dashboard. The marketing
+  // page at / is for unauthenticated visitors.
+  if (user && (pathname === "/" || pathname === "/login")) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 

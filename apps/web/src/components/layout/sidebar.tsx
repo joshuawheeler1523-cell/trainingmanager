@@ -144,7 +144,7 @@ function SidebarContent({
     <>
       <div className="border-border flex h-16 shrink-0 items-center border-b px-4">
         <Link
-          href="/"
+          href="/dashboard"
           aria-label="Arbor home"
           className="inline-flex items-center transition-transform hover:scale-[1.02]"
           onClick={() => {
