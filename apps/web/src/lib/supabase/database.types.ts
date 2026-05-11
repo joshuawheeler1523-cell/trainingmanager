@@ -3473,6 +3473,80 @@ export type Database = {
           },
         ];
       };
+      status_incident_updates: {
+        Row: {
+          body: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          incident_id: string;
+          status: string;
+        };
+        Insert: {
+          body: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          incident_id: string;
+          status: string;
+        };
+        Update: {
+          body?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          incident_id?: string;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "status_incident_updates_incident_id_fkey";
+            columns: ["incident_id"];
+            isOneToOne: false;
+            referencedRelation: "status_incidents";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      status_incidents: {
+        Row: {
+          body: string | null;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          resolved_at: string | null;
+          severity: string;
+          started_at: string;
+          status: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          body?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          resolved_at?: string | null;
+          severity?: string;
+          started_at?: string;
+          status?: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          body?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          resolved_at?: string | null;
+          severity?: string;
+          started_at?: string;
+          status?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       support_ticket_messages: {
         Row: {
           author_id: string | null;

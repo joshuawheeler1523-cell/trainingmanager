@@ -18,8 +18,23 @@ describe("isAllowedPath", () => {
     expect(isAllowedPath("/public/projects/xyz")).toBe(true);
   });
 
-  it("blocks /", () => {
-    expect(isAllowedPath("/")).toBe(false);
+  it("allows / (marketing landing page)", () => {
+    expect(isAllowedPath("/")).toBe(true);
+  });
+  it("allows /pricing", () => {
+    expect(isAllowedPath("/pricing")).toBe(true);
+  });
+  it("allows /legal/terms", () => {
+    expect(isAllowedPath("/legal/terms")).toBe(true);
+  });
+  it("allows /trust", () => {
+    expect(isAllowedPath("/trust")).toBe(true);
+  });
+  it("allows /status", () => {
+    expect(isAllowedPath("/status")).toBe(true);
+  });
+  it("allows /agency-signup", () => {
+    expect(isAllowedPath("/agency-signup")).toBe(true);
   });
   it("blocks /dashboard", () => {
     expect(isAllowedPath("/dashboard")).toBe(false);
@@ -32,6 +47,10 @@ describe("isAllowedPath", () => {
   });
   it("blocks /account/set-password", () => {
     expect(isAllowedPath("/account/set-password")).toBe(false);
+  });
+  it("does not allow nested paths under /", () => {
+    // exact-match rule for "/" — otherwise every path would be allowed
+    expect(isAllowedPath("/instructors")).toBe(false);
   });
 });
 
@@ -55,7 +74,19 @@ describe("skipOrgCheck", () => {
   it("checks /instructors", () => {
     expect(skipOrgCheck("/instructors")).toBe(false);
   });
-  it("checks /account/set-password", () => {
-    expect(skipOrgCheck("/account/set-password")).toBe(false);
+  it("skips /account/set-password (account routes don't need an org)", () => {
+    expect(skipOrgCheck("/account/set-password")).toBe(true);
+  });
+  it("skips /agency (agency console)", () => {
+    expect(skipOrgCheck("/agency/clients/new")).toBe(true);
+  });
+  it("skips /legal/terms", () => {
+    expect(skipOrgCheck("/legal/terms")).toBe(true);
+  });
+  it("skips /api/health", () => {
+    expect(skipOrgCheck("/api/health")).toBe(true);
+  });
+  it("skips /api/v1/instructors", () => {
+    expect(skipOrgCheck("/api/v1/instructors")).toBe(true);
   });
 });

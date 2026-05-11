@@ -9,6 +9,7 @@ const UNAUTHENTICATED_ALLOWED = [
   "/agency-signup",
   "/legal",
   "/trust",
+  "/status",
   "/api/health",
   "/api/v1/", // Bearer-token auth handled inside the route
 ];
@@ -33,6 +34,7 @@ const ORG_CHECK_SKIP = [
   "/agency-signup",
   "/legal",
   "/trust",
+  "/status",
   "/api/health",
   "/api/v1/",
   "/account",
