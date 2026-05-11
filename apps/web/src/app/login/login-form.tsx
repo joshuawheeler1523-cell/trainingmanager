@@ -1,15 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useActionState, useState, useTransition } from "react";
-import {
-  discoverSsoForEmail,
-  sendMagicLink,
-  signInWithPassword,
-  startSsoSignIn,
-  type MagicLinkState,
-  type PasswordState,
-} from "./actions";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { discoverSsoForEmail, sendMagicLink, signInWithPassword, startSsoSignIn } from "./actions";
 
 export type LoginBrand = {
   name: string;
@@ -18,35 +12,43 @@ export type LoginBrand = {
   isAgency: boolean;
 };
 
+type Phase = "idle" | "checking" | "submitting";
+
 export default function LoginForm({ brand }: { brand: LoginBrand }) {
+  const router = useRouter();
   const [mode, setMode] = useState<"magic" | "password">("magic");
-  const [magicState, magicAction, magicPending] = useActionState<MagicLinkState, FormData>(
-    sendMagicLink,
-    { status: "idle" },
-  );
-  const [passState, passAction, passPending] = useActionState<PasswordState, FormData>(
-    signInWithPassword,
-    {},
-  );
-  const [ssoChecking, startSsoCheck] = useTransition();
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [magicSentTo, setMagicSentTo] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
 
   // SSO check happens on form submit: we look up the email's domain in
   // sso_configs first; if a provider id is registered + enabled we
   // dispatch to the IdP via signInWithSSO, otherwise we fall through to
   // the magic-link / password flow the user picked.
+  //
+  // Why call the server actions directly (not via useActionState)? Calling
+  // an action-state dispatcher imperatively from inside a useTransition
+  // double-wraps the action and (a) hangs the pending state on "Checking…"
+  // and (b) swallows the redirect() from signInWithPassword. Direct calls
+  // let us own the pending state and navigate explicitly on success.
   const handleEmailSubmit = (
     e: React.SyntheticEvent<HTMLFormElement>,
-    mode: "magic" | "password",
+    submitMode: "magic" | "password",
   ) => {
     // Always preventDefault so a missing email or pre-validation bail-out
     // doesn't trigger a native form submit (the form has no action= and
     // the browser would do a full-page reload to the same URL).
     e.preventDefault();
     const form = e.currentTarget;
-    const email = (new FormData(form).get("email") as string | null)?.trim() ?? "";
+    const fd = new FormData(form);
+    const email = (fd.get("email") as string | null)?.trim() ?? "";
     if (!email.includes("@")) return; // native required + type=email handle the message
 
-    startSsoCheck(async () => {
+    setErrorMessage(null);
+    setPhase("checking");
+
+    startTransition(async () => {
       // SSO discovery is best-effort. If the RPC errors (RLS, missing
       // migration on a preview deploy, network blip) or takes longer
       // than 2.5s, we fall through to the user's chosen flow rather
@@ -63,8 +65,6 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
           }),
         ]);
       } catch (err) {
-        // Don't surface SSO-discovery errors to the user — it's a
-        // background optimization. Fall through to magic link / password.
         console.warn("[login] SSO discovery failed, falling through:", err);
       }
       if (sso) {
@@ -75,14 +75,34 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
           console.warn("[login] SSO sign-in failed, falling through:", err);
         }
       }
-      // No SSO (or SSO failed) — submit the user's chosen action.
-      if (mode === "magic") {
-        magicAction(new FormData(form));
+
+      setPhase("submitting");
+      if (submitMode === "magic") {
+        const result = await sendMagicLink({ status: "idle" }, fd);
+        if (result.status === "sent") {
+          setMagicSentTo(result.email);
+        } else if (result.status === "error") {
+          setErrorMessage(result.message);
+        }
+        setPhase("idle");
       } else {
-        passAction(new FormData(form));
+        const result = await signInWithPassword({}, fd);
+        // signInWithPassword redirects on success, so on a happy path
+        // we never get a value back. If we do, it's an error state.
+        if (result.error) {
+          setErrorMessage(result.error);
+          setPhase("idle");
+        } else {
+          // Server-action redirect didn't fire (rare) but the auth cookie
+          // is set — navigate explicitly so we never strand the user here.
+          router.replace("/");
+          router.refresh();
+        }
       }
     });
   };
+
+  const isBusy = phase !== "idle";
 
   const accent = brand.isAgency ? brand.primaryColor : "#8FA68E";
 
@@ -178,8 +198,8 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
         </div>
 
         <div className="w-full max-w-sm">
-          {magicState.status === "sent" ? (
-            <SentCard email={magicState.email} />
+          {magicSentTo ? (
+            <SentCard email={magicSentTo} />
           ) : (
             <>
               <header className="mb-8">
@@ -205,10 +225,10 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
                     label="Email"
                     autoComplete="email"
                   />
-                  {magicState.status === "error" && <ErrorText>{magicState.message}</ErrorText>}
+                  {errorMessage && <ErrorText>{errorMessage}</ErrorText>}
                   <PrimaryButton
-                    pending={magicPending || ssoChecking}
-                    pendingLabel={ssoChecking ? "Checking…" : "Sending…"}
+                    pending={isBusy}
+                    pendingLabel={phase === "checking" ? "Checking…" : "Sending…"}
                     brand={brand}
                   >
                     Send magic link
@@ -235,10 +255,10 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
                     label="Password"
                     autoComplete="current-password"
                   />
-                  {passState.error && <ErrorText>{passState.error}</ErrorText>}
+                  {errorMessage && <ErrorText>{errorMessage}</ErrorText>}
                   <PrimaryButton
-                    pending={passPending || ssoChecking}
-                    pendingLabel={ssoChecking ? "Checking…" : "Signing in…"}
+                    pending={isBusy}
+                    pendingLabel={phase === "checking" ? "Checking…" : "Signing in…"}
                     brand={brand}
                   >
                     Sign in
@@ -250,6 +270,7 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
                 <button
                   type="button"
                   onClick={() => {
+                    setErrorMessage(null);
                     setMode(mode === "magic" ? "password" : "magic");
                   }}
                   className="text-muted-foreground text-sm underline-offset-4 transition-colors hover:underline"
