@@ -223,7 +223,7 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
                 </form>
               )}
 
-              <div className="mt-6 flex justify-center">
+              <div className="mt-6 flex flex-col items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -236,6 +236,14 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
                     ? "Sign in with password instead"
                     : "Send me a magic link instead"}
                 </button>
+                {mode === "password" && (
+                  <a
+                    href="/auth/reset"
+                    className="text-muted-foreground text-xs underline-offset-4 hover:underline"
+                  >
+                    Forgot password?
+                  </a>
+                )}
               </div>
             </>
           )}
