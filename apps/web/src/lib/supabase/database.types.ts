@@ -581,6 +581,65 @@ export type Database = {
         };
         Relationships: [];
       };
+      baa_requests: {
+        Row: {
+          created_at: string;
+          effective_date: string | null;
+          id: string;
+          notes: string | null;
+          org_id: string;
+          requested_at: string;
+          requested_by: string | null;
+          signed_at: string | null;
+          signed_pdf_path: string | null;
+          signer_email: string | null;
+          signer_name: string | null;
+          signer_title: string | null;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          effective_date?: string | null;
+          id?: string;
+          notes?: string | null;
+          org_id: string;
+          requested_at?: string;
+          requested_by?: string | null;
+          signed_at?: string | null;
+          signed_pdf_path?: string | null;
+          signer_email?: string | null;
+          signer_name?: string | null;
+          signer_title?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          effective_date?: string | null;
+          id?: string;
+          notes?: string | null;
+          org_id?: string;
+          requested_at?: string;
+          requested_by?: string | null;
+          signed_at?: string | null;
+          signed_pdf_path?: string | null;
+          signer_email?: string | null;
+          signer_name?: string | null;
+          signer_title?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "baa_requests_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       class_instructor_assignments: {
         Row: {
           assigned_offerings: number;
@@ -897,6 +956,45 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      cookie_consents: {
+        Row: {
+          analytics: boolean;
+          consented_at: string;
+          id: string;
+          ip: string | null;
+          marketing: boolean;
+          necessary: boolean;
+          session_id: string | null;
+          source: string;
+          user_agent: string | null;
+          user_id: string | null;
+        };
+        Insert: {
+          analytics?: boolean;
+          consented_at?: string;
+          id?: string;
+          ip?: string | null;
+          marketing?: boolean;
+          necessary?: boolean;
+          session_id?: string | null;
+          source?: string;
+          user_agent?: string | null;
+          user_id?: string | null;
+        };
+        Update: {
+          analytics?: boolean;
+          consented_at?: string;
+          id?: string;
+          ip?: string | null;
+          marketing?: boolean;
+          necessary?: boolean;
+          session_id?: string | null;
+          source?: string;
+          user_agent?: string | null;
+          user_id?: string | null;
+        };
+        Relationships: [];
       };
       data_exports: {
         Row: {
@@ -2444,6 +2542,45 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      legal_acceptances: {
+        Row: {
+          accepted_at: string;
+          context: string;
+          document_key: string;
+          email: string | null;
+          id: string;
+          ip: string | null;
+          metadata: Json | null;
+          user_agent: string | null;
+          user_id: string | null;
+          version: string;
+        };
+        Insert: {
+          accepted_at?: string;
+          context?: string;
+          document_key: string;
+          email?: string | null;
+          id?: string;
+          ip?: string | null;
+          metadata?: Json | null;
+          user_agent?: string | null;
+          user_id?: string | null;
+          version: string;
+        };
+        Update: {
+          accepted_at?: string;
+          context?: string;
+          document_key?: string;
+          email?: string | null;
+          id?: string;
+          ip?: string | null;
+          metadata?: Json | null;
+          user_agent?: string | null;
+          user_id?: string | null;
+          version?: string;
+        };
+        Relationships: [];
       };
       milestones: {
         Row: {

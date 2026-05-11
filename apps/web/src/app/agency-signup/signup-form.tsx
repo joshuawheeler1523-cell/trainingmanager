@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { createAgencySignupAction } from "./actions";
+import { recordLegalAcceptanceAction } from "@/app/legal/actions";
 
 const fieldClass =
   "border-input bg-background text-foreground w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
@@ -13,6 +15,7 @@ export default function SignupForm() {
   const [agencySlug, setAgencySlug] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminFullName, setAdminFullName] = useState("");
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [done, setDone] = useState<{ email: string; emailSent: boolean } | null>(null);
   // Tracks whether the user has manually edited the slug. Once they have,
   // we stop auto-deriving from the name. The previous closure-based
@@ -34,7 +37,20 @@ export default function SignupForm() {
 
   const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!acceptedLegal) {
+      toast.error("You must accept the legal agreements to continue");
+      return;
+    }
     startTransition(async () => {
+      // Record acceptance keyed by email BEFORE creating the agency, so
+      // the audit trail exists even if the user creation fails. The
+      // server side recordAcceptance is idempotent so re-recording on a
+      // retry is harmless.
+      await recordLegalAcceptanceAction({
+        documents: ["terms", "privacy", "reseller"],
+        email: adminEmail,
+        context: "agency_signup",
+      });
       const result = await createAgencySignupAction({
         agencyName,
         agencySlug,
@@ -140,9 +156,42 @@ export default function SignupForm() {
         </p>
       </div>
 
+      <label className="flex items-start gap-3 text-sm">
+        <input
+          type="checkbox"
+          checked={acceptedLegal}
+          onChange={(e) => {
+            setAcceptedLegal(e.target.checked);
+          }}
+          className="mt-1 h-4 w-4"
+          required
+        />
+        <span className="text-foreground">
+          I agree to the{" "}
+          <Link href="/legal/terms" target="_blank" className="text-primary underline">
+            Terms of Service
+          </Link>
+          ,{" "}
+          <Link href="/legal/privacy" target="_blank" className="text-primary underline">
+            Privacy Policy
+          </Link>
+          , and{" "}
+          <Link href="/legal/reseller-agreement" target="_blank" className="text-primary underline">
+            Reseller Agreement
+          </Link>{" "}
+          on behalf of my agency.
+        </span>
+      </label>
+
       <button
         type="submit"
-        disabled={pending || !agencyName.trim() || !adminEmail.trim() || !adminFullName.trim()}
+        disabled={
+          pending ||
+          !agencyName.trim() ||
+          !adminEmail.trim() ||
+          !adminFullName.trim() ||
+          !acceptedLegal
+        }
         className="bg-primary text-primary-foreground w-full rounded-md py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50"
       >
         {pending ? "Creating agency…" : "Create agency"}

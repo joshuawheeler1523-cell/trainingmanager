@@ -3,6 +3,8 @@ const UNAUTHENTICATED_ALLOWED = [
   "/auth/callback",
   "/public/",
   "/agency-signup",
+  "/legal",
+  "/trust",
   "/api/v1/", // Bearer-token auth handled inside the route
 ];
 
@@ -17,6 +19,8 @@ const ORG_CHECK_SKIP = [
   "/public/",
   "/agency",
   "/agency-signup",
+  "/legal",
+  "/trust",
   "/api/v1/",
 ];
 
