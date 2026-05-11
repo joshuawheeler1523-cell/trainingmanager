@@ -127,47 +127,49 @@ export default function ApiKeysList({ keys }: { keys: Key[] }) {
         {keys.length === 0 ? (
           <p className="text-muted-foreground p-6 text-center text-sm italic">No API keys yet.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-surface text-muted-foreground border-border border-b text-xs uppercase">
-              <tr>
-                <th className="px-5 py-2.5 text-left font-medium">Name</th>
-                <th className="px-5 py-2.5 text-left font-medium">Prefix</th>
-                <th className="px-5 py-2.5 text-left font-medium">Created</th>
-                <th className="px-5 py-2.5 text-left font-medium">Last used</th>
-                <th className="px-5 py-2.5 text-right font-medium" />
-              </tr>
-            </thead>
-            <tbody className="divide-border divide-y">
-              {keys.map((k) => (
-                <tr key={k.id} className={k.revoked_at ? "opacity-60" : ""}>
-                  <td className="text-foreground px-5 py-3 font-medium">{k.name}</td>
-                  <td className="text-muted-foreground px-5 py-3 font-mono">{k.key_prefix}…</td>
-                  <td className="text-foreground px-5 py-3 tabular-nums">
-                    {k.created_at.slice(0, 10)}
-                  </td>
-                  <td className="text-foreground px-5 py-3 tabular-nums">
-                    {k.last_used_at ? k.last_used_at.slice(0, 10) : "—"}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    {k.revoked_at ? (
-                      <span className="text-muted-foreground text-xs">Revoked</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleRevoke(k.id);
-                        }}
-                        disabled={pending}
-                        className="text-destructive text-xs hover:underline disabled:opacity-50"
-                      >
-                        Revoke
-                      </button>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface text-muted-foreground border-border border-b text-xs uppercase">
+                <tr>
+                  <th className="px-5 py-2.5 text-left font-medium">Name</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Prefix</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Created</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Last used</th>
+                  <th className="px-5 py-2.5 text-right font-medium" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-border divide-y">
+                {keys.map((k) => (
+                  <tr key={k.id} className={k.revoked_at ? "opacity-60" : ""}>
+                    <td className="text-foreground px-5 py-3 font-medium">{k.name}</td>
+                    <td className="text-muted-foreground px-5 py-3 font-mono">{k.key_prefix}…</td>
+                    <td className="text-foreground px-5 py-3 tabular-nums">
+                      {k.created_at.slice(0, 10)}
+                    </td>
+                    <td className="text-foreground px-5 py-3 tabular-nums">
+                      {k.last_used_at ? k.last_used_at.slice(0, 10) : "—"}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      {k.revoked_at ? (
+                        <span className="text-muted-foreground text-xs">Revoked</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleRevoke(k.id);
+                          }}
+                          disabled={pending}
+                          className="text-destructive text-xs hover:underline disabled:opacity-50"
+                        >
+                          Revoke
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

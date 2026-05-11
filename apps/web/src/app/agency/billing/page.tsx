@@ -120,62 +120,66 @@ export default async function AgencyBillingPage() {
             , then add a contract here.
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-surface border-border border-b text-xs">
-              <tr className="text-muted-foreground">
-                <th className="px-5 py-2.5 text-left font-medium">Client org</th>
-                <th className="px-5 py-2.5 text-left font-medium">Tier</th>
-                <th className="px-5 py-2.5 text-right font-medium">Annual value</th>
-                <th className="px-5 py-2.5 text-right font-medium">Rev share</th>
-                <th className="px-5 py-2.5 text-left font-medium">Period</th>
-                <th className="px-5 py-2.5 text-left font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-border divide-y">
-              {contractList.map((c) => {
-                type WithOrg = {
-                  organizations:
-                    | { name: string; slug: string }
-                    | { name: string; slug: string }[]
-                    | null;
-                };
-                const cx = c as unknown as WithOrg;
-                const orgs = cx.organizations;
-                const orgRow = Array.isArray(orgs) ? orgs[0] : orgs;
-                const orgName = orgRow?.name ?? "(unknown)";
-                const sharePct =
-                  (c.revenue_share_pct ?? agency?.default_revenue_share_pct ?? 3000) / 100;
-                return (
-                  <tr key={c.id} className="hover:bg-surface">
-                    <td className="text-foreground px-5 py-3 font-medium">{orgName}</td>
-                    <td className="text-muted-foreground px-5 py-3 capitalize">{c.pricing_tier}</td>
-                    <td className="text-foreground px-5 py-3 text-right tabular-nums">
-                      {formatCents(c.annual_contract_value_cents)}/yr
-                    </td>
-                    <td className="text-foreground px-5 py-3 text-right tabular-nums">
-                      {sharePct.toFixed(0)}%
-                    </td>
-                    <td className="text-muted-foreground px-5 py-3 text-xs">
-                      {c.contract_start} → {c.contract_end ?? "open"}
-                    </td>
-                    <td className="px-5 py-3">
-                      <span
-                        className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                          c.status === "active"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : c.status === "trial"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {c.status}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface border-border border-b text-xs">
+                <tr className="text-muted-foreground">
+                  <th className="px-5 py-2.5 text-left font-medium">Client org</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Tier</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Annual value</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Rev share</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Period</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-border divide-y">
+                {contractList.map((c) => {
+                  type WithOrg = {
+                    organizations:
+                      | { name: string; slug: string }
+                      | { name: string; slug: string }[]
+                      | null;
+                  };
+                  const cx = c as unknown as WithOrg;
+                  const orgs = cx.organizations;
+                  const orgRow = Array.isArray(orgs) ? orgs[0] : orgs;
+                  const orgName = orgRow?.name ?? "(unknown)";
+                  const sharePct =
+                    (c.revenue_share_pct ?? agency?.default_revenue_share_pct ?? 3000) / 100;
+                  return (
+                    <tr key={c.id} className="hover:bg-surface">
+                      <td className="text-foreground px-5 py-3 font-medium">{orgName}</td>
+                      <td className="text-muted-foreground px-5 py-3 capitalize">
+                        {c.pricing_tier}
+                      </td>
+                      <td className="text-foreground px-5 py-3 text-right tabular-nums">
+                        {formatCents(c.annual_contract_value_cents)}/yr
+                      </td>
+                      <td className="text-foreground px-5 py-3 text-right tabular-nums">
+                        {sharePct.toFixed(0)}%
+                      </td>
+                      <td className="text-muted-foreground px-5 py-3 text-xs">
+                        {c.contract_start} → {c.contract_end ?? "open"}
+                      </td>
+                      <td className="px-5 py-3">
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                            c.status === "active"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : c.status === "trial"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {c.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
@@ -194,51 +198,53 @@ export default async function AgencyBillingPage() {
             contracts.
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-surface border-border border-b text-xs">
-              <tr className="text-muted-foreground">
-                <th className="px-5 py-2.5 text-left font-medium">Invoice #</th>
-                <th className="px-5 py-2.5 text-left font-medium">Period</th>
-                <th className="px-5 py-2.5 text-left font-medium">Issued</th>
-                <th className="px-5 py-2.5 text-left font-medium">Due</th>
-                <th className="px-5 py-2.5 text-right font-medium">Amount</th>
-                <th className="px-5 py-2.5 text-left font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-border divide-y">
-              {invoiceList.map((inv) => (
-                <tr key={inv.id} className="hover:bg-surface">
-                  <td className="px-5 py-3">
-                    <Link
-                      href={`/agency/billing/${inv.id}`}
-                      className="text-primary font-mono text-xs hover:underline"
-                    >
-                      {inv.invoice_number}
-                    </Link>
-                  </td>
-                  <td className="text-muted-foreground px-5 py-3 text-xs">
-                    {inv.period_start} → {inv.period_end}
-                  </td>
-                  <td className="text-muted-foreground px-5 py-3 text-xs">
-                    {inv.issued_at.slice(0, 10)}
-                  </td>
-                  <td className="text-muted-foreground px-5 py-3 text-xs">{inv.due_at}</td>
-                  <td className="text-foreground px-5 py-3 text-right font-semibold tabular-nums">
-                    {formatCents(inv.total_cents)}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                        INVOICE_STATUS_BADGE[inv.status] ?? "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {inv.status}
-                    </span>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface border-border border-b text-xs">
+                <tr className="text-muted-foreground">
+                  <th className="px-5 py-2.5 text-left font-medium">Invoice #</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Period</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Issued</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Due</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Amount</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-border divide-y">
+                {invoiceList.map((inv) => (
+                  <tr key={inv.id} className="hover:bg-surface">
+                    <td className="px-5 py-3">
+                      <Link
+                        href={`/agency/billing/${inv.id}`}
+                        className="text-primary font-mono text-xs hover:underline"
+                      >
+                        {inv.invoice_number}
+                      </Link>
+                    </td>
+                    <td className="text-muted-foreground px-5 py-3 text-xs">
+                      {inv.period_start} → {inv.period_end}
+                    </td>
+                    <td className="text-muted-foreground px-5 py-3 text-xs">
+                      {inv.issued_at.slice(0, 10)}
+                    </td>
+                    <td className="text-muted-foreground px-5 py-3 text-xs">{inv.due_at}</td>
+                    <td className="text-foreground px-5 py-3 text-right font-semibold tabular-nums">
+                      {formatCents(inv.total_cents)}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                          INVOICE_STATUS_BADGE[inv.status] ?? "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {inv.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

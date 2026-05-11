@@ -20,10 +20,22 @@ type Config = {
 export default function SsoConfigList({ configs }: { configs: Config[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [pendingRowId, setPendingRowId] = useState<string | null>(null);
   const [emailDomain, setEmailDomain] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [providerId, setProviderId] = useState("");
   const [enabled, setEnabled] = useState(false);
+
+  const runRow = (id: string, op: () => Promise<void>) => {
+    setPendingRowId(id);
+    startTransition(async () => {
+      try {
+        await op();
+      } finally {
+        setPendingRowId(null);
+      }
+    });
+  };
 
   const handleSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -54,7 +66,7 @@ export default function SsoConfigList({ configs }: { configs: Config[] }) {
       )
     )
       return;
-    startTransition(async () => {
+    runRow(id, async () => {
       const result = await deleteSsoConfigAction(id);
       if (result.ok) {
         toast.success("SSO config deleted");
@@ -66,7 +78,7 @@ export default function SsoConfigList({ configs }: { configs: Config[] }) {
   };
 
   const handleToggle = (config: Config) => {
-    startTransition(async () => {
+    runRow(config.id, async () => {
       const result = await upsertSsoConfigAction({
         emailDomain: config.email_domain,
         displayName: config.display_name,
@@ -94,59 +106,61 @@ export default function SsoConfigList({ configs }: { configs: Config[] }) {
             No SSO configs yet.
           </p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-surface text-muted-foreground border-border border-b text-xs uppercase">
-              <tr>
-                <th className="px-5 py-2.5 text-left font-medium">Domain</th>
-                <th className="px-5 py-2.5 text-left font-medium">Display</th>
-                <th className="px-5 py-2.5 text-left font-medium">Provider id</th>
-                <th className="px-5 py-2.5 text-left font-medium">Status</th>
-                <th className="px-5 py-2.5 text-right font-medium" />
-              </tr>
-            </thead>
-            <tbody className="divide-border divide-y">
-              {configs.map((c) => (
-                <tr key={c.id}>
-                  <td className="text-foreground px-5 py-3 font-mono">{c.email_domain}</td>
-                  <td className="text-foreground px-5 py-3">{c.display_name ?? "—"}</td>
-                  <td className="text-muted-foreground px-5 py-3 font-mono text-xs">
-                    {c.supabase_provider_id ?? "(not set)"}
-                  </td>
-                  <td className="px-5 py-3">
-                    {c.enabled ? (
-                      <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                        ✓ Enabled
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">Disabled</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleToggle(c);
-                      }}
-                      disabled={pending || !c.supabase_provider_id}
-                      className="text-primary mr-3 text-xs hover:underline disabled:opacity-50"
-                    >
-                      {c.enabled ? "Disable" : "Enable"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleDelete(c.id);
-                      }}
-                      disabled={pending}
-                      className="text-destructive text-xs hover:underline disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface text-muted-foreground border-border border-b text-xs uppercase">
+                <tr>
+                  <th className="px-5 py-2.5 text-left font-medium">Domain</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Display</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Provider id</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Status</th>
+                  <th className="px-5 py-2.5 text-right font-medium" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-border divide-y">
+                {configs.map((c) => (
+                  <tr key={c.id}>
+                    <td className="text-foreground px-5 py-3 font-mono">{c.email_domain}</td>
+                    <td className="text-foreground px-5 py-3">{c.display_name ?? "—"}</td>
+                    <td className="text-muted-foreground px-5 py-3 font-mono text-xs">
+                      {c.supabase_provider_id ?? "(not set)"}
+                    </td>
+                    <td className="px-5 py-3">
+                      {c.enabled ? (
+                        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                          ✓ Enabled
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">Disabled</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleToggle(c);
+                        }}
+                        disabled={pendingRowId === c.id || !c.supabase_provider_id}
+                        className="text-primary mr-3 text-xs hover:underline disabled:opacity-50"
+                      >
+                        {pendingRowId === c.id ? "…" : c.enabled ? "Disable" : "Enable"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleDelete(c.id);
+                        }}
+                        disabled={pendingRowId === c.id}
+                        className="text-destructive text-xs hover:underline disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 

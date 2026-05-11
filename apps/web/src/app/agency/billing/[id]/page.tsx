@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgencyId } from "@/lib/auth/agency";
 import MarkPaidForm from "./mark-paid-form";
@@ -76,7 +77,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           rel="noopener noreferrer"
           className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium"
         >
-          📄 Download PDF
+          <ArrowDownTrayIcon className="h-4 w-4" />
+          Download PDF
         </a>
       </div>
 
@@ -84,44 +86,46 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         <div className="border-border border-b px-5 py-4">
           <h2 className="text-foreground text-base font-bold">Line items</h2>
         </div>
-        <table className="w-full text-sm">
-          <thead className="bg-surface text-muted-foreground border-border border-b text-xs">
-            <tr>
-              <th className="px-5 py-2.5 text-left font-medium">Client org</th>
-              <th className="px-5 py-2.5 text-left font-medium">Tier</th>
-              <th className="px-5 py-2.5 text-right font-medium">Annual value</th>
-              <th className="px-5 py-2.5 text-right font-medium">Share %</th>
-              <th className="px-5 py-2.5 text-right font-medium">Period share</th>
-            </tr>
-          </thead>
-          <tbody className="divide-border divide-y">
-            {lineItems.length === 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-surface text-muted-foreground border-border border-b text-xs">
               <tr>
-                <td colSpan={5} className="text-muted-foreground p-6 text-center text-sm">
-                  No line items.
-                </td>
+                <th className="px-5 py-2.5 text-left font-medium">Client org</th>
+                <th className="px-5 py-2.5 text-left font-medium">Tier</th>
+                <th className="px-5 py-2.5 text-right font-medium">Annual value</th>
+                <th className="px-5 py-2.5 text-right font-medium">Share %</th>
+                <th className="px-5 py-2.5 text-right font-medium">Period share</th>
               </tr>
-            ) : (
-              lineItems.map((item) => (
-                <tr key={item.contract_id}>
-                  <td className="text-foreground px-5 py-3 font-medium">{item.org_name}</td>
-                  <td className="text-muted-foreground px-5 py-3 capitalize">
-                    {item.pricing_tier}
-                  </td>
-                  <td className="text-foreground px-5 py-3 text-right tabular-nums">
-                    {formatCents(item.annual_value_cents)}
-                  </td>
-                  <td className="text-foreground px-5 py-3 text-right tabular-nums">
-                    {(item.effective_share_pct / 100).toFixed(0)}%
-                  </td>
-                  <td className="text-foreground px-5 py-3 text-right font-semibold tabular-nums">
-                    {formatCents(item.period_share_cents)}
+            </thead>
+            <tbody className="divide-border divide-y">
+              {lineItems.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-muted-foreground p-6 text-center text-sm">
+                    No line items.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                lineItems.map((item) => (
+                  <tr key={item.contract_id}>
+                    <td className="text-foreground px-5 py-3 font-medium">{item.org_name}</td>
+                    <td className="text-muted-foreground px-5 py-3 capitalize">
+                      {item.pricing_tier}
+                    </td>
+                    <td className="text-foreground px-5 py-3 text-right tabular-nums">
+                      {formatCents(item.annual_value_cents)}
+                    </td>
+                    <td className="text-foreground px-5 py-3 text-right tabular-nums">
+                      {(item.effective_share_pct / 100).toFixed(0)}%
+                    </td>
+                    <td className="text-foreground px-5 py-3 text-right font-semibold tabular-nums">
+                      {formatCents(item.period_share_cents)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {/* Payment recorded? */}

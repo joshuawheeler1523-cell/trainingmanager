@@ -120,12 +120,12 @@ export default function BrandingForm({
         <div>
           <h2 className="text-foreground text-base font-bold">Logo</h2>
           <p className="text-muted-foreground mt-0.5 text-xs">
-            Shown in the agency console header and generated invoice PDFs. PNG, JPG, or SVG up to
-            2MB.
+            Shown in the agency console header and generated invoice PDFs. PNG, JPG, WebP, or GIF up
+            to 2MB.
           </p>
         </div>
         <div className="flex items-center gap-6">
-          <div className="border-border bg-surface flex h-24 w-48 items-center justify-center overflow-hidden rounded-md border">
+          <div className="border-border bg-surface relative flex h-24 w-48 items-center justify-center overflow-hidden rounded-md border">
             {logoUrl ? (
               <Image
                 src={logoUrl}
@@ -137,6 +137,14 @@ export default function BrandingForm({
               />
             ) : (
               <span className="text-muted-foreground text-xs italic">No logo uploaded</span>
+            )}
+            {uploading && (
+              <div className="bg-background/80 absolute inset-0 flex items-center justify-center">
+                <span className="text-foreground inline-flex items-center gap-2 text-xs font-medium">
+                  <span className="border-foreground/30 border-t-foreground inline-block h-3 w-3 animate-spin rounded-full border-2" />
+                  Uploading…
+                </span>
+              </div>
             )}
           </div>
           <div className="flex flex-col gap-2">
@@ -151,9 +159,9 @@ export default function BrandingForm({
                   void handleLogoUpload(file);
                 }
               }}
-              className="text-foreground file:bg-primary file:text-primary-foreground text-sm file:mr-3 file:cursor-pointer file:rounded file:border-0 file:px-3 file:py-1.5 file:text-xs file:font-medium file:hover:opacity-90"
+              className="text-foreground file:bg-primary file:text-primary-foreground text-sm file:mr-3 file:cursor-pointer file:rounded file:border-0 file:px-3 file:py-1.5 file:text-xs file:font-medium file:hover:opacity-90 disabled:opacity-50"
             />
-            {logoUrl && (
+            {logoUrl && !uploading && (
               <button
                 type="button"
                 onClick={handleRemoveLogo}

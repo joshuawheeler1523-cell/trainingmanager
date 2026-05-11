@@ -51,61 +51,63 @@ export default async function DataExportPage() {
         <div className="border-border border-b px-5 py-4">
           <h2 className="text-foreground text-base font-bold">Export history</h2>
         </div>
-        <table className="w-full text-sm">
-          <thead className="bg-surface text-muted-foreground border-border border-b text-xs uppercase">
-            <tr>
-              <th className="px-5 py-2.5 text-left font-medium">Requested</th>
-              <th className="px-5 py-2.5 text-left font-medium">Status</th>
-              <th className="px-5 py-2.5 text-right font-medium">Tables</th>
-              <th className="px-5 py-2.5 text-right font-medium">Rows</th>
-              <th className="px-5 py-2.5 text-right font-medium">Size</th>
-              <th className="px-5 py-2.5 text-right font-medium" />
-            </tr>
-          </thead>
-          <tbody className="divide-border divide-y">
-            {(exports ?? []).length === 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-surface text-muted-foreground border-border border-b text-xs uppercase">
               <tr>
-                <td colSpan={6} className="text-muted-foreground p-6 text-center text-sm italic">
-                  No exports yet.
-                </td>
+                <th className="px-5 py-2.5 text-left font-medium">Requested</th>
+                <th className="px-5 py-2.5 text-left font-medium">Status</th>
+                <th className="px-5 py-2.5 text-right font-medium">Tables</th>
+                <th className="px-5 py-2.5 text-right font-medium">Rows</th>
+                <th className="px-5 py-2.5 text-right font-medium">Size</th>
+                <th className="px-5 py-2.5 text-right font-medium" />
               </tr>
-            ) : (
-              (exports ?? []).map((e) => (
-                <tr key={e.id}>
-                  <td className="text-foreground px-5 py-3 tabular-nums">
-                    {e.requested_at.replace("T", " ").slice(0, 16)}
-                  </td>
-                  <td className="text-foreground px-5 py-3 capitalize">{e.status}</td>
-                  <td className="text-foreground px-5 py-3 text-right tabular-nums">
-                    {e.table_count?.toString() ?? "—"}
-                  </td>
-                  <td className="text-foreground px-5 py-3 text-right tabular-nums">
-                    {e.row_count?.toString() ?? "—"}
-                  </td>
-                  <td className="text-foreground px-5 py-3 text-right tabular-nums">
-                    {e.size_bytes ? formatBytes(e.size_bytes) : "—"}
-                  </td>
-                  <td className="text-foreground px-5 py-3 text-right">
-                    {e.status === "completed" && e.storage_path ? (
-                      <a
-                        href={`/api/admin/data-exports/${e.id}/download`}
-                        className="text-primary hover:underline"
-                      >
-                        Download
-                      </a>
-                    ) : e.status === "failed" ? (
-                      <span className="text-destructive text-xs" title={e.error_message ?? ""}>
-                        Failed
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground text-xs italic">…</span>
-                    )}
+            </thead>
+            <tbody className="divide-border divide-y">
+              {(exports ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-muted-foreground p-6 text-center text-sm italic">
+                    No exports yet.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                (exports ?? []).map((e) => (
+                  <tr key={e.id}>
+                    <td className="text-foreground px-5 py-3 tabular-nums">
+                      {e.requested_at.replace("T", " ").slice(0, 16)}
+                    </td>
+                    <td className="text-foreground px-5 py-3 capitalize">{e.status}</td>
+                    <td className="text-foreground px-5 py-3 text-right tabular-nums">
+                      {e.table_count?.toString() ?? "—"}
+                    </td>
+                    <td className="text-foreground px-5 py-3 text-right tabular-nums">
+                      {e.row_count?.toString() ?? "—"}
+                    </td>
+                    <td className="text-foreground px-5 py-3 text-right tabular-nums">
+                      {e.size_bytes ? formatBytes(e.size_bytes) : "—"}
+                    </td>
+                    <td className="text-foreground px-5 py-3 text-right">
+                      {e.status === "completed" && e.storage_path ? (
+                        <a
+                          href={`/api/admin/data-exports/${e.id}/download`}
+                          className="text-primary hover:underline"
+                        >
+                          Download
+                        </a>
+                      ) : e.status === "failed" ? (
+                        <span className="text-destructive text-xs" title={e.error_message ?? ""}>
+                          Failed
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs italic">…</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

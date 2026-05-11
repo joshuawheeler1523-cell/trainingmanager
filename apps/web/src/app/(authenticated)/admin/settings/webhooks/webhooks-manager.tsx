@@ -53,6 +53,10 @@ export default function WebhooksManager({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // Per-row pending id so a click on row A's button doesn't disable
+  // every other row's buttons. The global `pending` flag still drives
+  // the create form's submit button.
+  const [pendingRowId, setPendingRowId] = useState<string | null>(null);
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
@@ -60,6 +64,17 @@ export default function WebhooksManager({
 
   const toggleEvent = (e: string) => {
     setSelectedEvents((prev) => (prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e]));
+  };
+
+  const runRow = (id: string, op: () => Promise<void>) => {
+    setPendingRowId(id);
+    startTransition(async () => {
+      try {
+        await op();
+      } finally {
+        setPendingRowId(null);
+      }
+    });
   };
 
   const handleCreate = (e: React.SyntheticEvent<HTMLFormElement>) => {
@@ -91,7 +106,7 @@ export default function WebhooksManager({
       )
     )
       return;
-    startTransition(async () => {
+    runRow(id, async () => {
       const result = await rotateWebhookSecretAction(id);
       if (result.ok) {
         setNewSecret(result.data.signingSecret);
@@ -106,7 +121,7 @@ export default function WebhooksManager({
   const handleDelete = (id: string) => {
     if (!confirm("Delete this webhook endpoint? It will stop receiving events immediately."))
       return;
-    startTransition(async () => {
+    runRow(id, async () => {
       const result = await deleteWebhookEndpointAction(id);
       if (result.ok) {
         toast.success("Endpoint deleted");
@@ -118,7 +133,7 @@ export default function WebhooksManager({
   };
 
   const handleReplay = (id: string) => {
-    startTransition(async () => {
+    runRow(id, async () => {
       const result = await replayWebhookDeliveryAction(id);
       if (result.ok) {
         toast.success("Delivery replayed");
@@ -242,18 +257,18 @@ export default function WebhooksManager({
                       onClick={() => {
                         handleRotate(ep.id);
                       }}
-                      disabled={pending}
-                      className="text-primary hover:underline"
+                      disabled={pendingRowId === ep.id}
+                      className="text-primary hover:underline disabled:opacity-50"
                     >
-                      Rotate secret
+                      {pendingRowId === ep.id ? "Working…" : "Rotate secret"}
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         handleDelete(ep.id);
                       }}
-                      disabled={pending}
-                      className="text-destructive hover:underline"
+                      disabled={pendingRowId === ep.id}
+                      className="text-destructive hover:underline disabled:opacity-50"
                     >
                       Delete
                     </button>
@@ -273,49 +288,51 @@ export default function WebhooksManager({
         {deliveries.length === 0 ? (
           <p className="text-muted-foreground p-6 text-center text-sm italic">No deliveries yet.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-surface text-muted-foreground border-border border-b text-xs uppercase">
-              <tr>
-                <th className="px-5 py-2.5 text-left font-medium">When</th>
-                <th className="px-5 py-2.5 text-left font-medium">Event</th>
-                <th className="px-5 py-2.5 text-left font-medium">Status</th>
-                <th className="px-5 py-2.5 text-right font-medium">Code</th>
-                <th className="px-5 py-2.5 text-right font-medium">Attempts</th>
-                <th className="px-5 py-2.5 text-right font-medium" />
-              </tr>
-            </thead>
-            <tbody className="divide-border divide-y">
-              {deliveries.map((d) => (
-                <tr key={d.id}>
-                  <td className="text-foreground px-5 py-3 tabular-nums">
-                    {d.created_at.replace("T", " ").slice(0, 16)}
-                  </td>
-                  <td className="text-foreground px-5 py-3 font-mono text-xs">{d.event_type}</td>
-                  <td className="px-5 py-3">
-                    <StatusBadge status={d.status} />
-                  </td>
-                  <td className="text-foreground px-5 py-3 text-right tabular-nums">
-                    {d.response_code?.toString() ?? "—"}
-                  </td>
-                  <td className="text-foreground px-5 py-3 text-right tabular-nums">
-                    {d.attempts.toString()}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleReplay(d.id);
-                      }}
-                      disabled={pending}
-                      className="text-primary text-xs hover:underline"
-                    >
-                      Replay
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface text-muted-foreground border-border border-b text-xs uppercase">
+                <tr>
+                  <th className="px-5 py-2.5 text-left font-medium">When</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Event</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Status</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Code</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Attempts</th>
+                  <th className="px-5 py-2.5 text-right font-medium" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-border divide-y">
+                {deliveries.map((d) => (
+                  <tr key={d.id}>
+                    <td className="text-foreground px-5 py-3 tabular-nums">
+                      {d.created_at.replace("T", " ").slice(0, 16)}
+                    </td>
+                    <td className="text-foreground px-5 py-3 font-mono text-xs">{d.event_type}</td>
+                    <td className="px-5 py-3">
+                      <StatusBadge status={d.status} />
+                    </td>
+                    <td className="text-foreground px-5 py-3 text-right tabular-nums">
+                      {d.response_code?.toString() ?? "—"}
+                    </td>
+                    <td className="text-foreground px-5 py-3 text-right tabular-nums">
+                      {d.attempts.toString()}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleReplay(d.id);
+                        }}
+                        disabled={pendingRowId === d.id}
+                        className="text-primary text-xs hover:underline disabled:opacity-50"
+                      >
+                        {pendingRowId === d.id ? "Replaying…" : "Replay"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>
