@@ -6,6 +6,7 @@ import DepartmentSwitcher from "@/components/DepartmentSwitcher";
 import AppShell from "@/components/layout/app-shell";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
+import { isArborAdmin } from "@/lib/auth/arbor-admin";
 import { getOrgIdentity } from "@/lib/labels/get-org-identity";
 import { OrgIdentityProvider } from "@/components/labels";
 
@@ -24,7 +25,7 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
 
   // Initial notifications + admin flag + workspace identity, parallelized.
   const orgId = await getCurrentOrgId();
-  const [{ data: notifications }, admin, identity] = await Promise.all([
+  const [{ data: notifications }, admin, arborAdmin, identity] = await Promise.all([
     supabase
       .from("notifications")
       .select("*")
@@ -32,6 +33,7 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
       .order("created_at", { ascending: false })
       .limit(10),
     orgId ? isManager(orgId) : Promise.resolve(false),
+    isArborAdmin(),
     orgId ? getOrgIdentity(orgId) : Promise.resolve(null),
   ]);
 
@@ -50,6 +52,7 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
           userName={name}
           userId={user.id}
           isAdmin={admin}
+          isArborAdmin={arborAdmin}
           modules={
             identity?.modules ?? {
               "module.classes": true,

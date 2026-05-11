@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useHotkeys } from "react-hotkeys-hook";
-import { QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
+import { QuestionMarkCircleIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import type { ToggleableModule } from "@arbor/shared";
 import ProfileMenu from "./profile-menu";
 import CommandPalette from "./command-palette";
@@ -17,6 +18,7 @@ type Props = {
   userName: string;
   userId: string;
   isAdmin: boolean;
+  isArborAdmin?: boolean;
   modules: Record<ToggleableModule, boolean>;
   initialNotifications: NotificationRow[];
 };
@@ -28,6 +30,7 @@ export default function AppShell({
   userName,
   userId,
   isAdmin,
+  isArborAdmin = false,
   modules,
   initialNotifications,
 }: Props) {
@@ -66,6 +69,16 @@ export default function AppShell({
           <MobileSidebar isAdmin={isAdmin} modules={modules} />
           <div className="min-w-0 flex-1">{orgSwitcherSlot}</div>
           <div className="flex items-center gap-1">
+            {isArborAdmin && (
+              <Link
+                href="/arbor"
+                className="border-primary text-primary hover:bg-primary hover:text-primary-foreground inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+                title="Arbor super-admin console"
+              >
+                <ShieldCheckIcon className="h-3.5 w-3.5" />
+                Arbor admin
+              </Link>
+            )}
             <NotificationBell initial={initialNotifications} userId={userId} />
             <button
               type="button"

@@ -121,6 +121,8 @@ export type Database = {
           primary_color: string | null;
           secondary_color: string | null;
           slug: string;
+          suspended_at: string | null;
+          suspended_reason: string | null;
           updated_at: string;
           updated_by: string | null;
           version: number;
@@ -147,6 +149,8 @@ export type Database = {
           primary_color?: string | null;
           secondary_color?: string | null;
           slug: string;
+          suspended_at?: string | null;
+          suspended_reason?: string | null;
           updated_at?: string;
           updated_by?: string | null;
           version?: number;
@@ -173,6 +177,8 @@ export type Database = {
           primary_color?: string | null;
           secondary_color?: string | null;
           slug?: string;
+          suspended_at?: string | null;
+          suspended_reason?: string | null;
           updated_at?: string;
           updated_by?: string | null;
           version?: number;
@@ -2812,6 +2818,8 @@ export type Database = {
           role_labels: Json;
           settings: Json;
           slug: string;
+          suspended_at: string | null;
+          suspended_reason: string | null;
           time_zone: string;
           updated_at: string;
           updated_by: string | null;
@@ -2832,6 +2840,8 @@ export type Database = {
           role_labels?: Json;
           settings?: Json;
           slug: string;
+          suspended_at?: string | null;
+          suspended_reason?: string | null;
           time_zone?: string;
           updated_at?: string;
           updated_by?: string | null;
@@ -2852,6 +2862,8 @@ export type Database = {
           role_labels?: Json;
           settings?: Json;
           slug?: string;
+          suspended_at?: string | null;
+          suspended_reason?: string | null;
           time_zone?: string;
           updated_at?: string;
           updated_by?: string | null;
