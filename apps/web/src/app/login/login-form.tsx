@@ -47,12 +47,35 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
     if (!email.includes("@")) return; // native required + type=email handle the message
 
     startSsoCheck(async () => {
-      const sso = await discoverSsoForEmail(email);
-      if (sso) {
-        await startSsoSignIn(sso.providerId);
-        return;
+      // SSO discovery is best-effort. If the RPC errors (RLS, missing
+      // migration on a preview deploy, network blip) or takes longer
+      // than 2.5s, we fall through to the user's chosen flow rather
+      // than trap them on "Checking…" with no exit. Most users don't
+      // have SSO configured and shouldn't pay any UX cost for it.
+      let sso: Awaited<ReturnType<typeof discoverSsoForEmail>> = null;
+      try {
+        sso = await Promise.race([
+          discoverSsoForEmail(email),
+          new Promise<null>((resolve) => {
+            setTimeout(() => {
+              resolve(null);
+            }, 2500);
+          }),
+        ]);
+      } catch (err) {
+        // Don't surface SSO-discovery errors to the user — it's a
+        // background optimization. Fall through to magic link / password.
+        console.warn("[login] SSO discovery failed, falling through:", err);
       }
-      // No SSO — submit the original form action.
+      if (sso) {
+        try {
+          await startSsoSignIn(sso.providerId);
+          return;
+        } catch (err) {
+          console.warn("[login] SSO sign-in failed, falling through:", err);
+        }
+      }
+      // No SSO (or SSO failed) — submit the user's chosen action.
       if (mode === "magic") {
         magicAction(new FormData(form));
       } else {
