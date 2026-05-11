@@ -680,6 +680,133 @@ describe("go-live buffer", () => {
   });
 });
 
+// ── Per-class distinct rooms / trainers from the simulation ────────────────
+
+describe("per-class distinct rooms + trainers", () => {
+  it("stamps distinctRoomsUsed and distinctTrainersUsed for a happy-path class", () => {
+    // 1 class, 3 sessions, 1 trainer, 1 room → exactly 1 room and 1 trainer used.
+    const result = computeFeasibility({
+      implementation: baseImpl,
+      rooms: [makeRoom()],
+      trainers: [makeTrainer()],
+      classes: [makeClass()],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    const cf = result.classFeasibility[0];
+    expect(cf?.distinctRoomsUsed).toBe(1);
+    expect(cf?.distinctTrainersUsed).toBe(1);
+    expect(cf?.sessionsScheduled).toBe(3);
+    expect(result.distinctRoomsUsedTotal).toBe(1);
+    expect(result.distinctTrainersUsedTotal).toBe(1);
+  });
+
+  it("returns null per-class fields when window dates aren't set (sim couldn't run)", () => {
+    const result = computeFeasibility({
+      implementation: { ...baseImpl, window_start_date: null, window_end_date: null },
+      rooms: [makeRoom()],
+      trainers: [makeTrainer()],
+      classes: [makeClass()],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    const cf = result.classFeasibility[0];
+    expect(cf?.distinctRoomsUsed).toBeNull();
+    expect(cf?.distinctTrainersUsed).toBeNull();
+    expect(cf?.sessionsScheduled).toBe(0);
+    expect(result.distinctRoomsUsedTotal).toBeNull();
+    expect(result.distinctTrainersUsedTotal).toBeNull();
+  });
+
+  it("returns 0 rooms/trainers for a class that's blocked (sim ran, placed nothing)", () => {
+    // Class needs 25 seats; only room has 10 → roomCapacityOk=false; sim skips
+    // it. Sim DID run, so the field is 0 (not null).
+    const result = computeFeasibility({
+      implementation: baseImpl,
+      rooms: [makeRoom({ seat_capacity: 10 })],
+      trainers: [makeTrainer()],
+      classes: [makeClass({ expected_learners_per_session: 25 })],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    const cf = result.classFeasibility[0];
+    expect(cf?.distinctRoomsUsed).toBe(0);
+    expect(cf?.distinctTrainersUsed).toBe(0);
+    expect(cf?.sessionsScheduled).toBe(0);
+    expect(result.distinctRoomsUsedTotal).toBe(0);
+  });
+
+  it("counts ALL distinct rooms when sessions spill across multiple rooms", () => {
+    // 10 sessions, small room holds 12 perfectly. With 1 trainer, sim uses
+    // the small (best-fit) room exclusively → distinctRoomsUsed = 1.
+    // But add a SECOND trainer to enable parallel placement, and the sim
+    // should still prefer the smallest room first; both trainers compete
+    // for the same room and only one of them runs at a time. Use a class
+    // that's too big for the small room so only the big room qualifies.
+    const result = computeFeasibility({
+      implementation: baseImpl,
+      rooms: [
+        makeRoom({ id: "small", name: "Small", seat_capacity: 12 }),
+        makeRoom({ id: "big", name: "Big", seat_capacity: 40 }),
+      ],
+      trainers: [makeTrainer()],
+      classes: [makeClass({ expected_learners_per_session: 15 })], // only fits in big
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    const cf = result.classFeasibility[0];
+    expect(cf?.distinctRoomsUsed).toBe(1);
+    // Verify it was the big one (small was excluded by seat capacity).
+    const usedBig = result.roomUtilization.find((r) => r.id === "big");
+    expect(usedBig?.hoursAssigned ?? 0).toBeGreaterThan(0);
+  });
+
+  it("totals are the UNION across classes, not the sum (rooms shared across classes counted once)", () => {
+    // Two classes that both fit a single small room (best-fit). Each
+    // class's distinctRoomsUsed = 1; total should also be 1 (same room
+    // shared), not 2.
+    const result = computeFeasibility({
+      implementation: baseImpl,
+      rooms: [makeRoom({ id: "only", seat_capacity: 20 })],
+      trainers: [makeTrainer()],
+      classes: [
+        makeClass({ id: "a", name: "A", sort_order: 0 }),
+        makeClass({ id: "b", name: "B", sort_order: 1 }),
+      ],
+      classTrainers: [classTrainer("a", "t1"), classTrainer("b", "t1")],
+      prereqs: [],
+    });
+    const ca = result.classFeasibility.find((f) => f.classId === "a");
+    const cb = result.classFeasibility.find((f) => f.classId === "b");
+    expect(ca?.distinctRoomsUsed).toBe(1);
+    expect(cb?.distinctRoomsUsed).toBe(1);
+    expect(result.distinctRoomsUsedTotal).toBe(1); // union, not sum
+    expect(result.distinctTrainersUsedTotal).toBe(1);
+  });
+
+  it("captures 2 trainers when load distributes across the slate", () => {
+    // Even-load distribution should split a 4-session class across both
+    // assigned trainers → distinctTrainersUsed = 2.
+    const result = computeFeasibility({
+      implementation: baseImpl,
+      rooms: [makeRoom()],
+      trainers: [makeTrainer({ id: "t1", name: "T1" }), makeTrainer({ id: "t2", name: "T2" })],
+      classes: [
+        makeClass({
+          hours_per_session: 2,
+          expected_learners_per_session: 10,
+          total_people_to_train: 40, // 4 sessions
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1"), classTrainer("c1", "t2")],
+      prereqs: [],
+    });
+    const cf = result.classFeasibility[0];
+    expect(cf?.distinctTrainersUsed).toBe(2);
+    expect(cf?.distinctRoomsUsed).toBe(1); // only one room exists
+  });
+});
+
 // ── Ready gate ─────────────────────────────────────────────────────────────
 
 describe("ready gate", () => {

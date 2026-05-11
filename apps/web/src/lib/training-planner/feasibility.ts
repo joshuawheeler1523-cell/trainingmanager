@@ -38,6 +38,14 @@ export type ClassFeasibility = {
   trainerSlateOk: boolean;
   prereqReachable: boolean;
   blockers: string[];
+  // Populated by the simulation when (and only when) the class is reachable.
+  // distinctRoomsUsed = unique impl_rooms the sim placed sessions of this
+  // class in; distinctTrainersUsed similarly. sessionsScheduled is how many
+  // of sessionsNeeded actually fit in the window (sessions that couldn't be
+  // placed are counted in FeasibilityResult.unscheduledSessions, not here).
+  distinctRoomsUsed: number | null;
+  distinctTrainersUsed: number | null;
+  sessionsScheduled: number;
 };
 
 export type ResourceUtilization = {
@@ -81,6 +89,10 @@ export type FeasibilityResult = {
   targetCompletionDate: string | null; // go_live - buffer, or window_end if go_live unset
   unscheduledSessions: number;
   daysOverTarget: number; // simulated - target (0 if on or under)
+  // Union of all distinct rooms / trainers the sim actually used across all
+  // classes. Null when the simulation couldn't run (no window dates, etc.).
+  distinctRoomsUsedTotal: number | null;
+  distinctTrainersUsedTotal: number | null;
   recommendations: Recommendation[];
   ready: boolean;
   readyBlockers: string[]; // global reasons Generate is disabled
@@ -285,6 +297,11 @@ function classFeasibilityRow(
     trainerSlateOk,
     prereqReachable,
     blockers,
+    // Populated by the simulation pass below — start null so callers can
+    // distinguish "sim didn't run" from "sim ran, no rooms used".
+    distinctRoomsUsed: null,
+    distinctTrainersUsed: null,
+    sessionsScheduled: 0,
   };
 }
 
@@ -509,6 +526,24 @@ export function computeFeasibility(input: {
     prereqsByClass,
   });
 
+  // Stamp per-class sim results back onto the feasibility rows so the UI
+  // can render distinct-rooms-used and distinct-trainers-used alongside
+  // the static blocker flags. When the sim didn't run, leave the fields
+  // null so callers fall back to the FTE estimate.
+  if (sim.simRan) {
+    for (const cf of classFeas) {
+      const roomsUsed = sim.roomsByClass.get(cf.classId);
+      const trainersUsed = sim.trainersByClassUsed.get(cf.classId);
+      cf.distinctRoomsUsed = roomsUsed ? roomsUsed.size : 0;
+      cf.distinctTrainersUsed = trainersUsed ? trainersUsed.size : 0;
+      cf.sessionsScheduled = sim.sessionsScheduledByClass.get(cf.classId) ?? 0;
+    }
+  }
+  const distinctRoomsUsedTotal = sim.simRan ? unionSize([...sim.roomsByClass.values()]) : null;
+  const distinctTrainersUsedTotal = sim.simRan
+    ? unionSize([...sim.trainersByClassUsed.values()])
+    : null;
+
   // ── Recommendations
   const recommendations = buildRecommendations({
     classes,
@@ -571,10 +606,18 @@ export function computeFeasibility(input: {
     targetCompletionDate: sim.targetCompletionDate,
     unscheduledSessions: sim.unscheduledSessions,
     daysOverTarget: sim.daysOverTarget,
+    distinctRoomsUsedTotal,
+    distinctTrainersUsedTotal,
     recommendations,
     ready,
     readyBlockers: overallBlockers,
   };
+}
+
+function unionSize(sets: Set<string>[]): number {
+  const union = new Set<string>();
+  for (const s of sets) for (const x of s) union.add(x);
+  return union.size;
 }
 
 // ── Simulation impl ─────────────────────────────────────────────────────────
@@ -586,6 +629,14 @@ type SimResult = {
   daysOverTarget: number;
   trainerUtilization: ResourceUtilization[];
   roomUtilization: ResourceUtilization[];
+  // Per-class assignment maps. Empty when the sim couldn't run (window
+  // unset). When the sim ran, an entry is present for every class even if
+  // it had 0 sessions scheduled (so callers can disambiguate "no sim run"
+  // from "ran, placed nothing").
+  roomsByClass: Map<string, Set<string>>;
+  trainersByClassUsed: Map<string, Set<string>>;
+  sessionsScheduledByClass: Map<string, number>;
+  simRan: boolean;
 };
 
 function simulate(args: {
@@ -678,6 +729,17 @@ function simulate(args: {
   );
 
   const lastSessionEndByClass = new Map<string, Date>();
+  const roomsByClass = new Map<string, Set<string>>();
+  const trainersByClassUsed = new Map<string, Set<string>>();
+  const sessionsScheduledByClass = new Map<string, number>();
+  // Seed every class with empty sets so consumers can distinguish "sim
+  // didn't run" (map absent) from "sim ran, class placed zero sessions"
+  // (map present, set empty).
+  for (const c of classes) {
+    roomsByClass.set(c.id, new Set());
+    trainersByClassUsed.set(c.id, new Set());
+    sessionsScheduledByClass.set(c.id, 0);
+  }
   let latestEnd: Date | null = null;
   let unscheduled = 0;
 
@@ -788,6 +850,9 @@ function simulate(args: {
         trainer.weeklyUsed.set(wk, used + c.hours_per_session);
 
         lastSessionEndByClass.set(c.id, end);
+        roomsByClass.get(c.id)?.add(room.id);
+        trainersByClassUsed.get(c.id)?.add(trainer.id);
+        sessionsScheduledByClass.set(c.id, (sessionsScheduledByClass.get(c.id) ?? 0) + 1);
         if (!latestEnd || end > latestEnd) latestEnd = end;
         placed = true;
       }
@@ -842,6 +907,10 @@ function simulate(args: {
     daysOverTarget,
     trainerUtilization: trainerUtil,
     roomUtilization: roomUtil,
+    roomsByClass,
+    trainersByClassUsed,
+    sessionsScheduledByClass,
+    simRan: true,
   };
 }
 
@@ -851,6 +920,10 @@ function emptySim(rooms: ImplRoom[], trainers: ImplTrainer[]): SimResult {
     targetCompletionDate: null,
     unscheduledSessions: 0,
     daysOverTarget: 0,
+    roomsByClass: new Map(),
+    trainersByClassUsed: new Map(),
+    sessionsScheduledByClass: new Map(),
+    simRan: false,
     trainerUtilization: trainers.map((t) => ({
       id: t.id,
       name: t.name,

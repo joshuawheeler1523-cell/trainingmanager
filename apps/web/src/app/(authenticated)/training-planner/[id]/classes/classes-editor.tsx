@@ -12,6 +12,7 @@ import {
   type ImplModule,
   type ImplTrainer,
 } from "@arbor/shared";
+import type { ClassFeasibility } from "@/lib/training-planner/feasibility";
 import {
   addClassPrerequisite,
   createClass,
@@ -31,6 +32,9 @@ type Props = {
   trainers: ImplTrainer[];
   classTrainers: ImplClassTrainer[];
   prerequisites: ImplClassPrerequisite[];
+  classFeasibility: ClassFeasibility[];
+  distinctRoomsUsedTotal: number | null;
+  distinctTrainersUsedTotal: number | null;
 };
 
 const fieldClass =
@@ -58,6 +62,9 @@ export default function ClassesEditor({
   trainers,
   classTrainers,
   prerequisites,
+  classFeasibility,
+  distinctRoomsUsedTotal,
+  distinctTrainersUsedTotal,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -84,6 +91,11 @@ export default function ClassesEditor({
   }, [prerequisites]);
 
   const classMap = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
+
+  const feasibilityById = useMemo(
+    () => new Map(classFeasibility.map((cf) => [cf.classId, cf])),
+    [classFeasibility],
+  );
 
   const [newName, setNewName] = useState("");
   const [newModuleId, setNewModuleId] = useState("");
@@ -199,10 +211,20 @@ export default function ClassesEditor({
                 const sessions = sessionsNeeded(c);
                 const hours = sessions * c.hours_per_session;
                 const trainerFte = fteDenominator > 0 ? hours / fteDenominator : null;
-                const roomsNeeded =
+                const roomsEstimate =
                   fteDenominator > 0
                     ? Math.max(hours > 0 ? 1 : 0, Math.ceil(hours / fteDenominator))
                     : null;
+                // Prefer sim-based distinct-rooms when the sim placed at
+                // least one session for this class; otherwise show the FTE
+                // estimate with an "est." annotation.
+                const cf = feasibilityById.get(c.id);
+                const simRoomsUsed =
+                  cf && cf.distinctRoomsUsed != null && cf.sessionsScheduled > 0
+                    ? cf.distinctRoomsUsed
+                    : null;
+                const roomsToShow = simRoomsUsed ?? roomsEstimate;
+                const roomsSource: "sim" | "est" = simRoomsUsed != null ? "sim" : "est";
                 const trainerCount = (trainersByClass.get(c.id) ?? []).length;
                 const prereqCount = (prereqsByClass.get(c.id) ?? []).length;
                 return (
@@ -304,7 +326,18 @@ export default function ClassesEditor({
                       {trainerFte == null ? "—" : trainerFte.toFixed(2)}
                     </td>
                     <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
-                      {roomsNeeded == null ? "—" : roomsNeeded.toString()}
+                      {roomsToShow == null ? (
+                        "—"
+                      ) : (
+                        <>
+                          {roomsToShow.toString()}
+                          {roomsSource === "est" && (
+                            <span className="text-muted-foreground/70 ml-1 text-[10px] not-italic">
+                              est.
+                            </span>
+                          )}
+                        </>
+                      )}
                     </td>
                     <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
                       {trainerCount.toString()}
@@ -351,17 +384,29 @@ export default function ClassesEditor({
                 </span>
               </span>
               <span>
-                Rooms needed in parallel:{" "}
+                Rooms used (union):{" "}
                 <span className="text-foreground font-medium tabular-nums">
-                  {totalRoomsNeeded == null ? "—" : totalRoomsNeeded.toString()}
+                  {distinctRoomsUsedTotal != null
+                    ? distinctRoomsUsedTotal.toString()
+                    : totalRoomsNeeded == null
+                      ? "—"
+                      : `${totalRoomsNeeded.toString()} est.`}
+                </span>
+              </span>
+              <span>
+                Trainers used (union):{" "}
+                <span className="text-foreground font-medium tabular-nums">
+                  {distinctTrainersUsedTotal != null ? distinctTrainersUsedTotal.toString() : "—"}
                 </span>
               </span>
             </div>
             <p className="text-[11px] italic">
               FTE = total hours ÷ ({FTE_HOURS_PER_WEEK.toString()}h/wk ×{" "}
               {windowWeeks > 0 ? windowWeeks.toString() + " window weeks" : "set window dates"}).
-              Rooms = ceil(hours ÷ same denominator), i.e. the minimum rooms running in parallel
-              full-time to absorb the load.
+              Rooms/Trainers come from the same simulator the Calculate step uses — actual distinct
+              resources the scheduler placed across all classes. Rows show &quot;est.&quot; when the
+              simulator couldn&apos;t place that class (e.g. window dates or rooms not yet
+              configured).
             </p>
           </div>
         </div>

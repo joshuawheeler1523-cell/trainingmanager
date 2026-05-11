@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import type { Implementation } from "@arbor/shared";
+import { computeFeasibility } from "@/lib/training-planner/feasibility";
 import ClassesEditor from "./classes-editor";
 
 type Params = Promise<{ id: string }>;
@@ -12,6 +14,7 @@ export default async function ClassesPage({ params }: { params: Params }) {
 
   const [
     { data: impl },
+    { data: rooms },
     { data: classes },
     { data: modules },
     { data: trainers },
@@ -20,11 +23,12 @@ export default async function ClassesPage({ params }: { params: Params }) {
   ] = await Promise.all([
     supabase
       .from("implementations")
-      .select("window_start_date, window_end_date")
+      .select("*")
       .eq("id", id)
       .eq("org_id", orgId)
       .is("deleted_at", null)
       .maybeSingle(),
+    supabase.from("impl_rooms").select("*").eq("implementation_id", id).eq("org_id", orgId),
     supabase
       .from("impl_classes")
       .select("*")
@@ -48,6 +52,20 @@ export default async function ClassesPage({ params }: { params: Params }) {
     supabase.from("impl_class_prerequisites").select("*").eq("org_id", orgId),
   ]);
 
+  // Run the same feasibility simulation the Calculate step uses so we can
+  // surface per-class distinct rooms/trainers actually used, not just the
+  // FTE-based estimate.
+  const feasibility = impl
+    ? computeFeasibility({
+        implementation: impl as unknown as Implementation,
+        rooms: rooms ?? [],
+        trainers: trainers ?? [],
+        classes: classes ?? [],
+        classTrainers: classTrainers ?? [],
+        prereqs: prerequisites ?? [],
+      })
+    : null;
+
   return (
     <ClassesEditor
       implementationId={id}
@@ -58,6 +76,9 @@ export default async function ClassesPage({ params }: { params: Params }) {
       trainers={trainers ?? []}
       classTrainers={classTrainers ?? []}
       prerequisites={prerequisites ?? []}
+      classFeasibility={feasibility?.classFeasibility ?? []}
+      distinctRoomsUsedTotal={feasibility?.distinctRoomsUsedTotal ?? null}
+      distinctTrainersUsedTotal={feasibility?.distinctTrainersUsedTotal ?? null}
     />
   );
 }
