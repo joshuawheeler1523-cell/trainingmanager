@@ -403,6 +403,9 @@ function CompletionCard({ result, impl }: { result: FeasibilityResult; impl: Imp
     );
   }
   const isOver = result.daysOverTarget > 0;
+  const targetLabel = impl.go_live_date
+    ? `Go-live ${impl.go_live_date} − ${impl.go_live_buffer_days.toString()}d buffer`
+    : "Window end";
   return (
     <div className="border-border bg-background rounded-lg border p-4">
       <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
@@ -416,10 +419,11 @@ function CompletionCard({ result, impl }: { result: FeasibilityResult; impl: Imp
           </p>
         </div>
         <div>
-          <p className="text-muted-foreground text-[11px]">Window end</p>
+          <p className="text-muted-foreground text-[11px]">Target</p>
           <p className="text-foreground text-sm font-semibold tabular-nums">
-            {impl.window_end_date ?? "—"}
+            {result.targetCompletionDate ?? impl.window_end_date ?? "—"}
           </p>
+          <p className="text-muted-foreground text-[10px]">{targetLabel}</p>
         </div>
         <div>
           <p className="text-muted-foreground text-[11px]">Gap</p>
@@ -432,11 +436,6 @@ function CompletionCard({ result, impl }: { result: FeasibilityResult; impl: Imp
           </p>
         </div>
       </div>
-      {impl.go_live_date && (
-        <p className="text-muted-foreground mt-2 text-[11px]">
-          Go-live: {impl.go_live_date}. (Buffer-aware comparison comes in Phase D.)
-        </p>
-      )}
     </div>
   );
 }

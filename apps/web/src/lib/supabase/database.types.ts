@@ -2228,6 +2228,7 @@ export type Database = {
           deleted_at: string | null;
           department_id: string;
           description: string | null;
+          go_live_buffer_days: number;
           go_live_date: string | null;
           id: string;
           linked_project_id: string | null;
@@ -2250,6 +2251,7 @@ export type Database = {
           deleted_at?: string | null;
           department_id: string;
           description?: string | null;
+          go_live_buffer_days?: number;
           go_live_date?: string | null;
           id?: string;
           linked_project_id?: string | null;
@@ -2272,6 +2274,7 @@ export type Database = {
           deleted_at?: string | null;
           department_id?: string;
           description?: string | null;
+          go_live_buffer_days?: number;
           go_live_date?: string | null;
           id?: string;
           linked_project_id?: string | null;

@@ -14,9 +14,6 @@
 //   - Bottleneck identification (most-utilized trainer / room)
 //   - Quantitative recommendations to close any gap
 //
-// What we DON'T model here yet (deferred to later phases of the overhaul):
-//   - Go-live buffer (Phase D) — uses window_end as the cutoff
-//
 // All inputs are read-only. No DB calls. Pure functions, tested independently.
 
 import type {
@@ -76,8 +73,9 @@ export type FeasibilityResult = {
   trainerUtilization: ResourceUtilization[];
   roomUtilization: ResourceUtilization[];
   estimatedCompletionDate: string | null; // ISO YYYY-MM-DD; null if any class unschedulable
+  targetCompletionDate: string | null; // go_live - buffer, or window_end if go_live unset
   unscheduledSessions: number;
-  daysOverTarget: number; // simulated completion - window_end (or go_live-buffer in Phase D). 0 if on/under.
+  daysOverTarget: number; // simulated - target (0 if on or under)
   recommendations: Recommendation[];
   ready: boolean;
   readyBlockers: string[]; // global reasons Generate is disabled
@@ -565,6 +563,7 @@ export function computeFeasibility(input: {
     trainerUtilization: sim.trainerUtilization,
     roomUtilization: sim.roomUtilization,
     estimatedCompletionDate: sim.estimatedCompletionDate,
+    targetCompletionDate: sim.targetCompletionDate,
     unscheduledSessions: sim.unscheduledSessions,
     daysOverTarget: sim.daysOverTarget,
     recommendations,
@@ -577,6 +576,7 @@ export function computeFeasibility(input: {
 
 type SimResult = {
   estimatedCompletionDate: string | null;
+  targetCompletionDate: string | null;
   unscheduledSessions: number;
   daysOverTarget: number;
   trainerUtilization: ResourceUtilization[];
@@ -602,6 +602,23 @@ function simulate(args: {
   windowStart.setUTCHours(0, 0, 0, 0);
   const windowEnd = parseUtcDate(impl.window_end_date);
   windowEnd.setUTCHours(23, 59, 59, 999);
+
+  // Target completion = the earlier of window_end and (go_live - buffer).
+  // The generator clamps scheduling to this date; we mirror that so the
+  // sim's "days over target" matches what the SQL would produce.
+  let targetEnd = new Date(windowEnd);
+  if (impl.go_live_date) {
+    const goLive = parseUtcDate(impl.go_live_date);
+    goLive.setUTCDate(goLive.getUTCDate() - impl.go_live_buffer_days);
+    goLive.setUTCHours(23, 59, 59, 999);
+    if (goLive < targetEnd) targetEnd = goLive;
+  }
+  // If the buffer pushes the target before window_start, every session
+  // becomes unschedulable — clamp to window_start so the loop terminates.
+  if (targetEnd < windowStart) {
+    targetEnd = new Date(windowStart);
+    targetEnd.setUTCDate(targetEnd.getUTCDate() - 1);
+  }
 
   const lunch: LunchWindow =
     impl.lunch_break_length_minutes > 0
@@ -706,7 +723,7 @@ function simulate(args: {
         const snapped = snapToWorkingDay(
           candidate,
           room.daysOfWeek,
-          windowEnd,
+          targetEnd,
           room.startHourLocal,
         );
         if (!snapped) break;
@@ -757,7 +774,7 @@ function simulate(args: {
 
         // Commit
         const end = new Date(candidate.getTime() + c.hours_per_session * 3600 * 1000);
-        if (end > windowEnd) break;
+        if (end > targetEnd) break;
 
         room.nextFree = end;
         room.hoursAssigned += c.hours_per_session;
@@ -806,8 +823,8 @@ function simulate(args: {
   // Days over target (Phase A target = window_end; Phase D will tighten to go_live - buffer)
   let daysOverTarget = 0;
   if (latestEnd) {
-    if (latestEnd > windowEnd) {
-      daysOverTarget = Math.ceil((latestEnd.getTime() - windowEnd.getTime()) / MS_PER_DAY);
+    if (latestEnd > targetEnd) {
+      daysOverTarget = Math.ceil((latestEnd.getTime() - targetEnd.getTime()) / MS_PER_DAY);
     }
   } else if (unscheduled > 0) {
     daysOverTarget = -1; // signal that nothing got placed
@@ -815,6 +832,7 @@ function simulate(args: {
 
   return {
     estimatedCompletionDate: latestEnd ? fmtDate(latestEnd) : null,
+    targetCompletionDate: fmtDate(targetEnd),
     unscheduledSessions: unscheduled,
     daysOverTarget,
     trainerUtilization: trainerUtil,
@@ -825,6 +843,7 @@ function simulate(args: {
 function emptySim(rooms: ImplRoom[], trainers: ImplTrainer[]): SimResult {
   return {
     estimatedCompletionDate: null,
+    targetCompletionDate: null,
     unscheduledSessions: 0,
     daysOverTarget: 0,
     trainerUtilization: trainers.map((t) => ({

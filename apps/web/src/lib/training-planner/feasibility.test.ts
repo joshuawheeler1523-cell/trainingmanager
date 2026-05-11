@@ -26,6 +26,7 @@ const baseImpl: Implementation = {
   // Lunch defaults match the new SQL CHECK constraints: 720 = noon, 60 mins
   lunch_break_start_minutes: 720,
   lunch_break_length_minutes: 60,
+  go_live_buffer_days: 7,
   deleted_at: null,
   created_at: "2026-05-01T00:00:00Z",
   updated_at: "2026-05-01T00:00:00Z",
@@ -558,6 +559,93 @@ describe("equipment tags", () => {
       prereqs: [],
     });
     expect(result.classFeasibility[0]?.roomCapacityOk).toBe(true);
+  });
+});
+
+// ── Phase D: go-live buffer ────────────────────────────────────────────────
+
+describe("go-live buffer", () => {
+  it("targetCompletionDate equals window_end when go_live is not set", () => {
+    const result = computeFeasibility({
+      implementation: { ...baseImpl, go_live_date: null, go_live_buffer_days: 7 },
+      rooms: [makeRoom()],
+      trainers: [makeTrainer()],
+      classes: [makeClass()],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    expect(result.targetCompletionDate).toBe(baseImpl.window_end_date);
+  });
+
+  it("targetCompletionDate equals go_live - buffer when that's earlier than window_end", () => {
+    // go_live 2026-07-01, buffer 5 → target 2026-06-26 (before window_end 07-26)
+    const result = computeFeasibility({
+      implementation: {
+        ...baseImpl,
+        go_live_date: "2026-07-01",
+        go_live_buffer_days: 5,
+      },
+      rooms: [makeRoom()],
+      trainers: [makeTrainer()],
+      classes: [makeClass()],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    expect(result.targetCompletionDate).toBe("2026-06-26");
+  });
+
+  it("marks every session unschedulable when the buffer pushes target before window_start", () => {
+    const result = computeFeasibility({
+      implementation: {
+        ...baseImpl,
+        window_start_date: "2026-06-01",
+        window_end_date: "2026-06-30",
+        go_live_date: "2026-06-05",
+        go_live_buffer_days: 14, // target = 2026-05-22, before start
+      },
+      rooms: [makeRoom()],
+      trainers: [makeTrainer()],
+      classes: [makeClass()],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    expect(result.unscheduledSessions).toBe(3);
+  });
+
+  it("daysOverTarget compares to the buffered target, not the raw window_end", () => {
+    // Tight schedule: 10 sessions × 2h, single trainer @ 8h/wk over 4 wks → 2 weeks of work.
+    // With go_live 2026-06-10 and buffer 7 (target = 2026-06-03), 4-week work spills past target.
+    const result = computeFeasibility({
+      implementation: {
+        ...baseImpl,
+        window_start_date: "2026-06-01",
+        window_end_date: "2026-06-30",
+        go_live_date: "2026-06-10",
+        go_live_buffer_days: 7, // target = 2026-06-03
+      },
+      rooms: [makeRoom()],
+      trainers: [makeTrainer({ availability_hours_per_week: 8 })],
+      classes: [
+        makeClass({
+          hours_per_session: 2,
+          expected_learners_per_session: 10,
+          total_people_to_train: 100, // 10 sessions
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    // Sessions can't all fit before 2026-06-03; some end up unschedulable
+    // OR the placed sessions extend past target.
+    if (result.estimatedCompletionDate) {
+      const placed = new Date(result.estimatedCompletionDate + "T00:00:00Z");
+      const target = new Date((result.targetCompletionDate ?? "") + "T00:00:00Z");
+      if (placed > target) {
+        expect(result.daysOverTarget).toBeGreaterThan(0);
+      }
+    } else {
+      expect(result.unscheduledSessions).toBeGreaterThan(0);
+    }
   });
 });
 

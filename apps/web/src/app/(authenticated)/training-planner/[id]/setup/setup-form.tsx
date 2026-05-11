@@ -25,6 +25,7 @@ type FormValues = {
   linked_tra_id: string;
   lunch_break_start_minutes: number;
   lunch_break_length_minutes: number;
+  go_live_buffer_days: number;
 };
 
 const fieldClass =
@@ -50,6 +51,7 @@ export default function SetupForm({ implementation, projects, tras }: Props) {
       linked_tra_id: implementation.linked_tra_id ?? "",
       lunch_break_start_minutes: implementation.lunch_break_start_minutes,
       lunch_break_length_minutes: implementation.lunch_break_length_minutes,
+      go_live_buffer_days: implementation.go_live_buffer_days,
     },
   });
 
@@ -221,6 +223,26 @@ export default function SetupForm({ implementation, projects, tras }: Props) {
               className={fieldClass}
             />
           </div>
+        </div>
+        <div className="mt-4">
+          <label
+            htmlFor="go_live_buffer_days"
+            className="text-foreground mb-1 block text-xs font-medium"
+          >
+            Go-live buffer (days)
+          </label>
+          <input
+            id="go_live_buffer_days"
+            type="number"
+            min={0}
+            max={365}
+            {...register("go_live_buffer_days", { valueAsNumber: true })}
+            className={fieldClass}
+          />
+          <p className="text-muted-foreground mt-1 text-[11px]">
+            The scheduler won&apos;t place sessions in the final N days before go-live, leaving
+            slack for makeups and no-shows. Set to 0 to disable.
+          </p>
         </div>
       </div>
 

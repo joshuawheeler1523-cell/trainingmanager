@@ -42,6 +42,7 @@ export const implementationInsertSchema = z.object({
   linked_tra_id: optionalUuid,
   lunch_break_start_minutes: z.coerce.number().int().min(0).max(1439).default(720),
   lunch_break_length_minutes: z.coerce.number().int().min(0).max(240).default(60),
+  go_live_buffer_days: z.coerce.number().int().min(0).max(365).default(7),
 });
 
 // Setup-step validation: dates required to leave Step 1.
@@ -55,6 +56,7 @@ export const implementationSetupSchema = z.object({
   linked_tra_id: optionalUuid,
   lunch_break_start_minutes: z.coerce.number().int().min(0).max(1439).default(720),
   lunch_break_length_minutes: z.coerce.number().int().min(0).max(240).default(60),
+  go_live_buffer_days: z.coerce.number().int().min(0).max(365).default(7),
 });
 
 export const implementationUpdateSchema = implementationInsertSchema.partial().extend({
@@ -80,6 +82,7 @@ export type Implementation = {
   current_step: number;
   lunch_break_start_minutes: number;
   lunch_break_length_minutes: number;
+  go_live_buffer_days: number;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
