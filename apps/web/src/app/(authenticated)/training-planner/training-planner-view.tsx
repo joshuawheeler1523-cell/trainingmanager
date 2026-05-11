@@ -4,10 +4,10 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { PlusIcon } from "@heroicons/react/20/solid";
+import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import EmptyState from "@/components/ui/empty-state";
 import { IMPL_STATUS_VALUES, type Implementation, type ImplStatus } from "@arbor/shared";
-import { createImplementation } from "./actions";
+import { archiveImplementation, createImplementation } from "./actions";
 
 type PlannerRow = Implementation & {
   class_count: number;
@@ -40,6 +40,25 @@ export default function TrainingPlannerView({ implementations }: Props) {
         toast.success("Implementation created");
         setName("");
         router.push(`/training-planner/${result.data.id}/setup`);
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function handleDelete(i: PlannerRow) {
+    if (
+      !confirm(
+        `Delete implementation "${i.name}"? It will be archived and removed from this list. Sessions, rooms, trainers, and classes inside it stay in the database (soft delete).`,
+      )
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      const result = await archiveImplementation(i.id);
+      if (result.ok) {
+        toast.success(`"${i.name}" deleted`);
+        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -123,6 +142,7 @@ export default function TrainingPlannerView({ implementations }: Props) {
                 <Th>Classes</Th>
                 <Th>Sessions</Th>
                 <Th className="w-32">Completion</Th>
+                <Th className="w-12" />
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
@@ -160,6 +180,19 @@ export default function TrainingPlannerView({ implementations }: Props) {
                   </td>
                   <td className="px-3 py-2">
                     <CompletionBar percent={i.completion_pct} />
+                  </td>
+                  <td className="px-3 py-2">
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => {
+                        handleDelete(i);
+                      }}
+                      aria-label={`Delete ${i.name}`}
+                      className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
                   </td>
                 </tr>
               ))}

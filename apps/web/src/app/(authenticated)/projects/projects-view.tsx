@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { PlusIcon } from "@heroicons/react/20/solid";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import EmptyState from "@/components/ui/empty-state";
 import ProjectFormDialog from "./project-form-dialog";
 import {
@@ -12,6 +14,7 @@ import {
   type ProjectPriority,
   type ProjectStatus,
 } from "@arbor/shared";
+import { archiveProject } from "./actions";
 
 type ProjectRow = Project & {
   task_count: number;
@@ -36,9 +39,30 @@ const PRIORITY_BADGE: Record<ProjectPriority, string> = {
 };
 
 export default function ProjectsView({ projects }: Props) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
   const [priorityFilter, setPriorityFilter] = useState<ProjectPriority | "all">("all");
   const [openCreate, setOpenCreate] = useState(false);
+
+  function handleDelete(p: ProjectRow) {
+    if (
+      !confirm(
+        `Delete project "${p.name}"? It will be archived and removed from this list. Tasks, milestones, and team rows inside it stay in the database (soft delete).`,
+      )
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      const result = await archiveProject(p.id);
+      if (result.ok) {
+        toast.success(`"${p.name}" deleted`);
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
 
   const filtered = useMemo(() => {
     return projects.filter((p) => {
@@ -123,6 +147,7 @@ export default function ProjectsView({ projects }: Props) {
                 <Th>Priority</Th>
                 <Th>Dates</Th>
                 <Th className="w-48">Progress</Th>
+                <Th className="w-12" />
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
@@ -159,6 +184,19 @@ export default function ProjectsView({ projects }: Props) {
                   <td className="px-3 py-2">
                     <ProgressBar percent={p.percent_complete} taskCount={p.task_count} />
                   </td>
+                  <td className="px-3 py-2">
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => {
+                        handleDelete(p);
+                      }}
+                      aria-label={`Delete ${p.name}`}
+                      className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -178,7 +216,7 @@ export default function ProjectsView({ projects }: Props) {
   );
 }
 
-function Th({ children, className }: { children: React.ReactNode; className?: string }) {
+function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th
       className={`bg-surface px-3 py-2 text-left text-xs font-medium uppercase tracking-wide ${className ?? ""}`}
