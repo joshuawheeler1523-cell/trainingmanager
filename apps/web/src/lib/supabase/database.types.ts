@@ -107,6 +107,7 @@ export type Database = {
           created_by: string | null;
           custom_domain: string | null;
           custom_domain_pending: string | null;
+          custom_domain_pending_at: string | null;
           custom_domain_verification_token: string | null;
           custom_domain_verified_at: string | null;
           default_revenue_share_pct: number;
@@ -132,6 +133,7 @@ export type Database = {
           created_by?: string | null;
           custom_domain?: string | null;
           custom_domain_pending?: string | null;
+          custom_domain_pending_at?: string | null;
           custom_domain_verification_token?: string | null;
           custom_domain_verified_at?: string | null;
           default_revenue_share_pct?: number;
@@ -157,6 +159,7 @@ export type Database = {
           created_by?: string | null;
           custom_domain?: string | null;
           custom_domain_pending?: string | null;
+          custom_domain_pending_at?: string | null;
           custom_domain_verification_token?: string | null;
           custom_domain_verified_at?: string | null;
           default_revenue_share_pct?: number;
@@ -216,6 +219,33 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      agency_signup_attempts: {
+        Row: {
+          agency_slug: string;
+          created_at: string;
+          email: string;
+          id: string;
+          ip: string | null;
+          succeeded: boolean;
+        };
+        Insert: {
+          agency_slug: string;
+          created_at?: string;
+          email: string;
+          id?: string;
+          ip?: string | null;
+          succeeded?: boolean;
+        };
+        Update: {
+          agency_slug?: string;
+          created_at?: string;
+          email?: string;
+          id?: string;
+          ip?: string | null;
+          succeeded?: boolean;
+        };
+        Relationships: [];
       };
       allocation_buckets: {
         Row: {
@@ -4798,6 +4828,13 @@ export type Database = {
           target_percent: number;
         }[];
       };
+      expire_stale_pending_domains: {
+        Args: { p_max_age_hours?: number };
+        Returns: {
+          agency_id: string;
+          expired_domain: string;
+        }[];
+      };
       frequency_to_annual: { Args: { p_frequency: string }; Returns: number };
       generate_implementation_schedule: {
         Args: { p_implementation_id: string };
@@ -4894,6 +4931,14 @@ export type Database = {
         Returns: {
           deleted_count: number;
           org_id: string;
+        }[];
+      };
+      purge_old_data_exports: {
+        Args: { p_max_age_days?: number };
+        Returns: {
+          export_id: string;
+          org_id: string;
+          storage_path: string;
         }[];
       };
       qualified_instructors_for_class: {

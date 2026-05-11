@@ -40,8 +40,12 @@ export default function BrandingForm({
   const [emailFromAddress, setEmailFromAddress] = useState(initial.emailFromAddress);
 
   const handleLogoUpload = async (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Logo must be an image (PNG, JPG, or SVG)");
+    // SVG is intentionally excluded — SVGs can carry inline JS and become
+    // an XSS vector if anything ever renders them outside an <img>. The
+    // Storage bucket itself also enforces this server-side.
+    const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+    if (!ALLOWED_MIME.includes(file.type)) {
+      toast.error("Logo must be a PNG, JPG, WebP, or GIF");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
@@ -139,7 +143,7 @@ export default function BrandingForm({
             <input
               ref={fileRef}
               type="file"
-              accept="image/png,image/jpeg,image/svg+xml"
+              accept="image/png,image/jpeg,image/webp,image/gif"
               disabled={uploading}
               onChange={(e) => {
                 const file = e.target.files?.[0];

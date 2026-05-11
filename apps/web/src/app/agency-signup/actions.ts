@@ -5,6 +5,13 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, inviteEmailHtml, inviteEmailText } from "@/lib/email";
 
+// Throttle limits — chosen to allow legitimate retries (typo, mistyped
+// password, magic-link expired) but block mass-mailer abuse since the
+// action emits a "Welcome to Arbor — finish setting up <attacker name>"
+// magic-link to any address.
+const MAX_ATTEMPTS_PER_IP_PER_HOUR = 3;
+const MAX_ATTEMPTS_PER_EMAIL_PER_DAY = 3;
+
 type ActionResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string; field?: string } };
@@ -50,6 +57,64 @@ export async function createAgencySignupAction(
   }
 
   const admin = createAdminClient();
+
+  // Best-effort IP capture from forwarded headers (Vercel sets these).
+  // We do NOT trust them for auth, only for rate limiting; spoofing them
+  // just changes which "bucket" a request gets counted in.
+  const headersList = await headers();
+  const ip =
+    headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    headersList.get("x-real-ip") ??
+    null;
+
+  // Throttle check — counts attempts in the lookback windows.
+  const oneHourAgo = new Date(Date.now() - 60 * 60_000).toISOString();
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+  if (ip) {
+    const { count: ipCount } = await admin
+      .from("agency_signup_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("ip", ip)
+      .gte("created_at", oneHourAgo);
+    if ((ipCount ?? 0) >= MAX_ATTEMPTS_PER_IP_PER_HOUR) {
+      return {
+        ok: false,
+        error: {
+          code: "RATE_LIMITED",
+          message: "Too many signup attempts from this IP. Try again in an hour.",
+        },
+      };
+    }
+  }
+  const { count: emailCount } = await admin
+    .from("agency_signup_attempts")
+    .select("id", { count: "exact", head: true })
+    .ilike("email", parsed.data.adminEmail)
+    .gte("created_at", oneDayAgo);
+  if ((emailCount ?? 0) >= MAX_ATTEMPTS_PER_EMAIL_PER_DAY) {
+    return {
+      ok: false,
+      error: {
+        code: "RATE_LIMITED",
+        message: "Too many signup attempts for this email. Try again tomorrow.",
+      },
+    };
+  }
+
+  // Always log the attempt (succeeded flag flipped at the bottom on
+  // success). This means even rejected validations contribute to the
+  // throttle, which is the right behavior — a brute-forcer rapidly
+  // probing slugs shouldn't get an unlimited budget.
+  const { data: attemptRow } = await admin
+    .from("agency_signup_attempts")
+    .insert({
+      ip,
+      email: parsed.data.adminEmail,
+      agency_slug: parsed.data.agencySlug,
+    })
+    .select("id")
+    .single();
+  const attemptId = attemptRow?.id ?? null;
 
   // Slug uniqueness check
   const { data: existingAgency } = await admin
@@ -142,7 +207,6 @@ export async function createAgencySignupAction(
   }
 
   // Send magic link to confirm email + sign in
-  const headersList = await headers();
   const origin = headersList.get("origin") ?? "";
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
     type: "magiclink",
@@ -167,6 +231,12 @@ export async function createAgencySignupAction(
       }),
     });
     emailSent = result.ok && !("degraded" in result ? result.degraded : false);
+  }
+
+  // Mark the throttle row as succeeded so we can track conversion vs.
+  // attempts in audit queries (and future fraud analysis).
+  if (attemptId) {
+    await admin.from("agency_signup_attempts").update({ succeeded: true }).eq("id", attemptId);
   }
 
   return { ok: true, data: { agencyId: agencyRow.id, emailSent } };

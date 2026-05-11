@@ -46,9 +46,7 @@ const setDomainSchema = z.object({
 });
 
 /** @requiredAgencyRole agency_admin */
-export async function setAgencyDomainAction(
-  input: unknown,
-): Promise<
+export async function setAgencyDomainAction(input: unknown): Promise<
   ActionResult<{
     pending: string;
     verification?: { type: string; value: string }[];
@@ -103,6 +101,7 @@ export async function setAgencyDomainAction(
     .from("agencies")
     .update({
       custom_domain_pending: domain,
+      custom_domain_pending_at: new Date().toISOString(),
       custom_domain_verification_token: txt,
     })
     .eq("id", agencyId);
@@ -180,6 +179,7 @@ export async function verifyAgencyDomainAction(): Promise<
     .update({
       custom_domain: target,
       custom_domain_pending: null,
+      custom_domain_pending_at: null,
       custom_domain_verification_token: null,
       custom_domain_verified_at: new Date().toISOString(),
     })
@@ -220,6 +220,7 @@ export async function removeAgencyDomainAction(): Promise<ActionResult<true>> {
     .update({
       custom_domain: null,
       custom_domain_pending: null,
+      custom_domain_pending_at: null,
       custom_domain_verification_token: null,
       custom_domain_verified_at: null,
     })
