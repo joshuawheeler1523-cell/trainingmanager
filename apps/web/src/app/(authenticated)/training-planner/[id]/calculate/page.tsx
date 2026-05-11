@@ -7,6 +7,7 @@ import type { Implementation } from "@arbor/shared";
 import {
   computeFeasibility,
   type ClassFeasibility,
+  type CrossImplBusy,
   type FeasibilityResult,
   type FeasibilityVerdict,
   type Recommendation,
@@ -27,6 +28,9 @@ export default async function CalculatePage({ params }: { params: Params }) {
     { data: classes },
     { data: classTrainers },
     { data: prereqs },
+    { data: orgTrainers },
+    { data: orgImpls },
+    { data: orgPublishedSessions },
     { count: sessionCount },
   ] = await Promise.all([
     supabase
@@ -44,6 +48,22 @@ export default async function CalculatePage({ params }: { params: Params }) {
     // org, and computeFeasibility filters down to the supplied class IDs.
     supabase.from("impl_class_trainers").select("*").eq("org_id", orgId),
     supabase.from("impl_class_prerequisites").select("*").eq("org_id", orgId),
+    // For cross-impl trainer conflict: all impl_trainer rows in the org so
+    // we can match instructor_id across implementations.
+    supabase
+      .from("impl_trainers")
+      .select("id, instructor_id, implementation_id")
+      .eq("org_id", orgId),
+    // Implementations metadata so we can filter cross-impl busy to live impls only.
+    supabase.from("implementations").select("id, name, status, deleted_at").eq("org_id", orgId),
+    // Published sessions in OTHER implementations — these are the cross-impl
+    // commitments the simulator must dodge for trainers shared via instructor_id.
+    supabase
+      .from("impl_sessions")
+      .select("impl_trainer_id, scheduled_start, scheduled_end, implementation_id")
+      .eq("org_id", orgId)
+      .eq("status", "published")
+      .neq("implementation_id", id),
     supabase
       .from("impl_sessions")
       .select("*", { count: "exact", head: true })
@@ -52,6 +72,43 @@ export default async function CalculatePage({ params }: { params: Params }) {
   ]);
 
   if (!impl) notFound();
+
+  // Build per-trainer cross-impl busy map: for each of THIS impl's trainers
+  // whose underlying instructor also teaches in OTHER live implementations,
+  // accumulate the other impls' published session intervals.
+  const myTrainerByInstructor = new Map<string, string>(); // instructor_id → my_trainer_id
+  for (const t of trainers ?? []) {
+    if (t.instructor_id) myTrainerByInstructor.set(t.instructor_id, t.id);
+  }
+  const otherTrainerById = new Map<string, { instructor_id: string | null; impl_id: string }>();
+  for (const t of orgTrainers ?? []) {
+    if (t.implementation_id === id) continue; // same-impl trainers are handled normally
+    otherTrainerById.set(t.id, { instructor_id: t.instructor_id, impl_id: t.implementation_id });
+  }
+  const liveImplIds = new Set(
+    (orgImpls ?? [])
+      .filter((i) => !i.deleted_at && i.status !== "archived" && i.status !== "cancelled")
+      .map((i) => i.id),
+  );
+  const implNameById = new Map((orgImpls ?? []).map((i) => [i.id, i.name]));
+
+  const crossImplBusyByTrainer = new Map<string, CrossImplBusy[]>();
+  for (const s of orgPublishedSessions ?? []) {
+    if (!s.impl_trainer_id) continue;
+    if (!liveImplIds.has(s.implementation_id)) continue;
+    const other = otherTrainerById.get(s.impl_trainer_id);
+    if (!other?.instructor_id) continue;
+    const myTrainerId = myTrainerByInstructor.get(other.instructor_id);
+    if (!myTrainerId) continue;
+    const list = crossImplBusyByTrainer.get(myTrainerId) ?? [];
+    const implName = implNameById.get(s.implementation_id);
+    list.push({
+      start: s.scheduled_start,
+      end: s.scheduled_end,
+      ...(implName ? { implName } : {}),
+    });
+    crossImplBusyByTrainer.set(myTrainerId, list);
+  }
 
   // Supabase widens our text-with-CHECK columns to `string`; the shared
   // Implementation type narrows status to a union. The other rows match
@@ -64,6 +121,7 @@ export default async function CalculatePage({ params }: { params: Params }) {
     classes: classes ?? [],
     classTrainers: classTrainers ?? [],
     prereqs: prereqs ?? [],
+    crossImplBusyByTrainer,
   });
 
   return (

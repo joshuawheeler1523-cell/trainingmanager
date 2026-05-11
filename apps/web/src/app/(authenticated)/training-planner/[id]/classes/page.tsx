@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import type { Implementation } from "@arbor/shared";
-import { computeFeasibility } from "@/lib/training-planner/feasibility";
+import { computeFeasibility, type CrossImplBusy } from "@/lib/training-planner/feasibility";
 import ClassesEditor from "./classes-editor";
 
 type Params = Promise<{ id: string }>;
@@ -20,6 +20,9 @@ export default async function ClassesPage({ params }: { params: Params }) {
     { data: trainers },
     { data: classTrainers },
     { data: prerequisites },
+    { data: orgTrainers },
+    { data: orgImpls },
+    { data: orgPublishedSessions },
   ] = await Promise.all([
     supabase
       .from("implementations")
@@ -50,7 +53,55 @@ export default async function ClassesPage({ params }: { params: Params }) {
       .order("name"),
     supabase.from("impl_class_trainers").select("*").eq("org_id", orgId),
     supabase.from("impl_class_prerequisites").select("*").eq("org_id", orgId),
+    // Cross-impl trainer matching (same algorithm as the Calculate page).
+    supabase
+      .from("impl_trainers")
+      .select("id, instructor_id, implementation_id")
+      .eq("org_id", orgId),
+    supabase.from("implementations").select("id, name, status, deleted_at").eq("org_id", orgId),
+    supabase
+      .from("impl_sessions")
+      .select("impl_trainer_id, scheduled_start, scheduled_end, implementation_id")
+      .eq("org_id", orgId)
+      .eq("status", "published")
+      .neq("implementation_id", id),
   ]);
+
+  // Cross-impl busy map (mirrors Calculate page logic): every published
+  // session in another live impl whose trainer links to one of this impl's
+  // trainers via instructor_id becomes a busy wall in the simulator.
+  const myTrainerByInstructor = new Map<string, string>();
+  for (const t of trainers ?? []) {
+    if (t.instructor_id) myTrainerByInstructor.set(t.instructor_id, t.id);
+  }
+  const otherTrainerById = new Map<string, { instructor_id: string | null; impl_id: string }>();
+  for (const t of orgTrainers ?? []) {
+    if (t.implementation_id === id) continue;
+    otherTrainerById.set(t.id, { instructor_id: t.instructor_id, impl_id: t.implementation_id });
+  }
+  const liveImplIds = new Set(
+    (orgImpls ?? [])
+      .filter((i) => !i.deleted_at && i.status !== "archived" && i.status !== "cancelled")
+      .map((i) => i.id),
+  );
+  const implNameById = new Map((orgImpls ?? []).map((i) => [i.id, i.name]));
+  const crossImplBusyByTrainer = new Map<string, CrossImplBusy[]>();
+  for (const s of orgPublishedSessions ?? []) {
+    if (!s.impl_trainer_id) continue;
+    if (!liveImplIds.has(s.implementation_id)) continue;
+    const other = otherTrainerById.get(s.impl_trainer_id);
+    if (!other?.instructor_id) continue;
+    const myTrainerId = myTrainerByInstructor.get(other.instructor_id);
+    if (!myTrainerId) continue;
+    const list = crossImplBusyByTrainer.get(myTrainerId) ?? [];
+    const implName = implNameById.get(s.implementation_id);
+    list.push({
+      start: s.scheduled_start,
+      end: s.scheduled_end,
+      ...(implName ? { implName } : {}),
+    });
+    crossImplBusyByTrainer.set(myTrainerId, list);
+  }
 
   // Run the same feasibility simulation the Calculate step uses so we can
   // surface per-class distinct rooms/trainers actually used, not just the
@@ -63,6 +114,7 @@ export default async function ClassesPage({ params }: { params: Params }) {
         classes: classes ?? [],
         classTrainers: classTrainers ?? [],
         prereqs: prerequisites ?? [],
+        crossImplBusyByTrainer,
       })
     : null;
 

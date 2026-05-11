@@ -807,6 +807,183 @@ describe("per-class distinct rooms + trainers", () => {
   });
 });
 
+// ── Cross-implementation trainer busy intervals ────────────────────────────
+
+describe("cross-impl trainer busy", () => {
+  it("respects a cross-impl busy interval that overlaps the first slot", () => {
+    // Trainer t1 is "busy elsewhere" 09:00–11:00 UTC on day 1. With 1 session
+    // of 2h needed and 1 trainer + 1 room, the placement should be pushed
+    // to 11:00 instead of starting at 09:00.
+    const cross = new Map<string, Array<{ start: string; end: string; implName?: string }>>([
+      [
+        "t1",
+        [
+          {
+            start: "2026-06-01T09:00:00Z",
+            end: "2026-06-01T11:00:00Z",
+            implName: "Other Hospital — EMR",
+          },
+        ],
+      ],
+    ]);
+    const result = computeFeasibility({
+      implementation: { ...baseImpl, window_end_date: "2026-06-05" },
+      rooms: [makeRoom()],
+      trainers: [makeTrainer()],
+      classes: [
+        makeClass({
+          hours_per_session: 2,
+          expected_learners_per_session: 10,
+          total_people_to_train: 10, // 1 session
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+      crossImplBusyByTrainer: cross,
+    });
+    expect(result.unscheduledSessions).toBe(0);
+    // Session placed on day 1 because it can slide to 11:00 inside the same day.
+    expect(result.estimatedCompletionDate).toBe("2026-06-01");
+    // Total hours assigned to t1 = 2 (this impl's session), NOT incrementing
+    // for the cross-impl interval — cross-impl is a wall, not consumed capacity.
+    const t1 = result.trainerUtilization.find((t) => t.id === "t1");
+    expect(t1?.hoursAssigned).toBe(2);
+  });
+
+  it("pushes to the next day when cross-impl busy fills the entire first day", () => {
+    // Trainer busy 09:00–17:00 day 1 → all-day block. Session must spill to day 2.
+    const cross = new Map<string, Array<{ start: string; end: string; implName?: string }>>([
+      [
+        "t1",
+        [
+          {
+            start: "2026-06-01T09:00:00Z",
+            end: "2026-06-01T17:00:00Z",
+            implName: "Other site",
+          },
+        ],
+      ],
+    ]);
+    const result = computeFeasibility({
+      implementation: { ...baseImpl, window_end_date: "2026-06-05" },
+      rooms: [makeRoom({ available_hours_per_day: 8 })],
+      trainers: [makeTrainer()],
+      classes: [
+        makeClass({
+          hours_per_session: 2,
+          expected_learners_per_session: 10,
+          total_people_to_train: 10, // 1 session
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+      crossImplBusyByTrainer: cross,
+    });
+    expect(result.unscheduledSessions).toBe(0);
+    // Day 1 fully blocked → completion on day 2 (2026-06-02)
+    expect(result.estimatedCompletionDate).toBe("2026-06-02");
+  });
+
+  it("handles multiple cross-impl intervals on the same trainer", () => {
+    // Three blocks in a row force the session into the gap.
+    const cross = new Map<string, Array<{ start: string; end: string; implName?: string }>>([
+      [
+        "t1",
+        [
+          { start: "2026-06-01T09:00:00Z", end: "2026-06-01T11:00:00Z" },
+          { start: "2026-06-01T13:00:00Z", end: "2026-06-01T15:00:00Z" },
+        ],
+      ],
+    ]);
+    const result = computeFeasibility({
+      implementation: { ...baseImpl, window_end_date: "2026-06-05" },
+      rooms: [makeRoom()],
+      trainers: [makeTrainer()],
+      classes: [
+        makeClass({
+          hours_per_session: 2,
+          expected_learners_per_session: 10,
+          total_people_to_train: 10,
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+      crossImplBusyByTrainer: cross,
+    });
+    expect(result.unscheduledSessions).toBe(0);
+    // Should slot 11:00–13:00 (the gap), still on day 1.
+    expect(result.estimatedCompletionDate).toBe("2026-06-01");
+  });
+
+  it("does NOT affect trainers without cross-impl entries", () => {
+    // Two trainers, only t1 has a cross-impl block. Sim should route the work
+    // to t2 (least-loaded after t1 is blocked) or to t1 in the gap.
+    const cross = new Map<string, Array<{ start: string; end: string }>>([
+      ["t1", [{ start: "2026-06-01T09:00:00Z", end: "2026-06-01T11:00:00Z" }]],
+    ]);
+    const result = computeFeasibility({
+      implementation: { ...baseImpl, window_end_date: "2026-06-05" },
+      rooms: [makeRoom()],
+      trainers: [makeTrainer({ id: "t1", name: "T1" }), makeTrainer({ id: "t2", name: "T2" })],
+      classes: [
+        makeClass({
+          hours_per_session: 2,
+          expected_learners_per_session: 10,
+          total_people_to_train: 10, // 1 session
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1"), classTrainer("c1", "t2")],
+      prereqs: [],
+      crossImplBusyByTrainer: cross,
+    });
+    expect(result.unscheduledSessions).toBe(0);
+    expect(result.estimatedCompletionDate).toBe("2026-06-01");
+    // t2 should pick up the session since t1 is blocked at the same start.
+    // (Least-loaded picks t1 first because both at 0h, but the cross-impl
+    // wall on t1 pushes its placement past 11:00. The sim with current
+    // implementation prefers staying on t1 by pushing past the block —
+    // either outcome is correct, so we just assert SOMEONE took it.)
+    const total =
+      (result.trainerUtilization.find((t) => t.id === "t1")?.hoursAssigned ?? 0) +
+      (result.trainerUtilization.find((t) => t.id === "t2")?.hoursAssigned ?? 0);
+    expect(total).toBe(2);
+  });
+
+  it("an empty cross-impl map (or no entry for trainer) is a no-op", () => {
+    const result = computeFeasibility({
+      implementation: baseImpl,
+      rooms: [makeRoom()],
+      trainers: [makeTrainer()],
+      classes: [makeClass()],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+      crossImplBusyByTrainer: new Map(),
+    });
+    expect(result.unscheduledSessions).toBe(0);
+    expect(result.estimatedCompletionDate).toBe("2026-06-01");
+  });
+
+  it("cross-impl busy past the window end can't break the sim", () => {
+    // Busy interval entirely in the future, after window_end. Sim should
+    // ignore it (or, more precisely, never overlap it because the sim
+    // never gets that far).
+    const cross = new Map<string, Array<{ start: string; end: string }>>([
+      ["t1", [{ start: "2027-01-01T09:00:00Z", end: "2027-01-01T11:00:00Z" }]],
+    ]);
+    const result = computeFeasibility({
+      implementation: baseImpl,
+      rooms: [makeRoom()],
+      trainers: [makeTrainer()],
+      classes: [makeClass()],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+      crossImplBusyByTrainer: cross,
+    });
+    expect(result.unscheduledSessions).toBe(0);
+    expect(result.estimatedCompletionDate).toBe("2026-06-01");
+  });
+});
+
 // ── Ready gate ─────────────────────────────────────────────────────────────
 
 describe("ready gate", () => {

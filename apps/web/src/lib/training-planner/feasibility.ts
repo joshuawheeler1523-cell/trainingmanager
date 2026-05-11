@@ -333,6 +333,10 @@ type TrainerState = {
   maxConcurrent: number;
   weeklyUsed: Map<string, number>;
   nextFree: Date;
+  // Cross-impl busy intervals — published sessions in OTHER implementations
+  // where this person teaches (matched by instructor_id server-side). The
+  // sim treats overlapping placements as if this trainer were booked.
+  crossImplBusy: Array<{ start: Date; end: Date; label?: string }>;
 };
 
 type RoomState = {
@@ -426,6 +430,22 @@ function setHourOfDay(d: Date, hourLocal: number): void {
 
 // ── Main entry ─────────────────────────────────────────────────────────────
 
+/**
+ * Cross-implementation busy interval keyed by this impl's trainer id. The
+ * server pre-computes per-trainer busy windows by joining published
+ * sessions in OTHER live implementations whose trainer rows link to the
+ * same instructor_id, then mapping back to THIS impl's trainer id. The
+ * sim treats each interval as if the trainer were already booked, so the
+ * Calculate preview matches what the SQL generator will produce on
+ * Generate (which has the same pre-seed logic in pg_temp.tmp_busy_trainer).
+ */
+export type CrossImplBusy = {
+  start: string; // ISO timestamptz
+  end: string; // ISO timestamptz
+  implName?: string;
+  className?: string;
+};
+
 export function computeFeasibility(input: {
   implementation: Implementation;
   rooms: ImplRoom[];
@@ -433,8 +453,17 @@ export function computeFeasibility(input: {
   classes: ImplClass[];
   classTrainers: ImplClassTrainer[];
   prereqs: ImplClassPrerequisite[];
+  crossImplBusyByTrainer?: Map<string, CrossImplBusy[]>;
 }): FeasibilityResult {
-  const { implementation: impl, rooms, trainers, classes, classTrainers, prereqs } = input;
+  const {
+    implementation: impl,
+    rooms,
+    trainers,
+    classes,
+    classTrainers,
+    prereqs,
+    crossImplBusyByTrainer,
+  } = input;
 
   // ── Window math
   const windowDays =
@@ -524,6 +553,7 @@ export function computeFeasibility(input: {
     classFeasibility: classFeas,
     trainersByClass,
     prereqsByClass,
+    ...(crossImplBusyByTrainer ? { crossImplBusyByTrainer } : {}),
   });
 
   // Stamp per-class sim results back onto the feasibility rows so the UI
@@ -647,9 +677,18 @@ function simulate(args: {
   classFeasibility: ClassFeasibility[];
   trainersByClass: Map<string, string[]>;
   prereqsByClass: Map<string, string[]>;
+  crossImplBusyByTrainer?: Map<string, CrossImplBusy[]>;
 }): SimResult {
-  const { impl, rooms, trainers, classes, classFeasibility, trainersByClass, prereqsByClass } =
-    args;
+  const {
+    impl,
+    rooms,
+    trainers,
+    classes,
+    classFeasibility,
+    trainersByClass,
+    prereqsByClass,
+    crossImplBusyByTrainer,
+  } = args;
 
   if (!impl.window_start_date || !impl.window_end_date) {
     return emptySim(rooms, trainers);
@@ -712,6 +751,20 @@ function simulate(args: {
       const earliestRoomStart =
         rooms.length > 0 ? Math.min(...rooms.map((r) => r.start_hour_local)) : 9;
       setHourOfDay(start, earliestRoomStart);
+      const crossBusy = (crossImplBusyByTrainer?.get(t.id) ?? [])
+        .map((b) => {
+          const label =
+            b.implName && b.className
+              ? `${b.className} (${b.implName})`
+              : (b.implName ?? b.className);
+          return {
+            start: new Date(b.start),
+            end: new Date(b.end),
+            ...(label ? { label } : {}),
+          };
+        })
+        // Sort by start so the placement check can scan linearly.
+        .sort((a, b) => a.start.getTime() - b.start.getTime());
       return [
         t.id,
         {
@@ -723,6 +776,7 @@ function simulate(args: {
           nextFree: start,
           weeklyUsed: new Map(),
           maxConcurrent: t.max_concurrent_sessions,
+          crossImplBusy: crossBusy,
         },
       ];
     }),
@@ -803,6 +857,25 @@ function simulate(args: {
           if (candHr < lunch.endHr && candHr + c.hours_per_session > lunch.startHr) {
             setHourOfDay(candidate, lunch.endHr);
           }
+        }
+
+        // Cross-impl busy check: if the candidate window overlaps any
+        // cross-impl busy interval for this trainer, push past the
+        // interval and retry. Treat overlapping cross-impl commitments
+        // as immovable walls — the SQL generator does the same via
+        // pg_temp.tmp_busy_trainer.
+        {
+          const end = new Date(candidate.getTime() + c.hours_per_session * 3600 * 1000);
+          let pushed = false;
+          for (const busy of trainer.crossImplBusy) {
+            if (busy.end <= candidate) continue; // busy ends before we start — fine
+            if (busy.start >= end) break; // sorted; no more relevant overlaps
+            // Overlaps. Push past it.
+            trainer.nextFree = new Date(busy.end);
+            pushed = true;
+            break;
+          }
+          if (pushed) continue;
         }
 
         // Trainer weekly cap check
