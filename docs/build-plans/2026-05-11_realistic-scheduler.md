@@ -38,11 +38,12 @@ This is a multi-quarter program, not a sprint. Each phase is independently shipp
 
 ## Scope decisions (made 2026-05-11)
 
-- **All five phases in scope** as a roadmap, but Phase 1 starts now and others gate on user decisions documented below.
-- **Solver hosting** (Phase 3): Supabase Edge Function in Python with `ortools`. Alternatives (separate Cloud Run service, Vercel function, browser-side) considered and rejected — see Phase 3 notes.
-- **AI provider** (Phase 4): Claude API (`claude-sonnet-4-6` default, escalate to `claude-opus-4-7` for the explanation pipeline). Prompt caching mandatory for the per-impl prompt prefix.
+- **Phases 1, 3, 4, 5 in scope.** Phase 2 (learner cohorts) is out — learners are handled in a separate system; the scheduler stays at the headcount/cohort-size level.
+- **Phase 1.3 (holidays) is out.** User explicitly removed; orgs handle holiday closures by editing the impl window instead.
+- **Solver hosting** (Phase 3): try Supabase Edge Function in Python with `ortools` first; fall back to a small Cloud Run service if the runtime doesn't work. User prefers no marginal infra cost but accepts Cloud Run (~$5–20/mo) if necessary.
+- **AI provider** (Phase 4): Claude API (`claude-sonnet-4-6` default, escalate to `claude-opus-4-7` for the explanation pipeline). Prompt caching mandatory for the per-impl prompt prefix. Minimize call volume — AI is the only piece with marginal cost.
 - **Migration safety**: greedy generator stays alongside the solver for a release cycle; a feature flag picks which one Generate calls. Cutover happens once parity is proven on real impls.
-- **Out of scope for this program**: machine-learned demand forecasting, optimization across multiple impls (each impl is solved independently), cost/billing-driven scheduling.
+- **Out of scope for this program**: machine-learned demand forecasting, optimization across multiple impls (each impl is solved independently), cost/billing-driven scheduling, learner-level scheduling.
 
 ## Phase 1 — Constraint gap closure (greedy stays)
 
@@ -62,11 +63,9 @@ This is a multi-quarter program, not a sprint. Each phase is independently shipp
 - Sim + generator: `trainer.nextFree` advances to `session_end + min_rest_minutes` (not just `session_end`).
 - UI: editable per trainer; default 0 (no enforced break). Recommend 15-30 min for back-to-back classes.
 
-### 1.3 Holiday calendar
+### 1.3 Holiday calendar — OUT OF SCOPE
 
-- Migration: new table `org_holidays(org_id, date, name, is_observed)`. Org-level (not impl-level) because hospital holidays span impls.
-- Sim + generator: when iterating days, skip dates present in `org_holidays`.
-- UI: a "Holidays" section on the org settings page; preset US federal holidays buttons; manual add/remove.
+User decision 2026-05-11: orgs handle holiday closures by editing the impl window instead of a dedicated holidays model.
 
 ### 1.4 Per-trainer PTO / unavailability windows
 
@@ -113,31 +112,9 @@ This is a multi-quarter program, not a sprint. Each phase is independently shipp
 
 **Estimated effort:** 4–6 weeks of focused work (1.1–1.5 are 3–4 days each; 1.8 and 1.10 are the bigger items at ~1 week each). Each item is its own PR per the new workflow.
 
-## Phase 2 — Learner cohorts
+## Phase 2 — Learner cohorts — OUT OF SCOPE
 
-**Goal:** track learners as identifiable people grouped into cohorts so the same person can't be double-booked, and so per-cohort curriculum paths can be modeled.
-
-This is a significant data-model expansion — the planner moves from "20 nurses need IV training" to "Cohort A (Joe, Lisa, Marcus...) needs IV training, EKG, and Sepsis training in order."
-
-### 2.1 Schema
-
-- `impl_cohorts(id, impl_id, name, target_size, color, sort_order)` — a named group of learners.
-- `impl_cohort_members(cohort_id, learner_id, role)` — junction. Learners are first-class people, but for v1 they can be free-text names rather than linked accounts.
-- `impl_learners(id, impl_id, full_name, email, employee_id, role_title)` — the people.
-- `impl_class_cohorts(impl_class_id, cohort_id, learners_count)` — which cohorts attend which classes, and how many of each cohort.
-
-### 2.2 Sim + generator
-
-- Replace fungible-headcount placement with per-cohort placement. A session is assigned to _one cohort_ (or a subset of one cohort) at a time.
-- New constraint: for each `(cohort, time-window)` no overlapping sessions.
-- `sessions_needed` per class becomes `sum over cohorts assigned to class of ceil(cohort_count / per_session)`.
-
-### 2.3 UI
-
-- New "Learners" wizard step, between Classes and Trainers.
-- Roster import (CSV).
-- Drag-and-drop cohort assignment.
-- Calendar view filterable by cohort.
+User decision 2026-05-11: learner-level scheduling is handled in a separate system. Arbor's scheduler stays at the headcount level. The original Phase 2 spec (impl_learners + impl_cohorts tables, per-cohort placement) is parked indefinitely.
 
 **Estimated effort:** 3–4 weeks. This is the biggest _data model_ change. Stack it after Phase 1 because the per-cohort logic depends on cohort-aware constraints anyway.
 
