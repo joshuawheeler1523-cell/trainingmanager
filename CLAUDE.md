@@ -66,7 +66,8 @@ The pre-commit hook runs lint-staged (eslint --fix + prettier --write on staged 
 - **Explicit deletions.** `rm` + `git add <other paths>` does NOT stage the deletion. Use `git rm -r <path>` or `git add -A <path>`. Cost me a 5-deploy-failure debugging session — see `feedback_git_rm_explicit.md` in memory.
 - **Conventional commit prefixes.** `feat(scope):`, `fix(scope):`, `chore(scope):`, `docs(scope):`, `refactor(scope):`. Body explains the _why_; commit messages are read months later.
 - **Co-author footer:** `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` — already convention.
-- **Push immediately after commit** unless the user says otherwise. The user works in the deployed Vercel preview.
+- **PR workflow for non-trivial changes.** For features, schema migrations, server actions, auth/billing/RLS, or anything spanning more than ~2 files: create a feature branch (`feat/<scope>`, `fix/<scope>`, etc.), push, open a PR with `gh pr create` (Summary + Test plan body), and let the user self-merge. The PR pause lets the diff be eyeballed before it's live, runs CI in isolation, and gives a clean revert unit.
+- **Direct-to-master is fine for tiny/safe stuff.** Docs, copy, CSS tweaks, one-line bugfixes, migration idempotency fixes — commit on master and push immediately. PRs for these are pure ceremony.
 
 ### When the user says "tackle them all" / "keep going" / "do it"
 
