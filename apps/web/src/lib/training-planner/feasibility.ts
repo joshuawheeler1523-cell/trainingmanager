@@ -72,6 +72,36 @@ export type Recommendation =
 
 export type FeasibilityVerdict = "feasible" | "tight" | "infeasible";
 
+export type ResourceForecastTier = {
+  /** Minimum seat capacity required at this tier (= the class's expected_learners_per_session). */
+  minSeats: number;
+  /** Class names whose sessions land in this tier. */
+  classNames: string[];
+  /** Total wall-clock session-hours that must be placed in rooms of this tier or larger. */
+  sessionHoursWallClock: number;
+  /** Minimum rooms with ≥minSeats needed to absorb this tier's load (floor 1). */
+  roomsNeeded: number;
+};
+
+export type ResourceForecast = {
+  /** Per-seat-tier room requirements, sorted by minSeats descending (largest first). */
+  tiers: ResourceForecastTier[];
+  /** Sum of instructional hours across all classes (matches totalTrainerHoursNeeded). */
+  totalInstructionHours: number;
+  /** Sum of wall-clock session-hours (instruction + lunch when spanning). */
+  totalWallClockHours: number;
+  /** Minimum trainer headcount assuming each works fteHoursPerWeek over the window. */
+  trainersNeeded: number;
+  /** Reference figure used to translate trainer-hours to headcount (40h/wk default). */
+  fteHoursPerWeek: number;
+  /** Working days in window (Mon–Fri intersect with window dates). */
+  workingDays: number;
+  /** Weeks in window. */
+  weeks: number;
+  /** Effective room hours per working day (room-hours + lunch length when lunch falls inside). */
+  effectiveHoursPerDay: number;
+};
+
 export type FeasibilityResult = {
   verdict: FeasibilityVerdict;
   windowDays: number;
@@ -94,6 +124,13 @@ export type FeasibilityResult = {
   distinctRoomsUsedTotal: number | null;
   distinctTrainersUsedTotal: number | null;
   recommendations: Recommendation[];
+  /**
+   * Resource forecast — what you need at minimum to make this implementation
+   * fit, independent of what rooms/trainers you've already entered. Tiers are
+   * grouped by class.expected_learners_per_session so the planner can see
+   * "buy/book 2 rooms with ≥12 seats, 1 with ≥6 seats" before scheduling.
+   */
+  resourceForecast: ResourceForecast;
   ready: boolean;
   readyBlockers: string[]; // global reasons Generate is disabled
 };
@@ -352,6 +389,43 @@ type RoomState = {
 };
 
 type LunchWindow = { startHr: number; endHr: number } | null;
+
+/**
+ * Compute how a session interacts with the lunch window when starting at
+ * `startHr` for `hours` of instruction time.
+ *
+ *   - Starts strictly before lunch and would extend into or past lunch
+ *     ⇒ session "spans" lunch. Wall-clock duration = hours + lunch length.
+ *     The class runs in two halves bracketing the break; total instruction
+ *     time is still `hours`, but the resource (room + trainer) is committed
+ *     for the extra lunch interval.
+ *   - Starts inside the lunch window (start ≥ lunch.start and < lunch.end)
+ *     ⇒ push start to lunch.end. Wall-clock = hours.
+ *   - Otherwise (starts at or after lunch end, or fully before lunch with
+ *     no overlap) ⇒ no impact. Wall-clock = hours.
+ *
+ * `pushedTo` is non-null only for the second case. Callers should re-snap
+ * to that hour before commit; `wallClockHours` is the elapsed clock time
+ * actually used by the session for occupancy bookkeeping.
+ */
+export function applyLunch(
+  startHr: number,
+  hours: number,
+  lunch: LunchWindow,
+): { wallClockHours: number; spansLunch: boolean; pushedTo: number | null } {
+  if (!lunch) return { wallClockHours: hours, spansLunch: false, pushedTo: null };
+  if (startHr >= lunch.startHr && startHr < lunch.endHr) {
+    return { wallClockHours: hours, spansLunch: false, pushedTo: lunch.endHr };
+  }
+  if (startHr < lunch.startHr && startHr + hours > lunch.startHr) {
+    return {
+      wallClockHours: hours + (lunch.endHr - lunch.startHr),
+      spansLunch: true,
+      pushedTo: null,
+    };
+  }
+  return { wallClockHours: hours, spansLunch: false, pushedTo: null };
+}
 
 function pickBestFitRoom(rooms: RoomState[], perSession: number): RoomState | null {
   // Best-fit = smallest seat_capacity that meets demand. Leaves larger
@@ -619,6 +693,13 @@ export function computeFeasibility(input: {
   const ready =
     overallBlockers.length === 0 && rooms.length > 0 && trainers.length > 0 && classes.length > 0;
 
+  const resourceForecast = computeResourceForecast({
+    implementation: impl,
+    classes,
+    rooms,
+    windowWeeks: wWeeks,
+  });
+
   return {
     verdict,
     windowDays,
@@ -639,8 +720,111 @@ export function computeFeasibility(input: {
     distinctRoomsUsedTotal,
     distinctTrainersUsedTotal,
     recommendations,
+    resourceForecast,
     ready,
     readyBlockers: overallBlockers,
+  };
+}
+
+// ── Resource forecast ──────────────────────────────────────────────────────
+//
+// Independent of the rooms/trainers entered for the impl — answers "what
+// resources do I need to even attempt this?" Drives a UI panel that helps
+// planners pre-book rooms and request trainer headcount before scheduling.
+
+export function computeResourceForecast(input: {
+  implementation: Implementation;
+  classes: ImplClass[];
+  rooms: ImplRoom[];
+  windowWeeks: number;
+}): ResourceForecast {
+  const { implementation: impl, classes, rooms, windowWeeks: wWeeks } = input;
+
+  // Default to a standard 8-hour Mon–Fri day if no rooms exist yet; otherwise
+  // use the longest available_hours_per_day from existing rooms (the typical
+  // ceiling) and the union of available_days_of_week so the forecast tracks
+  // the planner's actual operating schedule.
+  const defaultDays = [1, 2, 3, 4, 5];
+  const daysOfWeek =
+    rooms.length > 0
+      ? Array.from(new Set(rooms.flatMap((r) => r.available_days_of_week)))
+      : defaultDays;
+  const hoursPerDay =
+    rooms.length > 0 ? Math.max(...rooms.map((r) => r.available_hours_per_day)) : 8;
+
+  const workingDays =
+    impl.window_start_date && impl.window_end_date
+      ? workingDaysInWindow(impl.window_start_date, impl.window_end_date, daysOfWeek)
+      : 0;
+
+  const lunchActive = impl.lunch_break_length_minutes > 0;
+  const lunchLengthHr = impl.lunch_break_length_minutes / 60;
+  const lunchStartHr = impl.lunch_break_start_minutes / 60;
+  // Assume a typical start hour (9:00 if no rooms entered, else earliest room
+  // start). This mirrors how the simulator assigns the first slot of the day.
+  const dayStartHr = rooms.length > 0 ? Math.min(...rooms.map((r) => r.start_hour_local)) : 9;
+
+  function wallClockForSession(hours: number): number {
+    if (!lunchActive) return hours;
+    if (dayStartHr < lunchStartHr && dayStartHr + hours > lunchStartHr) {
+      return hours + lunchLengthHr;
+    }
+    return hours;
+  }
+
+  const effectiveHoursPerDay =
+    hoursPerDay +
+    (lunchActive && lunchStartHr >= dayStartHr && lunchStartHr < dayStartHr + hoursPerDay
+      ? lunchLengthHr
+      : 0);
+
+  const tierMap = new Map<number, { sessionHoursWallClock: number; classNames: string[] }>();
+  let totalInstructionHours = 0;
+  let totalWallClockHours = 0;
+
+  for (const c of classes) {
+    const sessions = sessionsNeeded(c);
+    if (sessions === 0) continue;
+    const instr = sessions * c.hours_per_session;
+    const wallClock = sessions * wallClockForSession(c.hours_per_session);
+    totalInstructionHours += instr;
+    totalWallClockHours += wallClock;
+
+    const tier = c.expected_learners_per_session;
+    const entry = tierMap.get(tier) ?? { sessionHoursWallClock: 0, classNames: [] };
+    entry.sessionHoursWallClock += wallClock;
+    entry.classNames.push(c.name);
+    tierMap.set(tier, entry);
+  }
+
+  const roomCapacityPerWindow = workingDays * effectiveHoursPerDay;
+  const tiers: ResourceForecastTier[] = [...tierMap.entries()]
+    .map(([minSeats, stats]) => ({
+      minSeats,
+      classNames: stats.classNames,
+      sessionHoursWallClock: stats.sessionHoursWallClock,
+      roomsNeeded:
+        roomCapacityPerWindow > 0
+          ? Math.max(1, Math.ceil(stats.sessionHoursWallClock / roomCapacityPerWindow))
+          : stats.sessionHoursWallClock > 0
+            ? 1
+            : 0,
+    }))
+    .sort((a, b) => b.minSeats - a.minSeats);
+
+  const fteHoursPerWeek = 40;
+  const trainersNeeded =
+    wWeeks > 0 ? Math.ceil(totalInstructionHours / (fteHoursPerWeek * wWeeks)) : 0;
+
+  return {
+    tiers,
+    totalInstructionHours,
+    totalWallClockHours,
+    trainersNeeded,
+    fteHoursPerWeek,
+    workingDays,
+    weeks: wWeeks,
+    effectiveHoursPerDay,
   };
 }
 
@@ -850,14 +1034,18 @@ function simulate(args: {
         if (!snapped) break;
         candidate = snapped;
 
-        // Lunch push: if the proposed slot overlaps the lunch window, push
-        // start to lunch end. Re-snap to ensure we didn't blow past the day.
-        if (lunch) {
-          const candHr = candidate.getUTCHours() + candidate.getUTCMinutes() / 60;
-          if (candHr < lunch.endHr && candHr + c.hours_per_session > lunch.startHr) {
-            setHourOfDay(candidate, lunch.endHr);
-          }
+        // Lunch interaction. If the candidate start falls inside the lunch
+        // window, push to lunch end and re-loop. If it spans lunch, the
+        // session's wall-clock occupancy = hours + lunch_length (the class
+        // pauses for lunch but the resource is still committed).
+        let candHr = candidate.getUTCHours() + candidate.getUTCMinutes() / 60;
+        let lunchInfo = applyLunch(candHr, c.hours_per_session, lunch);
+        if (lunchInfo.pushedTo !== null) {
+          setHourOfDay(candidate, lunchInfo.pushedTo);
+          candHr = lunchInfo.pushedTo;
+          lunchInfo = applyLunch(candHr, c.hours_per_session, lunch);
         }
+        const wallClockHours = lunchInfo.wallClockHours;
 
         // Cross-impl busy check: if the candidate window overlaps any
         // cross-impl busy interval for this trainer, push past the
@@ -865,7 +1053,7 @@ function simulate(args: {
         // as immovable walls — the SQL generator does the same via
         // pg_temp.tmp_busy_trainer.
         {
-          const end = new Date(candidate.getTime() + c.hours_per_session * 3600 * 1000);
+          const end = new Date(candidate.getTime() + wallClockHours * 3600 * 1000);
           let pushed = false;
           for (const busy of trainer.crossImplBusy) {
             if (busy.end <= candidate) continue; // busy ends before we start — fine
@@ -878,7 +1066,8 @@ function simulate(args: {
           if (pushed) continue;
         }
 
-        // Trainer weekly cap check
+        // Trainer weekly cap check (instruction hours only — lunch isn't
+        // counted against the trainer's billable week).
         const wk = weekKey(candidate);
         const used = trainer.weeklyUsed.get(wk) ?? 0;
         if (used + c.hours_per_session > trainer.hoursPerWeek + 1e-6) {
@@ -893,8 +1082,8 @@ function simulate(args: {
         }
 
         // Room daily-hours cap check. Day spans [startHour, startHour + hours_per_day],
-        // plus lunch length if lunch falls inside that span.
-        const slotHr = candidate.getUTCHours() + candidate.getUTCMinutes() / 60;
+        // plus lunch length if lunch falls inside that span. Wall-clock duration
+        // (instruction + lunch when spanning) must fit inside that envelope.
         const dayEndHr =
           room.startHourLocal +
           room.hoursPerDay +
@@ -903,7 +1092,7 @@ function simulate(args: {
           lunch.startHr < room.startHourLocal + room.hoursPerDay
             ? lunch.endHr - lunch.startHr
             : 0);
-        if (slotHr + c.hours_per_session > dayEndHr + 1e-6) {
+        if (candHr + wallClockHours > dayEndHr + 1e-6) {
           // Push room to next day at its start hour
           const nextDay = new Date(candidate);
           nextDay.setUTCDate(nextDay.getUTCDate() + 1);
@@ -912,8 +1101,9 @@ function simulate(args: {
           continue;
         }
 
-        // Commit
-        const end = new Date(candidate.getTime() + c.hours_per_session * 3600 * 1000);
+        // Commit. nextFree advances by wall-clock so the next session in
+        // the same room/trainer doesn't start before this one truly ends.
+        const end = new Date(candidate.getTime() + wallClockHours * 3600 * 1000);
         if (end > targetEnd) break;
 
         room.nextFree = end;
