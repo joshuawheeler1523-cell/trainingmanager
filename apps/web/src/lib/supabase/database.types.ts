@@ -1,4 +1,4 @@
-﻿export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -718,6 +718,77 @@ export type Database = {
           },
           {
             foreignKeyName: "class_instructor_assignments_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      class_roadmap_steps: {
+        Row: {
+          class_id: string;
+          competency: string;
+          created_at: string;
+          department_id: string;
+          duration_minutes: number;
+          id: string;
+          modality: string;
+          notes: string | null;
+          org_id: string;
+          position: number;
+          updated_at: string;
+        };
+        Insert: {
+          class_id: string;
+          competency: string;
+          created_at?: string;
+          department_id: string;
+          duration_minutes: number;
+          id?: string;
+          modality: string;
+          notes?: string | null;
+          org_id: string;
+          position?: number;
+          updated_at?: string;
+        };
+        Update: {
+          class_id?: string;
+          competency?: string;
+          created_at?: string;
+          department_id?: string;
+          duration_minutes?: number;
+          id?: string;
+          modality?: string;
+          notes?: string | null;
+          org_id?: string;
+          position?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "class_roadmap_steps_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_roadmap_steps_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes_with_hours";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_roadmap_steps_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "class_roadmap_steps_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";

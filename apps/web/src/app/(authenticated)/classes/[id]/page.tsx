@@ -2,7 +2,13 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import ClassDetailClient from "./class-detail-client";
-import type { ClassWithHours, Instructor, ClassSkillRequirement, Skill } from "@arbor/shared";
+import type {
+  ClassWithHours,
+  Instructor,
+  ClassSkillRequirement,
+  ClassRoadmapStep,
+  Skill,
+} from "@arbor/shared";
 
 type Params = Promise<{ id: string }>;
 
@@ -14,6 +20,7 @@ export type Assignment = {
 };
 
 export type RequirementRow = ClassSkillRequirement & { skill: Skill };
+export type RoadmapStep = ClassRoadmapStep;
 
 export default async function ClassDetailPage({ params }: { params: Params }) {
   const { id } = await params;
@@ -29,6 +36,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
     { data: requirements },
     { data: allSkills },
     { data: qualified },
+    { data: roadmapSteps },
   ] = await Promise.all([
     supabase.from("classes_with_hours").select("*").eq("id", id).eq("org_id", orgId).maybeSingle(),
     supabase
@@ -59,6 +67,12 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       .order("created_at", { ascending: false }),
     supabase.from("skills").select("*").eq("org_id", orgId).eq("is_archived", false).order("name"),
     supabase.rpc("qualified_instructors_for_class", { p_class_id: id }),
+    supabase
+      .from("class_roadmap_steps")
+      .select("*")
+      .eq("class_id", id)
+      .eq("org_id", orgId)
+      .order("position", { ascending: true }),
   ]);
 
   if (!cls) notFound();
@@ -72,6 +86,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       requirements={(requirements ?? []) as RequirementRow[]}
       allSkills={allSkills ?? []}
       qualifiedInstructorCount={qualified?.length ?? 0}
+      roadmapSteps={(roadmapSteps ?? []) as RoadmapStep[]}
     />
   );
 }

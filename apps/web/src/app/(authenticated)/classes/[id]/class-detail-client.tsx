@@ -11,6 +11,9 @@ import {
   PlusIcon,
   TrashIcon,
   ArrowsRightLeftIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/20/solid";
 import ClassFormDialog from "@/app/(authenticated)/classes/class-form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
@@ -23,14 +26,32 @@ import {
   distributeOfferingsEvenly,
 } from "@/app/(authenticated)/classes/actions";
 import {
+  createRoadmapStep,
+  updateRoadmapStep,
+  deleteRoadmapStep,
+  moveRoadmapStep,
+} from "@/app/(authenticated)/classes/roadmap-actions";
+import {
   addClassSkillRequirement,
   updateClassSkillRequirement,
   removeClassSkillRequirement,
 } from "@/app/(authenticated)/skills/actions";
-import { PROFICIENCY_VALUES, REQUIREMENT_VALUES } from "@arbor/shared";
-import type { ClassWithHours, Instructor, Skill, Proficiency, Requirement } from "@arbor/shared";
+import {
+  PROFICIENCY_VALUES,
+  REQUIREMENT_VALUES,
+  CLASS_MODALITY_VALUES,
+  CLASS_MODALITY_LABELS,
+} from "@arbor/shared";
+import type {
+  ClassWithHours,
+  Instructor,
+  Skill,
+  Proficiency,
+  Requirement,
+  ClassModality,
+} from "@arbor/shared";
 import { Label, useLabel } from "@/components/labels";
-import type { Assignment, RequirementRow } from "./page";
+import type { Assignment, RequirementRow, RoadmapStep } from "./page";
 
 type AuditEntry = {
   id: number;
@@ -50,9 +71,10 @@ type Props = {
   requirements: RequirementRow[];
   allSkills: Skill[];
   qualifiedInstructorCount: number;
+  roadmapSteps: RoadmapStep[];
 };
 
-type Tab = "overview" | "instructors" | "skills" | "audit";
+type Tab = "overview" | "roadmap" | "instructors" | "skills" | "audit";
 
 // Tab labels are computed inside the component now so the "instructors" tab
 // can carry the org's terminology label. Constant kept as a fallback shape.
@@ -809,6 +831,472 @@ function SkillRequirementsTab({
   );
 }
 
+function formatDuration(totalMinutes: number): string {
+  if (totalMinutes <= 0) return "0m";
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h === 0) return `${String(m)}m`;
+  if (m === 0) return `${String(h)}h`;
+  return `${String(h)}h ${String(m)}m`;
+}
+
+function RoadmapTab({
+  classId,
+  steps,
+  instructionHoursPerOffering,
+}: {
+  classId: string;
+  steps: RoadmapStep[];
+  instructionHoursPerOffering: number | null;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [adding, setAdding] = useState(false);
+  const [draftCompetency, setDraftCompetency] = useState("");
+  const [draftModality, setDraftModality] = useState<ClassModality>("ilt");
+  const [draftMinutes, setDraftMinutes] = useState("30");
+  const [draftNotes, setDraftNotes] = useState("");
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editCompetency, setEditCompetency] = useState("");
+  const [editModality, setEditModality] = useState<ClassModality>("ilt");
+  const [editMinutes, setEditMinutes] = useState("0");
+  const [editNotes, setEditNotes] = useState("");
+
+  const totalMinutes = steps.reduce((s, r) => s + r.duration_minutes, 0);
+  const expectedMinutes =
+    instructionHoursPerOffering != null ? Math.round(instructionHoursPerOffering * 60) : null;
+  const mismatch = expectedMinutes != null && steps.length > 0 && totalMinutes !== expectedMinutes;
+  const diffMinutes = expectedMinutes != null ? totalMinutes - expectedMinutes : 0;
+
+  function resetDraft() {
+    setDraftCompetency("");
+    setDraftModality("ilt");
+    setDraftMinutes("30");
+    setDraftNotes("");
+    setAdding(false);
+  }
+
+  function handleAdd() {
+    if (!draftCompetency.trim()) {
+      toast.error("Competency is required");
+      return;
+    }
+    const minutes = Number(draftMinutes);
+    if (!Number.isFinite(minutes) || minutes < 1) {
+      toast.error("Duration must be at least 1 minute");
+      return;
+    }
+    startTransition(async () => {
+      const result = await createRoadmapStep(classId, {
+        competency: draftCompetency,
+        modality: draftModality,
+        duration_minutes: minutes,
+        notes: draftNotes.trim() || null,
+      });
+      if (result.ok) {
+        toast.success("Step added");
+        resetDraft();
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function startEdit(row: RoadmapStep) {
+    setEditingId(row.id);
+    setEditCompetency(row.competency);
+    setEditModality(row.modality);
+    setEditMinutes(String(row.duration_minutes));
+    setEditNotes(row.notes ?? "");
+  }
+
+  function saveEdit(rowId: string) {
+    const minutes = Number(editMinutes);
+    if (!Number.isFinite(minutes) || minutes < 1) {
+      toast.error("Duration must be at least 1 minute");
+      return;
+    }
+    startTransition(async () => {
+      const result = await updateRoadmapStep(rowId, classId, {
+        competency: editCompetency,
+        modality: editModality,
+        duration_minutes: minutes,
+        notes: editNotes.trim() || null,
+      });
+      if (result.ok) {
+        toast.success("Step updated");
+        setEditingId(null);
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function handleRemove(rowId: string) {
+    startTransition(async () => {
+      const result = await deleteRoadmapStep(rowId, classId);
+      if (result.ok) {
+        toast.success("Step removed");
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function handleMove(rowId: string, direction: "up" | "down") {
+    startTransition(async () => {
+      const result = await moveRoadmapStep(rowId, classId, direction);
+      if (result.ok) router.refresh();
+      else toast.error(result.error.message);
+    });
+  }
+
+  const inputCls =
+    "border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-muted-foreground text-sm">
+          Document the curriculum: which competencies are taught, in what format, for how long, and
+          in what order.
+        </p>
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(true);
+            }}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Add step
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="border-border bg-background space-y-3 rounded-xl border p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
+            <div className="sm:col-span-5">
+              <label
+                htmlFor="add-step-competency"
+                className="text-muted-foreground mb-1 block text-xs font-medium"
+              >
+                Competency *
+              </label>
+              <input
+                id="add-step-competency"
+                type="text"
+                value={draftCompetency}
+                onChange={(e) => {
+                  setDraftCompetency(e.target.value);
+                }}
+                placeholder="e.g., IV start technique"
+                className={`${inputCls} w-full`}
+              />
+            </div>
+            <div className="sm:col-span-3">
+              <label
+                htmlFor="add-step-modality"
+                className="text-muted-foreground mb-1 block text-xs font-medium"
+              >
+                Format
+              </label>
+              <select
+                id="add-step-modality"
+                value={draftModality}
+                onChange={(e) => {
+                  setDraftModality(e.target.value as ClassModality);
+                }}
+                className={`${inputCls} w-full`}
+              >
+                {CLASS_MODALITY_VALUES.map((m) => (
+                  <option key={m} value={m}>
+                    {CLASS_MODALITY_LABELS[m]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label
+                htmlFor="add-step-minutes"
+                className="text-muted-foreground mb-1 block text-xs font-medium"
+              >
+                Minutes *
+              </label>
+              <input
+                id="add-step-minutes"
+                type="number"
+                min={1}
+                step={1}
+                value={draftMinutes}
+                onChange={(e) => {
+                  setDraftMinutes(e.target.value);
+                }}
+                className={`${inputCls} w-full`}
+              />
+            </div>
+            <div className="flex items-end justify-end gap-2 sm:col-span-2">
+              <button
+                type="button"
+                onClick={resetDraft}
+                className="text-muted-foreground hover:text-foreground text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={handleAdd}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1 text-xs font-medium disabled:opacity-50"
+              >
+                {pending ? "Adding…" : "Add"}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label
+              htmlFor="add-step-notes"
+              className="text-muted-foreground mb-1 block text-xs font-medium"
+            >
+              Notes (optional)
+            </label>
+            <input
+              id="add-step-notes"
+              type="text"
+              value={draftNotes}
+              onChange={(e) => {
+                setDraftNotes(e.target.value);
+              }}
+              placeholder="Reference material, prerequisites, anything else worth recording"
+              className={`${inputCls} w-full`}
+            />
+          </div>
+        </div>
+      )}
+
+      {steps.length === 0 ? (
+        <div className="border-border bg-surface rounded-xl border border-dashed p-10 text-center">
+          <p className="text-muted-foreground text-sm">
+            No roadmap steps yet — add one to document the curriculum.
+          </p>
+        </div>
+      ) : (
+        <div className="border-border bg-background overflow-hidden rounded-xl border">
+          <table className="w-full text-sm">
+            <thead className="border-border bg-surface border-b">
+              <tr>
+                <th className="text-muted-foreground w-10 px-3 py-2.5 text-left text-xs font-medium">
+                  #
+                </th>
+                <th className="text-muted-foreground px-3 py-2.5 text-left text-xs font-medium">
+                  Competency
+                </th>
+                <th className="text-muted-foreground px-3 py-2.5 text-left text-xs font-medium">
+                  Format
+                </th>
+                <th className="text-muted-foreground px-3 py-2.5 text-left text-xs font-medium">
+                  Duration
+                </th>
+                <th className="text-muted-foreground px-3 py-2.5 text-left text-xs font-medium">
+                  Notes
+                </th>
+                <th className="px-3 py-2.5" />
+              </tr>
+            </thead>
+            <tbody className="divide-border divide-y">
+              {steps.map((row, idx) => {
+                const isFirst = idx === 0;
+                const isLast = idx === steps.length - 1;
+                const isEditing = editingId === row.id;
+                return (
+                  <tr key={row.id} className="hover:bg-surface align-top">
+                    <td className="text-muted-foreground px-3 py-3 tabular-nums">{idx + 1}</td>
+                    <td className="text-foreground px-3 py-3">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editCompetency}
+                          onChange={(e) => {
+                            setEditCompetency(e.target.value);
+                          }}
+                          className={`${inputCls} w-full`}
+                        />
+                      ) : (
+                        <span className="font-medium">{row.competency}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      {isEditing ? (
+                        <select
+                          value={editModality}
+                          onChange={(e) => {
+                            setEditModality(e.target.value as ClassModality);
+                          }}
+                          className={`${inputCls} w-full`}
+                        >
+                          {CLASS_MODALITY_VALUES.map((m) => (
+                            <option key={m} value={m}>
+                              {CLASS_MODALITY_LABELS[m]}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-foreground bg-surface inline-flex rounded-full px-2 py-0.5 text-xs font-medium">
+                          {CLASS_MODALITY_LABELS[row.modality]}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 tabular-nums">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={editMinutes}
+                          onChange={(e) => {
+                            setEditMinutes(e.target.value);
+                          }}
+                          className={`${inputCls} w-24`}
+                        />
+                      ) : (
+                        <span className="text-foreground">
+                          {formatDuration(row.duration_minutes)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-muted-foreground px-3 py-3 text-xs">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editNotes}
+                          onChange={(e) => {
+                            setEditNotes(e.target.value);
+                          }}
+                          className={`${inputCls} w-full`}
+                        />
+                      ) : (
+                        (row.notes ?? "—")
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {isEditing ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingId(null);
+                              }}
+                              className="text-muted-foreground hover:text-foreground text-xs"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pending}
+                              onClick={() => {
+                                saveEdit(row.id);
+                              }}
+                              className="text-primary hover:text-primary/80 text-xs font-medium disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              disabled={pending || isFirst}
+                              onClick={() => {
+                                handleMove(row.id, "up");
+                              }}
+                              className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                              aria-label="Move step up"
+                              title="Move up"
+                            >
+                              <ArrowUpIcon className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pending || isLast}
+                              onClick={() => {
+                                handleMove(row.id, "down");
+                              }}
+                              className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                              aria-label="Move step down"
+                              title="Move down"
+                            >
+                              <ArrowDownIcon className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                startEdit(row);
+                              }}
+                              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
+                            >
+                              <PencilSquareIcon className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pending}
+                              onClick={() => {
+                                handleRemove(row.id);
+                              }}
+                              className="text-destructive hover:text-destructive/80 inline-flex items-center gap-1 text-xs disabled:opacity-50"
+                            >
+                              <TrashIcon className="h-3.5 w-3.5" />
+                              Remove
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot className="border-border bg-surface border-t">
+              <tr>
+                <td colSpan={3} className="text-muted-foreground px-3 py-2.5 text-xs font-medium">
+                  Total
+                </td>
+                <td className="text-foreground px-3 py-2.5 text-sm font-semibold tabular-nums">
+                  {formatDuration(totalMinutes)}
+                </td>
+                <td colSpan={2} className="text-muted-foreground px-3 py-2.5 text-xs">
+                  {expectedMinutes != null && (
+                    <>Class instruction time: {formatDuration(expectedMinutes)}</>
+                  )}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {mismatch && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div>
+            Roadmap total is {formatDuration(totalMinutes)}, but the class instruction time is{" "}
+            {formatDuration(expectedMinutes)} ({diffMinutes > 0 ? "+" : ""}
+            {formatDuration(Math.abs(diffMinutes))} {diffMinutes > 0 ? "over" : "under"}). Adjust
+            the steps or the class&apos;s hours so they agree.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AuditTab({ entries }: { entries: AuditEntry[] }) {
   if (!entries.length) {
     return (
@@ -860,6 +1348,7 @@ export default function ClassDetailClient({
   requirements,
   allSkills,
   qualifiedInstructorCount,
+  roadmapSteps,
 }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
@@ -868,6 +1357,7 @@ export default function ClassDetailClient({
 
   const TABS: TabDef[] = [
     { id: "overview", label: "Overview" },
+    { id: "roadmap", label: "Roadmap" },
     { id: "instructors", label: instructorPlural },
     { id: "skills", label: "Skill Requirements" },
     { id: "audit", label: "Audit" },
@@ -994,6 +1484,13 @@ export default function ClassDetailClient({
       {/* Tab content */}
       <div className="p-6">
         {activeTab === "overview" && <OverviewTab cls={cls} />}
+        {activeTab === "roadmap" && (
+          <RoadmapTab
+            classId={cls.id}
+            steps={roadmapSteps}
+            instructionHoursPerOffering={cls.instruction_hours_per_offering}
+          />
+        )}
         {activeTab === "instructors" && (
           <InstructorsTab
             classId={cls.id}

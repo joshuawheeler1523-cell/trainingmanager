@@ -58,6 +58,66 @@ export const classInstructorAssignmentSchema = z.object({
   assigned_offerings: z.coerce.number().int().min(0).default(0),
 });
 
+// ── Class roadmap (per-class curriculum) ─────────────────────────────────────
+
+export const CLASS_MODALITY_VALUES = [
+  "ilt",
+  "vilt",
+  "elearning",
+  "video",
+  "reading",
+  "simulation",
+  "ojt",
+  "assessment",
+  "blended",
+] as const;
+export type ClassModality = (typeof CLASS_MODALITY_VALUES)[number];
+
+export const CLASS_MODALITY_LABELS: Record<ClassModality, string> = {
+  ilt: "ILT (in-person)",
+  vilt: "VILT (virtual)",
+  elearning: "eLearning",
+  video: "Video",
+  reading: "Reading",
+  simulation: "Simulation",
+  ojt: "On-the-job",
+  assessment: "Assessment",
+  blended: "Blended",
+};
+
+export const classRoadmapStepInputSchema = z.object({
+  competency: z.string().trim().min(1, "Competency is required").max(500),
+  modality: z.enum(CLASS_MODALITY_VALUES),
+  duration_minutes: z.coerce
+    .number()
+    .int()
+    .min(1, "Duration must be at least 1 minute")
+    .max(100000),
+  notes: z
+    .string()
+    .nullish()
+    .transform((v) => (v === "" || v == null ? null : v)),
+});
+
+export const classRoadmapStepUpdateSchema = classRoadmapStepInputSchema.partial();
+
+export type ClassRoadmapStepInput = z.infer<typeof classRoadmapStepInputSchema>;
+export type ClassRoadmapStepUpdate = z.infer<typeof classRoadmapStepUpdateSchema>;
+
+export type ClassRoadmapStep = {
+  id: string;
+  org_id: string;
+  department_id: string;
+  class_id: string;
+  position: number;
+  competency: string;
+  modality: ClassModality;
+  duration_minutes: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ClassInput = z.infer<typeof classInputSchema>;
 export type ClassUpdate = z.infer<typeof classUpdateSchema>;
 export type ClassInstructorAssignment = z.infer<typeof classInstructorAssignmentSchema>;
