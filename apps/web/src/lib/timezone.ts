@@ -76,9 +76,14 @@ export function fromCalendarLocal(fakeLocal: Date, tz: string): string {
     minute: fakeLocal.getMinutes(),
     second: fakeLocal.getSeconds(),
   };
-  let guess = Date.UTC(wall.year, wall.month, wall.day, wall.hour, wall.minute, wall.second);
-  // Two iterations: the first guess may straddle a DST jump; refine using
-  // the offset measured at the guess instant.
+  const wallMillis = Date.UTC(wall.year, wall.month, wall.day, wall.hour, wall.minute, wall.second);
+  let guess = wallMillis;
+  // Two passes: the first computes the tz offset for the initial guess; the
+  // second refines if the guess straddled a DST transition. drift is measured
+  // against the fixed wallMillis target, NOT the moving guess — otherwise the
+  // loop re-applies the full offset on iteration 2 and drifts by one offset
+  // per pass (4h for EDT, 5h for EST, etc.). This was the source of the
+  // post-#19 "moved sessions land N hours late" bug.
   for (let i = 0; i < 2; i++) {
     const parts = partsFormatter(tz).formatToParts(new Date(guess));
     const got: Record<string, string> = {};
@@ -91,7 +96,7 @@ export function fromCalendarLocal(fakeLocal: Date, tz: string): string {
       Number(got.minute ?? "0"),
       Number(got.second ?? "0"),
     );
-    const drift = gotMillis - guess; // tz local instant minus our guess = offset
+    const drift = gotMillis - wallMillis;
     guess -= drift;
   }
   return new Date(guess).toISOString();
