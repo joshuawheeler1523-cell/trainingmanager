@@ -3,20 +3,41 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeftIcon, ArrowRightIcon, PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
-import type { ImplTrainer, Instructor } from "@arbor/shared";
-import { createTrainer, deleteTrainer, setStep, updateTrainer } from "../../actions";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CalendarDaysIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@heroicons/react/20/solid";
+import type { ImplTrainer, ImplTrainerUnavailability, Instructor } from "@arbor/shared";
+import {
+  addTrainerUnavailability,
+  createTrainer,
+  deleteTrainer,
+  deleteTrainerUnavailability,
+  setStep,
+  updateTrainer,
+} from "../../actions";
 
 type Props = {
   implementationId: string;
   trainers: ImplTrainer[];
   instructors: Instructor[];
+  unavailability: ImplTrainerUnavailability[];
 };
 
 const fieldClass =
   "border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
-export default function TrainersEditor({ implementationId, trainers, instructors }: Props) {
+export default function TrainersEditor({
+  implementationId,
+  trainers,
+  instructors,
+  unavailability,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -29,6 +50,14 @@ export default function TrainersEditor({ implementationId, trainers, instructors
   const [externalName, setExternalName] = useState("");
   const [externalEmail, setExternalEmail] = useState("");
   const [hours, setHours] = useState("20");
+  const [openPtoFor, setOpenPtoFor] = useState<string | null>(null);
+
+  const ptoByTrainer = new Map<string, ImplTrainerUnavailability[]>();
+  for (const u of unavailability) {
+    const list = ptoByTrainer.get(u.impl_trainer_id) ?? [];
+    list.push(u);
+    ptoByTrainer.set(u.impl_trainer_id, list);
+  }
 
   function addFromInstructor() {
     if (!pickInstructor) return;
@@ -100,7 +129,8 @@ export default function TrainersEditor({ implementationId, trainers, instructors
       <p className="text-muted-foreground text-xs">
         Add trainers available for this implementation. Pick from your instructor roster, or add an
         external trainer (e.g., a vendor&apos;s specialist). Availability is hours dedicated to{" "}
-        <em>this implementation</em>, not their total weekly hours.
+        <em>this implementation</em>, not their total weekly hours. Use the calendar icon on each
+        row to record PTO / unavailability windows so the scheduler plans around them.
       </p>
 
       {trainers.length === 0 ? (
@@ -112,98 +142,42 @@ export default function TrainersEditor({ implementationId, trainers, instructors
           <table className="w-full text-sm">
             <thead className="bg-surface text-muted-foreground text-xs">
               <tr>
+                <Th className="w-8" />
                 <Th>Name</Th>
                 <Th>Email</Th>
                 <Th>Source</Th>
                 <Th>Hrs/week</Th>
                 <Th>Max concurrent</Th>
+                <Th>Time off</Th>
                 <Th className="w-12" />
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {trainers.map((t) => (
-                <tr key={t.id}>
-                  <td className="px-3 py-2">
-                    <input
-                      defaultValue={t.name}
-                      disabled={pending || !!t.instructor_id}
-                      onBlur={(e) => {
-                        if (!t.instructor_id && e.target.value !== t.name) {
-                          handleUpdate(t, { name: e.target.value });
-                        }
-                      }}
-                      className={fieldClass + " w-full"}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      defaultValue={t.email ?? ""}
-                      disabled={pending}
-                      onBlur={(e) => {
-                        if (e.target.value !== (t.email ?? "")) {
-                          handleUpdate(t, { email: e.target.value || null });
-                        }
-                      }}
-                      className={fieldClass + " w-full"}
-                      placeholder="—"
-                    />
-                  </td>
-                  <td className="text-muted-foreground px-3 py-2 text-xs">
-                    {t.instructor_id ? "Roster" : "External"}
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      step="0.5"
-                      min={0}
-                      defaultValue={t.availability_hours_per_week}
-                      disabled={pending}
-                      onBlur={(e) => {
-                        const v = Number(e.target.value);
-                        if (v !== t.availability_hours_per_week) {
-                          handleUpdate(t, { availability_hours_per_week: v });
-                        }
-                      }}
-                      className={fieldClass + " w-20 tabular-nums"}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      min={1}
-                      defaultValue={t.max_concurrent_sessions}
-                      disabled={pending}
-                      onBlur={(e) => {
-                        const v = Number(e.target.value);
-                        if (v !== t.max_concurrent_sessions) {
-                          handleUpdate(t, { max_concurrent_sessions: v });
-                        }
-                      }}
-                      className={fieldClass + " w-16 tabular-nums"}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => {
-                        handleDelete(t.id);
-                      }}
-                      aria-label="Delete trainer"
-                      className="text-muted-foreground hover:text-destructive disabled:opacity-50"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {trainers.map((t) => {
+                const trainerPto = ptoByTrainer.get(t.id) ?? [];
+                const isOpen = openPtoFor === t.id;
+                return (
+                  <TrainerRow
+                    key={t.id}
+                    t={t}
+                    pto={trainerPto}
+                    isOpen={isOpen}
+                    onToggle={() => {
+                      setOpenPtoFor(isOpen ? null : t.id);
+                    }}
+                    implementationId={implementationId}
+                    pending={pending}
+                    onUpdate={handleUpdate}
+                    onDelete={handleDelete}
+                  />
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
       <div className="border-border bg-background grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-2">
-        {/* Add from roster */}
         <div className="space-y-2">
           <p className="text-foreground text-xs font-semibold">From instructor roster</p>
           <select
@@ -247,7 +221,6 @@ export default function TrainersEditor({ implementationId, trainers, instructors
           </div>
         </div>
 
-        {/* Add external */}
         <div className="space-y-2">
           <p className="text-foreground text-xs font-semibold">External trainer</p>
           <input
@@ -304,6 +277,297 @@ export default function TrainersEditor({ implementationId, trainers, instructors
       </div>
     </div>
   );
+}
+
+function TrainerRow({
+  t,
+  pto,
+  isOpen,
+  onToggle,
+  implementationId,
+  pending,
+  onUpdate,
+  onDelete,
+}: {
+  t: ImplTrainer;
+  pto: ImplTrainerUnavailability[];
+  isOpen: boolean;
+  onToggle: () => void;
+  implementationId: string;
+  pending: boolean;
+  onUpdate: (t: ImplTrainer, patch: Record<string, unknown>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const router = useRouter();
+  const [ptoPending, startPtoTransition] = useTransition();
+  const [draftStart, setDraftStart] = useState("");
+  const [draftEnd, setDraftEnd] = useState("");
+  const [draftReason, setDraftReason] = useState("");
+
+  function handleAddPto() {
+    if (!draftStart || !draftEnd) {
+      toast.error("Pick both start and end");
+      return;
+    }
+    startPtoTransition(async () => {
+      const result = await addTrainerUnavailability(t.id, implementationId, {
+        starts_at: new Date(draftStart).toISOString(),
+        ends_at: new Date(draftEnd).toISOString(),
+        reason: draftReason.trim() || null,
+      });
+      if (result.ok) {
+        setDraftStart("");
+        setDraftEnd("");
+        setDraftReason("");
+        toast.success("Time off added");
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function handleDeletePto(id: string) {
+    startPtoTransition(async () => {
+      const result = await deleteTrainerUnavailability(id, implementationId);
+      if (result.ok) router.refresh();
+      else toast.error(result.error.message);
+    });
+  }
+
+  const ptoCount = pto.length;
+  const rowPending = pending || ptoPending;
+
+  return (
+    <>
+      <tr>
+        <td className="px-2 py-2">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={isOpen ? "Hide time off" : "Show time off"}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            {isOpen ? (
+              <ChevronDownIcon className="h-4 w-4" />
+            ) : (
+              <ChevronRightIcon className="h-4 w-4" />
+            )}
+          </button>
+        </td>
+        <td className="px-3 py-2">
+          <input
+            defaultValue={t.name}
+            disabled={rowPending || !!t.instructor_id}
+            onBlur={(e) => {
+              if (!t.instructor_id && e.target.value !== t.name) {
+                onUpdate(t, { name: e.target.value });
+              }
+            }}
+            className={fieldClass + " w-full"}
+          />
+        </td>
+        <td className="px-3 py-2">
+          <input
+            defaultValue={t.email ?? ""}
+            disabled={rowPending}
+            onBlur={(e) => {
+              if (e.target.value !== (t.email ?? "")) {
+                onUpdate(t, { email: e.target.value || null });
+              }
+            }}
+            className={fieldClass + " w-full"}
+            placeholder="—"
+          />
+        </td>
+        <td className="text-muted-foreground px-3 py-2 text-xs">
+          {t.instructor_id ? "Roster" : "External"}
+        </td>
+        <td className="px-3 py-2">
+          <input
+            type="number"
+            step="0.5"
+            min={0}
+            defaultValue={t.availability_hours_per_week}
+            disabled={rowPending}
+            onBlur={(e) => {
+              const v = Number(e.target.value);
+              if (v !== t.availability_hours_per_week) {
+                onUpdate(t, { availability_hours_per_week: v });
+              }
+            }}
+            className={fieldClass + " w-20 tabular-nums"}
+          />
+        </td>
+        <td className="px-3 py-2">
+          <input
+            type="number"
+            min={1}
+            defaultValue={t.max_concurrent_sessions}
+            disabled={rowPending}
+            onBlur={(e) => {
+              const v = Number(e.target.value);
+              if (v !== t.max_concurrent_sessions) {
+                onUpdate(t, { max_concurrent_sessions: v });
+              }
+            }}
+            className={fieldClass + " w-16 tabular-nums"}
+          />
+        </td>
+        <td className="px-3 py-2">
+          <button
+            type="button"
+            onClick={onToggle}
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
+              ptoCount > 0
+                ? "bg-amber-100 text-amber-900 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-100 dark:hover:bg-amber-900/50"
+                : "text-muted-foreground hover:bg-surface"
+            }`}
+          >
+            <CalendarDaysIcon className="h-3.5 w-3.5" />
+            {ptoCount === 0 ? "Add" : `${String(ptoCount)} entr${ptoCount === 1 ? "y" : "ies"}`}
+          </button>
+        </td>
+        <td className="px-3 py-2">
+          <button
+            type="button"
+            disabled={rowPending}
+            onClick={() => {
+              onDelete(t.id);
+            }}
+            aria-label="Delete trainer"
+            className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </td>
+      </tr>
+
+      {isOpen && (
+        <tr>
+          <td />
+          <td colSpan={7} className="bg-surface/50 px-3 py-3">
+            <div className="space-y-2">
+              <p className="text-foreground text-xs font-semibold">Time off / unavailability</p>
+              {pto.length === 0 ? (
+                <p className="text-muted-foreground text-xs italic">
+                  No time off recorded. The scheduler will treat this trainer as fully available
+                  during their weekly hours.
+                </p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {pto.map((u) => (
+                    <li
+                      key={u.id}
+                      className="border-border bg-background flex items-center justify-between gap-3 rounded-md border px-3 py-1.5 text-xs"
+                    >
+                      <span className="text-foreground tabular-nums">
+                        {formatDateRange(u.starts_at, u.ends_at)}
+                      </span>
+                      <span className="text-muted-foreground flex-1 truncate">
+                        {u.reason ?? "—"}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={rowPending}
+                        onClick={() => {
+                          handleDeletePto(u.id);
+                        }}
+                        aria-label="Remove time off"
+                        className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="border-border bg-background grid grid-cols-1 gap-2 rounded-md border p-2 sm:grid-cols-[1fr_1fr_2fr_auto]">
+                <div>
+                  <label
+                    htmlFor={`pto-start-${t.id}`}
+                    className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase"
+                  >
+                    Start
+                  </label>
+                  <input
+                    id={`pto-start-${t.id}`}
+                    type="datetime-local"
+                    value={draftStart}
+                    onChange={(e) => {
+                      setDraftStart(e.target.value);
+                    }}
+                    className={fieldClass + " w-full"}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor={`pto-end-${t.id}`}
+                    className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase"
+                  >
+                    End
+                  </label>
+                  <input
+                    id={`pto-end-${t.id}`}
+                    type="datetime-local"
+                    value={draftEnd}
+                    onChange={(e) => {
+                      setDraftEnd(e.target.value);
+                    }}
+                    className={fieldClass + " w-full"}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor={`pto-reason-${t.id}`}
+                    className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase"
+                  >
+                    Reason (optional)
+                  </label>
+                  <input
+                    id={`pto-reason-${t.id}`}
+                    type="text"
+                    value={draftReason}
+                    onChange={(e) => {
+                      setDraftReason(e.target.value);
+                    }}
+                    placeholder="Vacation, conference, on-call coverage…"
+                    className={fieldClass + " w-full"}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    disabled={rowPending || !draftStart || !draftEnd}
+                    onClick={handleAddPto}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function formatDateRange(startIso: string, endIso: string): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  const sameDay = start.toDateString() === end.toDateString();
+  const datePart = (d: Date): string =>
+    d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const timePart = (d: Date): string =>
+    d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  if (sameDay) {
+    return `${datePart(start)}, ${timePart(start)} – ${timePart(end)}`;
+  }
+  return `${datePart(start)} ${timePart(start)} – ${datePart(end)} ${timePart(end)}`;
 }
 
 function Th({ children, className }: { children?: React.ReactNode; className?: string }) {

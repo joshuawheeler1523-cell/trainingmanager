@@ -520,6 +520,17 @@ export type CrossImplBusy = {
   className?: string;
 };
 
+/**
+ * Per-trainer PTO / unavailability windows from impl_trainer_unavailability.
+ * Same shape as CrossImplBusy so the simulator can merge them; `reason` is
+ * surfaced as the label when the placement loop logs/debugs.
+ */
+export type TrainerUnavailability = {
+  start: string;
+  end: string;
+  reason?: string;
+};
+
 export function computeFeasibility(input: {
   implementation: Implementation;
   rooms: ImplRoom[];
@@ -528,6 +539,7 @@ export function computeFeasibility(input: {
   classTrainers: ImplClassTrainer[];
   prereqs: ImplClassPrerequisite[];
   crossImplBusyByTrainer?: Map<string, CrossImplBusy[]>;
+  unavailabilityByTrainer?: Map<string, TrainerUnavailability[]>;
 }): FeasibilityResult {
   const {
     implementation: impl,
@@ -537,6 +549,7 @@ export function computeFeasibility(input: {
     classTrainers,
     prereqs,
     crossImplBusyByTrainer,
+    unavailabilityByTrainer,
   } = input;
 
   // ── Window math
@@ -628,6 +641,7 @@ export function computeFeasibility(input: {
     trainersByClass,
     prereqsByClass,
     ...(crossImplBusyByTrainer ? { crossImplBusyByTrainer } : {}),
+    ...(unavailabilityByTrainer ? { unavailabilityByTrainer } : {}),
   });
 
   // Stamp per-class sim results back onto the feasibility rows so the UI
@@ -862,6 +876,7 @@ function simulate(args: {
   trainersByClass: Map<string, string[]>;
   prereqsByClass: Map<string, string[]>;
   crossImplBusyByTrainer?: Map<string, CrossImplBusy[]>;
+  unavailabilityByTrainer?: Map<string, TrainerUnavailability[]>;
 }): SimResult {
   const {
     impl,
@@ -872,6 +887,7 @@ function simulate(args: {
     trainersByClass,
     prereqsByClass,
     crossImplBusyByTrainer,
+    unavailabilityByTrainer,
   } = args;
 
   if (!impl.window_start_date || !impl.window_end_date) {
@@ -935,20 +951,31 @@ function simulate(args: {
       const earliestRoomStart =
         rooms.length > 0 ? Math.min(...rooms.map((r) => r.start_hour_local)) : 9;
       setHourOfDay(start, earliestRoomStart);
-      const crossBusy = (crossImplBusyByTrainer?.get(t.id) ?? [])
-        .map((b) => {
-          const label =
-            b.implName && b.className
-              ? `${b.className} (${b.implName})`
-              : (b.implName ?? b.className);
-          return {
-            start: new Date(b.start),
-            end: new Date(b.end),
-            ...(label ? { label } : {}),
-          };
-        })
-        // Sort by start so the placement check can scan linearly.
-        .sort((a, b) => a.start.getTime() - b.start.getTime());
+      // Merge cross-impl commitments AND PTO/unavailability windows — both
+      // are immovable wall-clock blocks the trainer can't be scheduled over.
+      // Sort by start so the placement check can scan linearly.
+      const crossLabeled = (crossImplBusyByTrainer?.get(t.id) ?? []).map((b) => {
+        const label =
+          b.implName && b.className
+            ? `${b.className} (${b.implName})`
+            : (b.implName ?? b.className);
+        return {
+          start: new Date(b.start),
+          end: new Date(b.end),
+          ...(label ? { label } : {}),
+        };
+      });
+      const ptoLabeled = (unavailabilityByTrainer?.get(t.id) ?? []).map((u) => {
+        const label = u.reason ? `PTO — ${u.reason}` : "PTO";
+        return {
+          start: new Date(u.start),
+          end: new Date(u.end),
+          label,
+        };
+      });
+      const crossBusy = [...crossLabeled, ...ptoLabeled].sort(
+        (a, b) => a.start.getTime() - b.start.getTime(),
+      );
       return [
         t.id,
         {
