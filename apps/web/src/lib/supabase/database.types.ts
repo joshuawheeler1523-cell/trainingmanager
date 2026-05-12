@@ -2207,6 +2207,64 @@ export type Database = {
           },
         ];
       };
+      impl_trainer_unavailability: {
+        Row: {
+          created_at: string;
+          department_id: string;
+          ends_at: string;
+          id: string;
+          impl_trainer_id: string;
+          org_id: string;
+          reason: string | null;
+          starts_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          department_id: string;
+          ends_at: string;
+          id?: string;
+          impl_trainer_id: string;
+          org_id: string;
+          reason?: string | null;
+          starts_at: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          department_id?: string;
+          ends_at?: string;
+          id?: string;
+          impl_trainer_id?: string;
+          org_id?: string;
+          reason?: string | null;
+          starts_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "impl_trainer_unavailability_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_trainer_unavailability_impl_trainer_id_fkey";
+            columns: ["impl_trainer_id"];
+            isOneToOne: false;
+            referencedRelation: "impl_trainers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_trainer_unavailability_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       impl_trainers: {
         Row: {
           availability_hours_per_week: number;

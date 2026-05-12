@@ -1261,6 +1261,78 @@ describe("computeFeasibility lunch-span placement", () => {
   });
 });
 
+// ── Trainer PTO / unavailability ────────────────────────────────────────────
+
+describe("computeFeasibility trainer unavailability", () => {
+  it("pushes placement past a trainer's PTO window", () => {
+    // 1-week window starting Mon 2026-06-01. Trainer is out the entire first
+    // week → only week-2 sessions can be placed; with a 1-session class
+    // needing 2h, completion lands on or after Mon 2026-06-08.
+    const impl: Implementation = {
+      ...baseImpl,
+      window_start_date: "2026-06-01",
+      window_end_date: "2026-06-12",
+      go_live_date: null,
+    };
+    const unavailability = new Map([
+      ["t1", [{ start: "2026-06-01T00:00:00Z", end: "2026-06-07T00:00:00Z", reason: "Vacation" }]],
+    ]);
+    const result = computeFeasibility({
+      implementation: impl,
+      rooms: [makeRoom()],
+      trainers: [makeTrainer()],
+      classes: [
+        makeClass({
+          hours_per_session: 2,
+          expected_learners_per_session: 10,
+          total_people_to_train: 10, // 1 session
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+      unavailabilityByTrainer: unavailability,
+    });
+    expect(result.unscheduledSessions).toBe(0);
+    // estimatedCompletionDate is yyyy-mm-dd; should be on or after Jun 8
+    expect(result.estimatedCompletionDate).not.toBeNull();
+    if (result.estimatedCompletionDate) {
+      expect(result.estimatedCompletionDate >= "2026-06-08").toBe(true);
+    }
+  });
+
+  it("declares unscheduled when PTO covers the entire window", () => {
+    const impl: Implementation = {
+      ...baseImpl,
+      window_start_date: "2026-06-01",
+      window_end_date: "2026-06-05",
+      go_live_date: null,
+    };
+    const unavailability = new Map([
+      [
+        "t1",
+        [{ start: "2026-05-30T00:00:00Z", end: "2026-06-10T00:00:00Z", reason: "Extended leave" }],
+      ],
+    ]);
+    const result = computeFeasibility({
+      implementation: impl,
+      rooms: [makeRoom()],
+      trainers: [makeTrainer()],
+      classes: [
+        makeClass({
+          hours_per_session: 2,
+          expected_learners_per_session: 10,
+          total_people_to_train: 10,
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+      unavailabilityByTrainer: unavailability,
+    });
+    expect(result.unscheduledSessions).toBeGreaterThan(0);
+    expect(result.verdict).toBe("infeasible");
+  });
+});
+
 // ── Resource forecast ───────────────────────────────────────────────────────
 
 describe("computeResourceForecast", () => {

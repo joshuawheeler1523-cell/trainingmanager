@@ -12,6 +12,8 @@ import {
   implRoomUpdateSchema,
   implTrainerInsertSchema,
   implTrainerUpdateSchema,
+  implTrainerUnavailabilityInsertSchema,
+  implTrainerUnavailabilityUpdateSchema,
   implModuleInsertSchema,
   implModuleUpdateSchema,
   implClassInsertSchema,
@@ -19,6 +21,7 @@ import {
   type Implementation,
   type ImplRoom,
   type ImplTrainer,
+  type ImplTrainerUnavailability,
   type ImplModule,
   type ImplClass,
   type ImplClassPrerequisite,
@@ -282,6 +285,83 @@ export async function deleteTrainer(
 
   const { error } = await c.supabase
     .from("impl_trainers")
+    .delete()
+    .eq("id", id)
+    .eq("org_id", c.orgId);
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateImpl(implementationId);
+  return { ok: true, data: { id } };
+}
+
+// ── impl_trainer_unavailability (PTO / time off) ────────────────────────────
+
+export async function addTrainerUnavailability(
+  trainerId: string,
+  implementationId: string,
+  input: unknown,
+): Promise<ActionResult<ImplTrainerUnavailability>> {
+  const parsed = implTrainerUnavailabilityInsertSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("impl_trainer_unavailability")
+    .insert({
+      org_id: c.orgId,
+      department_id: c.departmentId,
+      impl_trainer_id: trainerId,
+      starts_at: parsed.data.starts_at,
+      ends_at: parsed.data.ends_at,
+      reason: parsed.data.reason,
+    })
+    .select()
+    .single();
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateImpl(implementationId);
+  return { ok: true, data };
+}
+
+export async function updateTrainerUnavailability(
+  id: string,
+  implementationId: string,
+  input: unknown,
+): Promise<ActionResult<ImplTrainerUnavailability>> {
+  const parsed = implTrainerUnavailabilityUpdateSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("impl_trainer_unavailability")
+    .update(
+      stripUndefined(
+        parsed.data as Record<string, unknown>,
+      ) as unknown as TablesUpdate<"impl_trainer_unavailability">,
+    )
+    .eq("id", id)
+    .eq("org_id", c.orgId)
+    .select()
+    .single();
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateImpl(implementationId);
+  return { ok: true, data };
+}
+
+export async function deleteTrainerUnavailability(
+  id: string,
+  implementationId: string,
+): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { error } = await c.supabase
+    .from("impl_trainer_unavailability")
     .delete()
     .eq("id", id)
     .eq("org_id", c.orgId);

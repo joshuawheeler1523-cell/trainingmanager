@@ -163,6 +163,55 @@ export type ImplTrainer = {
   updated_by: string | null;
 };
 
+// ── impl_trainer_unavailability (PTO / time off) ────────────────────────────
+
+export const implTrainerUnavailabilityInsertSchema = z
+  .object({
+    starts_at: z.string().min(1, "Start is required"),
+    ends_at: z.string().min(1, "End is required"),
+    reason: emptyToNull,
+  })
+  .superRefine((data, ctx) => {
+    if (data.starts_at && data.ends_at && data.ends_at <= data.starts_at) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "End must be after start",
+        path: ["ends_at"],
+      });
+    }
+  });
+
+export const implTrainerUnavailabilityUpdateSchema = z
+  .object({
+    starts_at: z.string().optional(),
+    ends_at: z.string().optional(),
+    reason: emptyToNull,
+  })
+  .superRefine((data, ctx) => {
+    if (data.starts_at && data.ends_at && data.ends_at <= data.starts_at) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "End must be after start",
+        path: ["ends_at"],
+      });
+    }
+  });
+
+export type ImplTrainerUnavailabilityInput = z.infer<typeof implTrainerUnavailabilityInsertSchema>;
+export type ImplTrainerUnavailabilityUpdate = z.infer<typeof implTrainerUnavailabilityUpdateSchema>;
+
+export type ImplTrainerUnavailability = {
+  id: string;
+  org_id: string;
+  department_id: string;
+  impl_trainer_id: string;
+  starts_at: string;
+  ends_at: string;
+  reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // ── impl_modules ────────────────────────────────────────────────────────────
 
 export const implModuleInsertSchema = z.object({

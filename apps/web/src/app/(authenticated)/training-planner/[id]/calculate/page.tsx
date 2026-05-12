@@ -3,7 +3,12 @@ import { notFound } from "next/navigation";
 import { CheckCircleIcon, ExclamationTriangleIcon, XCircleIcon } from "@heroicons/react/20/solid";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import type { Implementation, ImplRoom, ImplTrainer } from "@arbor/shared";
+import type {
+  Implementation,
+  ImplRoom,
+  ImplTrainer,
+  ImplTrainerUnavailability,
+} from "@arbor/shared";
 import {
   computeFeasibility,
   type ClassFeasibility,
@@ -11,6 +16,7 @@ import {
   type FeasibilityResult,
   type FeasibilityVerdict,
   type Recommendation,
+  type TrainerUnavailability,
 } from "@/lib/training-planner/feasibility";
 import GenerateButton from "./generate-button";
 
@@ -31,6 +37,7 @@ export default async function CalculatePage({ params }: { params: Params }) {
     { data: orgTrainers },
     { data: orgImpls },
     { data: orgPublishedSessions },
+    { data: unavailability },
     { count: sessionCount },
   ] = await Promise.all([
     supabase
@@ -64,6 +71,11 @@ export default async function CalculatePage({ params }: { params: Params }) {
       .eq("org_id", orgId)
       .eq("status", "published")
       .neq("implementation_id", id),
+    // PTO / unavailability for this impl's trainers.
+    supabase
+      .from("impl_trainer_unavailability")
+      .select("impl_trainer_id, starts_at, ends_at, reason")
+      .eq("org_id", orgId),
     supabase
       .from("impl_sessions")
       .select("*", { count: "exact", head: true })
@@ -110,6 +122,23 @@ export default async function CalculatePage({ params }: { params: Params }) {
     crossImplBusyByTrainer.set(myTrainerId, list);
   }
 
+  // PTO/unavailability windows — only those for this impl's trainers.
+  const thisImplTrainerIds = new Set((trainers ?? []).map((t) => t.id));
+  const unavailabilityByTrainer = new Map<string, TrainerUnavailability[]>();
+  for (const u of (unavailability ?? []) as Pick<
+    ImplTrainerUnavailability,
+    "impl_trainer_id" | "starts_at" | "ends_at" | "reason"
+  >[]) {
+    if (!thisImplTrainerIds.has(u.impl_trainer_id)) continue;
+    const list = unavailabilityByTrainer.get(u.impl_trainer_id) ?? [];
+    list.push({
+      start: u.starts_at,
+      end: u.ends_at,
+      ...(u.reason ? { reason: u.reason } : {}),
+    });
+    unavailabilityByTrainer.set(u.impl_trainer_id, list);
+  }
+
   // Supabase widens our text-with-CHECK columns to `string`; the shared
   // Implementation type narrows status to a union. The other rows match
   // structurally, so we only cast at the implementation boundary.
@@ -122,6 +151,7 @@ export default async function CalculatePage({ params }: { params: Params }) {
     classTrainers: classTrainers ?? [],
     prereqs: prereqs ?? [],
     crossImplBusyByTrainer,
+    unavailabilityByTrainer,
   });
 
   return (
