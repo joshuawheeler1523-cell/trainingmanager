@@ -534,7 +534,8 @@ function ResourceForecastPanel({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
+        {/* Rooms-by-seat-capacity table */}
         <div>
           <p className="text-muted-foreground mb-2 text-[11px] font-medium uppercase tracking-wide">
             Rooms by seat capacity
@@ -544,51 +545,77 @@ function ResourceForecastPanel({
               No room demand — no classes have sessions.
             </p>
           ) : (
-            <ul className="space-y-1.5 text-sm">
-              {fc.tiers.map((t) => {
-                const haveAtTier = countAtOrAboveSeats(roomsHave, t.minSeats);
-                const short = Math.max(0, t.roomsNeeded - haveAtTier);
-                return (
-                  <li key={t.minSeats} className="flex items-baseline justify-between gap-3">
-                    <div>
-                      <span className="text-foreground font-semibold tabular-nums">
-                        {t.roomsNeeded.toString()}
-                      </span>{" "}
-                      <span className="text-foreground">
-                        room{t.roomsNeeded === 1 ? "" : "s"} with ≥{t.minSeats.toString()} seats
-                      </span>
-                      <span className="text-muted-foreground ml-1 text-xs">
-                        ({t.classNames.join(", ")})
-                      </span>
-                    </div>
-                    <span
-                      className={`text-xs tabular-nums ${
-                        short > 0
-                          ? "text-rose-600 dark:text-rose-400"
-                          : "text-emerald-600 dark:text-emerald-400"
-                      }`}
-                    >
-                      have {haveAtTier.toString()}
-                      {short > 0 ? ` · short ${short.toString()}` : " ✓"}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="border-border overflow-hidden rounded-md border">
+              <table className="w-full text-xs">
+                <thead className="bg-surface text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium uppercase tracking-wide">
+                      Seats
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium uppercase tracking-wide">
+                      Need
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium uppercase tracking-wide">
+                      Have
+                    </th>
+                    <th className="px-3 py-2 text-center font-medium uppercase tracking-wide">
+                      Status
+                    </th>
+                    <th className="px-3 py-2 text-left font-medium uppercase tracking-wide">
+                      Classes
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-border divide-y">
+                  {fc.tiers.map((t) => {
+                    const haveAtTier = countAtOrAboveSeats(roomsHave, t.minSeats);
+                    const short = Math.max(0, t.roomsNeeded - haveAtTier);
+                    return (
+                      <tr key={t.minSeats} className="hover:bg-surface/40 align-top">
+                        <td className="text-foreground px-3 py-2 font-semibold tabular-nums">
+                          ≥{t.minSeats.toString()}
+                        </td>
+                        <td className="text-foreground px-3 py-2 text-right tabular-nums">
+                          {t.roomsNeeded.toString()}
+                        </td>
+                        <td className="text-foreground px-3 py-2 text-right tabular-nums">
+                          {haveAtTier.toString()}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {short > 0 ? (
+                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-200">
+                              short {short.toString()}
+                            </span>
+                          ) : (
+                            <span className="text-emerald-600 dark:text-emerald-400">✓</span>
+                          )}
+                        </td>
+                        <td className="text-muted-foreground px-3 py-2">
+                          {t.classNames.join(", ")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
-        <div>
-          <p className="text-muted-foreground mb-2 text-[11px] font-medium uppercase tracking-wide">
+        {/* Trainer headcount card (single-row, keeps card form) */}
+        <div className="border-border bg-surface/40 rounded-md border p-3">
+          <p className="text-muted-foreground mb-1 text-[11px] font-medium uppercase tracking-wide">
             Trainer headcount
           </p>
           <p className="text-foreground text-sm">
-            <span className="font-semibold tabular-nums">{fc.trainersNeeded.toString()}</span>{" "}
-            trainer{fc.trainersNeeded === 1 ? "" : "s"} at ~{fc.fteHoursPerWeek.toString()} h/wk
-            over {fc.weeks.toString()} {fc.weeks === 1 ? "week" : "weeks"}.
+            <span className="text-2xl font-semibold tabular-nums">
+              {fc.trainersNeeded.toString()}
+            </span>{" "}
+            trainer{fc.trainersNeeded === 1 ? "" : "s"}
           </p>
-          <p className="text-muted-foreground mt-1 text-xs tabular-nums">
-            {fc.totalInstructionHours.toFixed(0)} instructional hours total
+          <p className="text-muted-foreground text-[11px] tabular-nums">
+            at ~{fc.fteHoursPerWeek.toString()} h/wk over {fc.weeks.toString()}{" "}
+            {fc.weeks === 1 ? "week" : "weeks"} · {fc.totalInstructionHours.toFixed(0)}h total
           </p>
           <p
             className={`mt-2 text-xs tabular-nums ${
@@ -597,10 +624,10 @@ function ResourceForecastPanel({
                 : "text-emerald-600 dark:text-emerald-400"
             }`}
           >
-            have {trainerCount.toString()} trainer{trainerCount === 1 ? "" : "s"} entered
+            have {trainerCount.toString()} entered
             {trainersShort > 0 ? ` · short ${trainersShort.toString()}` : " ✓"}
           </p>
-          <p className="text-muted-foreground mt-3 text-[11px]">
+          <p className="text-muted-foreground mt-3 text-[10px] leading-snug">
             Headcount is a floor — classes with tight trainer pools (only one eligible trainer) may
             require more even when total hours fit.
           </p>
