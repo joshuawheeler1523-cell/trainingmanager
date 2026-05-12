@@ -10,6 +10,7 @@ export * from "./schemas/tra";
 export * from "./schemas/education-request";
 export * from "./schemas/project";
 export * from "./schemas/training-planner";
+export * from "./schemas/sketchpad";
 export * from "./reports";
 export * from "./types";
 export * from "./utils/slug";

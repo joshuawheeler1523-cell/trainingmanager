@@ -3534,6 +3534,196 @@ export type Database = {
           },
         ];
       };
+      sketchpad_rooms: {
+        Row: {
+          capacity: number | null;
+          created_at: string;
+          id: string;
+          name: string;
+          org_id: string;
+          position: number;
+          schedule_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          capacity?: number | null;
+          created_at?: string;
+          id?: string;
+          name: string;
+          org_id: string;
+          position?: number;
+          schedule_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          capacity?: number | null;
+          created_at?: string;
+          id?: string;
+          name?: string;
+          org_id?: string;
+          position?: number;
+          schedule_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sketchpad_rooms_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sketchpad_rooms_schedule_id_fkey";
+            columns: ["schedule_id"];
+            isOneToOne: false;
+            referencedRelation: "sketchpad_schedules";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      sketchpad_schedules: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          day_count: number;
+          deleted_at: string | null;
+          department_id: string;
+          hours_end: number;
+          hours_start: number;
+          id: string;
+          name: string;
+          notes: string | null;
+          org_id: string;
+          slot_minutes: number;
+          start_date: string;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          day_count?: number;
+          deleted_at?: string | null;
+          department_id: string;
+          hours_end?: number;
+          hours_start?: number;
+          id?: string;
+          name: string;
+          notes?: string | null;
+          org_id: string;
+          slot_minutes?: number;
+          start_date?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          day_count?: number;
+          deleted_at?: string | null;
+          department_id?: string;
+          hours_end?: number;
+          hours_start?: number;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          org_id?: string;
+          slot_minutes?: number;
+          start_date?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sketchpad_schedules_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sketchpad_schedules_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      sketchpad_sessions: {
+        Row: {
+          class_name: string;
+          color: string | null;
+          created_at: string;
+          ends_at: string;
+          id: string;
+          learner_count: number | null;
+          notes: string | null;
+          org_id: string;
+          room_id: string | null;
+          schedule_id: string;
+          starts_at: string;
+          trainer_name: string;
+          updated_at: string;
+        };
+        Insert: {
+          class_name: string;
+          color?: string | null;
+          created_at?: string;
+          ends_at: string;
+          id?: string;
+          learner_count?: number | null;
+          notes?: string | null;
+          org_id: string;
+          room_id?: string | null;
+          schedule_id: string;
+          starts_at: string;
+          trainer_name: string;
+          updated_at?: string;
+        };
+        Update: {
+          class_name?: string;
+          color?: string | null;
+          created_at?: string;
+          ends_at?: string;
+          id?: string;
+          learner_count?: number | null;
+          notes?: string | null;
+          org_id?: string;
+          room_id?: string | null;
+          schedule_id?: string;
+          starts_at?: string;
+          trainer_name?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sketchpad_sessions_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sketchpad_sessions_room_id_fkey";
+            columns: ["room_id"];
+            isOneToOne: false;
+            referencedRelation: "sketchpad_rooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sketchpad_sessions_schedule_id_fkey";
+            columns: ["schedule_id"];
+            isOneToOne: false;
+            referencedRelation: "sketchpad_schedules";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       skills: {
         Row: {
           category: string | null;
