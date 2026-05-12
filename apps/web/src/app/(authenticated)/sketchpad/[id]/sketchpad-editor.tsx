@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -11,9 +11,12 @@ import withDragAndDrop, {
 import { format, parse, startOfWeek, getDay, addDays } from "date-fns";
 import { enUS } from "date-fns/locale";
 import {
+  ArrowDownTrayIcon,
   ArrowLeftIcon,
+  ClipboardDocumentIcon,
   Cog6ToothIcon,
   PlusIcon,
+  QuestionMarkCircleIcon,
   TrashIcon,
   XMarkIcon,
 } from "@heroicons/react/20/solid";
@@ -21,6 +24,7 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import type { SketchpadRoom, SketchpadSchedule, SketchpadSession } from "@arbor/shared";
 import {
+  bulkCreateSessions,
   createRoom,
   createSession,
   deleteRoom,
@@ -135,6 +139,107 @@ function sameDay(a: Date, b: Date): boolean {
   );
 }
 
+// ── Smart-paste ────────────────────────────────────────────────────────────
+// Accepts tab- or comma-separated rows like:
+//   "Smith\tEMR Provider\t9:00\t2h\tRoom A"
+//   "Smith, EMR Provider, 09:00, 60min, Room A"
+// Columns (in order): Trainer, Class, Start time (HH:MM or HH:MM AM/PM),
+// Duration ("60", "60m", "60min", "1h", "1.5h", "2 hours"), Room (optional).
+// Returns one ParsedRow per non-empty source line plus a list of human
+// errors for lines that didn't parse cleanly.
+
+type ParsedRow = {
+  trainer_name: string;
+  class_name: string;
+  starts_at: string; // ISO
+  ends_at: string; // ISO
+  room_id: string | null;
+};
+
+function parsePasteText(
+  raw: string,
+  day: Date,
+  rooms: { id: string; name: string }[],
+): { rows: ParsedRow[]; errors: string[] } {
+  const lines = raw
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const errors: string[] = [];
+  const rows: ParsedRow[] = [];
+  const roomByName = new Map(rooms.map((r) => [r.name.trim().toLowerCase(), r.id]));
+
+  lines.forEach((line, idx) => {
+    const cols = (line.includes("\t") ? line.split("\t") : line.split(","))
+      .map((c) => c.trim())
+      .filter(Boolean);
+    if (cols.length < 4) {
+      errors.push(`Line ${(idx + 1).toString()}: need at least Trainer, Class, Start, Duration`);
+      return;
+    }
+    const [trainer, klass, startStr, durationStr, roomStr] = cols;
+    if (!trainer || !klass) {
+      errors.push(`Line ${(idx + 1).toString()}: trainer and class required`);
+      return;
+    }
+    const startMinutes = parseTimeToMinutes(startStr ?? "");
+    if (startMinutes == null) {
+      errors.push(`Line ${(idx + 1).toString()}: couldn't parse start time "${startStr ?? ""}"`);
+      return;
+    }
+    const durMin = parseDurationToMinutes(durationStr ?? "");
+    if (durMin == null || durMin <= 0) {
+      errors.push(`Line ${(idx + 1).toString()}: couldn't parse duration "${durationStr ?? ""}"`);
+      return;
+    }
+    const start = new Date(day);
+    start.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
+    const end = new Date(start);
+    end.setMinutes(end.getMinutes() + durMin);
+    const roomKey = roomStr?.trim().toLowerCase() ?? "";
+    const roomId = roomKey ? (roomByName.get(roomKey) ?? null) : null;
+    rows.push({
+      trainer_name: trainer,
+      class_name: klass,
+      starts_at: start.toISOString(),
+      ends_at: end.toISOString(),
+      room_id: roomId,
+    });
+    if (roomStr && !roomId) {
+      errors.push(
+        `Line ${(idx + 1).toString()}: room "${roomStr}" not found — row imported as Unassigned`,
+      );
+    }
+  });
+
+  return { rows, errors };
+}
+
+function parseTimeToMinutes(raw: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})\s*(am|pm)?$/i.exec(raw.trim());
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = Number(m[2]);
+  const period = m[3]?.toLowerCase();
+  if (period === "pm" && h < 12) h += 12;
+  if (period === "am" && h === 12) h = 0;
+  if (!Number.isFinite(h) || !Number.isFinite(min) || h < 0 || h > 23 || min < 0 || min > 59) {
+    return null;
+  }
+  return h * 60 + min;
+}
+
+function parseDurationToMinutes(raw: string): number | null {
+  const s = raw.trim().toLowerCase();
+  // bare number → minutes
+  if (/^\d+(\.\d+)?$/.test(s)) return Math.round(Number(s));
+  const minMatch = /^(\d+(?:\.\d+)?)\s*(?:m|min|mins|minute|minutes)$/.exec(s);
+  if (minMatch?.[1]) return Math.round(Number(minMatch[1]));
+  const hMatch = /^(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)$/.exec(s);
+  if (hMatch?.[1]) return Math.round(Number(hMatch[1]) * 60);
+  return null;
+}
+
 export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -162,6 +267,9 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
   const [selectedDay, setSelectedDay] = useState(0);
   const [drawerSessionId, setDrawerSessionId] = useState<string | null>(null);
   const [newRoomName, setNewRoomName] = useState("");
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // Quick-add form state. Kept simple — one form for one new session at a time.
   const [qaTrainer, setQaTrainer] = useState("");
@@ -169,6 +277,8 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
   const [qaDuration, setQaDuration] = useState("60");
   const [qaTime, setQaTime] = useState("09:00");
   const [qaRoomId, setQaRoomId] = useState<string>(rooms[0]?.id ?? "");
+
+  const trainerInputRef = useRef<HTMLInputElement>(null);
 
   const days = useMemo(
     () => Array.from({ length: schedule.day_count }, (_, i) => dayDate(schedule.start_date, i)),
@@ -300,6 +410,54 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     () => rooms.map((r) => ({ resourceId: r.id, resourceTitle: r.name })),
     [rooms],
   );
+
+  // Unique trainer names already used in this sketch — feeds the
+  // <datalist> for autocomplete on the quick-add Trainer field.
+  const trainerHistory = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const s of optimisticSessions) {
+      const key = s.trainer_name.trim().toLowerCase();
+      if (key && !seen.has(key)) seen.set(key, s.trainer_name.trim());
+    }
+    return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
+  }, [optimisticSessions]);
+
+  // Keyboard shortcuts:
+  //   • `N` (not while typing) → focus the quick-add Trainer field
+  //   • `Esc` → close drawer / paste modal / export menu / help
+  //   • `?` → toggle the help overlay
+  useEffect(() => {
+    function isTypingTarget(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+      if (target.isContentEditable) return true;
+      return false;
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (helpOpen) setHelpOpen(false);
+        else if (pasteOpen) setPasteOpen(false);
+        else if (exportOpen) setExportOpen(false);
+        else if (drawerSessionId) setDrawerSessionId(null);
+        return;
+      }
+      if (isTypingTarget(e.target)) return;
+      if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
+        e.preventDefault();
+        setHelpOpen((v) => !v);
+        return;
+      }
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        trainerInputRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [drawerSessionId, exportOpen, helpOpen, pasteOpen]);
 
   // ── Mutations ────────────────────────────────────────────────────────────
 
@@ -469,6 +627,29 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     });
   }
 
+  function handleBulkPaste(rawText: string): { inserted: number; errors: string[] } | null {
+    const { rows, errors } = parsePasteText(rawText, currentDay, rooms);
+    if (rows.length === 0) {
+      toast.error(errors[0] ?? "Nothing parsed — check the format");
+      return null;
+    }
+    startTransition(async () => {
+      const result = await bulkCreateSessions(schedule.id, rows);
+      if (result.ok) {
+        toast.success(
+          `Imported ${result.data.inserted.toString()} session${
+            result.data.inserted === 1 ? "" : "s"
+          }`,
+        );
+        setPasteOpen(false);
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+    return { inserted: rows.length, errors };
+  }
+
   function handleDeleteSession(id: string) {
     if (!confirm("Delete this session?")) return;
     startTransition(async () => {
@@ -522,6 +703,27 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           <button
             type="button"
             onClick={() => {
+              setHelpOpen(true);
+            }}
+            aria-label="Keyboard shortcuts"
+            title="Keyboard shortcuts (?)"
+            className="border-border bg-background hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-medium"
+          >
+            <QuestionMarkCircleIcon className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPasteOpen(true);
+            }}
+            className="border-border bg-background hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium"
+          >
+            <ClipboardDocumentIcon className="h-3.5 w-3.5" />
+            Paste
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               setShowSettings((v) => !v);
             }}
             className="border-border bg-background hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium"
@@ -529,14 +731,62 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
             <Cog6ToothIcon className="h-3.5 w-3.5" />
             Settings
           </button>
-          <button
-            type="button"
-            disabled
-            title="Export coming in the next phase"
-            className="border-border bg-background inline-flex cursor-not-allowed items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium opacity-50"
-          >
-            Export
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setExportOpen((v) => !v);
+              }}
+              className="border-border bg-background hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium"
+            >
+              <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+              Export
+            </button>
+            {exportOpen && (
+              <div
+                className="border-border bg-background absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-md border shadow-lg"
+                role="menu"
+              >
+                <a
+                  href={`/api/sketchpad/${schedule.id}/schedule.xlsx?format=byday`}
+                  className="hover:bg-surface block px-3 py-2 text-xs"
+                  onClick={() => {
+                    setExportOpen(false);
+                  }}
+                >
+                  <span className="text-foreground font-medium">Excel — by day</span>
+                  <span className="text-muted-foreground mt-0.5 block text-[11px]">
+                    One sheet per day, rooms as columns
+                  </span>
+                </a>
+                <a
+                  href={`/api/sketchpad/${schedule.id}/schedule.xlsx?format=bysession`}
+                  className="hover:bg-surface border-border block border-t px-3 py-2 text-xs"
+                  onClick={() => {
+                    setExportOpen(false);
+                  }}
+                >
+                  <span className="text-foreground font-medium">Excel — by session</span>
+                  <span className="text-muted-foreground mt-0.5 block text-[11px]">
+                    Flat table, one row per session
+                  </span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExportOpen(false);
+                    window.print();
+                  }}
+                  className="hover:bg-surface border-border block w-full border-t px-3 py-2 text-left text-xs"
+                >
+                  <span className="text-foreground font-medium">Print / save as PDF</span>
+                  <span className="text-muted-foreground mt-0.5 block text-[11px]">
+                    Uses your browser&apos;s print dialog
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -592,18 +842,29 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
       {/* Quick-add bar */}
       <div className="border-border bg-background grid grid-cols-1 gap-2 rounded-lg border p-3 md:grid-cols-[1.5fr_1.5fr_80px_100px_1.5fr_auto]">
         <div>
-          <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+          <label
+            htmlFor="qa-trainer"
+            className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide"
+          >
             Trainer
           </label>
           <input
+            id="qa-trainer"
+            ref={trainerInputRef}
             value={qaTrainer}
             onChange={(e) => {
               setQaTrainer(e.target.value);
             }}
+            list="sketchpad-trainer-history"
             placeholder="e.g., Smith"
             className={fieldClass + " w-full"}
             disabled={pending}
           />
+          <datalist id="sketchpad-trainer-history">
+            {trainerHistory.map((t) => (
+              <option key={t} value={t} />
+            ))}
+          </datalist>
         </div>
         <div>
           <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
@@ -803,6 +1064,26 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           }}
           onDelete={() => {
             handleDeleteSession(openSession.id);
+          }}
+        />
+      )}
+
+      {pasteOpen && (
+        <PasteModal
+          dayLabel={formatDayLabel(currentDay)}
+          rooms={rooms}
+          pending={pending}
+          onClose={() => {
+            setPasteOpen(false);
+          }}
+          onSubmit={handleBulkPaste}
+        />
+      )}
+
+      {helpOpen && (
+        <HelpOverlay
+          onClose={() => {
+            setHelpOpen(false);
           }}
         />
       )}
@@ -1235,6 +1516,176 @@ function DrawerField({
         }}
         className={fieldClass + " w-full"}
       />
+    </div>
+  );
+}
+
+function PasteModal({
+  dayLabel,
+  rooms,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  dayLabel: string;
+  rooms: { id: string; name: string }[];
+  pending: boolean;
+  onClose: () => void;
+  onSubmit: (text: string) => { inserted: number; errors: string[] } | null;
+}) {
+  const [text, setText] = useState("");
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const roomList = rooms
+    .map((r) => r.name)
+    .slice(0, 3)
+    .join(", ");
+
+  function handleImport() {
+    const result = onSubmit(text);
+    if (result) setWarnings(result.errors);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="border-border bg-background flex max-h-[90vh] w-full max-w-2xl flex-col gap-3 rounded-lg border p-5 shadow-xl"
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-foreground text-base font-semibold">Paste from spreadsheet</h2>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              One session per line, tab or comma separated. Imports to <strong>{dayLabel}</strong>.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="text-muted-foreground bg-surface rounded-md px-3 py-2 text-[11px] leading-relaxed">
+          <p className="text-foreground mb-1 font-semibold">Format</p>
+          <code className="text-foreground block">
+            Trainer, Class, Start (HH:MM), Duration (60m or 1h), Room (optional)
+          </code>
+          <p className="mt-1.5">Examples:</p>
+          <pre className="text-foreground mt-0.5 overflow-x-auto whitespace-pre text-[11px]">
+            {`Smith, EMR Provider, 9:00, 2h, ${rooms[0]?.name ?? "Room A"}
+Park, Op Reports, 9:30 AM, 90min, ${rooms[1]?.name ?? rooms[0]?.name ?? "Room B"}
+Lee, Sim Lab, 13:00, 60`}
+          </pre>
+          {rooms.length > 0 && (
+            <p className="mt-1.5">
+              Known rooms: <em>{roomList}</em>
+              {rooms.length > 3 && ` (+${(rooms.length - 3).toString()} more)`}. Unknown room names
+              import as Unassigned.
+            </p>
+          )}
+        </div>
+
+        <textarea
+          autoFocus
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+          }}
+          rows={10}
+          placeholder={`Smith, EMR Provider, 9:00, 2h, ${rooms[0]?.name ?? "Room A"}`}
+          className={fieldClass + " w-full font-mono text-xs"}
+        />
+
+        {warnings.length > 0 && (
+          <ul className="space-y-0.5 rounded-md bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:bg-amber-900/30 dark:text-amber-100">
+            {warnings.slice(0, 6).map((w, i) => (
+              <li key={i}>⚠ {w}</li>
+            ))}
+            {warnings.length > 6 && (
+              <li className="opacity-70">…{(warnings.length - 6).toString()} more</li>
+            )}
+          </ul>
+        )}
+
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleImport}
+            disabled={pending || !text.trim()}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          >
+            Import
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HelpOverlay({ onClose }: { onClose: () => void }) {
+  const shortcuts: Array<[string, string]> = [
+    ["N", "Focus the quick-add Trainer field"],
+    ["Enter (in Class field)", "Commit the quick-add row"],
+    ["Esc", "Close drawer / modal / menu / overlay"],
+    ["?", "Toggle this help overlay"],
+    ["Drag a session block", "Move in time, across rooms, or resize via the bottom edge"],
+    ["Click a session", "Open the side drawer to edit / delete"],
+  ];
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="border-border bg-background w-full max-w-md rounded-lg border p-5 shadow-xl"
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="mb-3 flex items-start justify-between">
+          <h2 className="text-foreground text-base font-semibold">Keyboard shortcuts</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+        <ul className="divide-border divide-y text-xs">
+          {shortcuts.map(([key, label]) => (
+            <li key={key} className="flex items-center justify-between py-2">
+              <span className="text-foreground">{label}</span>
+              <kbd className="border-border bg-surface text-foreground rounded border px-2 py-0.5 font-mono text-[11px]">
+                {key}
+              </kbd>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

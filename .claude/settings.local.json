@@ -91,7 +91,15 @@
       "Bash(rm C:/Users/joshu/Documents/my-arbor/apps/web/scripts/tune-at-risk.mjs)",
       "Bash(where.exe supabase *)",
       "Bash(grep *)",
-      "PowerShell(Out-File *)"
+      "PowerShell(Out-File *)",
+      "Bash(gh pr *)",
+      "Bash(git fetch *)",
+      "Bash(git rebase *)",
+      "Bash(git stash *)",
+      "Bash(git pull *)",
+      "Bash(rm /tmp/types.ts)",
+      "Bash(npx prettier *)",
+      "Bash(npx eslint *)"
     ]
   }
 }
