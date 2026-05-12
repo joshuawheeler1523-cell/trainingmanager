@@ -17,6 +17,7 @@ import {
   CalendarDaysIcon,
   ChartBarIcon,
   Cog6ToothIcon,
+  WrenchScrewdriverIcon,
   Bars3Icon,
   XMarkIcon,
   ArrowRightEndOnRectangleIcon,
@@ -66,6 +67,11 @@ function workGroup(modules: ModuleFlags): NavGroup {
 const INSIGHTS_GROUP: NavGroup = {
   title: "Insights",
   items: [{ href: "/reports", label: "Reports", icon: ChartBarIcon }],
+};
+
+const TOOLS_GROUP: NavGroup = {
+  title: "Tools",
+  items: [{ href: "/sketchpad", label: "Schedule Sketchpad", icon: WrenchScrewdriverIcon }],
 };
 
 const ADMIN_GROUP: NavGroup = {
@@ -172,6 +178,7 @@ function SidebarContent({
         <NavGroupBlock group={team} pathname={pathname} onNavigate={onNavigate} />
         <NavGroupBlock group={work} pathname={pathname} onNavigate={onNavigate} />
         <NavGroupBlock group={INSIGHTS_GROUP} pathname={pathname} onNavigate={onNavigate} />
+        <NavGroupBlock group={TOOLS_GROUP} pathname={pathname} onNavigate={onNavigate} />
         {isAdmin && (
           <NavGroupBlock group={ADMIN_GROUP} pathname={pathname} onNavigate={onNavigate} />
         )}
