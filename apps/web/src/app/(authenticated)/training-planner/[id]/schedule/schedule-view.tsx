@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Calendar, dateFnsLocalizer, type Event } from "react-big-calendar";
@@ -119,6 +119,9 @@ export default function ScheduleView({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
+  const [pendingMoves, setPendingMoves] = useState<Map<string, { start: string; end: string }>>(
+    () => new Map(),
+  );
 
   const [trainerFilter, setTrainerFilter] = useState<string>("all");
   const [roomFilter, setRoomFilter] = useState<string>("all");
@@ -127,6 +130,27 @@ export default function ScheduleView({
   const classMap = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
   const trainerMap = useMemo(() => new Map(trainers.map((t) => [t.id, t])), [trainers]);
   const roomMap = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
+
+  // Drop any optimistic move once the incoming sessions prop matches its target.
+  useEffect(() => {
+    setPendingMoves((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Map(prev);
+      let changed = false;
+      for (const [id, move] of prev) {
+        const s = sessions.find((ss) => ss.id === id);
+        if (
+          s &&
+          new Date(s.scheduled_start).getTime() === new Date(move.start).getTime() &&
+          new Date(s.scheduled_end).getTime() === new Date(move.end).getTime()
+        ) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [sessions]);
 
   const filtered = useMemo(() => {
     return sessions.filter((s) => {
@@ -143,10 +167,13 @@ export default function ScheduleView({
       const klass = classMap.get(s.impl_class_id);
       const trainer = s.impl_trainer_id ? trainerMap.get(s.impl_trainer_id) : null;
       const room = s.impl_room_id ? roomMap.get(s.impl_room_id) : null;
-      const start = toCalendarLocal(s.scheduled_start, orgTimeZone);
-      const end = toCalendarLocal(s.scheduled_end, orgTimeZone);
-      const realStart = new Date(s.scheduled_start);
-      const realEnd = new Date(s.scheduled_end);
+      const override = pendingMoves.get(s.id);
+      const scheduledStart = override?.start ?? s.scheduled_start;
+      const scheduledEnd = override?.end ?? s.scheduled_end;
+      const start = toCalendarLocal(scheduledStart, orgTimeZone);
+      const end = toCalendarLocal(scheduledEnd, orgTimeZone);
+      const realStart = new Date(scheduledStart);
+      const realEnd = new Date(scheduledEnd);
       const title = klass?.name ?? "—";
       const tooltip = [
         klass?.name ?? "—",
@@ -170,17 +197,9 @@ export default function ScheduleView({
           roomId: s.impl_room_id,
           tooltip,
         },
-        // Room id lights up the per-room lane in Day view's resources mode.
-        ...(s.impl_room_id ? { resourceId: s.impl_room_id } : {}),
       };
     });
-  }, [filtered, classMap, trainerMap, roomMap, orgTimeZone]);
-
-  // Map rooms → calendar resources so Day view shows one lane per room.
-  const calendarResources = useMemo(
-    () => rooms.map((r) => ({ resourceId: r.id, resourceTitle: r.name })),
-    [rooms],
-  );
+  }, [filtered, classMap, trainerMap, roomMap, orgTimeZone, pendingMoves]);
 
   function handleEventDrop(args: EventInteractionArgs<CalEvent>) {
     const { event, start, end } = args;
@@ -190,23 +209,22 @@ export default function ScheduleView({
     // to be browser-local). Convert back to real UTC before saving.
     const startIso = fromCalendarLocal(startLocal, orgTimeZone);
     const endIso = fromCalendarLocal(endLocal, orgTimeZone);
-    const titleText = typeof event.title === "string" ? event.title : "session";
-    const ok = confirm(
-      `Move "${titleText}" to ${formatLocal(new Date(startIso), orgTimeZone)} (${orgTimeZone})? This may create conflicts.`,
-    );
-    if (!ok) return;
+    const sessionId = event.resource.sessionId;
+    // Optimistic: pin the event at the new position so it doesn't snap back
+    // while the server roundtrip + router.refresh resolves.
+    setPendingMoves((prev) => new Map(prev).set(sessionId, { start: startIso, end: endIso }));
     startTransition(async () => {
-      const result = await updateSessionTime(
-        event.resource.sessionId,
-        implementation.id,
-        startIso,
-        endIso,
-      );
+      const result = await updateSessionTime(sessionId, implementation.id, startIso, endIso);
       if (result.ok) {
         toast.success("Session moved");
         router.refresh();
       } else {
         toast.error(result.error.message);
+        setPendingMoves((prev) => {
+          const next = new Map(prev);
+          next.delete(sessionId);
+          return next;
+        });
       }
     });
   }
@@ -341,9 +359,6 @@ export default function ScheduleView({
               ? new Date(implementation.window_start_date + "T00:00:00")
               : new Date()
           }
-          resources={calendarResources}
-          resourceIdAccessor={(r: object) => (r as { resourceId: string }).resourceId}
-          resourceTitleAccessor={(r: object) => (r as { resourceTitle: string }).resourceTitle}
           tooltipAccessor={(event: CalEvent) => event.resource.tooltip}
           min={new Date(0, 0, 0, 7, 0, 0)}
           max={new Date(0, 0, 0, 20, 0, 0)}
