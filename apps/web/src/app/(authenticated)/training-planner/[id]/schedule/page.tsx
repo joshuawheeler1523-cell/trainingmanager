@@ -17,6 +17,7 @@ export default async function SchedulePage({ params }: { params: Params }) {
     { data: classes },
     { data: trainers },
     { data: rooms },
+    { data: org },
   ] = await Promise.all([
     supabase
       .from("implementations")
@@ -44,9 +45,12 @@ export default async function SchedulePage({ params }: { params: Params }) {
       .eq("implementation_id", id)
       .eq("org_id", orgId)
       .order("name"),
+    supabase.from("organizations").select("time_zone").eq("id", orgId).maybeSingle(),
   ]);
 
   if (!impl) notFound();
+
+  const orgTimeZone = org?.time_zone ?? "America/New_York";
 
   return (
     <ScheduleView
@@ -56,6 +60,7 @@ export default async function SchedulePage({ params }: { params: Params }) {
       trainers={trainers ?? []}
       rooms={rooms ?? []}
       backHref={`/training-planner/${id}/calculate`}
+      orgTimeZone={orgTimeZone}
     />
   );
 }

@@ -18,6 +18,7 @@ import {
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import type { ImplClass, ImplRoom, ImplSession, ImplTrainer, Implementation } from "@arbor/shared";
+import { toCalendarLocal, fromCalendarLocal } from "@/lib/timezone";
 import {
   publishImplementation,
   setSessionStatus,
@@ -32,6 +33,7 @@ type Props = {
   trainers: ImplTrainer[];
   rooms: ImplRoom[];
   backHref: string;
+  orgTimeZone: string;
 };
 
 type Resource = {
@@ -40,10 +42,12 @@ type Resource = {
   classId: string;
   trainerId: string | null;
   roomId: string | null;
+  tooltip: string;
 };
 
 type CalEvent = Omit<Event, "resource"> & {
   resource: Resource;
+  resourceId?: string;
 };
 
 const locales = { "en-US": enUS };
@@ -56,11 +60,52 @@ const localizer = dateFnsLocalizer({
 });
 const DnDCalendar = withDragAndDrop<CalEvent>(Calendar);
 
-const CONFLICT_COLORS: Record<ImplSession["conflict_status"], string> = {
-  none: "#34d399", // emerald
-  partial: "#fbbf24", // amber
-  full: "#f87171", // red
+// Conflict status drives the BORDER. Per-class color drives the FILL.
+const CONFLICT_BORDER: Record<ImplSession["conflict_status"], string> = {
+  none: "transparent",
+  partial: "#f59e0b", // amber-500
+  full: "#e11d48", // rose-600
 };
+
+// Per-class fill palette. Chosen to be visually distinct, accessible against
+// dark text, and to avoid the conflict colors (red / amber / pure green).
+const CLASS_PALETTE = [
+  "#bfdbfe", // blue-200
+  "#c7d2fe", // indigo-200
+  "#ddd6fe", // violet-200
+  "#e9d5ff", // purple-200
+  "#f5d0fe", // fuchsia-200
+  "#fbcfe8", // pink-200
+  "#a5f3fc", // cyan-200
+  "#99f6e4", // teal-200
+  "#bae6fd", // sky-200
+  "#fed7aa", // orange-200 (light, distinguishable from amber border)
+  "#d9f99d", // lime-200
+  "#e2e8f0", // slate-200
+] as const;
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+function colorForClass(classId: string): string {
+  const idx = hashString(classId) % CLASS_PALETTE.length;
+  return CLASS_PALETTE[idx] ?? "#bfdbfe";
+}
+
+function formatLocal(date: Date, tz: string): string {
+  return date.toLocaleString("en-US", {
+    timeZone: tz,
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 export default function ScheduleView({
   implementation,
@@ -69,6 +114,7 @@ export default function ScheduleView({
   trainers,
   rooms,
   backHref,
+  orgTimeZone,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -97,42 +143,64 @@ export default function ScheduleView({
       const klass = classMap.get(s.impl_class_id);
       const trainer = s.impl_trainer_id ? trainerMap.get(s.impl_trainer_id) : null;
       const room = s.impl_room_id ? roomMap.get(s.impl_room_id) : null;
-      const title = [
+      const start = toCalendarLocal(s.scheduled_start, orgTimeZone);
+      const end = toCalendarLocal(s.scheduled_end, orgTimeZone);
+      const realStart = new Date(s.scheduled_start);
+      const realEnd = new Date(s.scheduled_end);
+      const title = klass?.name ?? "—";
+      const tooltip = [
         klass?.name ?? "—",
-        trainer?.name ?? "no trainer",
-        room?.name ?? "no room",
-      ].join(" · ");
+        `${formatLocal(realStart, orgTimeZone)} – ${formatLocal(realEnd, orgTimeZone)} (${orgTimeZone})`,
+        trainer ? `Trainer: ${trainer.name}` : "No trainer",
+        room ? `Room: ${room.name} (${room.seat_capacity.toString()} seats)` : "No room",
+        `${s.learners_count.toString()} learners · ${s.status}`,
+        s.conflict_status !== "none" && s.conflict_reason ? `⚠ ${s.conflict_reason}` : null,
+      ]
+        .filter((x): x is string => !!x)
+        .join("\n");
       return {
         title,
-        start: new Date(s.scheduled_start),
-        end: new Date(s.scheduled_end),
+        start,
+        end,
         resource: {
           sessionId: s.id,
           conflictStatus: s.conflict_status,
           classId: s.impl_class_id,
           trainerId: s.impl_trainer_id,
           roomId: s.impl_room_id,
+          tooltip,
         },
+        // Room id lights up the per-room lane in Day view's resources mode.
+        ...(s.impl_room_id ? { resourceId: s.impl_room_id } : {}),
       };
     });
-  }, [filtered, classMap, trainerMap, roomMap]);
+  }, [filtered, classMap, trainerMap, roomMap, orgTimeZone]);
+
+  // Map rooms → calendar resources so Day view shows one lane per room.
+  const calendarResources = useMemo(
+    () => rooms.map((r) => ({ resourceId: r.id, resourceTitle: r.name })),
+    [rooms],
+  );
 
   function handleEventDrop(args: EventInteractionArgs<CalEvent>) {
     const { event, start, end } = args;
-    const startDate = start instanceof Date ? start : new Date(start);
-    const endDate = end instanceof Date ? end : new Date(end);
-    const oldStart = event.start;
+    const startLocal = start instanceof Date ? start : new Date(start);
+    const endLocal = end instanceof Date ? end : new Date(end);
+    // The calendar hands us fake-local Dates (org-tz wall clock pretending
+    // to be browser-local). Convert back to real UTC before saving.
+    const startIso = fromCalendarLocal(startLocal, orgTimeZone);
+    const endIso = fromCalendarLocal(endLocal, orgTimeZone);
     const titleText = typeof event.title === "string" ? event.title : "session";
     const ok = confirm(
-      `Move "${titleText}" from ${oldStart?.toLocaleString() ?? "?"} to ${startDate.toLocaleString()}? This may create conflicts.`,
+      `Move "${titleText}" to ${formatLocal(new Date(startIso), orgTimeZone)} (${orgTimeZone})? This may create conflicts.`,
     );
     if (!ok) return;
     startTransition(async () => {
       const result = await updateSessionTime(
         event.resource.sessionId,
         implementation.id,
-        startDate.toISOString(),
-        endDate.toISOString(),
+        startIso,
+        endIso,
       );
       if (result.ok) {
         toast.success("Session moved");
@@ -267,23 +335,34 @@ export default function ScheduleView({
           startAccessor="start"
           endAccessor="end"
           views={["month", "week", "day", "agenda"]}
-          defaultView="week"
+          defaultView="day"
           defaultDate={
             implementation.window_start_date
               ? new Date(implementation.window_start_date + "T00:00:00")
               : new Date()
           }
+          resources={calendarResources}
+          resourceIdAccessor={(r: object) => (r as { resourceId: string }).resourceId}
+          resourceTitleAccessor={(r: object) => (r as { resourceTitle: string }).resourceTitle}
+          tooltipAccessor={(event: CalEvent) => event.resource.tooltip}
+          min={new Date(0, 0, 0, 7, 0, 0)}
+          max={new Date(0, 0, 0, 20, 0, 0)}
           onSelectEvent={(event) => {
             setOpenSessionId(event.resource.sessionId);
           }}
           onEventDrop={handleEventDrop}
           onEventResize={handleEventDrop}
           eventPropGetter={(event: CalEvent) => {
-            const color = CONFLICT_COLORS[event.resource.conflictStatus];
+            const fill = colorForClass(event.resource.classId);
+            const borderColor = CONFLICT_BORDER[event.resource.conflictStatus];
+            const hasBorder = event.resource.conflictStatus !== "none";
             return {
               style: {
-                backgroundColor: color,
-                borderColor: color,
+                backgroundColor: fill,
+                borderLeft: hasBorder ? `4px solid ${borderColor}` : "none",
+                borderTop: hasBorder ? `1px solid ${borderColor}` : "none",
+                borderRight: hasBorder ? `1px solid ${borderColor}` : "none",
+                borderBottom: hasBorder ? `1px solid ${borderColor}` : "none",
                 color: "#0f172a",
               },
             };
@@ -291,6 +370,10 @@ export default function ScheduleView({
           style={{ height: "100%" }}
         />
       </div>
+      <p className="text-muted-foreground text-[11px]">
+        Times shown in <strong>{orgTimeZone}</strong> (the org&apos;s timezone). Drag any session to
+        move it. Click for details.
+      </p>
 
       <div className="border-border flex items-center justify-between border-t pt-4">
         <a
@@ -308,6 +391,7 @@ export default function ScheduleView({
           klass={classMap.get(openSession.impl_class_id) ?? null}
           trainers={trainers}
           rooms={rooms}
+          orgTimeZone={orgTimeZone}
           onClose={() => {
             setOpenSessionId(null);
           }}
@@ -375,6 +459,7 @@ function SessionDrawer({
   klass,
   trainers,
   rooms,
+  orgTimeZone,
   onClose,
 }: {
   implementationId: string;
@@ -382,6 +467,7 @@ function SessionDrawer({
   klass: ImplClass | null;
   trainers: ImplTrainer[];
   rooms: ImplRoom[];
+  orgTimeZone: string;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -430,8 +516,9 @@ function SessionDrawer({
               {klass?.name ?? "Session"}
             </h2>
             <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">
-              {new Date(session.scheduled_start).toLocaleString()} →{" "}
-              {new Date(session.scheduled_end).toLocaleString()}
+              {formatLocal(new Date(session.scheduled_start), orgTimeZone)} →{" "}
+              {formatLocal(new Date(session.scheduled_end), orgTimeZone)}{" "}
+              <span className="text-[10px] font-normal opacity-70">({orgTimeZone})</span>
             </p>
             <p className="text-muted-foreground text-xs capitalize">
               {session.status} · {session.conflict_status} conflict ·{" "}
