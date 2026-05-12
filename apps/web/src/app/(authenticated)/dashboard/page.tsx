@@ -50,6 +50,7 @@ export default async function DashboardPage() {
       .from("instructors")
       .select("id, full_name, department, department_id, annual_hours, status")
       .eq("org_id", orgId)
+      .eq("is_external", false)
       .is("deleted_at", null)
       .eq("status", "active"),
     supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId),

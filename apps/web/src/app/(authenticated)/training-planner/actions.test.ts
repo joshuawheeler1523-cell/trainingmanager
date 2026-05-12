@@ -26,6 +26,9 @@ const {
   createModule,
   createClass,
   addClassPrerequisite,
+  createExternalInstructor,
+  linkImplTrainerToInstructor,
+  softDeleteExternalInstructor,
 } = await import("./actions");
 
 const ORG_ID = "aaaaaaaa-0000-0000-0000-000000000000";
@@ -343,6 +346,88 @@ describe("generateSchedule (RPC wrapper)", async () => {
       expect(result.data.sessions).toBe(5);
       expect(result.data.conflicts).toBe(0);
     }
+  });
+});
+
+describe("createExternalInstructor", () => {
+  it("inserts with is_external=true and returns the new row", async () => {
+    const inserted = {
+      id: "ee000000-0000-0000-0000-000000000001",
+      org_id: ORG_ID,
+      full_name: "Jane Consultant",
+      email: "jane@example.com",
+      is_external: true,
+      status: "active",
+    };
+    const chain = makeInsertChain({ data: inserted, error: null });
+    mockFrom.mockReturnValue(chain);
+    const result = await createExternalInstructor({
+      full_name: "Jane Consultant",
+      email: "jane@example.com",
+      notes: null,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.is_external).toBe(true);
+      expect(result.data.full_name).toBe("Jane Consultant");
+    }
+    expect(mockFrom).toHaveBeenCalledWith("instructors");
+    expect(chain.insert).toHaveBeenCalled();
+    const insertArg = (chain.insert.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+    expect(insertArg.is_external).toBe(true);
+    expect(insertArg.status).toBe("active");
+  });
+
+  it("rejects an empty name", async () => {
+    const result = await createExternalInstructor({ full_name: "", email: null, notes: null });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("VALIDATION");
+  });
+
+  it("rejects an invalid email", async () => {
+    const result = await createExternalInstructor({
+      full_name: "Jane",
+      email: "not-an-email",
+      notes: null,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("VALIDATION");
+  });
+});
+
+describe("linkImplTrainerToInstructor", () => {
+  it("sets instructor_id on the impl_trainer row scoped to the current org", async () => {
+    const chain = makeUpdateChain({
+      data: { id: "tr-1", instructor_id: "inst-1", name: "Jane" },
+      error: null,
+    });
+    mockFrom.mockReturnValue(chain);
+    const result = await linkImplTrainerToInstructor("tr-1", IMPL_ID, "inst-1");
+    expect(result.ok).toBe(true);
+    expect(chain.update).toHaveBeenCalledWith({ instructor_id: "inst-1" });
+    expect(chain.eq).toHaveBeenCalledWith("id", "tr-1");
+    expect(chain.eq).toHaveBeenCalledWith("org_id", ORG_ID);
+  });
+});
+
+describe("softDeleteExternalInstructor", () => {
+  it("sets deleted_at and scopes to is_external=true so internals are safe", async () => {
+    const updateFn = vi.fn().mockReturnThis();
+    const eqFn = vi.fn().mockReturnThis();
+    const chain: Record<string, unknown> = {
+      update: updateFn,
+      eq: eqFn,
+      // The action awaits the chain after the third .eq() — make the chain
+      // a thenable that resolves to { error: null }.
+      then: (resolve: (v: { error: null }) => unknown) => resolve({ error: null }),
+    };
+    mockFrom.mockReturnValue(chain);
+    const result = await softDeleteExternalInstructor("inst-1", IMPL_ID);
+    expect(result.ok).toBe(true);
+    expect(mockFrom).toHaveBeenCalledWith("instructors");
+    const updateArg = (updateFn.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+    expect(typeof updateArg.deleted_at).toBe("string");
+    expect(eqFn).toHaveBeenCalledWith("is_external", true);
   });
 });
 

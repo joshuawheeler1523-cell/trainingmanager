@@ -35,6 +35,7 @@ export default async function ReportSlugPage({
       .from("instructors")
       .select("id, full_name")
       .eq("org_id", orgId)
+      .eq("is_external", false)
       .is("deleted_at", null)
       .eq("status", "active")
       .order("full_name"),

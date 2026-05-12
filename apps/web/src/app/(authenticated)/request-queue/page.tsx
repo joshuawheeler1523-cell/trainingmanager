@@ -37,6 +37,7 @@ export default async function RequestQueuePage() {
         .from("instructors")
         .select("*")
         .eq("org_id", orgId)
+        .eq("is_external", false)
         .is("deleted_at", null)
         .eq("status", "active")
         .order("full_name"),

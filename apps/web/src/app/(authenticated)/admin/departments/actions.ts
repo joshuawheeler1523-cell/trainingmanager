@@ -106,6 +106,7 @@ export async function deleteDepartment(id: string): Promise<ActionResult<{ id: s
     .from("instructors")
     .select("id", { count: "exact", head: true })
     .eq("department_id", id)
+    .eq("is_external", false)
     .is("deleted_at", null);
   if ((instructorCount ?? 0) > 0) {
     return {

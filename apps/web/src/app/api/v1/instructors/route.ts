@@ -10,6 +10,10 @@ export const dynamic = "force-dynamic";
  * GET /api/v1/instructors
  * Cursor-based pagination via ?limit=50&cursor=<opaque base64>.
  * Cursor encodes the last seen (created_at, id) tuple.
+ *
+ * Returns internal instructors only by default. External / consultant
+ * trainers — the org-level pool used by Training Planner — are filtered out.
+ * Pass `?include_external=true` to include them.
  */
 export async function GET(req: Request) {
   const auth = await authApiRequest(req);
@@ -18,15 +22,20 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const limit = Math.min(Number(url.searchParams.get("limit") ?? "50") || 50, 200);
   const cursor = url.searchParams.get("cursor");
+  const includeExternal = url.searchParams.get("include_external") === "true";
 
   const admin = createAdminClient();
   let query = admin
     .from("instructors")
-    .select("id, full_name, email, status, department_id, created_at")
+    .select("id, full_name, email, status, department_id, created_at, is_external")
     .eq("org_id", auth.orgId)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(limit);
+
+  if (!includeExternal) {
+    query = query.eq("is_external", false);
+  }
 
   if (cursor) {
     const decoded = decodeCursor(cursor);

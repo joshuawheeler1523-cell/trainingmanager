@@ -36,6 +36,7 @@ export async function queryAllocationReport(
       .from("instructors")
       .select("id, full_name, annual_hours, status, deleted_at")
       .eq("org_id", orgId)
+      .eq("is_external", false)
       .is("deleted_at", null)
       .eq("status", "active"),
     supabase

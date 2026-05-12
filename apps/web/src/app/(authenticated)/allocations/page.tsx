@@ -54,6 +54,7 @@ export default async function AllocationsPage() {
       .from("instructors")
       .select("*")
       .eq("org_id", orgId)
+      .eq("is_external", false)
       .is("deleted_at", null)
       .order("full_name"),
     supabase.from("individual_allocations").select("*").eq("org_id", orgId),

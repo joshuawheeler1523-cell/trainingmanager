@@ -29,6 +29,7 @@ export async function querySkillGapReport(
       .from("instructors")
       .select("id, full_name, status, deleted_at")
       .eq("org_id", orgId)
+      .eq("is_external", false)
       .is("deleted_at", null)
       .eq("status", "active"),
   ]);

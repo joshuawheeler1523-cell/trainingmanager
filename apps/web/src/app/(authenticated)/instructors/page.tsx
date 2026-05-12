@@ -26,7 +26,12 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) return null;
 
-  let query = supabase.from("instructors").select("*").eq("org_id", orgId).order("full_name");
+  let query = supabase
+    .from("instructors")
+    .select("*")
+    .eq("org_id", orgId)
+    .eq("is_external", false)
+    .order("full_name");
   if (showDeleted) {
     query = query.not("deleted_at", "is", null);
   } else {
@@ -50,6 +55,7 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
       .from("instructors")
       .select("department")
       .eq("org_id", orgId)
+      .eq("is_external", false)
       .is("deleted_at", null)
       .not("department", "is", null),
     supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId),

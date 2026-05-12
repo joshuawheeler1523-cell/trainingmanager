@@ -28,6 +28,7 @@ export default async function ArborOrgDetailPage({ params }: { params: Promise<{
       .from("instructors")
       .select("id", { count: "exact", head: true })
       .eq("org_id", id)
+      .eq("is_external", false)
       .is("deleted_at", null),
     admin.from("tras").select("id", { count: "exact", head: true }).eq("org_id", id),
     admin

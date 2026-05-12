@@ -57,6 +57,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       .from("instructors")
       .select("*")
       .eq("org_id", orgId)
+      .eq("is_external", false)
       .is("deleted_at", null)
       .order("full_name"),
     supabase
