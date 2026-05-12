@@ -380,3 +380,66 @@ export async function deleteSession(
   revalidate(scheduleId);
   return { ok: true, data: { id } };
 }
+
+// Bulk-create from a smart-paste payload. Each row has already been parsed
+// client-side into the canonical shape; this just validates + inserts.
+// Returns the count actually inserted (server may drop rows whose room
+// reference doesn't exist on this schedule).
+export async function bulkCreateSessions(
+  scheduleId: string,
+  input: unknown,
+): Promise<ActionResult<{ inserted: number }>> {
+  const rowSchema = sketchpadSessionCreateSchema;
+  if (!Array.isArray(input)) {
+    return { ok: false, error: { code: "VALIDATION", message: "Expected an array" } };
+  }
+  const parsed: Array<ReturnType<typeof rowSchema.parse>> = [];
+  for (let i = 0; i < input.length; i++) {
+    const r = rowSchema.safeParse(input[i]);
+    if (!r.success) {
+      const first = r.error.errors[0];
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION",
+          message: `Row ${(i + 1).toString()}: ${first?.message ?? "invalid"}`,
+        },
+      };
+    }
+    parsed.push(r.data);
+  }
+  if (parsed.length === 0) {
+    return { ok: true, data: { inserted: 0 } };
+  }
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  // Restrict room_id to rooms that belong to this schedule (defense-in-
+  // depth; RLS would also reject foreign rooms but we'd rather null-out
+  // gracefully than fail the whole batch).
+  const { data: legitRooms } = await c.supabase
+    .from("sketchpad_rooms")
+    .select("id")
+    .eq("schedule_id", scheduleId)
+    .eq("org_id", c.orgId);
+  const validRoomIds = new Set((legitRooms ?? []).map((r) => r.id));
+
+  const rows = parsed.map((p) => ({
+    schedule_id: scheduleId,
+    room_id: p.room_id && validRoomIds.has(p.room_id) ? p.room_id : null,
+    org_id: c.orgId,
+    trainer_name: p.trainer_name,
+    class_name: p.class_name,
+    starts_at: p.starts_at,
+    ends_at: p.ends_at,
+    learner_count: p.learner_count ?? null,
+    notes: p.notes,
+    color: p.color,
+  }));
+
+  const { error } = await c.supabase.from("sketchpad_sessions").insert(rows);
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidate(scheduleId);
+  return { ok: true, data: { inserted: rows.length } };
+}
