@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { CheckCircleIcon, ExclamationTriangleIcon, XCircleIcon } from "@heroicons/react/20/solid";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import type { Implementation } from "@arbor/shared";
+import type { Implementation, ImplRoom, ImplTrainer } from "@arbor/shared";
 import {
   computeFeasibility,
   type ClassFeasibility,
@@ -137,6 +137,8 @@ export default async function CalculatePage({ params }: { params: Params }) {
       <VerdictBanner result={feas} />
 
       <SummaryCards result={feas} impl={implTyped} />
+
+      <ResourceForecastPanel result={feas} rooms={rooms ?? []} trainers={trainers ?? []} />
 
       <ClassFeasibilityTable result={feas} implementationId={id} />
 
@@ -496,6 +498,130 @@ function CompletionCard({ result, impl }: { result: FeasibilityResult; impl: Imp
       </div>
     </div>
   );
+}
+
+function ResourceForecastPanel({
+  result,
+  rooms,
+  trainers,
+}: {
+  result: FeasibilityResult;
+  rooms: ImplRoom[];
+  trainers: ImplTrainer[];
+}) {
+  const fc = result.resourceForecast;
+  const hasClasses = result.classFeasibility.length > 0;
+
+  if (!hasClasses) return null;
+
+  const roomsHave = countRoomsByTier(rooms);
+  const trainerCount = trainers.length;
+  const trainersShort = Math.max(0, fc.trainersNeeded - trainerCount);
+
+  return (
+    <div className="border-border bg-background rounded-lg border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-foreground text-sm font-semibold">Resource forecast</p>
+          <p className="text-muted-foreground text-xs">
+            What you need at minimum to absorb this workload. A larger room can always substitute
+            for a smaller one — these are floors, not ceilings.
+          </p>
+        </div>
+        <div className="text-muted-foreground text-right text-[11px] tabular-nums">
+          {fc.workingDays.toString()} working days · {fc.effectiveHoursPerDay.toFixed(1)} h/day
+          window
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <p className="text-muted-foreground mb-2 text-[11px] font-medium uppercase tracking-wide">
+            Rooms by seat capacity
+          </p>
+          {fc.tiers.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No room demand — no classes have sessions.
+            </p>
+          ) : (
+            <ul className="space-y-1.5 text-sm">
+              {fc.tiers.map((t) => {
+                const haveAtTier = countAtOrAboveSeats(roomsHave, t.minSeats);
+                const short = Math.max(0, t.roomsNeeded - haveAtTier);
+                return (
+                  <li key={t.minSeats} className="flex items-baseline justify-between gap-3">
+                    <div>
+                      <span className="text-foreground font-semibold tabular-nums">
+                        {t.roomsNeeded.toString()}
+                      </span>{" "}
+                      <span className="text-foreground">
+                        room{t.roomsNeeded === 1 ? "" : "s"} with ≥{t.minSeats.toString()} seats
+                      </span>
+                      <span className="text-muted-foreground ml-1 text-xs">
+                        ({t.classNames.join(", ")})
+                      </span>
+                    </div>
+                    <span
+                      className={`text-xs tabular-nums ${
+                        short > 0
+                          ? "text-rose-600 dark:text-rose-400"
+                          : "text-emerald-600 dark:text-emerald-400"
+                      }`}
+                    >
+                      have {haveAtTier.toString()}
+                      {short > 0 ? ` · short ${short.toString()}` : " ✓"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div>
+          <p className="text-muted-foreground mb-2 text-[11px] font-medium uppercase tracking-wide">
+            Trainer headcount
+          </p>
+          <p className="text-foreground text-sm">
+            <span className="font-semibold tabular-nums">{fc.trainersNeeded.toString()}</span>{" "}
+            trainer{fc.trainersNeeded === 1 ? "" : "s"} at ~{fc.fteHoursPerWeek.toString()} h/wk
+            over {fc.weeks.toString()} {fc.weeks === 1 ? "week" : "weeks"}.
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs tabular-nums">
+            {fc.totalInstructionHours.toFixed(0)} instructional hours total
+          </p>
+          <p
+            className={`mt-2 text-xs tabular-nums ${
+              trainersShort > 0
+                ? "text-rose-600 dark:text-rose-400"
+                : "text-emerald-600 dark:text-emerald-400"
+            }`}
+          >
+            have {trainerCount.toString()} trainer{trainerCount === 1 ? "" : "s"} entered
+            {trainersShort > 0 ? ` · short ${trainersShort.toString()}` : " ✓"}
+          </p>
+          <p className="text-muted-foreground mt-3 text-[11px]">
+            Headcount is a floor — classes with tight trainer pools (only one eligible trainer) may
+            require more even when total hours fit.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function countRoomsByTier(rooms: ImplRoom[]): Map<number, number> {
+  const m = new Map<number, number>();
+  for (const r of rooms) {
+    m.set(r.seat_capacity, (m.get(r.seat_capacity) ?? 0) + 1);
+  }
+  return m;
+}
+
+function countAtOrAboveSeats(roomsByTier: Map<number, number>, threshold: number): number {
+  let n = 0;
+  for (const [seats, count] of roomsByTier) if (seats >= threshold) n += count;
+  return n;
 }
 
 // ── Small bits ─────────────────────────────────────────────────────────────

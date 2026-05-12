@@ -7,7 +7,13 @@ import type {
   ImplClassTrainer,
   ImplClassPrerequisite,
 } from "@arbor/shared";
-import { computeFeasibility, workingDaysInWindow, windowWeeks } from "./feasibility";
+import {
+  applyLunch,
+  computeFeasibility,
+  computeResourceForecast,
+  workingDaysInWindow,
+  windowWeeks,
+} from "./feasibility";
 
 // ── Test fixtures ──────────────────────────────────────────────────────────
 
@@ -492,9 +498,13 @@ describe("business hours (start_hour_local)", () => {
 });
 
 describe("lunch break", () => {
-  it("pushes a session past lunch when it would otherwise overlap", () => {
-    // Lunch 12:00–13:00. 2-hour sessions stack 9-11, 11-13 → second one overlaps lunch.
-    // With lunch enabled, sequence should be 9-11, then 13-15.
+  it("spans lunch when a session would otherwise overlap, fitting all 4 sessions in one day", () => {
+    // Lunch 12:00–13:00. With the lunch-span model:
+    //   s1: 9:00–11:00 (no span)
+    //   s2: 11:00 + 2h work → spans lunch → room committed 11:00–14:00
+    //   s3: 14:00–16:00
+    //   s4: 16:00–18:00 (exactly day end with 1h lunch absorbed)
+    // All 4 fit on Monday 2026-06-01.
     const result = computeFeasibility({
       implementation: {
         ...baseImpl,
@@ -515,9 +525,7 @@ describe("lunch break", () => {
       prereqs: [],
     });
     expect(result.unscheduledSessions).toBe(0);
-    // 4 sessions × 2h with one lunch push = 9-11, 13-15, 15-17, then next day 9-11.
-    // (slot 2 at 11 overlaps 12-13; pushed to 13.) Completion on day 2.
-    expect(result.estimatedCompletionDate).toBe("2026-06-02");
+    expect(result.estimatedCompletionDate).toBe("2026-06-01");
   });
 
   it("ignores lunch when length is 0", () => {
@@ -1010,5 +1018,333 @@ describe("ready gate", () => {
       prereqs: [],
     });
     expect(result.ready).toBe(false);
+  });
+});
+
+// ── applyLunch ──────────────────────────────────────────────────────────────
+
+describe("applyLunch", () => {
+  const lunch = { startHr: 12, endHr: 13 };
+
+  it("returns input unchanged when lunch is null", () => {
+    expect(applyLunch(9, 8, null)).toEqual({
+      wallClockHours: 8,
+      spansLunch: false,
+      pushedTo: null,
+    });
+  });
+
+  it("spans lunch for a session starting before lunch that would cross it", () => {
+    // 9:00 + 8h would land at 17:00 → spans 12-13 lunch → wall clock = 9h
+    expect(applyLunch(9, 8, lunch)).toEqual({
+      wallClockHours: 9,
+      spansLunch: true,
+      pushedTo: null,
+    });
+  });
+
+  it("spans lunch for a 6h session at 9:00", () => {
+    expect(applyLunch(9, 6, lunch)).toEqual({
+      wallClockHours: 7,
+      spansLunch: true,
+      pushedTo: null,
+    });
+  });
+
+  it("does not span when session ends before lunch starts", () => {
+    expect(applyLunch(9, 2, lunch)).toEqual({
+      wallClockHours: 2,
+      spansLunch: false,
+      pushedTo: null,
+    });
+    // 9 + 3 = 12, equal to lunch start — treat as no overlap (no boundary span)
+    expect(applyLunch(9, 3, lunch)).toEqual({
+      wallClockHours: 3,
+      spansLunch: false,
+      pushedTo: null,
+    });
+  });
+
+  it("pushes start past lunch when session starts inside the lunch window", () => {
+    expect(applyLunch(12.5, 4, lunch)).toEqual({
+      wallClockHours: 4,
+      spansLunch: false,
+      pushedTo: 13,
+    });
+    // start exactly at lunch.startHr is treated as inside
+    expect(applyLunch(12, 4, lunch)).toEqual({
+      wallClockHours: 4,
+      spansLunch: false,
+      pushedTo: 13,
+    });
+  });
+
+  it("no impact when session starts at or after lunch end", () => {
+    expect(applyLunch(13, 4, lunch)).toEqual({
+      wallClockHours: 4,
+      spansLunch: false,
+      pushedTo: null,
+    });
+    expect(applyLunch(14, 3, lunch)).toEqual({
+      wallClockHours: 3,
+      spansLunch: false,
+      pushedTo: null,
+    });
+  });
+});
+
+// ── Lunch-span in the simulator ─────────────────────────────────────────────
+
+describe("computeFeasibility lunch-span placement", () => {
+  it("places an 8h class spanning lunch within a single 8h+lunch day", () => {
+    // Window deliberately small (one week) so the test fails loudly if the
+    // 8h session can't fit in a single day.
+    const impl: Implementation = {
+      ...baseImpl,
+      window_start_date: "2026-06-01",
+      window_end_date: "2026-06-05",
+      go_live_date: null,
+    };
+    const result = computeFeasibility({
+      implementation: impl,
+      rooms: [makeRoom({ seat_capacity: 12 })],
+      trainers: [makeTrainer({ availability_hours_per_week: 40 })],
+      classes: [
+        makeClass({
+          id: "c1",
+          hours_per_session: 8,
+          expected_learners_per_session: 8,
+          total_people_to_train: 8, // 1 session
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    expect(result.unscheduledSessions).toBe(0);
+    expect(result.estimatedCompletionDate).toBeTruthy();
+  });
+
+  it("places a 6h class spanning lunch in one day", () => {
+    const impl: Implementation = {
+      ...baseImpl,
+      window_start_date: "2026-06-01",
+      window_end_date: "2026-06-05",
+      go_live_date: null,
+    };
+    const result = computeFeasibility({
+      implementation: impl,
+      rooms: [makeRoom({ seat_capacity: 6 })],
+      trainers: [makeTrainer()],
+      classes: [
+        makeClass({
+          id: "c1",
+          hours_per_session: 6,
+          expected_learners_per_session: 5,
+          total_people_to_train: 5,
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    expect(result.unscheduledSessions).toBe(0);
+  });
+
+  it("regression: dual-care-style mix with 1h lunch finishes everything", () => {
+    // Mirrors the real-world scenario that surfaced the lunch bug: a mix of
+    // 2h / 4h / 5h / 6h / 8h classes, multiple rooms, plenty of trainers,
+    // 6-week window. Before the fix this produced 15 unscheduled sessions
+    // because every 6h+ class hit the lunch-push trap.
+    const impl: Implementation = {
+      ...baseImpl,
+      window_start_date: "2026-08-31",
+      window_end_date: "2026-10-09",
+      go_live_date: "2026-10-18",
+      go_live_buffer_days: 7,
+    };
+    const result = computeFeasibility({
+      implementation: impl,
+      rooms: [
+        makeRoom({ id: "r1", name: "Big A", seat_capacity: 12 }),
+        makeRoom({ id: "r2", name: "Big B", seat_capacity: 12 }),
+        makeRoom({ id: "r3", name: "Mid", seat_capacity: 6 }),
+        makeRoom({ id: "r4", name: "Small", seat_capacity: 4 }),
+      ],
+      trainers: Array.from({ length: 6 }, (_, i) =>
+        makeTrainer({ id: `t${(i + 1).toString()}`, name: `T${(i + 1).toString()}` }),
+      ),
+      classes: [
+        makeClass({
+          id: "c1",
+          name: "8h-A",
+          hours_per_session: 8,
+          expected_learners_per_session: 8,
+          total_people_to_train: 8, // 1 session
+        }),
+        makeClass({
+          id: "c2",
+          name: "8h-B",
+          hours_per_session: 8,
+          expected_learners_per_session: 5,
+          total_people_to_train: 5,
+        }),
+        makeClass({
+          id: "c3",
+          name: "6h",
+          hours_per_session: 6,
+          expected_learners_per_session: 5,
+          total_people_to_train: 5,
+        }),
+        makeClass({
+          id: "c4",
+          name: "5h",
+          hours_per_session: 5,
+          expected_learners_per_session: 5,
+          total_people_to_train: 5,
+        }),
+        makeClass({
+          id: "c5",
+          name: "4h",
+          hours_per_session: 4,
+          expected_learners_per_session: 5,
+          total_people_to_train: 5,
+        }),
+        makeClass({
+          id: "c6",
+          name: "2h",
+          hours_per_session: 2,
+          expected_learners_per_session: 5,
+          total_people_to_train: 5,
+        }),
+      ],
+      classTrainers: [
+        classTrainer("c1", "t1"),
+        classTrainer("c2", "t2"),
+        classTrainer("c3", "t3"),
+        classTrainer("c4", "t4"),
+        classTrainer("c5", "t5"),
+        classTrainer("c6", "t6"),
+      ],
+      prereqs: [],
+    });
+    expect(result.unscheduledSessions).toBe(0);
+    expect(result.verdict).not.toBe("infeasible");
+  });
+
+  it("pushes session start past lunch when starting inside the lunch window", () => {
+    // This wouldn't normally happen at hour 0 of the day, but test the
+    // pure applyLunch math instead — covered above. Here we just confirm
+    // the regression case where a long session running INSIDE lunch on
+    // back-to-back days still places.
+    const impl: Implementation = {
+      ...baseImpl,
+      window_start_date: "2026-06-01",
+      window_end_date: "2026-06-10",
+      go_live_date: null,
+    };
+    const result = computeFeasibility({
+      implementation: impl,
+      // Two 8h sessions of the same class force a second day in the same room.
+      rooms: [makeRoom({ seat_capacity: 12 })],
+      trainers: [makeTrainer({ availability_hours_per_week: 40 })],
+      classes: [
+        makeClass({
+          id: "c1",
+          hours_per_session: 8,
+          expected_learners_per_session: 8,
+          total_people_to_train: 16, // 2 sessions
+        }),
+      ],
+      classTrainers: [classTrainer("c1", "t1")],
+      prereqs: [],
+    });
+    expect(result.unscheduledSessions).toBe(0);
+  });
+});
+
+// ── Resource forecast ───────────────────────────────────────────────────────
+
+describe("computeResourceForecast", () => {
+  it("groups classes by expected_learners_per_session and recommends room counts", () => {
+    const impl: Implementation = {
+      ...baseImpl,
+      window_start_date: "2026-06-01",
+      window_end_date: "2026-07-26",
+    };
+    const result = computeResourceForecast({
+      implementation: impl,
+      windowWeeks: 8,
+      rooms: [makeRoom({ seat_capacity: 12 })],
+      classes: [
+        makeClass({
+          id: "c1",
+          name: "Big",
+          hours_per_session: 8,
+          expected_learners_per_session: 8,
+          total_people_to_train: 8, // 1 session
+        }),
+        makeClass({
+          id: "c2",
+          name: "Mid A",
+          hours_per_session: 4,
+          expected_learners_per_session: 5,
+          total_people_to_train: 5,
+        }),
+        makeClass({
+          id: "c3",
+          name: "Mid B",
+          hours_per_session: 6,
+          expected_learners_per_session: 5,
+          total_people_to_train: 5,
+        }),
+        makeClass({
+          id: "c4",
+          name: "Small",
+          hours_per_session: 8,
+          expected_learners_per_session: 4,
+          total_people_to_train: 4,
+        }),
+      ],
+    });
+    const seats = result.tiers.map((t) => t.minSeats);
+    // Sorted by seat tier descending.
+    expect(seats).toEqual([8, 5, 4]);
+    // Plenty of room capacity over 8 weeks — each tier needs the floor of 1.
+    expect(result.tiers.every((t) => t.roomsNeeded === 1)).toBe(true);
+    // Total instruction hours = 8 + 4 + 6 + 8 = 26.
+    expect(result.totalInstructionHours).toBe(26);
+    // 8h class spans lunch → +1h wall clock; 6h class spans → +1h; 4h class
+    // (9→13) spans → +1h; 8h small class spans → +1h. Total wall clock 30h.
+    expect(result.totalWallClockHours).toBe(30);
+  });
+
+  it("scales rooms-needed by total workload over the window", () => {
+    const impl: Implementation = {
+      ...baseImpl,
+      window_start_date: "2026-06-01",
+      window_end_date: "2026-06-05", // single 5-day week
+      go_live_date: null,
+    };
+    // 5 days × 9h = 45 wall-clock hours per room. Need more rooms when
+    // workload exceeds that.
+    const result = computeResourceForecast({
+      implementation: impl,
+      windowWeeks: 1,
+      rooms: [],
+      classes: Array.from({ length: 6 }, (_, i) =>
+        makeClass({
+          id: `c${(i + 1).toString()}`,
+          name: `Class ${(i + 1).toString()}`,
+          hours_per_session: 8,
+          expected_learners_per_session: 12,
+          total_people_to_train: 12,
+        }),
+      ),
+    });
+    expect(result.tiers).toHaveLength(1);
+    const tier = result.tiers[0];
+    if (!tier) throw new Error("expected one tier");
+    expect(tier.minSeats).toBe(12);
+    // 6 × 9h = 54 wall-clock hours; per-room cap is ~45 → need 2 rooms.
+    expect(tier.roomsNeeded).toBeGreaterThanOrEqual(2);
   });
 });
