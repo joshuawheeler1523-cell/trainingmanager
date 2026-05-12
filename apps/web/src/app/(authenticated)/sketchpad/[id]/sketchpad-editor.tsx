@@ -1,12 +1,34 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeftIcon, Cog6ToothIcon, PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
+import { Calendar, dateFnsLocalizer, type Event as CalEventBase } from "react-big-calendar";
+import withDragAndDrop, {
+  type EventInteractionArgs,
+} from "react-big-calendar/lib/addons/dragAndDrop";
+import { format, parse, startOfWeek, getDay, addDays } from "date-fns";
+import { enUS } from "date-fns/locale";
+import {
+  ArrowLeftIcon,
+  Cog6ToothIcon,
+  PlusIcon,
+  TrashIcon,
+  XMarkIcon,
+} from "@heroicons/react/20/solid";
+import "react-big-calendar/lib/css/react-big-calendar.css";
+import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import type { SketchpadRoom, SketchpadSchedule, SketchpadSession } from "@arbor/shared";
-import { createRoom, deleteRoom, updateRoom, updateSchedule } from "../actions";
+import {
+  createRoom,
+  createSession,
+  deleteRoom,
+  deleteSession,
+  updateRoom,
+  updateSchedule,
+  updateSession,
+} from "../actions";
 
 type Props = {
   schedule: SketchpadSchedule;
@@ -14,24 +36,272 @@ type Props = {
   sessions: SketchpadSession[];
 };
 
+type CalResource = {
+  sessionId: string;
+  trainerName: string;
+  className: string;
+  roomId: string | null;
+  conflictKind: "none" | "trainer" | "room" | "trainer-and-room" | "out-of-hours";
+  conflictTooltip: string;
+  color: string;
+};
+
+type CalEvent = Omit<CalEventBase, "resource"> & {
+  resource: CalResource;
+  resourceId?: string;
+};
+
 const fieldClass =
   "border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+
+const locales = { "en-US": enUS };
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
+  getDay,
+  locales,
+});
+const DnDCalendar = withDragAndDrop<CalEvent>(Calendar);
+
+const CLASS_PALETTE = [
+  "#bfdbfe", // blue-200
+  "#c7d2fe", // indigo-200
+  "#ddd6fe", // violet-200
+  "#e9d5ff", // purple-200
+  "#f5d0fe", // fuchsia-200
+  "#fbcfe8", // pink-200
+  "#a5f3fc", // cyan-200
+  "#99f6e4", // teal-200
+  "#bae6fd", // sky-200
+  "#fed7aa", // orange-200
+  "#d9f99d", // lime-200
+  "#e2e8f0", // slate-200
+] as const;
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+function colorForClass(name: string): string {
+  const key = name.trim().toLowerCase();
+  if (!key) return CLASS_PALETTE[0];
+  const idx = hashString(key) % CLASS_PALETTE.length;
+  return CLASS_PALETTE[idx] ?? CLASS_PALETTE[0];
+}
+
+// Date+time helpers — sketchpad runs entirely in browser-local time. We
+// store as UTC ISO via Date.toISOString() and render via Date#toLocaleString.
+function dayDate(scheduleStart: string, dayIndex: number): Date {
+  // scheduleStart is "YYYY-MM-DD" — interpret as midnight local.
+  const [y, m, d] = scheduleStart.split("-").map(Number);
+  return addDays(new Date(y ?? 2026, (m ?? 1) - 1, d ?? 1), dayIndex);
+}
+
+function formatDayLabel(d: Date): string {
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function isoFor(day: Date, hour: number, minute: number): string {
+  const d = new Date(day);
+  d.setHours(hour, minute, 0, 0);
+  return d.toISOString();
+}
+
+function isoForOffset(startIso: string, durationMinutes: number): string {
+  const end = new Date(startIso);
+  end.setMinutes(end.getMinutes() + durationMinutes);
+  return end.toISOString();
+}
+
+// Two intervals [a1,a2) and [b1,b2) overlap iff a1 < b2 && b1 < a2.
+function intervalsOverlap(a1: Date, a2: Date, b1: Date, b2: Date): boolean {
+  return a1 < b2 && b1 < a2;
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
 
 export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+
+  // Optimistic layer over sessions — drag-drop / edits apply synchronously,
+  // useOptimistic reverts on transition failure (no router.refresh).
+  const [optimisticSessions, applyOptimisticPatch] = useOptimistic(
+    sessions,
+    (
+      state,
+      action: { kind: "upsert"; session: SketchpadSession } | { kind: "delete"; id: string },
+    ) => {
+      if (action.kind === "delete") return state.filter((s) => s.id !== action.id);
+      const existing = state.findIndex((s) => s.id === action.session.id);
+      if (existing >= 0) {
+        const next = state.slice();
+        next[existing] = action.session;
+        return next;
+      }
+      return [...state, action.session];
+    },
+  );
+
   const [showSettings, setShowSettings] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(0);
+  const [drawerSessionId, setDrawerSessionId] = useState<string | null>(null);
   const [newRoomName, setNewRoomName] = useState("");
 
-  function renameSchedule(newName: string) {
-    const trimmed = newName.trim();
-    if (!trimmed || trimmed === schedule.name) return;
-    startTransition(async () => {
-      const result = await updateSchedule(schedule.id, { name: trimmed });
-      if (!result.ok) toast.error(result.error.message);
-      router.refresh();
-    });
-  }
+  // Quick-add form state. Kept simple — one form for one new session at a time.
+  const [qaTrainer, setQaTrainer] = useState("");
+  const [qaClass, setQaClass] = useState("");
+  const [qaDuration, setQaDuration] = useState("60");
+  const [qaTime, setQaTime] = useState("09:00");
+  const [qaRoomId, setQaRoomId] = useState<string>(rooms[0]?.id ?? "");
+
+  const days = useMemo(
+    () => Array.from({ length: schedule.day_count }, (_, i) => dayDate(schedule.start_date, i)),
+    [schedule.start_date, schedule.day_count],
+  );
+  const currentDay = days[selectedDay] ?? days[0] ?? dayDate(schedule.start_date, 0);
+
+  // Detect conflicts across the WHOLE optimisticSessions list (not just the
+  // visible day) so cross-day trainer conflicts also light up.
+  const conflicts = useMemo(() => {
+    const trainerHits = new Map<string, Set<string>>();
+    const roomHits = new Map<string, Set<string>>();
+    const outOfHours = new Set<string>();
+    const detail = new Map<string, string[]>();
+
+    function addReason(id: string, msg: string) {
+      const list = detail.get(id) ?? [];
+      list.push(msg);
+      detail.set(id, list);
+    }
+    function addEdge(map: Map<string, Set<string>>, fromId: string, toId: string) {
+      let set = map.get(fromId);
+      if (!set) {
+        set = new Set();
+        map.set(fromId, set);
+      }
+      set.add(toId);
+    }
+
+    for (let i = 0; i < optimisticSessions.length; i++) {
+      const a = optimisticSessions[i];
+      if (!a) continue;
+      const aStart = new Date(a.starts_at);
+      const aEnd = new Date(a.ends_at);
+      const startHour = aStart.getHours() + aStart.getMinutes() / 60;
+      const endHour = aEnd.getHours() + aEnd.getMinutes() / 60;
+      if (startHour < schedule.hours_start || endHour > schedule.hours_end) {
+        outOfHours.add(a.id);
+        addReason(
+          a.id,
+          `Outside the ${schedule.hours_start.toString()}:00–${schedule.hours_end.toString()}:00 window`,
+        );
+      }
+      for (let j = i + 1; j < optimisticSessions.length; j++) {
+        const b = optimisticSessions[j];
+        if (!b) continue;
+        const bStart = new Date(b.starts_at);
+        const bEnd = new Date(b.ends_at);
+        if (!intervalsOverlap(aStart, aEnd, bStart, bEnd)) continue;
+        const trainerEq =
+          a.trainer_name.trim().toLowerCase() === b.trainer_name.trim().toLowerCase();
+        const roomEq = a.room_id !== null && a.room_id === b.room_id;
+        if (trainerEq) {
+          addEdge(trainerHits, a.id, b.id);
+          addEdge(trainerHits, b.id, a.id);
+          addReason(
+            a.id,
+            `Trainer "${a.trainer_name}" also in "${b.class_name}" at ${formatTime(b.starts_at)}`,
+          );
+          addReason(
+            b.id,
+            `Trainer "${b.trainer_name}" also in "${a.class_name}" at ${formatTime(a.starts_at)}`,
+          );
+        }
+        if (roomEq) {
+          addEdge(roomHits, a.id, b.id);
+          addEdge(roomHits, b.id, a.id);
+          const roomName = rooms.find((r) => r.id === a.room_id)?.name ?? "this room";
+          addReason(a.id, `Room "${roomName}" double-booked with "${b.class_name}"`);
+          addReason(b.id, `Room "${roomName}" double-booked with "${a.class_name}"`);
+        }
+      }
+    }
+    return { trainerHits, roomHits, outOfHours, detail };
+  }, [optimisticSessions, rooms, schedule.hours_start, schedule.hours_end]);
+
+  // Build CalEvents from sessions that fall on the selected day AND have a room.
+  // Unassigned sessions are surfaced separately in the strip above the calendar.
+  const calendarEvents = useMemo<CalEvent[]>(() => {
+    function kindFor(sessionId: string): CalResource["conflictKind"] {
+      const t = conflicts.trainerHits.has(sessionId);
+      const r = conflicts.roomHits.has(sessionId);
+      if (t && r) return "trainer-and-room";
+      if (t) return "trainer";
+      if (r) return "room";
+      if (conflicts.outOfHours.has(sessionId)) return "out-of-hours";
+      return "none";
+    }
+    return optimisticSessions
+      .filter(
+        (s): s is SketchpadSession & { room_id: string } =>
+          s.room_id !== null && sameDay(new Date(s.starts_at), currentDay),
+      )
+      .map((s) => {
+        const kind = kindFor(s.id);
+        const reasons = conflicts.detail.get(s.id) ?? [];
+        return {
+          title: s.class_name,
+          start: new Date(s.starts_at),
+          end: new Date(s.ends_at),
+          resourceId: s.room_id,
+          resource: {
+            sessionId: s.id,
+            trainerName: s.trainer_name,
+            className: s.class_name,
+            roomId: s.room_id,
+            conflictKind: kind,
+            conflictTooltip: [
+              s.class_name,
+              `${formatTime(s.starts_at)} – ${formatTime(s.ends_at)}`,
+              `Trainer: ${s.trainer_name}`,
+              s.learner_count != null ? `${s.learner_count.toString()} learners` : null,
+              ...reasons.map((r) => `⚠ ${r}`),
+            ]
+              .filter((x): x is string => !!x)
+              .join("\n"),
+            color: colorForClass(s.class_name),
+          },
+        };
+      });
+  }, [optimisticSessions, currentDay, conflicts]);
+
+  const unassignedSessions = useMemo(
+    () => optimisticSessions.filter((s) => !s.room_id),
+    [optimisticSessions],
+  );
+
+  const calendarResources = useMemo(
+    () => rooms.map((r) => ({ resourceId: r.id, resourceTitle: r.name })),
+    [rooms],
+  );
+
+  // ── Mutations ────────────────────────────────────────────────────────────
 
   function patchSchedule(patch: Record<string, unknown>) {
     startTransition(async () => {
@@ -41,6 +311,12 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     });
   }
 
+  function renameSchedule(newName: string) {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === schedule.name) return;
+    patchSchedule({ name: trimmed });
+  }
+
   function handleAddRoom() {
     const name = newRoomName.trim();
     if (!name) return;
@@ -48,6 +324,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
       const result = await createRoom(schedule.id, { name });
       if (result.ok) {
         setNewRoomName("");
+        if (!qaRoomId) setQaRoomId(result.data.id);
         router.refresh();
       } else {
         toast.error(result.error.message);
@@ -65,14 +342,152 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
   }
 
   function handleRenameRoom(id: string, newName: string) {
+    const v = newName.trim();
+    if (!v) return;
     startTransition(async () => {
-      const result = await updateRoom(id, schedule.id, { name: newName.trim() });
+      const result = await updateRoom(id, schedule.id, { name: v });
       if (!result.ok) toast.error(result.error.message);
       router.refresh();
     });
   }
 
-  const unassignedCount = sessions.filter((s) => !s.room_id).length;
+  function handleQuickAdd() {
+    const trainer = qaTrainer.trim();
+    const klass = qaClass.trim();
+    if (!trainer || !klass) {
+      toast.error("Trainer and class are required");
+      return;
+    }
+    const duration = Number(qaDuration);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      toast.error("Duration must be positive");
+      return;
+    }
+    const [hh, mm] = qaTime.split(":").map(Number);
+    const startIso = isoFor(currentDay, hh ?? 0, mm ?? 0);
+    const endIso = isoForOffset(startIso, duration);
+
+    startTransition(async () => {
+      // Optimistic: insert a placeholder with a temp id so the user sees
+      // the block land immediately. useOptimistic auto-reverts on failure.
+      const tempId = `temp-${Date.now().toString()}`;
+      applyOptimisticPatch({
+        kind: "upsert",
+        session: {
+          id: tempId,
+          schedule_id: schedule.id,
+          room_id: qaRoomId || null,
+          org_id: schedule.org_id,
+          trainer_name: trainer,
+          class_name: klass,
+          starts_at: startIso,
+          ends_at: endIso,
+          learner_count: null,
+          notes: null,
+          color: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      });
+      const result = await createSession(schedule.id, {
+        room_id: qaRoomId || null,
+        trainer_name: trainer,
+        class_name: klass,
+        starts_at: startIso,
+        ends_at: endIso,
+      });
+      if (result.ok) {
+        // Reset Class but keep Trainer / Duration / Room / Time so a planner
+        // can rapid-fire add a series of sessions for the same trainer.
+        setQaClass("");
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function commitSessionMove(sessionId: string, patch: Partial<SketchpadSession>) {
+    const existing = optimisticSessions.find((s) => s.id === sessionId);
+    if (!existing) return;
+    const next: SketchpadSession = { ...existing, ...patch, updated_at: new Date().toISOString() };
+    startTransition(async () => {
+      applyOptimisticPatch({ kind: "upsert", session: next });
+      const result = await updateSession(sessionId, schedule.id, {
+        ...(patch.starts_at !== undefined ? { starts_at: patch.starts_at } : {}),
+        ...(patch.ends_at !== undefined ? { ends_at: patch.ends_at } : {}),
+        ...(patch.room_id !== undefined ? { room_id: patch.room_id } : {}),
+        ...(patch.trainer_name !== undefined ? { trainer_name: patch.trainer_name } : {}),
+        ...(patch.class_name !== undefined ? { class_name: patch.class_name } : {}),
+        ...(patch.learner_count !== undefined ? { learner_count: patch.learner_count } : {}),
+        ...(patch.notes !== undefined ? { notes: patch.notes } : {}),
+      });
+      if (result.ok) {
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function handleEventDrop(args: EventInteractionArgs<CalEvent>) {
+    const { event, start, end, resourceId } = args;
+    const startDate = start instanceof Date ? start : new Date(start);
+    const endDate = end instanceof Date ? end : new Date(end);
+    commitSessionMove(event.resource.sessionId, {
+      starts_at: startDate.toISOString(),
+      ends_at: endDate.toISOString(),
+      room_id: typeof resourceId === "string" ? resourceId : event.resource.roomId,
+    });
+  }
+
+  function handleEventResize(args: EventInteractionArgs<CalEvent>) {
+    const { event, start, end } = args;
+    const startDate = start instanceof Date ? start : new Date(start);
+    const endDate = end instanceof Date ? end : new Date(end);
+    commitSessionMove(event.resource.sessionId, {
+      starts_at: startDate.toISOString(),
+      ends_at: endDate.toISOString(),
+    });
+  }
+
+  function handleAssignUnassigned(sessionId: string, roomId: string) {
+    commitSessionMove(sessionId, {
+      room_id: roomId,
+      // Snap to the selected day at the current quick-add time if the
+      // session's date doesn't match the visible day.
+      ...((): { starts_at?: string; ends_at?: string } => {
+        const s = optimisticSessions.find((x) => x.id === sessionId);
+        if (!s) return {};
+        const startDate = new Date(s.starts_at);
+        if (sameDay(startDate, currentDay)) return {};
+        const durMin = (new Date(s.ends_at).getTime() - startDate.getTime()) / 60000;
+        const [hh, mm] = qaTime.split(":").map(Number);
+        const newStart = isoFor(currentDay, hh ?? 9, mm ?? 0);
+        return { starts_at: newStart, ends_at: isoForOffset(newStart, durMin) };
+      })(),
+    });
+  }
+
+  function handleDeleteSession(id: string) {
+    if (!confirm("Delete this session?")) return;
+    startTransition(async () => {
+      applyOptimisticPatch({ kind: "delete", id });
+      const result = await deleteSession(id, schedule.id);
+      if (result.ok) {
+        setDrawerSessionId(null);
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  const minOfDay = new Date(0, 0, 0, schedule.hours_start, 0, 0);
+  const maxOfDay = new Date(0, 0, 0, schedule.hours_end, 0, 0);
+  const openSession = drawerSessionId
+    ? optimisticSessions.find((s) => s.id === drawerSessionId)
+    : null;
 
   return (
     <div className="space-y-4">
@@ -96,10 +511,11 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           <p className="text-muted-foreground mt-1 text-xs">
             {schedule.start_date} · {schedule.day_count.toString()} day
             {schedule.day_count === 1 ? "" : "s"} · {schedule.hours_start.toString()}:00–
-            {schedule.hours_end.toString()}:00 · {schedule.slot_minutes.toString()}-min slots ·{" "}
-            {rooms.length.toString()} room{rooms.length === 1 ? "" : "s"} ·{" "}
-            {sessions.length.toString()} session{sessions.length === 1 ? "" : "s"}
-            {unassignedCount > 0 && ` (${unassignedCount.toString()} unassigned)`}
+            {schedule.hours_end.toString()}:00 · {rooms.length.toString()} room
+            {rooms.length === 1 ? "" : "s"} · {optimisticSessions.length.toString()} session
+            {optimisticSessions.length === 1 ? "" : "s"}
+            {unassignedSessions.length > 0 &&
+              ` (${unassignedSessions.length.toString()} unassigned)`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -125,101 +541,394 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
       </div>
 
       {showSettings && (
-        <div className="border-border bg-background grid grid-cols-2 gap-3 rounded-lg border p-3 md:grid-cols-4">
-          <SettingField
-            label="Start date"
-            type="date"
-            defaultValue={schedule.start_date}
-            disabled={pending}
-            onCommit={(v) => {
-              patchSchedule({ start_date: v });
-            }}
-          />
-          <SettingField
-            label="Days"
-            type="number"
-            min={1}
-            max={14}
-            defaultValue={schedule.day_count.toString()}
-            disabled={pending}
-            onCommit={(v) => {
-              patchSchedule({ day_count: Number(v) });
-            }}
-          />
-          <SettingField
-            label="Day start (24h)"
-            type="number"
-            min={0}
-            max={23}
-            defaultValue={schedule.hours_start.toString()}
-            disabled={pending}
-            onCommit={(v) => {
-              patchSchedule({ hours_start: Number(v) });
-            }}
-          />
-          <SettingField
-            label="Day end (24h)"
-            type="number"
-            min={1}
-            max={24}
-            defaultValue={schedule.hours_end.toString()}
-            disabled={pending}
-            onCommit={(v) => {
-              patchSchedule({ hours_end: Number(v) });
-            }}
-          />
-          <div className="col-span-2">
-            <label
-              htmlFor="slot-minutes"
-              className="text-muted-foreground mb-1 block text-xs font-medium uppercase tracking-wide"
-            >
-              Slot size
-            </label>
-            <select
-              id="slot-minutes"
-              defaultValue={schedule.slot_minutes.toString()}
-              disabled={pending}
-              onChange={(e) => {
-                patchSchedule({ slot_minutes: Number(e.target.value) });
+        <SettingsPanel
+          schedule={schedule}
+          rooms={rooms}
+          pending={pending}
+          newRoomName={newRoomName}
+          onRoomNameChange={setNewRoomName}
+          onPatch={patchSchedule}
+          onAddRoom={handleAddRoom}
+          onRenameRoom={handleRenameRoom}
+          onDeleteRoom={handleDeleteRoom}
+        />
+      )}
+
+      {/* Day tabs */}
+      <div className="border-border bg-background flex flex-wrap gap-1 rounded-lg border p-2">
+        {days.map((d, i) => {
+          const active = i === selectedDay;
+          const dayCount = optimisticSessions.filter((s) =>
+            sameDay(new Date(s.starts_at), d),
+          ).length;
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => {
+                setSelectedDay(i);
               }}
-              className={fieldClass + " w-full"}
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium ${
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-surface"
+              }`}
             >
-              <option value="15">15 minutes</option>
-              <option value="30">30 minutes</option>
-              <option value="60">60 minutes</option>
-            </select>
-          </div>
-          <div className="col-span-2 md:col-span-4">
-            <label
-              htmlFor="notes"
-              className="text-muted-foreground mb-1 block text-xs font-medium uppercase tracking-wide"
-            >
-              Notes
-            </label>
-            <textarea
-              id="notes"
-              defaultValue={schedule.notes ?? ""}
-              disabled={pending}
-              rows={2}
-              onBlur={(e) => {
-                patchSchedule({ notes: e.target.value });
-              }}
-              className={fieldClass + " w-full"}
-            />
+              {formatDayLabel(d)}
+              {dayCount > 0 && (
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
+                    active ? "bg-primary-foreground/20" : "bg-surface text-foreground"
+                  }`}
+                >
+                  {dayCount.toString()}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Quick-add bar */}
+      <div className="border-border bg-background grid grid-cols-1 gap-2 rounded-lg border p-3 md:grid-cols-[1.5fr_1.5fr_80px_100px_1.5fr_auto]">
+        <div>
+          <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+            Trainer
+          </label>
+          <input
+            value={qaTrainer}
+            onChange={(e) => {
+              setQaTrainer(e.target.value);
+            }}
+            placeholder="e.g., Smith"
+            className={fieldClass + " w-full"}
+            disabled={pending}
+          />
+        </div>
+        <div>
+          <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+            Class
+          </label>
+          <input
+            value={qaClass}
+            onChange={(e) => {
+              setQaClass(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleQuickAdd();
+              }
+            }}
+            placeholder="e.g., EMR Provider"
+            className={fieldClass + " w-full"}
+            disabled={pending}
+          />
+        </div>
+        <div>
+          <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+            Min
+          </label>
+          <input
+            type="number"
+            value={qaDuration}
+            min={5}
+            step={5}
+            onChange={(e) => {
+              setQaDuration(e.target.value);
+            }}
+            className={fieldClass + " w-full tabular-nums"}
+            disabled={pending}
+          />
+        </div>
+        <div>
+          <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+            Time
+          </label>
+          <input
+            type="time"
+            value={qaTime}
+            onChange={(e) => {
+              setQaTime(e.target.value);
+            }}
+            className={fieldClass + " w-full tabular-nums"}
+            disabled={pending}
+          />
+        </div>
+        <div>
+          <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+            Room
+          </label>
+          <select
+            value={qaRoomId}
+            onChange={(e) => {
+              setQaRoomId(e.target.value);
+            }}
+            className={fieldClass + " w-full"}
+            disabled={pending || rooms.length === 0}
+          >
+            {rooms.length === 0 ? (
+              <option value="">Add a room first</option>
+            ) : (
+              <>
+                <option value="">— Unassigned —</option>
+                {rooms.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </>
+            )}
+          </select>
+        </div>
+        <div className="flex items-end">
+          <button
+            type="button"
+            disabled={pending || !qaTrainer.trim() || !qaClass.trim()}
+            onClick={handleQuickAdd}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-[34px] items-center gap-1 rounded-md px-3 text-sm font-medium disabled:opacity-50"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Add
+          </button>
+        </div>
+      </div>
+
+      {/* Unassigned strip */}
+      {unassignedSessions.length > 0 && (
+        <div className="border-border rounded-lg border bg-amber-50/40 p-3 dark:bg-amber-900/10">
+          <p className="text-foreground mb-1.5 text-xs font-semibold">
+            Unassigned ({unassignedSessions.length.toString()})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {unassignedSessions.map((s) => (
+              <UnassignedPill
+                key={s.id}
+                session={s}
+                rooms={rooms}
+                pending={pending}
+                onOpen={() => {
+                  setDrawerSessionId(s.id);
+                }}
+                onAssign={(roomId) => {
+                  handleAssignUnassigned(s.id, roomId);
+                }}
+              />
+            ))}
           </div>
         </div>
       )}
 
-      <div className="border-border bg-background rounded-lg border p-3">
+      {/* Calendar grid */}
+      <div className="border-border bg-background rounded-lg border p-3" style={{ height: 720 }}>
+        {rooms.length === 0 ? (
+          <div className="text-muted-foreground flex h-full items-center justify-center text-sm italic">
+            Add at least one room (Settings → Rooms) to start placing sessions.
+          </div>
+        ) : (
+          <DnDCalendar
+            localizer={localizer}
+            events={calendarEvents}
+            startAccessor="start"
+            endAccessor="end"
+            views={["day"]}
+            defaultView="day"
+            view="day"
+            onView={() => {
+              // Locked to day view in v2; tabs above handle day nav.
+            }}
+            date={currentDay}
+            onNavigate={() => {
+              // Disable internal nav; we drive `date` via the tab strip above.
+            }}
+            toolbar={false}
+            resources={calendarResources}
+            resourceIdAccessor={(r: object) => (r as { resourceId: string }).resourceId}
+            resourceTitleAccessor={(r: object) => (r as { resourceTitle: string }).resourceTitle}
+            tooltipAccessor={(event: CalEvent) => event.resource.conflictTooltip}
+            min={minOfDay}
+            max={maxOfDay}
+            step={schedule.slot_minutes}
+            timeslots={Math.max(1, Math.floor(60 / schedule.slot_minutes))}
+            onSelectEvent={(event) => {
+              setDrawerSessionId(event.resource.sessionId);
+            }}
+            onEventDrop={handleEventDrop}
+            onEventResize={handleEventResize}
+            resizable
+            eventPropGetter={(event: CalEvent) => {
+              const kind = event.resource.conflictKind;
+              const borderColor =
+                kind === "trainer" || kind === "trainer-and-room"
+                  ? "#e11d48" // rose-600
+                  : kind === "room"
+                    ? "#f59e0b" // amber-500
+                    : kind === "out-of-hours"
+                      ? "#64748b" // slate-500
+                      : "transparent";
+              const hasBorder = kind !== "none";
+              return {
+                style: {
+                  backgroundColor: event.resource.color,
+                  borderLeft: hasBorder ? `4px solid ${borderColor}` : "none",
+                  borderTop: hasBorder ? `1px solid ${borderColor}` : "none",
+                  borderRight: hasBorder ? `1px solid ${borderColor}` : "none",
+                  borderBottom: hasBorder ? `1px solid ${borderColor}` : "none",
+                  color: "#0f172a",
+                },
+              };
+            }}
+            style={{ height: "100%" }}
+          />
+        )}
+      </div>
+
+      <p className="text-muted-foreground text-[11px]">
+        Times are in your browser&apos;s local timezone. Drag a session to move or resize. Click for
+        details. Trainer overlap = rose border. Room overlap = amber. Outside the day window =
+        slate.
+      </p>
+
+      {openSession && (
+        <SessionDrawer
+          session={openSession}
+          rooms={rooms}
+          pending={pending}
+          conflictTooltip={conflicts.detail.get(openSession.id) ?? []}
+          onClose={() => {
+            setDrawerSessionId(null);
+          }}
+          onPatch={(patch) => {
+            commitSessionMove(openSession.id, patch);
+          }}
+          onDelete={() => {
+            handleDeleteSession(openSession.id);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Subcomponents ──────────────────────────────────────────────────────────
+
+function SettingsPanel({
+  schedule,
+  rooms,
+  pending,
+  newRoomName,
+  onRoomNameChange,
+  onPatch,
+  onAddRoom,
+  onRenameRoom,
+  onDeleteRoom,
+}: {
+  schedule: SketchpadSchedule;
+  rooms: SketchpadRoom[];
+  pending: boolean;
+  newRoomName: string;
+  onRoomNameChange: (v: string) => void;
+  onPatch: (patch: Record<string, unknown>) => void;
+  onAddRoom: () => void;
+  onRenameRoom: (id: string, name: string) => void;
+  onDeleteRoom: (id: string, name: string) => void;
+}) {
+  return (
+    <div className="border-border bg-background space-y-3 rounded-lg border p-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <SettingField
+          label="Start date"
+          type="date"
+          defaultValue={schedule.start_date}
+          disabled={pending}
+          onCommit={(v) => {
+            onPatch({ start_date: v });
+          }}
+        />
+        <SettingField
+          label="Days"
+          type="number"
+          min={1}
+          max={14}
+          defaultValue={schedule.day_count.toString()}
+          disabled={pending}
+          onCommit={(v) => {
+            onPatch({ day_count: Number(v) });
+          }}
+        />
+        <SettingField
+          label="Day start"
+          type="number"
+          min={0}
+          max={23}
+          defaultValue={schedule.hours_start.toString()}
+          disabled={pending}
+          onCommit={(v) => {
+            onPatch({ hours_start: Number(v) });
+          }}
+        />
+        <SettingField
+          label="Day end"
+          type="number"
+          min={1}
+          max={24}
+          defaultValue={schedule.hours_end.toString()}
+          disabled={pending}
+          onCommit={(v) => {
+            onPatch({ hours_end: Number(v) });
+          }}
+        />
+        <div className="col-span-2">
+          <label
+            htmlFor="slot-minutes"
+            className="text-muted-foreground mb-1 block text-xs font-medium uppercase tracking-wide"
+          >
+            Slot size
+          </label>
+          <select
+            id="slot-minutes"
+            defaultValue={schedule.slot_minutes.toString()}
+            disabled={pending}
+            onChange={(e) => {
+              onPatch({ slot_minutes: Number(e.target.value) });
+            }}
+            className={fieldClass + " w-full"}
+          >
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">60 minutes</option>
+          </select>
+        </div>
+        <div className="col-span-2 md:col-span-4">
+          <label
+            htmlFor="notes"
+            className="text-muted-foreground mb-1 block text-xs font-medium uppercase tracking-wide"
+          >
+            Notes
+          </label>
+          <textarea
+            id="notes"
+            defaultValue={schedule.notes ?? ""}
+            disabled={pending}
+            rows={2}
+            onBlur={(e) => {
+              onPatch({ notes: e.target.value });
+            }}
+            className={fieldClass + " w-full"}
+          />
+        </div>
+      </div>
+
+      <div className="border-border border-t pt-3">
         <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-foreground text-sm font-semibold">Rooms</h2>
+          <h3 className="text-foreground text-xs font-semibold uppercase tracking-wide">Rooms</h3>
           <p className="text-muted-foreground text-[11px]">
-            Sessions will drag-drop across rooms in the next build phase.
+            Each room becomes a column in the day grid.
           </p>
         </div>
         {rooms.length === 0 ? (
           <p className="text-muted-foreground text-xs italic">
-            No rooms yet. Add at least one so you can assign sessions to it.
+            No rooms yet. Add at least one to start placing sessions.
           </p>
         ) : (
           <ul className="divide-border divide-y">
@@ -230,7 +939,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
                   disabled={pending}
                   onBlur={(e) => {
                     const v = e.target.value.trim();
-                    if (v && v !== r.name) handleRenameRoom(r.id, v);
+                    if (v && v !== r.name) onRenameRoom(r.id, v);
                   }}
                   className={fieldClass + " flex-1"}
                 />
@@ -238,7 +947,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
                   type="button"
                   disabled={pending}
                   onClick={() => {
-                    handleDeleteRoom(r.id, r.name);
+                    onDeleteRoom(r.id, r.name);
                   }}
                   aria-label={`Delete ${r.name}`}
                   className="text-muted-foreground hover:text-destructive rounded p-1 disabled:opacity-50"
@@ -253,12 +962,12 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           <input
             value={newRoomName}
             onChange={(e) => {
-              setNewRoomName(e.target.value);
+              onRoomNameChange(e.target.value);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                handleAddRoom();
+                onAddRoom();
               }
             }}
             placeholder="Room name (e.g., Sim Lab A)"
@@ -268,22 +977,13 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           <button
             type="button"
             disabled={pending || !newRoomName.trim()}
-            onClick={handleAddRoom}
+            onClick={onAddRoom}
             className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
           >
             <PlusIcon className="h-4 w-4" />
             Add room
           </button>
         </div>
-      </div>
-
-      <div className="border-border bg-surface/40 rounded-lg border border-dashed p-6 text-center">
-        <p className="text-foreground text-sm font-medium">Grid editor coming in the next build</p>
-        <p className="text-muted-foreground mt-1 text-xs">
-          Phase 1 ships the schema + list view + settings + rooms. Phase 2 (next PR) wires up the
-          calendar grid with drag-drop, quick-add bar, live conflict highlighting, autosave, and
-          undo/redo. Phase 3 adds the Excel + PDF export and smart-paste.
-        </p>
       </div>
     </div>
   );
@@ -326,6 +1026,214 @@ function SettingField({
           if (e.target.value && e.target.value !== defaultValue) onCommit(e.target.value);
         }}
         className={fieldClass + " w-full tabular-nums"}
+      />
+    </div>
+  );
+}
+
+function UnassignedPill({
+  session,
+  rooms,
+  pending,
+  onOpen,
+  onAssign,
+}: {
+  session: SketchpadSession;
+  rooms: SketchpadRoom[];
+  pending: boolean;
+  onOpen: () => void;
+  onAssign: (roomId: string) => void;
+}) {
+  return (
+    <div className="border-border bg-background flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="text-foreground hover:text-primary font-medium underline-offset-2 hover:underline"
+      >
+        {session.class_name}
+      </button>
+      <span className="text-muted-foreground">— {session.trainer_name}</span>
+      <select
+        defaultValue=""
+        disabled={pending || rooms.length === 0}
+        onChange={(e) => {
+          if (e.target.value) onAssign(e.target.value);
+        }}
+        className="bg-background border-input text-foreground ml-1 rounded border px-1 py-0.5 text-[11px]"
+      >
+        <option value="">Assign to…</option>
+        {rooms.map((r) => (
+          <option key={r.id} value={r.id}>
+            {r.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function SessionDrawer({
+  session,
+  rooms,
+  pending,
+  conflictTooltip,
+  onClose,
+  onPatch,
+  onDelete,
+}: {
+  session: SketchpadSession;
+  rooms: SketchpadRoom[];
+  pending: boolean;
+  conflictTooltip: string[];
+  onClose: () => void;
+  onPatch: (patch: Partial<SketchpadSession>) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex justify-end bg-black/40"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="border-border bg-background flex w-full max-w-md flex-col border-l shadow-xl"
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="border-border flex items-start justify-between border-b px-6 py-4">
+          <div className="min-w-0">
+            <h2 className="text-foreground truncate text-base font-semibold">
+              {session.class_name}
+            </h2>
+            <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">
+              {formatTime(session.starts_at)} – {formatTime(session.ends_at)}
+            </p>
+            {conflictTooltip.length > 0 && (
+              <ul className="mt-1 space-y-0.5">
+                {conflictTooltip.map((msg, i) => (
+                  <li key={i} className="text-xs text-rose-600 dark:text-rose-400">
+                    ⚠ {msg}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
+          <DrawerField
+            label="Trainer"
+            defaultValue={session.trainer_name}
+            disabled={pending}
+            onCommit={(v) => {
+              if (v && v !== session.trainer_name) onPatch({ trainer_name: v });
+            }}
+          />
+          <DrawerField
+            label="Class"
+            defaultValue={session.class_name}
+            disabled={pending}
+            onCommit={(v) => {
+              if (v && v !== session.class_name) onPatch({ class_name: v });
+            }}
+          />
+          <div>
+            <label className="text-muted-foreground mb-1 block text-xs font-medium uppercase tracking-wide">
+              Room
+            </label>
+            <select
+              value={session.room_id ?? ""}
+              disabled={pending}
+              onChange={(e) => {
+                onPatch({ room_id: e.target.value || null });
+              }}
+              className={fieldClass + " w-full"}
+            >
+              <option value="">— Unassigned —</option>
+              {rooms.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <DrawerField
+            label="Learner count"
+            type="number"
+            defaultValue={session.learner_count?.toString() ?? ""}
+            disabled={pending}
+            onCommit={(v) => {
+              const n = v === "" ? null : Number(v);
+              if (n !== session.learner_count) onPatch({ learner_count: n });
+            }}
+          />
+          <div>
+            <label className="text-muted-foreground mb-1 block text-xs font-medium uppercase tracking-wide">
+              Notes
+            </label>
+            <textarea
+              defaultValue={session.notes ?? ""}
+              disabled={pending}
+              rows={3}
+              onBlur={(e) => {
+                if (e.target.value !== (session.notes ?? "")) onPatch({ notes: e.target.value });
+              }}
+              className={fieldClass + " w-full"}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={pending}
+            className="text-destructive text-xs hover:underline disabled:opacity-50"
+          >
+            Delete session
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DrawerField({
+  label,
+  type = "text",
+  defaultValue,
+  disabled,
+  onCommit,
+}: {
+  label: string;
+  type?: "text" | "number";
+  defaultValue: string;
+  disabled: boolean;
+  onCommit: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="text-muted-foreground mb-1 block text-xs font-medium uppercase tracking-wide">
+        {label}
+      </label>
+      <input
+        type={type}
+        defaultValue={defaultValue}
+        disabled={disabled}
+        onBlur={(e) => {
+          onCommit(e.target.value);
+        }}
+        className={fieldClass + " w-full"}
       />
     </div>
   );
