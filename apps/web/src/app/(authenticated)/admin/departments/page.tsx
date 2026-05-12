@@ -33,6 +33,7 @@ export default async function DepartmentsAdminPage() {
     .from("instructors")
     .select("department_id")
     .eq("org_id", orgId)
+    .eq("is_external", false)
     .is("deleted_at", null);
 
   const headcountByDept = new Map<string, number>();

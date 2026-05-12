@@ -48,7 +48,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       .eq("project_id", projectId)
       .eq("org_id", orgId),
     supabase.from("task_assignments").select("*").eq("org_id", orgId),
-    supabase.from("instructors").select("id, full_name").eq("org_id", orgId).is("deleted_at", null),
+    supabase
+      .from("instructors")
+      .select("id, full_name")
+      .eq("org_id", orgId)
+      .eq("is_external", false)
+      .is("deleted_at", null),
   ]);
 
   if (!project) return new NextResponse("Not found", { status: 404 });

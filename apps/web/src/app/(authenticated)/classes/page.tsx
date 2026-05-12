@@ -38,6 +38,7 @@ async function ClassContent({ searchParams }: { searchParams: SearchParams }) {
       .from("instructors")
       .select("*")
       .eq("org_id", orgId)
+      .eq("is_external", false)
       .eq("status", "active")
       .is("deleted_at", null)
       .order("full_name"),

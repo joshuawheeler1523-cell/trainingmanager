@@ -26,7 +26,13 @@ export default async function InstructorDetailPage({ params }: { params: Params 
     { data: forecastRows },
     { data: bucketRows },
   ] = await Promise.all([
-    supabase.from("instructors").select("*").eq("id", id).eq("org_id", orgId).maybeSingle(),
+    supabase
+      .from("instructors")
+      .select("*")
+      .eq("id", id)
+      .eq("org_id", orgId)
+      .eq("is_external", false)
+      .maybeSingle(),
     supabase
       .from("audit_log")
       .select("id, operation, changed_fields, old_values, new_values, occurred_at, actor_id")

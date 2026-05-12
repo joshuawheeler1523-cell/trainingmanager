@@ -2629,6 +2629,7 @@ export type Database = {
           email: string | null;
           full_name: string;
           id: string;
+          is_external: boolean;
           job_title: string | null;
           location: string | null;
           notes: string | null;
@@ -2651,6 +2652,7 @@ export type Database = {
           email?: string | null;
           full_name: string;
           id?: string;
+          is_external?: boolean;
           job_title?: string | null;
           location?: string | null;
           notes?: string | null;
@@ -2673,6 +2675,7 @@ export type Database = {
           email?: string | null;
           full_name?: string;
           id?: string;
+          is_external?: boolean;
           job_title?: string | null;
           location?: string | null;
           notes?: string | null;

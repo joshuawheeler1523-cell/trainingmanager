@@ -23,6 +23,7 @@ export const instructorInsertSchema = z.object({
   annual_hours: z.coerce.number().int().min(0).max(4000).default(1880),
   status: z.enum(["active", "inactive", "on_leave"]).default("active"),
   notes: emptyToNull,
+  is_external: z.coerce.boolean().default(false),
 });
 
 export const instructorUpdateSchema = z.object({
@@ -40,7 +41,20 @@ export const instructorUpdateSchema = z.object({
   annual_hours: z.coerce.number().int().min(0).max(4000).optional(),
   status: z.enum(["active", "inactive", "on_leave"]).optional(),
   notes: emptyToNull.optional(),
+  is_external: z.coerce.boolean().optional(),
 });
+
+export const externalInstructorCreateSchema = z.object({
+  full_name: z.string().min(1, "Name is required").max(200),
+  email: z
+    .string()
+    .nullish()
+    .transform((v) => (v === "" || v == null ? null : v))
+    .pipe(z.string().email("Must be a valid email address").nullable()),
+  notes: emptyToNull,
+});
+
+export type ExternalInstructorCreate = z.infer<typeof externalInstructorCreateSchema>;
 
 export type InstructorInsert = z.infer<typeof instructorInsertSchema>;
 export type InstructorUpdate = z.infer<typeof instructorUpdateSchema>;
@@ -60,6 +74,7 @@ export type Instructor = {
   annual_hours: number;
   status: "active" | "inactive" | "on_leave";
   notes: string | null;
+  is_external: boolean;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;

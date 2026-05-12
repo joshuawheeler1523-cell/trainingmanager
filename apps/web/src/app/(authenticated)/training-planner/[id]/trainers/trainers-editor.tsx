@@ -15,10 +15,13 @@ import {
 import type { ImplTrainer, ImplTrainerUnavailability, Instructor } from "@arbor/shared";
 import {
   addTrainerUnavailability,
+  createExternalInstructor,
   createTrainer,
   deleteTrainer,
   deleteTrainerUnavailability,
+  linkImplTrainerToInstructor,
   setStep,
+  softDeleteExternalInstructor,
   updateTrainer,
 } from "../../actions";
 
@@ -44,13 +47,21 @@ export default function TrainersEditor({
   const usedInstructorIds = new Set(
     trainers.map((t) => t.instructor_id).filter((x): x is string => !!x),
   );
-  const availableInstructors = instructors.filter((i) => !usedInstructorIds.has(i.id));
+  const internalInstructors = instructors.filter((i) => !i.is_external);
+  const externalPool = instructors.filter((i) => i.is_external);
+  const availableInternal = internalInstructors.filter((i) => !usedInstructorIds.has(i.id));
+  const availableExternal = externalPool.filter((i) => !usedInstructorIds.has(i.id));
 
   const [pickInstructor, setPickInstructor] = useState("");
+  const [pickExternal, setPickExternal] = useState("");
+  const [newExtName, setNewExtName] = useState("");
+  const [newExtEmail, setNewExtEmail] = useState("");
+  const [showFreeText, setShowFreeText] = useState(false);
   const [externalName, setExternalName] = useState("");
   const [externalEmail, setExternalEmail] = useState("");
   const [hours, setHours] = useState("20");
   const [openPtoFor, setOpenPtoFor] = useState<string | null>(null);
+  const [promotingTrainerId, setPromotingTrainerId] = useState<string | null>(null);
 
   const ptoByTrainer = new Map<string, ImplTrainerUnavailability[]>();
   for (const u of unavailability) {
@@ -61,7 +72,7 @@ export default function TrainersEditor({
 
   function addFromInstructor() {
     if (!pickInstructor) return;
-    const inst = instructors.find((i) => i.id === pickInstructor);
+    const inst = internalInstructors.find((i) => i.id === pickInstructor);
     if (!inst) return;
     startTransition(async () => {
       const result = await createTrainer(implementationId, {
@@ -80,7 +91,59 @@ export default function TrainersEditor({
     });
   }
 
-  function addExternal() {
+  function addFromExternalPool() {
+    if (!pickExternal) return;
+    const ext = externalPool.find((i) => i.id === pickExternal);
+    if (!ext) return;
+    startTransition(async () => {
+      const result = await createTrainer(implementationId, {
+        instructor_id: ext.id,
+        name: ext.full_name,
+        email: ext.email,
+        availability_hours_per_week: Number(hours),
+      });
+      if (result.ok) {
+        setPickExternal("");
+        setHours("20");
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function createAndAddExternal() {
+    const name = newExtName.trim();
+    if (!name) return;
+    startTransition(async () => {
+      const extResult = await createExternalInstructor({
+        full_name: name,
+        email: newExtEmail.trim() || null,
+        notes: null,
+      });
+      if (!extResult.ok) {
+        toast.error(extResult.error.message);
+        return;
+      }
+      const trainerResult = await createTrainer(implementationId, {
+        instructor_id: extResult.data.id,
+        name: extResult.data.full_name,
+        email: extResult.data.email,
+        availability_hours_per_week: Number(hours),
+      });
+      if (trainerResult.ok) {
+        setNewExtName("");
+        setNewExtEmail("");
+        setHours("20");
+        toast.success(`Added "${name}" to the external pool`);
+        router.refresh();
+      } else {
+        toast.error(trainerResult.error.message);
+      }
+    });
+  }
+
+  function addExternalFreeText() {
     const name = externalName.trim();
     if (!name) return;
     startTransition(async () => {
@@ -97,6 +160,59 @@ export default function TrainersEditor({
         router.refresh();
       } else {
         toast.error(result.error.message);
+      }
+    });
+  }
+
+  function softDeleteFromPool(instructorId: string) {
+    if (
+      !confirm(
+        "Remove this trainer from the external pool? Existing implementations that already link to them stay intact; they just won't appear in the picker.",
+      )
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      const result = await softDeleteExternalInstructor(instructorId, implementationId);
+      if (result.ok) {
+        toast.success("Removed from pool");
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  // existingInstructorId is either an instructors.id or the literal "NEW"
+  // sentinel meaning "create a new external pool entry from this trainer's
+  // name/email and link to it".
+  function promoteToPool(
+    trainerId: string,
+    existingInstructorId: string,
+    name: string,
+    email: string | null,
+  ) {
+    startTransition(async () => {
+      let instructorId = existingInstructorId;
+      if (existingInstructorId === "NEW") {
+        const created = await createExternalInstructor({
+          full_name: name,
+          email,
+          notes: null,
+        });
+        if (!created.ok) {
+          toast.error(created.error.message);
+          return;
+        }
+        instructorId = created.data.id;
+      }
+      const linked = await linkImplTrainerToInstructor(trainerId, implementationId, instructorId);
+      if (linked.ok) {
+        setPromotingTrainerId(null);
+        toast.success("Linked to external pool");
+        router.refresh();
+      } else {
+        toast.error(linked.error.message);
       }
     });
   }
@@ -127,10 +243,12 @@ export default function TrainersEditor({
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground text-xs">
-        Add trainers available for this implementation. Pick from your instructor roster, or add an
-        external trainer (e.g., a vendor&apos;s specialist). Availability is hours dedicated to{" "}
-        <em>this implementation</em>, not their total weekly hours. Use the calendar icon on each
-        row to record PTO / unavailability windows so the scheduler plans around them.
+        Add trainers available for this implementation. Three options: an internal employee from
+        your instructor roster, an external/consultant from the org-wide pool, or a free-text
+        one-off (won&apos;t cross-conflict with other implementations). Externals in the pool get
+        the same cross-impl conflict checking that roster instructors do. Availability is hours
+        dedicated to <em>this implementation</em>; use the calendar icon to record PTO so the
+        scheduler plans around it.
       </p>
 
       {trainers.length === 0 ? (
@@ -156,6 +274,14 @@ export default function TrainersEditor({
               {trainers.map((t) => {
                 const trainerPto = ptoByTrainer.get(t.id) ?? [];
                 const isOpen = openPtoFor === t.id;
+                const linkedInstructor = t.instructor_id
+                  ? instructors.find((i) => i.id === t.instructor_id)
+                  : null;
+                const sourceKind: "roster" | "pool" | "freetext" = !t.instructor_id
+                  ? "freetext"
+                  : linkedInstructor?.is_external
+                    ? "pool"
+                    : "roster";
                 return (
                   <TrainerRow
                     key={t.id}
@@ -169,6 +295,18 @@ export default function TrainersEditor({
                     pending={pending}
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
+                    sourceKind={sourceKind}
+                    poolCandidates={availableExternal}
+                    isPromoting={promotingTrainerId === t.id}
+                    onStartPromote={() => {
+                      setPromotingTrainerId(t.id);
+                    }}
+                    onCancelPromote={() => {
+                      setPromotingTrainerId(null);
+                    }}
+                    onPromote={(instructorId, name, email) => {
+                      promoteToPool(t.id, instructorId, name, email);
+                    }}
                   />
                 );
               })}
@@ -177,19 +315,23 @@ export default function TrainersEditor({
         </div>
       )}
 
-      <div className="border-border bg-background grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-2">
+      <div className="border-border bg-background grid grid-cols-1 gap-4 rounded-lg border p-3 md:grid-cols-2">
         <div className="space-y-2">
-          <p className="text-foreground text-xs font-semibold">From instructor roster</p>
+          <p className="text-foreground text-xs font-semibold">From internal roster</p>
           <select
             value={pickInstructor}
             onChange={(e) => {
               setPickInstructor(e.target.value);
             }}
             className={fieldClass + " w-full"}
-            disabled={availableInstructors.length === 0}
+            disabled={availableInternal.length === 0}
           >
-            <option value="">Select instructor…</option>
-            {availableInstructors.map((i) => (
+            <option value="">
+              {availableInternal.length === 0
+                ? "No internal instructors available"
+                : "Select instructor…"}
+            </option>
+            {availableInternal.map((i) => (
               <option key={i.id} value={i.id}>
                 {i.full_name}
               </option>
@@ -221,36 +363,134 @@ export default function TrainersEditor({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <p className="text-foreground text-xs font-semibold">External trainer</p>
-          <input
-            value={externalName}
-            onChange={(e) => {
-              setExternalName(e.target.value);
-            }}
-            placeholder="Name"
-            className={fieldClass + " w-full"}
-          />
-          <div className="flex items-end gap-2">
-            <input
-              value={externalEmail}
-              onChange={(e) => {
-                setExternalEmail(e.target.value);
-              }}
-              placeholder="Email"
-              type="email"
-              className={fieldClass + " flex-1"}
-            />
-            <button
-              type="button"
-              disabled={pending || !externalName.trim()}
-              onClick={addExternal}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-            >
-              <PlusIcon className="h-4 w-4" />
-              Add
-            </button>
+        <div className="space-y-3">
+          <div>
+            <div className="mb-1 flex items-baseline justify-between">
+              <p className="text-foreground text-xs font-semibold">External / consultant pool</p>
+              <p className="text-muted-foreground text-[10px]">Cross-impl conflict checked</p>
+            </div>
+            <div className="flex items-end gap-2">
+              <select
+                value={pickExternal}
+                onChange={(e) => {
+                  setPickExternal(e.target.value);
+                }}
+                className={fieldClass + " flex-1"}
+                disabled={availableExternal.length === 0}
+              >
+                <option value="">
+                  {externalPool.length === 0
+                    ? "Pool is empty — create one below"
+                    : availableExternal.length === 0
+                      ? "All pool entries already on this impl"
+                      : "Select from pool…"}
+                </option>
+                {availableExternal.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.full_name}
+                    {i.email ? ` (${i.email})` : ""}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={pending || !pickExternal}
+                onClick={addFromExternalPool}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Add
+              </button>
+            </div>
+            {pickExternal && (
+              <button
+                type="button"
+                onClick={() => {
+                  softDeleteFromPool(pickExternal);
+                }}
+                disabled={pending}
+                className="text-muted-foreground hover:text-destructive mt-1 text-[11px] underline disabled:opacity-50"
+              >
+                Remove this entry from the pool
+              </button>
+            )}
           </div>
+
+          <div className="border-border border-t pt-2">
+            <p className="text-muted-foreground mb-1 text-[11px] font-medium uppercase tracking-wide">
+              Or create new
+            </p>
+            <input
+              value={newExtName}
+              onChange={(e) => {
+                setNewExtName(e.target.value);
+              }}
+              placeholder="Name"
+              className={fieldClass + " mb-1.5 w-full"}
+            />
+            <div className="flex items-end gap-2">
+              <input
+                value={newExtEmail}
+                onChange={(e) => {
+                  setNewExtEmail(e.target.value);
+                }}
+                placeholder="Email (optional)"
+                type="email"
+                className={fieldClass + " flex-1"}
+              />
+              <button
+                type="button"
+                disabled={pending || !newExtName.trim()}
+                onClick={createAndAddExternal}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Create + add
+              </button>
+            </div>
+          </div>
+
+          <details
+            className="border-border border-t pt-2"
+            open={showFreeText}
+            onToggle={(e) => {
+              setShowFreeText((e.target as HTMLDetailsElement).open);
+            }}
+          >
+            <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-[11px]">
+              Add as one-off free-text trainer (won&apos;t cross-conflict)
+            </summary>
+            <div className="mt-2 space-y-1.5">
+              <input
+                value={externalName}
+                onChange={(e) => {
+                  setExternalName(e.target.value);
+                }}
+                placeholder="Name"
+                className={fieldClass + " w-full"}
+              />
+              <div className="flex items-end gap-2">
+                <input
+                  value={externalEmail}
+                  onChange={(e) => {
+                    setExternalEmail(e.target.value);
+                  }}
+                  placeholder="Email"
+                  type="email"
+                  className={fieldClass + " flex-1"}
+                />
+                <button
+                  type="button"
+                  disabled={pending || !externalName.trim()}
+                  onClick={addExternalFreeText}
+                  className="border-border bg-background hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Add free-text
+                </button>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -288,6 +528,12 @@ function TrainerRow({
   pending,
   onUpdate,
   onDelete,
+  sourceKind,
+  poolCandidates,
+  isPromoting,
+  onStartPromote,
+  onCancelPromote,
+  onPromote,
 }: {
   t: ImplTrainer;
   pto: ImplTrainerUnavailability[];
@@ -297,6 +543,12 @@ function TrainerRow({
   pending: boolean;
   onUpdate: (t: ImplTrainer, patch: Record<string, unknown>) => void;
   onDelete: (id: string) => void;
+  sourceKind: "roster" | "pool" | "freetext";
+  poolCandidates: Instructor[];
+  isPromoting: boolean;
+  onStartPromote: () => void;
+  onCancelPromote: () => void;
+  onPromote: (instructorId: string, name: string, email: string | null) => void;
 }) {
   const router = useRouter();
   const [ptoPending, startPtoTransition] = useTransition();
@@ -335,8 +587,18 @@ function TrainerRow({
     });
   }
 
+  const [promoteSelection, setPromoteSelection] = useState<string>("");
   const ptoCount = pto.length;
   const rowPending = pending || ptoPending;
+
+  function handlePromote() {
+    if (promoteSelection === "") return;
+    if (promoteSelection === "NEW") {
+      onPromote("NEW", t.name, t.email);
+    } else {
+      onPromote(promoteSelection, t.name, t.email);
+    }
+  }
 
   return (
     <>
@@ -380,8 +642,31 @@ function TrainerRow({
             placeholder="—"
           />
         </td>
-        <td className="text-muted-foreground px-3 py-2 text-xs">
-          {t.instructor_id ? "Roster" : "External"}
+        <td className="px-3 py-2 text-xs">
+          {sourceKind === "roster" && <span className="text-muted-foreground">Roster</span>}
+          {sourceKind === "pool" && (
+            <span className="rounded-full bg-violet-100 px-2 py-0.5 font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-200">
+              Pool
+            </span>
+          )}
+          {sourceKind === "freetext" && (
+            <div className="flex items-center gap-1.5">
+              <span
+                className="text-muted-foreground"
+                title="Free-text trainer — won't cross-conflict with other implementations"
+              >
+                Free-text
+              </span>
+              <button
+                type="button"
+                onClick={onStartPromote}
+                disabled={pending}
+                className="text-primary text-[10px] underline hover:no-underline disabled:opacity-50"
+              >
+                Promote
+              </button>
+            </div>
+          )}
         </td>
         <td className="px-3 py-2">
           <input
@@ -442,6 +727,63 @@ function TrainerRow({
           </button>
         </td>
       </tr>
+
+      {isPromoting && (
+        <tr>
+          <td />
+          <td colSpan={7} className="bg-violet-50/50 px-3 py-3 dark:bg-violet-900/20">
+            <div className="space-y-2">
+              <p className="text-foreground text-xs font-semibold">
+                Promote &ldquo;{t.name}&rdquo; to the external pool
+              </p>
+              <p className="text-muted-foreground text-[11px]">
+                Either link to an existing pool entry, or create a new pool entry from this row.
+                After promotion, this trainer cross-conflicts with sessions in other
+                implementations.
+              </p>
+              <div className="flex flex-wrap items-end gap-2">
+                <select
+                  value={promoteSelection}
+                  onChange={(e) => {
+                    setPromoteSelection(e.target.value);
+                  }}
+                  className={fieldClass + " min-w-[260px] flex-1"}
+                  disabled={rowPending}
+                >
+                  <option value="">Pick an option…</option>
+                  <option value="NEW">+ Create new pool entry from this row</option>
+                  {poolCandidates.length > 0 && (
+                    <optgroup label="Or link to existing pool entry">
+                      {poolCandidates.map((i) => (
+                        <option key={i.id} value={i.id}>
+                          {i.full_name}
+                          {i.email ? ` (${i.email})` : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+                <button
+                  type="button"
+                  disabled={rowPending || !promoteSelection}
+                  onClick={handlePromote}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                >
+                  Promote
+                </button>
+                <button
+                  type="button"
+                  onClick={onCancelPromote}
+                  disabled={rowPending}
+                  className="text-muted-foreground hover:text-foreground text-xs underline disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
 
       {isOpen && (
         <tr>

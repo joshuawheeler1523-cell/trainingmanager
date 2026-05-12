@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import {
+  externalInstructorCreateSchema,
   implementationInsertSchema,
   implementationSetupSchema,
   implementationUpdateSchema,
@@ -19,6 +20,7 @@ import {
   implClassInsertSchema,
   implClassUpdateSchema,
   type Implementation,
+  type Instructor,
   type ImplRoom,
   type ImplTrainer,
   type ImplTrainerUnavailability,
@@ -246,6 +248,87 @@ export async function createTrainer(
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
   revalidateImpl(implementationId);
   return { ok: true, data };
+}
+
+// External-trainer pool: create a roster entry flagged is_external=true. The
+// new row gets a stable instructors.id that impl_trainer rows in any
+// implementation can link to via instructor_id — that's what the cross-impl
+// trainer-conflict trigger from 20260511000006 joins through. Externals are
+// filtered out of every internal-capacity surface (see lib/instructors/scope).
+export async function createExternalInstructor(input: unknown): Promise<ActionResult<Instructor>> {
+  const parsed = externalInstructorCreateSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("instructors")
+    .insert({
+      org_id: c.orgId,
+      department_id: c.departmentId,
+      full_name: parsed.data.full_name,
+      email: parsed.data.email,
+      notes: parsed.data.notes,
+      is_external: true,
+      status: "active",
+      annual_hours: 0,
+    })
+    .select()
+    .single();
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  return { ok: true, data: data as Instructor };
+}
+
+// Promote an existing free-text impl_trainer row (instructor_id NULL) into
+// the external pool: set its instructor_id to point at a real instructors row
+// flagged is_external=true. After this, the row gets cross-impl conflict
+// checking. The caller may have either picked an existing pool entry or
+// just created a new one via createExternalInstructor.
+export async function linkImplTrainerToInstructor(
+  implTrainerId: string,
+  implementationId: string,
+  instructorId: string,
+): Promise<ActionResult<ImplTrainer>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("impl_trainers")
+    .update({ instructor_id: instructorId })
+    .eq("id", implTrainerId)
+    .eq("org_id", c.orgId)
+    .select()
+    .single();
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateImpl(implementationId);
+  return { ok: true, data };
+}
+
+// Soft-delete an external pool entry. Linked impl_trainer rows keep working
+// (FK survives, name on impl_trainer is preserved), they're just no longer
+// surfaced in the pool picker. The cross-impl conflict trigger joins by
+// instructor_id only, so historical conflicts continue to fire even after
+// the pool entry is soft-deleted.
+export async function softDeleteExternalInstructor(
+  instructorId: string,
+  implementationId: string,
+): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { error } = await c.supabase
+    .from("instructors")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", instructorId)
+    .eq("org_id", c.orgId)
+    .eq("is_external", true);
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidateImpl(implementationId);
+  return { ok: true, data: { id: instructorId } };
 }
 
 export async function updateTrainer(
