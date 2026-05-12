@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Calendar, dateFnsLocalizer, type Event } from "react-big-calendar";
@@ -119,8 +119,18 @@ export default function ScheduleView({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
-  const [pendingMoves, setPendingMoves] = useState<Map<string, { start: string; end: string }>>(
-    () => new Map(),
+
+  // Optimistic layer over the server's sessions array. Drag-drop applies a
+  // move synchronously here so the event renders at its drop point in the
+  // same frame; React reconciles back to `sessions` automatically when the
+  // surrounding transition completes — successful saves land on the new time
+  // (router.refresh brings matching sessions in), failed saves snap back.
+  const [optimisticSessions, applyOptimisticMove] = useOptimistic(
+    sessions,
+    (state, move: { id: string; start: string; end: string }) =>
+      state.map((s) =>
+        s.id === move.id ? { ...s, scheduled_start: move.start, scheduled_end: move.end } : s,
+      ),
   );
 
   const [trainerFilter, setTrainerFilter] = useState<string>("all");
@@ -131,49 +141,25 @@ export default function ScheduleView({
   const trainerMap = useMemo(() => new Map(trainers.map((t) => [t.id, t])), [trainers]);
   const roomMap = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
 
-  // Drop any optimistic move once the incoming sessions prop matches its target.
-  useEffect(() => {
-    setPendingMoves((prev) => {
-      if (prev.size === 0) return prev;
-      const next = new Map(prev);
-      let changed = false;
-      for (const [id, move] of prev) {
-        const s = sessions.find((ss) => ss.id === id);
-        if (
-          s &&
-          new Date(s.scheduled_start).getTime() === new Date(move.start).getTime() &&
-          new Date(s.scheduled_end).getTime() === new Date(move.end).getTime()
-        ) {
-          next.delete(id);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [sessions]);
-
   const filtered = useMemo(() => {
-    return sessions.filter((s) => {
+    return optimisticSessions.filter((s) => {
       if (s.status === "cancelled") return false;
       if (trainerFilter !== "all" && s.impl_trainer_id !== trainerFilter) return false;
       if (roomFilter !== "all" && s.impl_room_id !== roomFilter) return false;
       if (classFilter !== "all" && s.impl_class_id !== classFilter) return false;
       return true;
     });
-  }, [sessions, trainerFilter, roomFilter, classFilter]);
+  }, [optimisticSessions, trainerFilter, roomFilter, classFilter]);
 
   const events = useMemo<CalEvent[]>(() => {
     return filtered.map((s) => {
       const klass = classMap.get(s.impl_class_id);
       const trainer = s.impl_trainer_id ? trainerMap.get(s.impl_trainer_id) : null;
       const room = s.impl_room_id ? roomMap.get(s.impl_room_id) : null;
-      const override = pendingMoves.get(s.id);
-      const scheduledStart = override?.start ?? s.scheduled_start;
-      const scheduledEnd = override?.end ?? s.scheduled_end;
-      const start = toCalendarLocal(scheduledStart, orgTimeZone);
-      const end = toCalendarLocal(scheduledEnd, orgTimeZone);
-      const realStart = new Date(scheduledStart);
-      const realEnd = new Date(scheduledEnd);
+      const start = toCalendarLocal(s.scheduled_start, orgTimeZone);
+      const end = toCalendarLocal(s.scheduled_end, orgTimeZone);
+      const realStart = new Date(s.scheduled_start);
+      const realEnd = new Date(s.scheduled_end);
       const title = klass?.name ?? "—";
       const tooltip = [
         klass?.name ?? "—",
@@ -199,7 +185,7 @@ export default function ScheduleView({
         },
       };
     });
-  }, [filtered, classMap, trainerMap, roomMap, orgTimeZone, pendingMoves]);
+  }, [filtered, classMap, trainerMap, roomMap, orgTimeZone]);
 
   function handleEventDrop(args: EventInteractionArgs<CalEvent>) {
     const { event, start, end } = args;
@@ -210,21 +196,17 @@ export default function ScheduleView({
     const startIso = fromCalendarLocal(startLocal, orgTimeZone);
     const endIso = fromCalendarLocal(endLocal, orgTimeZone);
     const sessionId = event.resource.sessionId;
-    // Optimistic: pin the event at the new position so it doesn't snap back
-    // while the server roundtrip + router.refresh resolves.
-    setPendingMoves((prev) => new Map(prev).set(sessionId, { start: startIso, end: endIso }));
     startTransition(async () => {
+      // Apply optimistic move inside the transition; useOptimistic auto-
+      // reverts if the transition completes without a matching base-state
+      // change (i.e., on server failure / no router.refresh).
+      applyOptimisticMove({ id: sessionId, start: startIso, end: endIso });
       const result = await updateSessionTime(sessionId, implementation.id, startIso, endIso);
       if (result.ok) {
         toast.success("Session moved");
         router.refresh();
       } else {
         toast.error(result.error.message);
-        setPendingMoves((prev) => {
-          const next = new Map(prev);
-          next.delete(sessionId);
-          return next;
-        });
       }
     });
   }
