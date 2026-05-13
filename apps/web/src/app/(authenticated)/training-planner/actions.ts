@@ -193,6 +193,8 @@ export async function duplicateImplementation(id: string): Promise<ActionResult<
       go_live_buffer_days: source.go_live_buffer_days,
       lunch_break_start_minutes: source.lunch_break_start_minutes,
       lunch_break_length_minutes: source.lunch_break_length_minutes,
+      business_hours_start_local: source.business_hours_start_local,
+      business_hours_end_local: source.business_hours_end_local,
       status: "draft",
       current_step: 1,
     })

@@ -101,7 +101,8 @@
       "Bash(npx prettier *)",
       "Bash(npx eslint *)",
       "Bash(npx vercel *)",
-      "Bash(git mv *)"
+      "Bash(git mv *)",
+      "Bash(xargs ls -lt)"
     ]
   }
 }

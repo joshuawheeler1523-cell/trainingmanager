@@ -43,21 +43,30 @@ export const implementationInsertSchema = z.object({
   lunch_break_start_minutes: z.coerce.number().int().min(0).max(1439).default(720),
   lunch_break_length_minutes: z.coerce.number().int().min(0).max(240).default(60),
   go_live_buffer_days: z.coerce.number().int().min(0).max(365).default(7),
+  business_hours_start_local: z.coerce.number().min(0).max(24).default(0),
+  business_hours_end_local: z.coerce.number().min(0).max(24).default(24),
 });
 
 // Setup-step validation: dates required to leave Step 1.
-export const implementationSetupSchema = z.object({
-  name: z.string().min(1, "Name is required").max(200),
-  description: emptyToNull,
-  window_start_date: z.string().min(1, "Window start is required"),
-  window_end_date: z.string().min(1, "Window end is required"),
-  go_live_date: z.string().min(1, "Go-live date is required"),
-  linked_project_id: optionalUuid,
-  linked_tra_id: optionalUuid,
-  lunch_break_start_minutes: z.coerce.number().int().min(0).max(1439).default(720),
-  lunch_break_length_minutes: z.coerce.number().int().min(0).max(240).default(60),
-  go_live_buffer_days: z.coerce.number().int().min(0).max(365).default(7),
-});
+export const implementationSetupSchema = z
+  .object({
+    name: z.string().min(1, "Name is required").max(200),
+    description: emptyToNull,
+    window_start_date: z.string().min(1, "Window start is required"),
+    window_end_date: z.string().min(1, "Window end is required"),
+    go_live_date: z.string().min(1, "Go-live date is required"),
+    linked_project_id: optionalUuid,
+    linked_tra_id: optionalUuid,
+    lunch_break_start_minutes: z.coerce.number().int().min(0).max(1439).default(720),
+    lunch_break_length_minutes: z.coerce.number().int().min(0).max(240).default(60),
+    go_live_buffer_days: z.coerce.number().int().min(0).max(365).default(7),
+    business_hours_start_local: z.coerce.number().min(0).max(24).default(0),
+    business_hours_end_local: z.coerce.number().min(0).max(24).default(24),
+  })
+  .refine((v) => v.business_hours_end_local >= v.business_hours_start_local, {
+    message: "Business hours end must be ≥ start",
+    path: ["business_hours_end_local"],
+  });
 
 export const implementationUpdateSchema = implementationInsertSchema.partial().extend({
   status: z.enum(IMPL_STATUS_VALUES).optional(),
@@ -83,6 +92,8 @@ export type Implementation = {
   lunch_break_start_minutes: number;
   lunch_break_length_minutes: number;
   go_live_buffer_days: number;
+  business_hours_start_local: number;
+  business_hours_end_local: number;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;

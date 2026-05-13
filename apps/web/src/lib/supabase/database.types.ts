@@ -2354,6 +2354,8 @@ export type Database = {
       };
       implementations: {
         Row: {
+          business_hours_end_local: number;
+          business_hours_start_local: number;
           created_at: string;
           created_by: string | null;
           current_step: number;
@@ -2377,6 +2379,8 @@ export type Database = {
           window_start_date: string | null;
         };
         Insert: {
+          business_hours_end_local?: number;
+          business_hours_start_local?: number;
           created_at?: string;
           created_by?: string | null;
           current_step?: number;
@@ -2400,6 +2404,8 @@ export type Database = {
           window_start_date?: string | null;
         };
         Update: {
+          business_hours_end_local?: number;
+          business_hours_start_local?: number;
           created_at?: string;
           created_by?: string | null;
           current_step?: number;
