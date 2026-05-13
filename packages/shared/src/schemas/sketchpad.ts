@@ -18,7 +18,7 @@ export const sketchpadScheduleCreateSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
     .optional(),
-  day_count: z.coerce.number().int().min(1).max(14).optional(),
+  day_count: z.coerce.number().int().min(1).max(90).optional(),
   hours_start: z.coerce.number().int().min(0).max(23).optional(),
   hours_end: z.coerce.number().int().min(1).max(24).optional(),
   slot_minutes: z
@@ -35,7 +35,7 @@ export const sketchpadScheduleUpdateSchema = z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
       .optional(),
-    day_count: z.coerce.number().int().min(1).max(14).optional(),
+    day_count: z.coerce.number().int().min(1).max(90).optional(),
     hours_start: z.coerce.number().int().min(0).max(23).optional(),
     hours_end: z.coerce.number().int().min(1).max(24).optional(),
     slot_minutes: z
