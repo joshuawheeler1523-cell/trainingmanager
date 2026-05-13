@@ -923,18 +923,28 @@ function simulate(args: {
         }
       : null;
 
+  // Apply the impl-wide business-hours clamp. start_hour_local stays the
+  // floor (a room can't start before its own configured opening), but the
+  // biz window can push it later or pull the close earlier. Matches the
+  // SQL generator's clamp at supabase/migrations/20260513000005.
+  const bizStartHr = impl.business_hours_start_local;
+  const bizEndHr = impl.business_hours_end_local;
   const roomState = new Map<string, RoomState>(
     rooms.map((r) => {
+      const effectiveStart = Math.max(r.start_hour_local, bizStartHr);
+      const rawEnd = r.start_hour_local + r.available_hours_per_day;
+      const effectiveEnd = Math.min(rawEnd, bizEndHr);
+      const effectiveHours = Math.max(0, effectiveEnd - effectiveStart);
       const start = new Date(windowStart);
-      setHourOfDay(start, r.start_hour_local);
+      setHourOfDay(start, effectiveStart);
       return [
         r.id,
         {
           id: r.id,
           name: r.name,
           seatCapacity: r.seat_capacity,
-          hoursPerDay: r.available_hours_per_day,
-          startHourLocal: r.start_hour_local,
+          hoursPerDay: effectiveHours,
+          startHourLocal: effectiveStart,
           daysOfWeek: new Set(r.available_days_of_week),
           equipmentTags: new Set(r.equipment_tags),
           hoursAssigned: 0,

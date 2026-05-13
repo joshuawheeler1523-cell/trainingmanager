@@ -26,6 +26,8 @@ type FormValues = {
   lunch_break_start_minutes: number;
   lunch_break_length_minutes: number;
   go_live_buffer_days: number;
+  business_hours_start_local: number;
+  business_hours_end_local: number;
 };
 
 const fieldClass =
@@ -52,6 +54,8 @@ export default function SetupForm({ implementation, projects, tras }: Props) {
       lunch_break_start_minutes: implementation.lunch_break_start_minutes,
       lunch_break_length_minutes: implementation.lunch_break_length_minutes,
       go_live_buffer_days: implementation.go_live_buffer_days,
+      business_hours_start_local: implementation.business_hours_start_local,
+      business_hours_end_local: implementation.business_hours_end_local,
     },
   });
 
@@ -224,6 +228,49 @@ export default function SetupForm({ implementation, projects, tras }: Props) {
             />
           </div>
         </div>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label
+              htmlFor="business_hours_start_local"
+              className="text-foreground mb-1 block text-xs font-medium"
+            >
+              Earliest start hour
+            </label>
+            <input
+              id="business_hours_start_local"
+              type="number"
+              min={0}
+              max={24}
+              step={0.25}
+              {...register("business_hours_start_local", { valueAsNumber: true })}
+              className={fieldClass}
+            />
+            <p className="text-muted-foreground mt-1 text-[11px]">
+              8 = 8:00 AM, 8.5 = 8:30 AM. 0 = no earliest-start limit (per-room defaults apply).
+            </p>
+          </div>
+          <div>
+            <label
+              htmlFor="business_hours_end_local"
+              className="text-foreground mb-1 block text-xs font-medium"
+            >
+              Latest end hour
+            </label>
+            <input
+              id="business_hours_end_local"
+              type="number"
+              min={0}
+              max={24}
+              step={0.25}
+              {...register("business_hours_end_local", { valueAsNumber: true })}
+              className={fieldClass}
+            />
+            <p className="text-muted-foreground mt-1 text-[11px]">
+              17 = 5:00 PM. 24 = no end limit. Sessions must finish (wall clock) by this hour.
+            </p>
+          </div>
+        </div>
+
         <div className="mt-4">
           <label
             htmlFor="go_live_buffer_days"
