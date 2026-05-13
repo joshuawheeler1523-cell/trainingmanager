@@ -68,6 +68,7 @@ export const sketchpadSessionCreateSchema = z.object({
   learner_count: z.coerce.number().int().min(0).max(10000).nullish(),
   notes: optionalText,
   color: optionalText,
+  group_id: z.string().uuid().nullish(),
 });
 
 export const sketchpadSessionUpdateSchema = z.object({
@@ -79,6 +80,7 @@ export const sketchpadSessionUpdateSchema = z.object({
   learner_count: z.coerce.number().int().min(0).max(10000).nullish().optional(),
   notes: optionalText.optional(),
   color: optionalText.optional(),
+  group_id: z.string().uuid().nullish().optional(),
 });
 
 export type SketchpadScheduleCreate = z.infer<typeof sketchpadScheduleCreateSchema>;
@@ -130,6 +132,7 @@ export type SketchpadSession = {
   learner_count: number | null;
   notes: string | null;
   color: string | null;
+  group_id: string | null;
   created_at: string;
   updated_at: string;
 };

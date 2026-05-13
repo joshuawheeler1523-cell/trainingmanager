@@ -100,7 +100,8 @@
       "Bash(rm /tmp/types.ts)",
       "Bash(npx prettier *)",
       "Bash(npx eslint *)",
-      "Bash(npx vercel *)"
+      "Bash(npx vercel *)",
+      "Bash(git mv *)"
     ]
   }
 }

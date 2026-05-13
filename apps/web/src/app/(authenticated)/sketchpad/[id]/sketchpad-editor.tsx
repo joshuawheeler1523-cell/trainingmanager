@@ -15,6 +15,7 @@ import {
   ArrowLeftIcon,
   ClipboardDocumentIcon,
   Cog6ToothIcon,
+  DocumentDuplicateIcon,
   PlusIcon,
   QuestionMarkCircleIcon,
   TrashIcon,
@@ -29,6 +30,7 @@ import {
   createSession,
   deleteRoom,
   deleteSession,
+  duplicateSession,
   updateRoom,
   updateSchedule,
   updateSession,
@@ -48,6 +50,7 @@ type CalResource = {
   conflictKind: "none" | "trainer" | "room" | "trainer-and-room" | "out-of-hours";
   conflictTooltip: string;
   color: string;
+  groupSeq: { index: number; total: number } | null;
 };
 
 type CalEvent = Omit<CalEventBase, "resource"> & {
@@ -106,6 +109,24 @@ function dayDate(scheduleStart: string, dayIndex: number): Date {
   // scheduleStart is "YYYY-MM-DD" — interpret as midnight local.
   const [y, m, d] = scheduleStart.split("-").map(Number);
   return addDays(new Date(y ?? 2026, (m ?? 1) - 1, d ?? 1), dayIndex);
+}
+
+function ymd(d: Date): string {
+  const y = d.getFullYear().toString();
+  const m = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function daysBetweenInclusive(startYmd: string, endYmd: string): number {
+  // Returns the day_count corresponding to [start..end] inclusive (so a
+  // single-day schedule = 1). Negative or invalid spans return 0.
+  const [sy, sm, sd] = startYmd.split("-").map(Number);
+  const [ey, em, ed] = endYmd.split("-").map(Number);
+  const start = new Date(sy ?? 2026, (sm ?? 1) - 1, sd ?? 1);
+  const end = new Date(ey ?? 2026, (em ?? 1) - 1, ed ?? 1);
+  const diff = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+  return diff < 0 ? 0 : diff + 1;
 }
 
 function formatDayLabel(d: Date): string {
@@ -358,6 +379,37 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     return { trainerHits, roomHits, outOfHours, detail };
   }, [optimisticSessions, rooms, schedule.hours_start, schedule.hours_end]);
 
+  // Group sequence numbers — "n/N" stamped on every session sharing a
+  // group_id, ordered by starts_at (then created_at, then id for stable
+  // tie-breaks). Standalone sessions and 1-of-1 groups get no badge.
+  const groupSeq = useMemo(() => {
+    const buckets = new Map<string, SketchpadSession[]>();
+    for (const s of optimisticSessions) {
+      if (!s.group_id) continue;
+      const list = buckets.get(s.group_id) ?? [];
+      list.push(s);
+      buckets.set(s.group_id, list);
+    }
+    const result = new Map<string, { index: number; total: number }>();
+    for (const list of buckets.values()) {
+      if (list.length < 2) continue;
+      const sorted = list.slice().sort((a, b) => {
+        const at = new Date(a.starts_at).getTime();
+        const bt = new Date(b.starts_at).getTime();
+        if (at !== bt) return at - bt;
+        const ac = new Date(a.created_at).getTime();
+        const bc = new Date(b.created_at).getTime();
+        if (ac !== bc) return ac - bc;
+        return a.id.localeCompare(b.id);
+      });
+      const total = sorted.length;
+      sorted.forEach((s, i) => {
+        result.set(s.id, { index: i + 1, total });
+      });
+    }
+    return result;
+  }, [optimisticSessions]);
+
   // Build CalEvents from sessions with a room. In Day view we filter to the
   // selected day so the rooms-as-columns layout makes sense; in Week / Month
   // we include the full session set and let react-big-calendar window it.
@@ -383,9 +435,14 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
         const kind = kindFor(s.id);
         const reasons = conflicts.detail.get(s.id) ?? [];
         const roomName = roomById.get(s.room_id)?.name ?? "—";
+        const seq = groupSeq.get(s.id) ?? null;
+        const seqPrefix = seq ? `${seq.index.toString()}/${seq.total.toString()} ` : "";
         // Day view groups by room column, so the title can be class-only.
         // Week / month have no room axis, so we prepend the room name.
-        const title = view === "day" ? s.class_name : `${roomName} · ${s.class_name}`;
+        const title =
+          view === "day"
+            ? `${seqPrefix}${s.class_name}`
+            : `${seqPrefix}${roomName} · ${s.class_name}`;
         return {
           title,
           start: new Date(s.starts_at),
@@ -398,7 +455,8 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
             roomId: s.room_id,
             conflictKind: kind,
             conflictTooltip: [
-              s.class_name,
+              s.class_name +
+                (seq ? ` (session ${seq.index.toString()} of ${seq.total.toString()})` : ""),
               `${formatTime(s.starts_at)} – ${formatTime(s.ends_at)}`,
               `Trainer: ${s.trainer_name}`,
               `Room: ${roomName}`,
@@ -408,10 +466,11 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
               .filter((x): x is string => !!x)
               .join("\n"),
             color: colorForClass(s.class_name),
+            groupSeq: seq,
           },
         };
       });
-  }, [optimisticSessions, currentDay, conflicts, rooms, view]);
+  }, [optimisticSessions, currentDay, conflicts, rooms, view, groupSeq]);
 
   const unassignedSessions = useMemo(
     () => optimisticSessions.filter((s) => !s.room_id),
@@ -555,6 +614,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           learner_count: null,
           notes: null,
           color: null,
+          group_id: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
@@ -660,6 +720,64 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
       }
     });
     return { inserted: rows.length, errors };
+  }
+
+  function handleDuplicateSession(sourceId: string) {
+    const source = optimisticSessions.find((s) => s.id === sourceId);
+    if (!source) return;
+
+    // Compute the optimistic placement client-side so the new block lands
+    // before the round-trip. Mirrors the server's logic in duplicateSession.
+    const sourceStart = new Date(source.starts_at);
+    const sourceEnd = new Date(source.ends_at);
+    const sourceDay = new Date(
+      sourceStart.getFullYear(),
+      sourceStart.getMonth(),
+      sourceStart.getDate(),
+    );
+    const [sy, sm, sd] = schedule.start_date.split("-").map(Number);
+    const scheduleStart = new Date(sy ?? 2026, (sm ?? 1) - 1, sd ?? 1);
+    const dayIndex = Math.round(
+      (sourceDay.getTime() - scheduleStart.getTime()) / (24 * 60 * 60 * 1000),
+    );
+    const advance = dayIndex < schedule.day_count - 1 ? 1 : 0;
+    const offset = advance * 24 * 60 * 60 * 1000;
+    const newStart = new Date(sourceStart.getTime() + offset).toISOString();
+    const newEnd = new Date(sourceEnd.getTime() + offset).toISOString();
+
+    startTransition(async () => {
+      const optimisticGroupId = source.group_id ?? `temp-group-${Date.now().toString()}`;
+      if (!source.group_id) {
+        applyOptimisticPatch({
+          kind: "upsert",
+          session: { ...source, group_id: optimisticGroupId },
+        });
+      }
+      const tempId = `temp-${Date.now().toString()}`;
+      applyOptimisticPatch({
+        kind: "upsert",
+        session: {
+          ...source,
+          id: tempId,
+          group_id: optimisticGroupId,
+          starts_at: newStart,
+          ends_at: newEnd,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      });
+      const result = await duplicateSession(sourceId, schedule.id);
+      if (result.ok) {
+        // Jump the visible day to where the copy landed, otherwise a same-time-
+        // next-day copy can feel like nothing happened in Day view.
+        const newDayDate = new Date(result.data.copy.starts_at);
+        const idx = days.findIndex((d) => sameDay(d, newDayDate));
+        if (idx >= 0 && idx !== selectedDay) setSelectedDay(idx);
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
   }
 
   function handleDeleteSession(id: string) {
@@ -1013,6 +1131,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
                 session={s}
                 rooms={rooms}
                 pending={pending}
+                groupSeq={groupSeq.get(s.id) ?? null}
                 onOpen={() => {
                   setDrawerSessionId(s.id);
                 }}
@@ -1074,6 +1193,16 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
             onEventDrop={handleEventDrop}
             onEventResize={handleEventResize}
             resizable
+            components={{
+              event: (props: { event: CalEvent; title: string }) => (
+                <CalendarEventBlock
+                  event={props.event}
+                  title={props.title}
+                  onDuplicate={handleDuplicateSession}
+                  disabled={pending}
+                />
+              ),
+            }}
             eventPropGetter={(event: CalEvent) => {
               const kind = event.resource.conflictKind;
               const borderColor =
@@ -1114,6 +1243,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           rooms={rooms}
           pending={pending}
           conflictTooltip={conflicts.detail.get(openSession.id) ?? []}
+          groupSeq={groupSeq.get(openSession.id) ?? null}
           onClose={() => {
             setDrawerSessionId(null);
           }}
@@ -1122,6 +1252,9 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           }}
           onDelete={() => {
             handleDeleteSession(openSession.id);
+          }}
+          onDuplicate={() => {
+            handleDuplicateSession(openSession.id);
           }}
         />
       )}
@@ -1150,6 +1283,47 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
 }
 
 // ── Subcomponents ──────────────────────────────────────────────────────────
+
+function CalendarEventBlock({
+  event,
+  title,
+  onDuplicate,
+  disabled,
+}: {
+  event: CalEvent;
+  title: string;
+  onDuplicate: (sessionId: string) => void;
+  disabled: boolean;
+}) {
+  // Don't render a copy button on the in-flight optimistic placeholder —
+  // it has no server id yet, so the action would 404.
+  const isOptimistic = event.resource.sessionId.startsWith("temp-");
+  return (
+    <div className="flex h-full min-w-0 items-start justify-between gap-1">
+      <span className="min-w-0 flex-1 truncate">{title}</span>
+      {!isOptimistic && (
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            // Stop RBC from initiating a drag from the icon and from opening
+            // the drawer (onSelectEvent fires on click).
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDuplicate(event.resource.sessionId);
+          }}
+          disabled={disabled}
+          aria-label="Duplicate this session"
+          title="Duplicate (same time, next day)"
+          className="-mr-0.5 -mt-0.5 inline-flex h-5 w-5 flex-none items-center justify-center rounded text-current opacity-70 hover:bg-black/15 hover:opacity-100 disabled:opacity-30"
+        >
+          <DocumentDuplicateIcon className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
 
 function SettingsPanel({
   schedule,
@@ -1186,15 +1360,24 @@ function SettingsPanel({
           }}
         />
         <SettingField
-          label="Days"
-          helper="How many days the schedule spans, starting from the Start date. Up to 90."
-          type="number"
-          min={1}
-          max={90}
-          defaultValue={schedule.day_count.toString()}
+          key={`end-${schedule.start_date}-${schedule.day_count.toString()}`}
+          label="End date"
+          helper="The last day of the schedule (inclusive). Day tabs render between Start date and this date. Up to 90 days."
+          type="date"
+          min={schedule.start_date}
+          defaultValue={ymd(addDays(dayDate(schedule.start_date, 0), schedule.day_count - 1))}
           disabled={pending}
           onCommit={(v) => {
-            onPatch({ day_count: Number(v) });
+            const dc = daysBetweenInclusive(schedule.start_date, v);
+            if (dc < 1) {
+              toast.error("End date must be on or after the Start date");
+              return;
+            }
+            if (dc > 90) {
+              toast.error("Schedules can be at most 90 days");
+              return;
+            }
+            onPatch({ day_count: dc });
           }}
         />
         <SettingField
@@ -1348,8 +1531,8 @@ function SettingField({
   defaultValue: string;
   disabled: boolean;
   onCommit: (v: string) => void;
-  min?: number;
-  max?: number;
+  min?: number | string;
+  max?: number | string;
 }) {
   const id = `settings-${label.toLowerCase().replace(/\s+/g, "-")}`;
   return (
@@ -1381,17 +1564,24 @@ function UnassignedPill({
   session,
   rooms,
   pending,
+  groupSeq,
   onOpen,
   onAssign,
 }: {
   session: SketchpadSession;
   rooms: SketchpadRoom[];
   pending: boolean;
+  groupSeq: { index: number; total: number } | null;
   onOpen: () => void;
   onAssign: (roomId: string) => void;
 }) {
   return (
     <div className="border-border bg-background flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
+      {groupSeq && (
+        <span className="bg-surface text-foreground border-border inline-flex items-center rounded-full border px-1 py-0.5 text-[10px] font-medium tabular-nums">
+          {groupSeq.index.toString()}/{groupSeq.total.toString()}
+        </span>
+      )}
       <button
         type="button"
         onClick={onOpen}
@@ -1424,17 +1614,21 @@ function SessionDrawer({
   rooms,
   pending,
   conflictTooltip,
+  groupSeq,
   onClose,
   onPatch,
   onDelete,
+  onDuplicate,
 }: {
   session: SketchpadSession;
   rooms: SketchpadRoom[];
   pending: boolean;
   conflictTooltip: string[];
+  groupSeq: { index: number; total: number } | null;
   onClose: () => void;
   onPatch: (patch: Partial<SketchpadSession>) => void;
   onDelete: () => void;
+  onDuplicate: () => void;
 }) {
   return (
     <div
@@ -1452,9 +1646,19 @@ function SessionDrawer({
       >
         <div className="border-border flex items-start justify-between border-b px-6 py-4">
           <div className="min-w-0">
-            <h2 className="text-foreground truncate text-base font-semibold">
-              {session.class_name}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-foreground truncate text-base font-semibold">
+                {session.class_name}
+              </h2>
+              {groupSeq && (
+                <span
+                  className="bg-surface text-foreground border-border inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium tabular-nums"
+                  title={`Session ${groupSeq.index.toString()} of ${groupSeq.total.toString()} in this series`}
+                >
+                  {groupSeq.index.toString()}/{groupSeq.total.toString()}
+                </span>
+              )}
+            </div>
             <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">
               {formatTime(session.starts_at)} – {formatTime(session.ends_at)}
             </p>
@@ -1468,14 +1672,27 @@ function SessionDrawer({
               </ul>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={onDuplicate}
+              disabled={pending}
+              aria-label="Duplicate this session"
+              title="Duplicate (same time, next day)"
+              className="text-muted-foreground hover:bg-surface hover:text-foreground inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium disabled:opacity-50"
+            >
+              <DocumentDuplicateIcon className="h-4 w-4" />
+              Duplicate
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
