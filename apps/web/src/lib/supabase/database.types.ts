@@ -5654,7 +5654,7 @@ export type Database = {
       };
       frequency_to_annual: { Args: { p_frequency: string }; Returns: number };
       generate_implementation_schedule: {
-        Args: { p_implementation_id: string };
+        Args: { p_dry_run?: boolean; p_implementation_id: string };
         Returns: Json;
       };
       generate_monthly_invoices_for_period: {
