@@ -25,11 +25,14 @@ import {
   updateTrainer,
 } from "../../actions";
 
+export type TrainerWorkload = { totalHours: number; classCount: number };
+
 type Props = {
   implementationId: string;
   trainers: ImplTrainer[];
   instructors: Instructor[];
   unavailability: ImplTrainerUnavailability[];
+  workload: Record<string, TrainerWorkload>;
 };
 
 const fieldClass =
@@ -40,6 +43,7 @@ export default function TrainersEditor({
   trainers,
   instructors,
   unavailability,
+  workload,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -265,6 +269,7 @@ export default function TrainersEditor({
                 <Th>Email</Th>
                 <Th>Source</Th>
                 <Th>Hrs/week</Th>
+                <Th>Total hrs to teach</Th>
                 <Th>Max concurrent</Th>
                 <Th>Time off</Th>
                 <Th className="w-12" />
@@ -287,6 +292,7 @@ export default function TrainersEditor({
                     key={t.id}
                     t={t}
                     pto={trainerPto}
+                    workload={workload[t.id] ?? null}
                     isOpen={isOpen}
                     onToggle={() => {
                       setOpenPtoFor(isOpen ? null : t.id);
@@ -522,6 +528,7 @@ export default function TrainersEditor({
 function TrainerRow({
   t,
   pto,
+  workload,
   isOpen,
   onToggle,
   implementationId,
@@ -537,6 +544,7 @@ function TrainerRow({
 }: {
   t: ImplTrainer;
   pto: ImplTrainerUnavailability[];
+  workload: TrainerWorkload | null;
   isOpen: boolean;
   onToggle: () => void;
   implementationId: string;
@@ -684,6 +692,20 @@ function TrainerRow({
             className={fieldClass + " w-20 tabular-nums"}
           />
         </td>
+        <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+          {workload && workload.totalHours > 0 ? (
+            <span
+              title={`Across ${workload.classCount.toString()} class${workload.classCount === 1 ? "" : "es"}`}
+            >
+              {workload.totalHours.toFixed(1)}h
+              <span className="text-muted-foreground/70 ml-1 text-[10px]">
+                / {workload.classCount.toString()} cls
+              </span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground/60">—</span>
+          )}
+        </td>
         <td className="px-3 py-2">
           <input
             type="number"
@@ -731,7 +753,7 @@ function TrainerRow({
       {isPromoting && (
         <tr>
           <td />
-          <td colSpan={7} className="bg-violet-50/50 px-3 py-3 dark:bg-violet-900/20">
+          <td colSpan={8} className="bg-violet-50/50 px-3 py-3 dark:bg-violet-900/20">
             <div className="space-y-2">
               <p className="text-foreground text-xs font-semibold">
                 Promote &ldquo;{t.name}&rdquo; to the external pool
@@ -788,7 +810,7 @@ function TrainerRow({
       {isOpen && (
         <tr>
           <td />
-          <td colSpan={7} className="bg-surface/50 px-3 py-3">
+          <td colSpan={8} className="bg-surface/50 px-3 py-3">
             <div className="space-y-2">
               <p className="text-foreground text-xs font-semibold">Time off / unavailability</p>
               {pto.length === 0 ? (
