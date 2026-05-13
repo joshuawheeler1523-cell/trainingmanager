@@ -31,6 +31,7 @@ import {
   createSession,
   deleteRoom,
   autoScheduleSessions,
+  deleteAllSessionsInSchedule,
   deleteSession,
   duplicateSession,
   recolorClassInSchedule,
@@ -835,6 +836,40 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     });
   }
 
+  function handleClearAllSessions() {
+    const total = optimisticSessions.length;
+    if (total === 0) {
+      toast.error("No sessions to clear");
+      return;
+    }
+    if (
+      !confirm(
+        `Delete all ${total.toString()} session${
+          total === 1 ? "" : "s"
+        } from this sketch? Rooms and schedule settings are kept.`,
+      )
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      for (const s of optimisticSessions) {
+        applyOptimisticPatch({ kind: "delete", id: s.id });
+      }
+      const result = await deleteAllSessionsInSchedule(schedule.id);
+      if (result.ok) {
+        setDrawerSessionId(null);
+        toast.success(
+          `Deleted ${result.data.deleted.toString()} session${
+            result.data.deleted === 1 ? "" : "s"
+          }`,
+        );
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
   function handleDeleteSession(id: string) {
     if (!confirm("Delete this session?")) return;
     startTransition(async () => {
@@ -1018,11 +1053,13 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           rooms={rooms}
           pending={pending}
           newRoomName={newRoomName}
+          sessionCount={optimisticSessions.length}
           onRoomNameChange={setNewRoomName}
           onPatch={patchSchedule}
           onAddRoom={handleAddRoom}
           onRenameRoom={handleRenameRoom}
           onDeleteRoom={handleDeleteRoom}
+          onClearAllSessions={handleClearAllSessions}
         />
       )}
 
@@ -1414,21 +1451,25 @@ function SettingsPanel({
   rooms,
   pending,
   newRoomName,
+  sessionCount,
   onRoomNameChange,
   onPatch,
   onAddRoom,
   onRenameRoom,
   onDeleteRoom,
+  onClearAllSessions,
 }: {
   schedule: SketchpadSchedule;
   rooms: SketchpadRoom[];
   pending: boolean;
   newRoomName: string;
+  sessionCount: number;
   onRoomNameChange: (v: string) => void;
   onPatch: (patch: Record<string, unknown>) => void;
   onAddRoom: () => void;
   onRenameRoom: (id: string, name: string) => void;
   onDeleteRoom: (id: string, name: string) => void;
+  onClearAllSessions: () => void;
 }) {
   return (
     <div className="border-border bg-background space-y-3 rounded-lg border p-3">
@@ -1593,6 +1634,36 @@ function SettingsPanel({
             <PlusIcon className="h-4 w-4" />
             Add room
           </button>
+        </div>
+      </div>
+
+      <div className="border-border border-t pt-3">
+        <div className="mb-2 flex items-baseline justify-between">
+          <h3 className="text-foreground text-xs font-semibold uppercase tracking-wide">
+            Danger zone
+          </h3>
+          <p className="text-muted-foreground text-[11px]">
+            Destructive operations. Confirmation required.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onClearAllSessions}
+            disabled={pending || sessionCount === 0}
+            className="border-destructive/50 text-destructive hover:bg-destructive/10 inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+            Clear all sessions
+            {sessionCount > 0 && (
+              <span className="bg-destructive/10 text-destructive ml-1 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums">
+                {sessionCount.toString()}
+              </span>
+            )}
+          </button>
+          <p className="text-muted-foreground text-[11px]">
+            Removes every session block from the calendar. Rooms and schedule settings are kept.
+          </p>
         </div>
       </div>
     </div>

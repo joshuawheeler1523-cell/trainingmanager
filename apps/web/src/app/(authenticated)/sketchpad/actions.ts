@@ -517,6 +517,27 @@ export async function deleteSession(
   return { ok: true, data: { id } };
 }
 
+// Wipe every session in a sketch in one shot. Used by the Settings panel's
+// "Clear all sessions" affordance so the planner can reset without deleting
+// the schedule + rooms. Rooms and schedule settings are preserved.
+export async function deleteAllSessionsInSchedule(
+  scheduleId: string,
+): Promise<ActionResult<{ deleted: number }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("sketchpad_sessions")
+    .delete()
+    .eq("schedule_id", scheduleId)
+    .eq("org_id", c.orgId)
+    .select("id");
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidate(scheduleId);
+  return { ok: true, data: { deleted: data.length } };
+}
+
 // Bulk-create from a smart-paste payload. Each row has already been parsed
 // client-side into the canonical shape; this just validates + inserts.
 // Returns the count actually inserted (server may drop rows whose room
