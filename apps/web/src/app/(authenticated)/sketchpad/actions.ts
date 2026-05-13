@@ -11,11 +11,13 @@ import {
   sketchpadRoomUpdateSchema,
   sketchpadSessionCreateSchema,
   sketchpadSessionUpdateSchema,
+  sketchpadAutoScheduleSchema,
   type SketchpadSchedule,
   type SketchpadRoom,
   type SketchpadSession,
 } from "@arbor/shared";
 import type { TablesInsert, TablesUpdate } from "@/lib/supabase/database.types";
+import { placeSessions, type SchedulerResult } from "@/lib/sketchpad-scheduler";
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -472,6 +474,31 @@ export async function updateSession(
   return { ok: true, data: data };
 }
 
+// Recolor every session in this schedule that matches the given class_name
+// (case-sensitive — class names are user-typed strings, so we honor what
+// they wrote rather than trying to normalize). Pass color=null to clear
+// the override and fall back to the auto-hashed default.
+export async function recolorClassInSchedule(
+  scheduleId: string,
+  className: string,
+  color: string | null,
+): Promise<ActionResult<{ updated: number }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("sketchpad_sessions")
+    .update({ color })
+    .eq("schedule_id", scheduleId)
+    .eq("org_id", c.orgId)
+    .eq("class_name", className)
+    .select("id");
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidate(scheduleId);
+  return { ok: true, data: { updated: data.length } };
+}
+
 export async function deleteSession(
   id: string,
   scheduleId: string,
@@ -551,4 +578,97 @@ export async function bulkCreateSessions(
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
   revalidate(scheduleId);
   return { ok: true, data: { inserted: rows.length } };
+}
+
+// Auto-schedule N identical sessions into this sketch. Loads the schedule
+// window + existing sessions + rooms, runs the in-process scheduler, and
+// batch-inserts what fits as a single group (so the calendar shows them
+// numbered 1/N..N/N out of the gate). Returns both the placed count and a
+// human-readable report of anything we couldn't fit, so the UI can warn.
+export async function autoScheduleSessions(
+  scheduleId: string,
+  input: unknown,
+): Promise<
+  ActionResult<{
+    inserted: number;
+    unplaced: SchedulerResult["unplaced"];
+    gaps: SchedulerResult["gaps"];
+    groupId: string | null;
+  }>
+> {
+  const parsed = sketchpadAutoScheduleSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data: schedule, error: schedErr } = await c.supabase
+    .from("sketchpad_schedules")
+    .select("id, start_date, day_count, hours_start, hours_end, slot_minutes")
+    .eq("id", scheduleId)
+    .eq("org_id", c.orgId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (schedErr) return { ok: false, error: { code: schedErr.code, message: schedErr.message } };
+  if (!schedule) return { ok: false, error: { code: "NOT_FOUND", message: "Schedule not found" } };
+
+  const [{ data: rooms }, { data: existing }] = await Promise.all([
+    c.supabase.from("sketchpad_rooms").select("id, name, capacity").eq("schedule_id", scheduleId),
+    c.supabase
+      .from("sketchpad_sessions")
+      .select("id, starts_at, ends_at, room_id, trainer_name")
+      .eq("schedule_id", scheduleId),
+  ]);
+
+  const result = placeSessions({
+    schedule: {
+      startDate: schedule.start_date,
+      dayCount: schedule.day_count,
+      hoursStart: schedule.hours_start,
+      hoursEnd: schedule.hours_end,
+      slotMinutes: schedule.slot_minutes,
+    },
+    rooms: rooms ?? [],
+    existing: existing ?? [],
+    request: parsed.data,
+  });
+
+  if (result.placed.length === 0) {
+    return {
+      ok: true,
+      data: { inserted: 0, unplaced: result.unplaced, gaps: result.gaps, groupId: null },
+    };
+  }
+
+  // Mint a single group_id when we're placing more than one session so they
+  // form a series automatically. A single placement gets group_id = null (no
+  // series exists yet — the planner can still copy it later).
+  const groupId = result.placed.length > 1 ? crypto.randomUUID() : null;
+
+  const rows = result.placed.map((p) => ({
+    schedule_id: scheduleId,
+    org_id: c.orgId,
+    room_id: p.roomId,
+    trainer_name: p.trainerName,
+    class_name: p.className,
+    starts_at: p.startsAt,
+    ends_at: p.endsAt,
+    learner_count: p.learnerCount,
+    notes: null,
+    color: null,
+    group_id: groupId,
+  }));
+
+  const { error: insErr } = await c.supabase.from("sketchpad_sessions").insert(rows);
+  if (insErr) return { ok: false, error: { code: insErr.code, message: insErr.message } };
+  revalidate(scheduleId);
+  return {
+    ok: true,
+    data: {
+      inserted: rows.length,
+      unplaced: result.unplaced,
+      gaps: result.gaps,
+      groupId,
+    },
+  };
 }

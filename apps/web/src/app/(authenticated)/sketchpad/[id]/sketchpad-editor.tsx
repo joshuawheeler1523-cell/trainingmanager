@@ -18,6 +18,7 @@ import {
   DocumentDuplicateIcon,
   PlusIcon,
   QuestionMarkCircleIcon,
+  SparklesIcon,
   TrashIcon,
   XMarkIcon,
 } from "@heroicons/react/20/solid";
@@ -29,8 +30,10 @@ import {
   createRoom,
   createSession,
   deleteRoom,
+  autoScheduleSessions,
   deleteSession,
   duplicateSession,
+  recolorClassInSchedule,
   updateRoom,
   updateSchedule,
   updateSession,
@@ -292,6 +295,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
   const [drawerSessionId, setDrawerSessionId] = useState<string | null>(null);
   const [newRoomName, setNewRoomName] = useState("");
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [autoOpen, setAutoOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -465,7 +469,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
             ]
               .filter((x): x is string => !!x)
               .join("\n"),
-            color: colorForClass(s.class_name),
+            color: s.color ?? colorForClass(s.class_name),
             groupSeq: seq,
           },
         };
@@ -508,6 +512,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         if (helpOpen) setHelpOpen(false);
+        else if (autoOpen) setAutoOpen(false);
         else if (pasteOpen) setPasteOpen(false);
         else if (exportOpen) setExportOpen(false);
         else if (drawerSessionId) setDrawerSessionId(null);
@@ -528,7 +533,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     return () => {
       window.removeEventListener("keydown", onKey);
     };
-  }, [drawerSessionId, exportOpen, helpOpen, pasteOpen]);
+  }, [autoOpen, drawerSessionId, exportOpen, helpOpen, pasteOpen]);
 
   // ── Mutations ────────────────────────────────────────────────────────────
 
@@ -699,6 +704,39 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     });
   }
 
+  function handleAutoSchedule(request: {
+    className: string;
+    trainerName: string | null;
+    durationMinutes: number;
+    count: number;
+    learnerCount: number | null;
+    preferredRoomId: string | null;
+    preferredStartMinutes: number | null;
+    distribution: "one-per-day" | "fill-earliest";
+  }) {
+    startTransition(async () => {
+      const result = await autoScheduleSessions(schedule.id, request);
+      if (!result.ok) {
+        toast.error(result.error.message);
+        return;
+      }
+      const { inserted, unplaced, gaps } = result.data;
+      if (inserted === 0) {
+        toast.error(gaps[0] ?? "Could not place any sessions in this window");
+      } else if (unplaced.length > 0) {
+        toast.success(
+          `Placed ${inserted.toString()} of ${request.count.toString()} — ${
+            gaps[0] ?? `${unplaced.length.toString()} unplaced`
+          }`,
+        );
+      } else {
+        toast.success(`Placed ${inserted.toString()} session${inserted === 1 ? "" : "s"}`);
+      }
+      setAutoOpen(false);
+      router.refresh();
+    });
+  }
+
   function handleBulkPaste(rawText: string): { inserted: number; errors: string[] } | null {
     const { rows, errors } = parsePasteText(rawText, currentDay, rooms);
     if (rows.length === 0) {
@@ -720,6 +758,23 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
       }
     });
     return { inserted: rows.length, errors };
+  }
+
+  function handleRecolorClass(className: string, color: string | null) {
+    startTransition(async () => {
+      // Optimistic: recolor every matching session in place.
+      for (const s of optimisticSessions) {
+        if (s.class_name === className) {
+          applyOptimisticPatch({ kind: "upsert", session: { ...s, color } });
+        }
+      }
+      const result = await recolorClassInSchedule(schedule.id, className, color);
+      if (result.ok) {
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
   }
 
   function handleDuplicateSession(sourceId: string) {
@@ -877,6 +932,16 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           >
             <ClipboardDocumentIcon className="h-3.5 w-3.5" />
             Paste
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAutoOpen(true);
+            }}
+            className="border-border bg-background hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium"
+          >
+            <SparklesIcon className="h-3.5 w-3.5" />
+            Auto-schedule
           </button>
           <button
             type="button"
@@ -1241,9 +1306,13 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
         <SessionDrawer
           session={openSession}
           rooms={rooms}
+          days={days}
           pending={pending}
           conflictTooltip={conflicts.detail.get(openSession.id) ?? []}
           groupSeq={groupSeq.get(openSession.id) ?? null}
+          siblingClassCount={
+            optimisticSessions.filter((s) => s.class_name === openSession.class_name).length
+          }
           onClose={() => {
             setDrawerSessionId(null);
           }}
@@ -1255,6 +1324,9 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           }}
           onDuplicate={() => {
             handleDuplicateSession(openSession.id);
+          }}
+          onRecolorClass={(color) => {
+            handleRecolorClass(openSession.class_name, color);
           }}
         />
       )}
@@ -1268,6 +1340,18 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
             setPasteOpen(false);
           }}
           onSubmit={handleBulkPaste}
+        />
+      )}
+
+      {autoOpen && (
+        <AutoScheduleModal
+          rooms={rooms}
+          trainerHistory={trainerHistory}
+          pending={pending}
+          onClose={() => {
+            setAutoOpen(false);
+          }}
+          onSubmit={handleAutoSchedule}
         />
       )}
 
@@ -1612,24 +1696,47 @@ function UnassignedPill({
 function SessionDrawer({
   session,
   rooms,
+  days,
   pending,
   conflictTooltip,
   groupSeq,
+  siblingClassCount,
   onClose,
   onPatch,
   onDelete,
   onDuplicate,
+  onRecolorClass,
 }: {
   session: SketchpadSession;
   rooms: SketchpadRoom[];
+  days: Date[];
   pending: boolean;
   conflictTooltip: string[];
   groupSeq: { index: number; total: number } | null;
+  siblingClassCount: number;
   onClose: () => void;
   onPatch: (patch: Partial<SketchpadSession>) => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  onRecolorClass: (color: string | null) => void;
 }) {
+  const currentDayIndex = days.findIndex((d) => sameDay(d, new Date(session.starts_at)));
+  const autoColor = colorForClass(session.class_name);
+  const effectiveColor = session.color ?? autoColor;
+
+  function moveToDay(newIndex: number) {
+    const target = days[newIndex];
+    if (!target) return;
+    const start = new Date(session.starts_at);
+    const end = new Date(session.ends_at);
+    const next = new Date(target);
+    next.setHours(start.getHours(), start.getMinutes(), 0, 0);
+    const durationMs = end.getTime() - start.getTime();
+    onPatch({
+      starts_at: next.toISOString(),
+      ends_at: new Date(next.getTime() + durationMs).toISOString(),
+    });
+  }
   return (
     <div
       className="fixed inset-0 z-50 flex justify-end bg-black/40"
@@ -1714,6 +1821,29 @@ function SessionDrawer({
           />
           <div>
             <label className="text-muted-foreground mb-1 block text-xs font-medium uppercase tracking-wide">
+              Day
+            </label>
+            <select
+              value={currentDayIndex >= 0 ? currentDayIndex.toString() : ""}
+              disabled={pending || days.length === 0}
+              onChange={(e) => {
+                moveToDay(Number(e.target.value));
+              }}
+              className={fieldClass + " w-full"}
+            >
+              {currentDayIndex < 0 && <option value="">(off-schedule)</option>}
+              {days.map((d, i) => (
+                <option key={i} value={i.toString()}>
+                  {formatDayLabel(d)}
+                </option>
+              ))}
+            </select>
+            <p className="text-muted-foreground mt-1 text-[11px] leading-snug">
+              Snaps the session to that day at its current time of day.
+            </p>
+          </div>
+          <div>
+            <label className="text-muted-foreground mb-1 block text-xs font-medium uppercase tracking-wide">
               Room
             </label>
             <select
@@ -1731,6 +1861,68 @@ function SessionDrawer({
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="text-muted-foreground mb-1 block text-xs font-medium uppercase tracking-wide">
+              Color
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  onPatch({ color: null });
+                }}
+                disabled={pending}
+                aria-label="Reset to auto color"
+                title="Auto (derived from class name)"
+                className={`border-border bg-surface text-muted-foreground h-7 rounded-md border px-2 text-[11px] font-medium ${
+                  session.color == null ? "ring-ring ring-2" : ""
+                }`}
+              >
+                Auto
+              </button>
+              {CLASS_PALETTE.map((c) => {
+                const active = session.color === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      onPatch({ color: c });
+                    }}
+                    disabled={pending}
+                    aria-label={`Set color ${c}`}
+                    title={c}
+                    className={`border-border h-7 w-7 rounded-md border ${
+                      active ? "ring-ring ring-2" : ""
+                    }`}
+                    style={{ backgroundColor: c }}
+                  />
+                );
+              })}
+            </div>
+            {siblingClassCount > 1 && (
+              <button
+                type="button"
+                onClick={() => {
+                  onRecolorClass(session.color);
+                }}
+                disabled={pending}
+                className="text-muted-foreground hover:text-foreground mt-1.5 text-[11px] underline-offset-2 hover:underline disabled:opacity-50"
+                title={`Apply this color to all ${siblingClassCount.toString()} "${session.class_name}" sessions in this schedule`}
+              >
+                Apply to all {siblingClassCount.toString()} &quot;{session.class_name}&quot;
+                sessions
+              </button>
+            )}
+            <p className="text-muted-foreground mt-1 text-[11px] leading-snug">
+              Current:{" "}
+              <span
+                className="border-border inline-block h-3 w-3 rounded border align-middle"
+                style={{ backgroundColor: effectiveColor }}
+              />{" "}
+              {session.color == null ? "auto" : "custom"}
+            </p>
           </div>
           <DrawerField
             label="Learner count"
@@ -1916,6 +2108,290 @@ Lee, Sim Lab, 13:00, 60`}
             className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
           >
             Import
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AutoScheduleModal({
+  rooms,
+  trainerHistory,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  rooms: SketchpadRoom[];
+  trainerHistory: string[];
+  pending: boolean;
+  onClose: () => void;
+  onSubmit: (req: {
+    className: string;
+    trainerName: string | null;
+    durationMinutes: number;
+    count: number;
+    learnerCount: number | null;
+    preferredRoomId: string | null;
+    preferredStartMinutes: number | null;
+    distribution: "one-per-day" | "fill-earliest";
+  }) => void;
+}) {
+  const [className, setClassName] = useState("");
+  const [trainerName, setTrainerName] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState("60");
+  const [count, setCount] = useState("5");
+  const [learnerCount, setLearnerCount] = useState("");
+  const [preferredRoomId, setPreferredRoomId] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [distribution, setDistribution] = useState<"one-per-day" | "fill-earliest">("one-per-day");
+
+  function handleSubmit() {
+    const klass = className.trim();
+    if (!klass) {
+      toast.error("Class name is required");
+      return;
+    }
+    const dur = Number(durationMinutes);
+    if (!Number.isFinite(dur) || dur <= 0) {
+      toast.error("Duration must be a positive number of minutes");
+      return;
+    }
+    const n = Number(count);
+    if (!Number.isFinite(n) || n < 1) {
+      toast.error("Session count must be at least 1");
+      return;
+    }
+    let preferredStartMinutes: number | null = null;
+    if (startTime) {
+      const [hh, mm] = startTime.split(":").map(Number);
+      if (Number.isFinite(hh) && Number.isFinite(mm)) {
+        preferredStartMinutes = (hh ?? 0) * 60 + (mm ?? 0);
+      }
+    }
+    onSubmit({
+      className: klass,
+      trainerName: trainerName.trim() || null,
+      durationMinutes: Math.round(dur),
+      count: Math.round(n),
+      learnerCount: learnerCount.trim() === "" ? null : Number(learnerCount),
+      preferredRoomId: preferredRoomId || null,
+      preferredStartMinutes,
+      distribution,
+    });
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="border-border bg-background flex max-h-[90vh] w-full max-w-xl flex-col gap-3 overflow-y-auto rounded-lg border p-5 shadow-xl"
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-foreground inline-flex items-center gap-1.5 text-base font-semibold">
+              <SparklesIcon className="h-4 w-4" />
+              Auto-schedule sessions
+            </h2>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              Place N identical classes across this sketch&apos;s day window. Avoids trainer and
+              room conflicts with what&apos;s already on the calendar.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+              Class name
+            </label>
+            <input
+              autoFocus
+              value={className}
+              onChange={(e) => {
+                setClassName(e.target.value);
+              }}
+              placeholder="e.g., EMR Provider"
+              className={fieldClass + " w-full"}
+              disabled={pending}
+            />
+          </div>
+          <div>
+            <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+              Trainer (optional)
+            </label>
+            <input
+              value={trainerName}
+              onChange={(e) => {
+                setTrainerName(e.target.value);
+              }}
+              list="auto-trainer-history"
+              placeholder="Auto-pick least-loaded"
+              className={fieldClass + " w-full"}
+              disabled={pending}
+            />
+            <datalist id="auto-trainer-history">
+              {trainerHistory.map((t) => (
+                <option key={t} value={t} />
+              ))}
+            </datalist>
+            <p className="text-muted-foreground mt-1 text-[11px] leading-snug">
+              Leave blank to auto-pick the least-loaded trainer in this schedule.
+            </p>
+          </div>
+          <div>
+            <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+              Preferred room (optional)
+            </label>
+            <select
+              value={preferredRoomId}
+              onChange={(e) => {
+                setPreferredRoomId(e.target.value);
+              }}
+              className={fieldClass + " w-full"}
+              disabled={pending || rooms.length === 0}
+            >
+              <option value="">Auto best-fit</option>
+              {rooms.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                  {r.capacity != null ? ` (cap ${r.capacity.toString()})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+              Duration (min)
+            </label>
+            <input
+              type="number"
+              min={5}
+              step={5}
+              value={durationMinutes}
+              onChange={(e) => {
+                setDurationMinutes(e.target.value);
+              }}
+              className={fieldClass + " w-full tabular-nums"}
+              disabled={pending}
+            />
+          </div>
+          <div>
+            <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+              Sessions to schedule
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={count}
+              onChange={(e) => {
+                setCount(e.target.value);
+              }}
+              className={fieldClass + " w-full tabular-nums"}
+              disabled={pending}
+            />
+          </div>
+          <div>
+            <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+              Learners per session (optional)
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={learnerCount}
+              onChange={(e) => {
+                setLearnerCount(e.target.value);
+              }}
+              placeholder="Best-fit picks smallest room that holds this"
+              className={fieldClass + " w-full tabular-nums"}
+              disabled={pending}
+            />
+          </div>
+          <div>
+            <label className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase tracking-wide">
+              Earliest start time (optional)
+            </label>
+            <input
+              type="time"
+              value={startTime}
+              onChange={(e) => {
+                setStartTime(e.target.value);
+              }}
+              className={fieldClass + " w-full tabular-nums"}
+              disabled={pending}
+            />
+            <p className="text-muted-foreground mt-1 text-[11px] leading-snug">
+              Each daily search begins at this time. Leave blank to start at the day window&apos;s
+              opening hour.
+            </p>
+          </div>
+          <div className="md:col-span-2">
+            <label className="text-muted-foreground mb-1 block text-[10px] font-medium uppercase tracking-wide">
+              Distribution
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  { value: "one-per-day", label: "Spread (1 per day, then stack)" },
+                  { value: "fill-earliest", label: "Fill earliest day first" },
+                ] as const
+              ).map((opt) => {
+                const active = distribution === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setDistribution(opt.value);
+                    }}
+                    className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-muted-foreground hover:bg-surface"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={pending || !className.trim()}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          >
+            <SparklesIcon className="h-4 w-4" />
+            Schedule
           </button>
         </div>
       </div>
