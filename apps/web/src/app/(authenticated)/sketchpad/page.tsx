@@ -46,12 +46,14 @@ export default async function SketchpadIndexPage() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
         title="Schedule Sketchpad"
         description="Quick, free-text course schedules. Not linked to your roster, classes, or capacity — just a fast way to mock something up and export to Excel."
       />
-      <SketchpadListView rows={rows} />
+      <div className="space-y-6 p-6">
+        <SketchpadListView rows={rows} />
+      </div>
     </div>
   );
 }

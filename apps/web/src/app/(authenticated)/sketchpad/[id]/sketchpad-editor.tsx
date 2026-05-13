@@ -683,7 +683,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-6">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <Link
@@ -1177,6 +1177,7 @@ function SettingsPanel({
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <SettingField
           label="Start date"
+          helper="The first day of the schedule. The day tabs and grid anchor here."
           type="date"
           defaultValue={schedule.start_date}
           disabled={pending}
@@ -1186,9 +1187,10 @@ function SettingsPanel({
         />
         <SettingField
           label="Days"
+          helper="How many days the schedule spans, starting from the Start date. Up to 90."
           type="number"
           min={1}
-          max={14}
+          max={90}
           defaultValue={schedule.day_count.toString()}
           disabled={pending}
           onCommit={(v) => {
@@ -1197,6 +1199,7 @@ function SettingsPanel({
         />
         <SettingField
           label="Day start"
+          helper="The hour the day grid begins, in 24-hour time. 7 = 7:00 AM, 13 = 1:00 PM."
           type="number"
           min={0}
           max={23}
@@ -1208,6 +1211,7 @@ function SettingsPanel({
         />
         <SettingField
           label="Day end"
+          helper="The hour the day grid ends, in 24-hour time. 17 = 5:00 PM, 19 = 7:00 PM."
           type="number"
           min={1}
           max={24}
@@ -1330,6 +1334,7 @@ function SettingsPanel({
 
 function SettingField({
   label,
+  helper,
   type,
   defaultValue,
   disabled,
@@ -1338,6 +1343,7 @@ function SettingField({
   max,
 }: {
   label: string;
+  helper?: string;
   type: "date" | "number";
   defaultValue: string;
   disabled: boolean;
@@ -1366,6 +1372,7 @@ function SettingField({
         }}
         className={fieldClass + " w-full tabular-nums"}
       />
+      {helper && <p className="text-muted-foreground mt-1 text-[11px] leading-snug">{helper}</p>}
     </div>
   );
 }
