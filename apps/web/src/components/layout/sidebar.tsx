@@ -16,6 +16,7 @@ import {
   BriefcaseIcon,
   CalendarDaysIcon,
   ChartBarIcon,
+  ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
   WrenchScrewdriverIcon,
   Bars3Icon,
@@ -61,6 +62,7 @@ function workGroup(modules: ModuleFlags): NavGroup {
   if (modules["module.training_planner"]) {
     items.push({ href: "/training-planner", label: "Training Planner", icon: CalendarDaysIcon });
   }
+  items.push({ href: "/one-on-ones", label: "1:1s", icon: ChatBubbleLeftRightIcon });
   return { title: "Work", items };
 }
 

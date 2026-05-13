@@ -2864,6 +2864,245 @@ export type Database = {
           },
         ];
       };
+      one_on_one_action_items: {
+        Row: {
+          category: string;
+          created_at: string;
+          department_id: string;
+          description: string;
+          due_by: string | null;
+          id: string;
+          one_on_one_id: string;
+          org_id: string;
+          owner: string;
+          resolved_at: string | null;
+          resolved_in_one_on_one_id: string | null;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          category: string;
+          created_at?: string;
+          department_id: string;
+          description: string;
+          due_by?: string | null;
+          id?: string;
+          one_on_one_id: string;
+          org_id: string;
+          owner: string;
+          resolved_at?: string | null;
+          resolved_in_one_on_one_id?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          category?: string;
+          created_at?: string;
+          department_id?: string;
+          description?: string;
+          due_by?: string | null;
+          id?: string;
+          one_on_one_id?: string;
+          org_id?: string;
+          owner?: string;
+          resolved_at?: string | null;
+          resolved_in_one_on_one_id?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "one_on_one_action_items_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "one_on_one_action_items_one_on_one_id_fkey";
+            columns: ["one_on_one_id"];
+            isOneToOne: false;
+            referencedRelation: "one_on_ones";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "one_on_one_action_items_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "one_on_one_action_items_resolved_in_one_on_one_id_fkey";
+            columns: ["resolved_in_one_on_one_id"];
+            isOneToOne: false;
+            referencedRelation: "one_on_ones";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      one_on_one_workload_changes: {
+        Row: {
+          actor_id: string | null;
+          after_value: Json | null;
+          before_value: Json | null;
+          change_kind: string;
+          created_at: string;
+          department_id: string;
+          id: string;
+          one_on_one_id: string;
+          org_id: string;
+          rationale_category: string | null;
+          source_id: string;
+          source_kind: string;
+        };
+        Insert: {
+          actor_id?: string | null;
+          after_value?: Json | null;
+          before_value?: Json | null;
+          change_kind: string;
+          created_at?: string;
+          department_id: string;
+          id?: string;
+          one_on_one_id: string;
+          org_id: string;
+          rationale_category?: string | null;
+          source_id: string;
+          source_kind: string;
+        };
+        Update: {
+          actor_id?: string | null;
+          after_value?: Json | null;
+          before_value?: Json | null;
+          change_kind?: string;
+          created_at?: string;
+          department_id?: string;
+          id?: string;
+          one_on_one_id?: string;
+          org_id?: string;
+          rationale_category?: string | null;
+          source_id?: string;
+          source_kind?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "one_on_one_workload_changes_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "one_on_one_workload_changes_one_on_one_id_fkey";
+            columns: ["one_on_one_id"];
+            isOneToOne: false;
+            referencedRelation: "one_on_ones";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "one_on_one_workload_changes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      one_on_ones: {
+        Row: {
+          completed_at: string | null;
+          concerns: string[];
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          department_id: string;
+          id: string;
+          instructor_id: string;
+          manager_id: string;
+          org_id: string;
+          scheduled_for: string;
+          sentiment: string | null;
+          snapshot_at: string | null;
+          snapshot_total_hours: number | null;
+          snapshot_utilization_pct: number | null;
+          topics: string[];
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          completed_at?: string | null;
+          concerns?: string[];
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          department_id: string;
+          id?: string;
+          instructor_id: string;
+          manager_id: string;
+          org_id: string;
+          scheduled_for?: string;
+          sentiment?: string | null;
+          snapshot_at?: string | null;
+          snapshot_total_hours?: number | null;
+          snapshot_utilization_pct?: number | null;
+          topics?: string[];
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          completed_at?: string | null;
+          concerns?: string[];
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          department_id?: string;
+          id?: string;
+          instructor_id?: string;
+          manager_id?: string;
+          org_id?: string;
+          scheduled_for?: string;
+          sentiment?: string | null;
+          snapshot_at?: string | null;
+          snapshot_total_hours?: number | null;
+          snapshot_utilization_pct?: number | null;
+          topics?: string[];
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "one_on_ones_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "one_on_ones_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "one_on_ones_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
+            foreignKeyName: "one_on_ones_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       org_invitations: {
         Row: {
           accepted_at: string | null;
