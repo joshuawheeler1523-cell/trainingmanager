@@ -201,7 +201,7 @@ export default function ClassesEditor({
                 <Th>Hours</Th>
                 <Th>Trainer FTE</Th>
                 <Th>Rooms</Th>
-                <Th>Slate</Th>
+                <Th>Trainers</Th>
                 <Th>Prereqs</Th>
                 <Th className="w-12" />
               </tr>
