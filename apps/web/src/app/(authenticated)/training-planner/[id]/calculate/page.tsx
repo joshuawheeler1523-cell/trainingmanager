@@ -18,6 +18,7 @@ import {
   type Recommendation,
   type TrainerUnavailability,
 } from "@/lib/training-planner/feasibility";
+import { dryRunSchedule, type ScheduleGenResult } from "../../actions";
 import GenerateButton from "./generate-button";
 
 type Params = Promise<{ id: string }>;
@@ -154,6 +155,22 @@ export default async function CalculatePage({ params }: { params: Params }) {
     unavailabilityByTrainer,
   });
 
+  // Authoritative unscheduled count + reasons come from the SQL generator
+  // running in dry-run mode — same planning math the Generate Schedule
+  // button uses, just without writing rows. The in-memory simulator above
+  // drifts from the SQL on some configurations (notably single-trainer
+  // class slates), so we override its unscheduledSessions with the SQL's
+  // gap list. Skipped when the impl can't be scheduled yet (no window
+  // dates, no classes, etc.) since the RPC would just raise.
+  let dryRun: ScheduleGenResult | null = null;
+  if (implTyped.window_start_date && implTyped.window_end_date && (classes?.length ?? 0) > 0) {
+    const result = await dryRunSchedule(id);
+    if (result.ok) dryRun = result.data;
+  }
+  if (dryRun) {
+    feas.unscheduledSessions = dryRun.capacity_gaps.length;
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -167,6 +184,8 @@ export default async function CalculatePage({ params }: { params: Params }) {
       <VerdictBanner result={feas} />
 
       <SummaryCards result={feas} impl={implTyped} />
+
+      {dryRun && dryRun.capacity_gaps.length > 0 && <UnscheduledReasonsPanel dryRun={dryRun} />}
 
       <ResourceForecastPanel result={feas} rooms={rooms ?? []} trainers={trainers ?? []} />
 
@@ -203,6 +222,99 @@ export default async function CalculatePage({ params }: { params: Params }) {
 }
 
 // ── Components ─────────────────────────────────────────────────────────────
+
+function UnscheduledReasonsPanel({ dryRun }: { dryRun: ScheduleGenResult }) {
+  // Group gaps by class so a class with N unscheduled sessions shows up as
+  // one row with a count, not N rows. Reason is the same across sibling
+  // sessions in practice (the SQL emits identical text per class).
+  type Group = { className: string; count: number; reason: string; sessionIndices: number[] };
+  const byClass = new Map<string, Group>();
+  for (const gap of dryRun.capacity_gaps) {
+    const g = byClass.get(gap.class_id) ?? {
+      className: gap.class_name,
+      count: 0,
+      reason: gap.reason,
+      sessionIndices: [],
+    };
+    g.count += 1;
+    g.sessionIndices.push(gap.session_index);
+    byClass.set(gap.class_id, g);
+  }
+  const groups = [...byClass.values()].sort((a, b) => b.count - a.count);
+  const total = dryRun.capacity_gaps.length;
+
+  return (
+    <div className="border-border rounded-md border bg-rose-50/40 p-3 dark:bg-rose-950/20">
+      <div className="mb-2 flex items-baseline justify-between">
+        <p className="text-foreground text-sm font-semibold">
+          {total.toString()} session{total === 1 ? "" : "s"} can&apos;t fit
+        </p>
+        <p className="text-muted-foreground text-[11px]">
+          From a dry-run of the actual scheduler. No rows were written.
+        </p>
+      </div>
+      <table className="w-full text-xs">
+        <thead className="text-muted-foreground">
+          <tr>
+            <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Class</th>
+            <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Unplaced</th>
+            <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Reason</th>
+          </tr>
+        </thead>
+        <tbody className="divide-border divide-y">
+          {groups.map((g) => (
+            <tr key={g.className}>
+              <td className="text-foreground px-2 py-1.5 font-medium">{g.className}</td>
+              <td className="text-foreground px-2 py-1.5 text-right tabular-nums">
+                {g.count.toString()}
+              </td>
+              <td className="text-muted-foreground px-2 py-1.5">{g.reason}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {dryRun.recommendations && Object.keys(dryRun.recommendations).length > 0 && (
+        <div className="border-border mt-2 border-t pt-2 text-[11px]">
+          <p className="text-foreground mb-1 font-semibold">Quick fixes:</p>
+          <ul className="text-muted-foreground list-disc space-y-0.5 pl-4">
+            {dryRun.recommendations.trainers_to_add != null &&
+              dryRun.recommendations.trainers_to_add > 0 && (
+                <li>
+                  Add{" "}
+                  <span className="text-foreground font-medium">
+                    {dryRun.recommendations.trainers_to_add.toString()}
+                  </span>{" "}
+                  more trainer
+                  {dryRun.recommendations.trainers_to_add === 1 ? "" : "s"} at typical hours/week.
+                </li>
+              )}
+            {dryRun.recommendations.trainer_hours_per_week_to_add != null &&
+              dryRun.recommendations.trainer_hours_per_week_to_add > 0 && (
+                <li>
+                  …or add{" "}
+                  <span className="text-foreground font-medium">
+                    {dryRun.recommendations.trainer_hours_per_week_to_add.toString()}
+                  </span>{" "}
+                  trainer-hours/week across the existing roster.
+                </li>
+              )}
+            {dryRun.recommendations.weeks_to_extend != null &&
+              dryRun.recommendations.weeks_to_extend > 0 && (
+                <li>
+                  …or extend the window by{" "}
+                  <span className="text-foreground font-medium">
+                    {dryRun.recommendations.weeks_to_extend.toString()}
+                  </span>{" "}
+                  week
+                  {dryRun.recommendations.weeks_to_extend === 1 ? "" : "s"}.
+                </li>
+              )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function VerdictBanner({ result }: { result: FeasibilityResult }) {
   const v = result.verdict;

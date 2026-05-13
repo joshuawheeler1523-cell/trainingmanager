@@ -1015,9 +1015,30 @@ export async function generateSchedule(
 
   const { data, error } = await c.supabase.rpc("generate_implementation_schedule", {
     p_implementation_id: implementationId,
+    p_dry_run: false,
   });
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
   revalidateImpl(implementationId);
+  return { ok: true, data: data as ScheduleGenResult };
+}
+
+// Run the SQL generator in dry-run mode — same planning math, no writes.
+// Used by the Calculate page so its "X can't fit" verdict reflects the
+// actual production scheduler instead of an in-memory simulator that
+// drifted from the SQL over time. Drafts and published sessions are left
+// untouched; the returned JSON shows what WOULD be placed if the planner
+// hit Generate right now.
+export async function dryRunSchedule(
+  implementationId: string,
+): Promise<ActionResult<ScheduleGenResult>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase.rpc("generate_implementation_schedule", {
+    p_implementation_id: implementationId,
+    p_dry_run: true,
+  });
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
   return { ok: true, data: data as ScheduleGenResult };
 }
 

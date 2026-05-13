@@ -33,6 +33,8 @@ const baseImpl: Implementation = {
   lunch_break_start_minutes: 720,
   lunch_break_length_minutes: 60,
   go_live_buffer_days: 7,
+  business_hours_start_local: 0,
+  business_hours_end_local: 24,
   deleted_at: null,
   created_at: "2026-05-01T00:00:00Z",
   updated_at: "2026-05-01T00:00:00Z",
