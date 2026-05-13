@@ -197,18 +197,35 @@ export async function duplicateSchedule(id: string): Promise<ActionResult<{ id: 
     .select("*")
     .eq("schedule_id", id);
   if (sessions && sessions.length > 0) {
-    const inserts = sessions.map((s) => ({
-      schedule_id: copy.id,
-      room_id: s.room_id ? (roomIdMap.get(s.room_id) ?? null) : null,
-      org_id: c.orgId,
-      trainer_name: s.trainer_name,
-      class_name: s.class_name,
-      starts_at: s.starts_at,
-      ends_at: s.ends_at,
-      learner_count: s.learner_count,
-      notes: s.notes,
-      color: s.color,
-    }));
+    // Remap group_ids: preserve sibling grouping within the duplicated
+    // schedule, but mint fresh UUIDs so the new sessions never share a
+    // group with their source schedule.
+    const groupIdMap = new Map<string, string>();
+    const inserts = sessions.map((s) => {
+      let newGroupId: string | null = null;
+      if (s.group_id) {
+        const existing = groupIdMap.get(s.group_id);
+        if (existing) {
+          newGroupId = existing;
+        } else {
+          newGroupId = crypto.randomUUID();
+          groupIdMap.set(s.group_id, newGroupId);
+        }
+      }
+      return {
+        schedule_id: copy.id,
+        room_id: s.room_id ? (roomIdMap.get(s.room_id) ?? null) : null,
+        org_id: c.orgId,
+        trainer_name: s.trainer_name,
+        class_name: s.class_name,
+        starts_at: s.starts_at,
+        ends_at: s.ends_at,
+        learner_count: s.learner_count,
+        notes: s.notes,
+        color: s.color,
+        group_id: newGroupId,
+      };
+    });
     const { error: sessErr } = await c.supabase.from("sketchpad_sessions").insert(inserts);
     if (sessErr) return { ok: false, error: { code: sessErr.code, message: sessErr.message } };
   }
@@ -326,6 +343,7 @@ export async function createSession(
       learner_count: parsed.data.learner_count ?? null,
       notes: parsed.data.notes,
       color: parsed.data.color,
+      group_id: parsed.data.group_id ?? null,
     })
     .select()
     .single();
@@ -333,6 +351,97 @@ export async function createSession(
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
   revalidate(scheduleId);
   return { ok: true, data: data };
+}
+
+// Duplicate a session — drops a copy at the same time on the next day (wraps
+// to the last day in the schedule). Mints a group_id on the source if it
+// doesn't have one yet, so source + copy become siblings in a series.
+// The UI shows "n/N" for each member; numbering is computed client-side
+// from group membership ordered by starts_at.
+export async function duplicateSession(
+  sessionId: string,
+  scheduleId: string,
+): Promise<ActionResult<{ source: SketchpadSession; copy: SketchpadSession }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data: source, error: srcErr } = await c.supabase
+    .from("sketchpad_sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .eq("schedule_id", scheduleId)
+    .eq("org_id", c.orgId)
+    .maybeSingle();
+  if (srcErr) return { ok: false, error: { code: srcErr.code, message: srcErr.message } };
+  if (!source) return { ok: false, error: { code: "NOT_FOUND", message: "Session not found" } };
+
+  const { data: schedule, error: schedErr } = await c.supabase
+    .from("sketchpad_schedules")
+    .select("start_date, day_count")
+    .eq("id", scheduleId)
+    .eq("org_id", c.orgId)
+    .maybeSingle();
+  if (schedErr) return { ok: false, error: { code: schedErr.code, message: schedErr.message } };
+  if (!schedule) return { ok: false, error: { code: "NOT_FOUND", message: "Schedule not found" } };
+
+  // If source isn't grouped yet, mint a group and write it back. We do this
+  // first so the returned source row reflects the new state.
+  let groupId = source.group_id;
+  let updatedSource: SketchpadSession = source;
+  if (!groupId) {
+    groupId = crypto.randomUUID();
+    const { data: patched, error: patchErr } = await c.supabase
+      .from("sketchpad_sessions")
+      .update({ group_id: groupId })
+      .eq("id", source.id)
+      .eq("org_id", c.orgId)
+      .select()
+      .single();
+    if (patchErr) return { ok: false, error: { code: patchErr.code, message: patchErr.message } };
+    updatedSource = patched;
+  }
+
+  // Place the copy at the same time the next day. If the source is already on
+  // the last day of the schedule, fall back to the same day so the copy still
+  // lands somewhere visible (the user can drag it after).
+  const sourceStart = new Date(source.starts_at);
+  const sourceEnd = new Date(source.ends_at);
+  const sourceDay = new Date(
+    sourceStart.getFullYear(),
+    sourceStart.getMonth(),
+    sourceStart.getDate(),
+  );
+  const [sy, sm, sd] = schedule.start_date.split("-").map(Number);
+  const scheduleStart = new Date(sy ?? 2026, (sm ?? 1) - 1, sd ?? 1);
+  const dayIndex = Math.round(
+    (sourceDay.getTime() - scheduleStart.getTime()) / (24 * 60 * 60 * 1000),
+  );
+  const advance = dayIndex < schedule.day_count - 1 ? 1 : 0;
+  const offsetMs = advance * 24 * 60 * 60 * 1000;
+  const newStart = new Date(sourceStart.getTime() + offsetMs);
+  const newEnd = new Date(sourceEnd.getTime() + offsetMs);
+
+  const { data: copy, error: copyErr } = await c.supabase
+    .from("sketchpad_sessions")
+    .insert({
+      schedule_id: scheduleId,
+      org_id: c.orgId,
+      room_id: source.room_id,
+      trainer_name: source.trainer_name,
+      class_name: source.class_name,
+      starts_at: newStart.toISOString(),
+      ends_at: newEnd.toISOString(),
+      learner_count: source.learner_count,
+      notes: source.notes,
+      color: source.color,
+      group_id: groupId,
+    })
+    .select()
+    .single();
+  if (copyErr) return { ok: false, error: { code: copyErr.code, message: copyErr.message } };
+
+  revalidate(scheduleId);
+  return { ok: true, data: { source: updatedSource, copy } };
 }
 
 export async function updateSession(

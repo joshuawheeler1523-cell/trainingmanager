@@ -3899,6 +3899,7 @@ export type Database = {
           color: string | null;
           created_at: string;
           ends_at: string;
+          group_id: string | null;
           id: string;
           learner_count: number | null;
           notes: string | null;
@@ -3914,6 +3915,7 @@ export type Database = {
           color?: string | null;
           created_at?: string;
           ends_at: string;
+          group_id?: string | null;
           id?: string;
           learner_count?: number | null;
           notes?: string | null;
@@ -3929,6 +3931,7 @@ export type Database = {
           color?: string | null;
           created_at?: string;
           ends_at?: string;
+          group_id?: string | null;
           id?: string;
           learner_count?: number | null;
           notes?: string | null;
