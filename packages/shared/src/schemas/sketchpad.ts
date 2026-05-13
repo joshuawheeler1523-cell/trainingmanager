@@ -83,6 +83,42 @@ export const sketchpadSessionUpdateSchema = z.object({
   group_id: z.string().uuid().nullish().optional(),
 });
 
+export const sketchpadAutoScheduleSchema = z.object({
+  className: trimmedString(200),
+  trainerName: z
+    .string()
+    .nullish()
+    .transform((v) => (v == null || v.trim() === "" ? null : v.trim())),
+  durationMinutes: z.coerce
+    .number()
+    .int()
+    .min(5)
+    .max(24 * 60),
+  count: z.coerce.number().int().min(1).max(100),
+  learnerCount: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(10000)
+    .nullish()
+    .transform((v) => v ?? null),
+  preferredRoomId: z
+    .string()
+    .uuid()
+    .nullish()
+    .transform((v) => v ?? null),
+  preferredStartMinutes: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(24 * 60)
+    .nullish()
+    .transform((v) => v ?? null),
+  distribution: z.enum(["one-per-day", "fill-earliest"]).default("one-per-day"),
+});
+
+export type SketchpadAutoScheduleInput = z.infer<typeof sketchpadAutoScheduleSchema>;
+
 export type SketchpadScheduleCreate = z.infer<typeof sketchpadScheduleCreateSchema>;
 export type SketchpadScheduleUpdate = z.infer<typeof sketchpadScheduleUpdateSchema>;
 export type SketchpadRoomCreate = z.infer<typeof sketchpadRoomCreateSchema>;
