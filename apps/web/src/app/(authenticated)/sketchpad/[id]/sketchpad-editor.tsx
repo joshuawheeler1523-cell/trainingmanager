@@ -55,6 +55,8 @@ type CalEvent = Omit<CalEventBase, "resource"> & {
   resourceId?: string;
 };
 
+type SketchpadView = "day" | "week" | "month";
+
 const fieldClass =
   "border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
@@ -264,6 +266,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
   );
 
   const [showSettings, setShowSettings] = useState(false);
+  const [view, setView] = useState<SketchpadView>("day");
   const [selectedDay, setSelectedDay] = useState(0);
   const [drawerSessionId, setDrawerSessionId] = useState<string | null>(null);
   const [newRoomName, setNewRoomName] = useState("");
@@ -355,8 +358,10 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     return { trainerHits, roomHits, outOfHours, detail };
   }, [optimisticSessions, rooms, schedule.hours_start, schedule.hours_end]);
 
-  // Build CalEvents from sessions that fall on the selected day AND have a room.
-  // Unassigned sessions are surfaced separately in the strip above the calendar.
+  // Build CalEvents from sessions with a room. In Day view we filter to the
+  // selected day so the rooms-as-columns layout makes sense; in Week / Month
+  // we include the full session set and let react-big-calendar window it.
+  // Unassigned sessions stay in the strip above the calendar regardless of view.
   const calendarEvents = useMemo<CalEvent[]>(() => {
     function kindFor(sessionId: string): CalResource["conflictKind"] {
       const t = conflicts.trainerHits.has(sessionId);
@@ -367,16 +372,22 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
       if (conflicts.outOfHours.has(sessionId)) return "out-of-hours";
       return "none";
     }
+    const roomById = new Map(rooms.map((r) => [r.id, r]));
     return optimisticSessions
-      .filter(
-        (s): s is SketchpadSession & { room_id: string } =>
-          s.room_id !== null && sameDay(new Date(s.starts_at), currentDay),
-      )
+      .filter((s): s is SketchpadSession & { room_id: string } => {
+        if (s.room_id === null) return false;
+        if (view === "day") return sameDay(new Date(s.starts_at), currentDay);
+        return true;
+      })
       .map((s) => {
         const kind = kindFor(s.id);
         const reasons = conflicts.detail.get(s.id) ?? [];
+        const roomName = roomById.get(s.room_id)?.name ?? "—";
+        // Day view groups by room column, so the title can be class-only.
+        // Week / month have no room axis, so we prepend the room name.
+        const title = view === "day" ? s.class_name : `${roomName} · ${s.class_name}`;
         return {
-          title: s.class_name,
+          title,
           start: new Date(s.starts_at),
           end: new Date(s.ends_at),
           resourceId: s.room_id,
@@ -390,6 +401,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
               s.class_name,
               `${formatTime(s.starts_at)} – ${formatTime(s.ends_at)}`,
               `Trainer: ${s.trainer_name}`,
+              `Room: ${roomName}`,
               s.learner_count != null ? `${s.learner_count.toString()} learners` : null,
               ...reasons.map((r) => `⚠ ${r}`),
             ]
@@ -399,7 +411,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           },
         };
       });
-  }, [optimisticSessions, currentDay, conflicts]);
+  }, [optimisticSessions, currentDay, conflicts, rooms, view]);
 
   const unassignedSessions = useMemo(
     () => optimisticSessions.filter((s) => !s.room_id),
@@ -700,6 +712,33 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div
+            role="tablist"
+            aria-label="Calendar view"
+            className="border-border bg-background inline-flex rounded-md border p-0.5"
+          >
+            {(["day", "week", "month"] as const).map((v) => {
+              const active = view === v;
+              return (
+                <button
+                  key={v}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => {
+                    setView(v);
+                  }}
+                  className={`rounded px-2.5 py-1 text-xs font-medium capitalize ${
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-surface"
+                  }`}
+                >
+                  {v}
+                </button>
+              );
+            })}
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -804,8 +843,14 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
         />
       )}
 
-      {/* Day tabs */}
-      <div className="border-border bg-background flex flex-wrap gap-1 rounded-lg border p-2">
+      {/* Day tabs — full-width strip in Day view; in Week/Month they act as an
+          anchor for the calendar plus the target day for quick-add. */}
+      <div className="border-border bg-background flex flex-wrap items-center gap-1 rounded-lg border p-2">
+        {view !== "day" && (
+          <span className="text-muted-foreground mr-1 px-1 text-[11px] uppercase tracking-wide">
+            Anchor day
+          </span>
+        )}
         {days.map((d, i) => {
           const active = i === selectedDay;
           const dayCount = optimisticSessions.filter((s) =>
@@ -992,20 +1037,32 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
             events={calendarEvents}
             startAccessor="start"
             endAccessor="end"
-            views={["day"]}
-            defaultView="day"
-            view="day"
+            views={view === "day" ? ["day"] : view === "week" ? ["work_week"] : ["month"]}
+            defaultView={view === "day" ? "day" : view === "week" ? "work_week" : "month"}
+            view={view === "day" ? "day" : view === "week" ? "work_week" : "month"}
             onView={() => {
-              // Locked to day view in v2; tabs above handle day nav.
+              // View transitions are driven by our toggle above, not by RBC.
             }}
             date={currentDay}
-            onNavigate={() => {
-              // Disable internal nav; we drive `date` via the tab strip above.
+            onNavigate={(newDate) => {
+              // Week / Month toolbars expose prev / next. Sync the anchor day
+              // index so quick-add targets a sensible day after navigation.
+              if (newDate instanceof Date) {
+                const idx = days.findIndex((d) => sameDay(d, newDate));
+                if (idx >= 0) setSelectedDay(idx);
+              }
             }}
-            toolbar={false}
-            resources={calendarResources}
-            resourceIdAccessor={(r: object) => (r as { resourceId: string }).resourceId}
-            resourceTitleAccessor={(r: object) => (r as { resourceTitle: string }).resourceTitle}
+            toolbar={view !== "day"}
+            // Resources (rooms-as-columns) only make sense in Day view. Week /
+            // Month use days as the column axis; room is shown in the event title.
+            {...(view === "day"
+              ? {
+                  resources: calendarResources,
+                  resourceIdAccessor: (r: object) => (r as { resourceId: string }).resourceId,
+                  resourceTitleAccessor: (r: object) =>
+                    (r as { resourceTitle: string }).resourceTitle,
+                }
+              : {})}
             tooltipAccessor={(event: CalEvent) => event.resource.conflictTooltip}
             min={minOfDay}
             max={maxOfDay}
@@ -1048,6 +1105,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
         Times are in your browser&apos;s local timezone. Drag a session to move or resize. Click for
         details. Trainer overlap = rose border. Room overlap = amber. Outside the day window =
         slate.
+        {view !== "day" && " Switch to Day view to see rooms as columns."}
       </p>
 
       {openSession && (
