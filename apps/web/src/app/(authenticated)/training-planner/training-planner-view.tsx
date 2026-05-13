@@ -4,10 +4,10 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
+import { DocumentDuplicateIcon, PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import EmptyState from "@/components/ui/empty-state";
 import { IMPL_STATUS_VALUES, type Implementation, type ImplStatus } from "@arbor/shared";
-import { archiveImplementation, createImplementation } from "./actions";
+import { archiveImplementation, createImplementation, duplicateImplementation } from "./actions";
 
 type PlannerRow = Implementation & {
   class_count: number;
@@ -39,6 +39,18 @@ export default function TrainingPlannerView({ implementations }: Props) {
       if (result.ok) {
         toast.success("Implementation created");
         setName("");
+        router.push(`/training-planner/${result.data.id}/setup`);
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  function handleDuplicate(i: PlannerRow) {
+    startTransition(async () => {
+      const result = await duplicateImplementation(i.id);
+      if (result.ok) {
+        toast.success(`Duplicated "${i.name}"`);
         router.push(`/training-planner/${result.data.id}/setup`);
       } else {
         toast.error(result.error.message);
@@ -182,17 +194,32 @@ export default function TrainingPlannerView({ implementations }: Props) {
                     <CompletionBar percent={i.completion_pct} />
                   </td>
                   <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => {
-                        handleDelete(i);
-                      }}
-                      aria-label={`Delete ${i.name}`}
-                      className="text-muted-foreground hover:text-destructive disabled:opacity-50"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => {
+                          handleDuplicate(i);
+                        }}
+                        aria-label={`Duplicate ${i.name}`}
+                        title="Duplicate (copies rooms, trainers, classes, modules, prereqs — no sessions)"
+                        className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-50"
+                      >
+                        <DocumentDuplicateIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => {
+                          handleDelete(i);
+                        }}
+                        aria-label={`Delete ${i.name}`}
+                        title="Delete"
+                        className="text-muted-foreground hover:text-destructive rounded p-1 disabled:opacity-50"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

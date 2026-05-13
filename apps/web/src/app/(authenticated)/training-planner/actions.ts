@@ -152,6 +152,291 @@ export async function archiveImplementation(id: string): Promise<ActionResult<{ 
   return { ok: true, data: { id } };
 }
 
+// Duplicate an implementation: copies the impl row + every child config
+// (modules, rooms, classes, trainers, class-trainer links, prereqs, trainer
+// unavailability) into a brand-new impl. Sessions are NOT copied — the user
+// re-runs Generate Schedule on the clone. Window dates and go-live carry
+// over; the user can tweak them on the new impl's Setup step.
+//
+// The clone starts in draft + step 1 so the wizard nudges the user through
+// any data they want to adjust before generating.
+export async function duplicateImplementation(id: string): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  // 1. Load source. Use service-role-level reads through the user session
+  // (RLS still applies — duplicate is gated on "user can read the source").
+  const { data: source, error: srcErr } = await c.supabase
+    .from("implementations")
+    .select("*")
+    .eq("id", id)
+    .eq("org_id", c.orgId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (srcErr) return { ok: false, error: { code: srcErr.code, message: srcErr.message } };
+  if (!source) {
+    return { ok: false, error: { code: "NOT_FOUND", message: "Implementation not found" } };
+  }
+
+  // 2. Insert the new impl. status=draft, current_step=1, fresh name.
+  const newName = `${source.name} (copy)`;
+  const { data: cloneRow, error: cloneErr } = await c.supabase
+    .from("implementations")
+    .insert({
+      org_id: c.orgId,
+      department_id: source.department_id,
+      name: newName,
+      description: source.description,
+      window_start_date: source.window_start_date,
+      window_end_date: source.window_end_date,
+      go_live_date: source.go_live_date,
+      go_live_buffer_days: source.go_live_buffer_days,
+      lunch_break_start_minutes: source.lunch_break_start_minutes,
+      lunch_break_length_minutes: source.lunch_break_length_minutes,
+      status: "draft",
+      current_step: 1,
+    })
+    .select("id")
+    .single();
+  if (cloneErr) return { ok: false, error: { code: cloneErr.code, message: cloneErr.message } };
+  const newImplId = cloneRow.id;
+
+  // 3. Load and re-insert children, building id maps for FK rewiring.
+  const moduleIdMap = new Map<string, string>();
+  const roomIdMap = new Map<string, string>();
+  const classIdMap = new Map<string, string>();
+  const trainerIdMap = new Map<string, string>();
+
+  // ── modules ──
+  const { data: modules } = await c.supabase
+    .from("impl_modules")
+    .select("*")
+    .eq("implementation_id", id);
+  if (modules && modules.length > 0) {
+    const inserts = modules.map((m) => ({
+      org_id: c.orgId,
+      department_id: m.department_id,
+      implementation_id: newImplId,
+      name: m.name,
+      description: m.description,
+      sort_order: m.sort_order,
+    }));
+    const { data: newModules, error: modErr } = await c.supabase
+      .from("impl_modules")
+      .insert(inserts)
+      .select("id, sort_order, name");
+    if (modErr) return { ok: false, error: { code: modErr.code, message: modErr.message } };
+    // Re-pair by (sort_order, name) — both are preserved 1:1 in insert order.
+    for (let i = 0; i < modules.length; i++) {
+      const src = modules[i];
+      const dst = newModules[i];
+      if (src && dst) moduleIdMap.set(src.id, dst.id);
+    }
+  }
+
+  // ── rooms ──
+  const { data: rooms } = await c.supabase
+    .from("impl_rooms")
+    .select("*")
+    .eq("implementation_id", id);
+  if (rooms && rooms.length > 0) {
+    const inserts = rooms.map((r) => ({
+      org_id: c.orgId,
+      department_id: r.department_id,
+      implementation_id: newImplId,
+      name: r.name,
+      location: r.location,
+      seat_capacity: r.seat_capacity,
+      available_hours_per_day: r.available_hours_per_day,
+      available_days_of_week: r.available_days_of_week,
+      equipment_notes: r.equipment_notes,
+      equipment_tags: r.equipment_tags,
+      start_hour_local: r.start_hour_local,
+      timezone: r.timezone,
+      sort_order: r.sort_order,
+    }));
+    const { data: newRooms, error: roomsErr } = await c.supabase
+      .from("impl_rooms")
+      .insert(inserts)
+      .select("id");
+    if (roomsErr) return { ok: false, error: { code: roomsErr.code, message: roomsErr.message } };
+    for (let i = 0; i < rooms.length; i++) {
+      const src = rooms[i];
+      const dst = newRooms[i];
+      if (src && dst) roomIdMap.set(src.id, dst.id);
+    }
+  }
+
+  // ── trainers ──
+  const { data: trainers } = await c.supabase
+    .from("impl_trainers")
+    .select("*")
+    .eq("implementation_id", id);
+  if (trainers && trainers.length > 0) {
+    const inserts = trainers.map((t) => ({
+      org_id: c.orgId,
+      department_id: t.department_id,
+      implementation_id: newImplId,
+      instructor_id: t.instructor_id,
+      name: t.name,
+      email: t.email,
+      availability_hours_per_week: t.availability_hours_per_week,
+      max_concurrent_sessions: t.max_concurrent_sessions,
+      sort_order: t.sort_order,
+    }));
+    const { data: newTrainers, error: trErr } = await c.supabase
+      .from("impl_trainers")
+      .insert(inserts)
+      .select("id");
+    if (trErr) return { ok: false, error: { code: trErr.code, message: trErr.message } };
+    for (let i = 0; i < trainers.length; i++) {
+      const src = trainers[i];
+      const dst = newTrainers[i];
+      if (src && dst) trainerIdMap.set(src.id, dst.id);
+    }
+  }
+
+  // ── classes ── (module_id needs remapping)
+  const { data: classes } = await c.supabase
+    .from("impl_classes")
+    .select("*")
+    .eq("implementation_id", id);
+  if (classes && classes.length > 0) {
+    const inserts = classes.map((cl) => ({
+      org_id: c.orgId,
+      department_id: cl.department_id,
+      implementation_id: newImplId,
+      module_id: cl.module_id ? (moduleIdMap.get(cl.module_id) ?? null) : null,
+      name: cl.name,
+      description: cl.description,
+      hours_per_session: cl.hours_per_session,
+      expected_learners_per_session: cl.expected_learners_per_session,
+      total_people_to_train: cl.total_people_to_train,
+      required_equipment_notes: cl.required_equipment_notes,
+      required_equipment_tags: cl.required_equipment_tags,
+      sort_order: cl.sort_order,
+    }));
+    const { data: newClasses, error: clErr } = await c.supabase
+      .from("impl_classes")
+      .insert(inserts)
+      .select("id");
+    if (clErr) return { ok: false, error: { code: clErr.code, message: clErr.message } };
+    for (let i = 0; i < classes.length; i++) {
+      const src = classes[i];
+      const dst = newClasses[i];
+      if (src && dst) classIdMap.set(src.id, dst.id);
+    }
+  }
+
+  // ── class_trainers (junction) ── remap both sides
+  const { data: classTrainers } = await c.supabase
+    .from("impl_class_trainers")
+    .select("impl_class_id, impl_trainer_id, department_id")
+    .in("impl_class_id", [...classIdMap.keys(), "00000000-0000-0000-0000-000000000000"]);
+  if (classTrainers && classTrainers.length > 0) {
+    const inserts = classTrainers
+      .map((ct) => {
+        const newClassId = classIdMap.get(ct.impl_class_id);
+        const newTrainerId = trainerIdMap.get(ct.impl_trainer_id);
+        if (!newClassId || !newTrainerId) return null;
+        return {
+          org_id: c.orgId,
+          department_id: ct.department_id,
+          impl_class_id: newClassId,
+          impl_trainer_id: newTrainerId,
+        };
+      })
+      .filter(
+        (
+          x,
+        ): x is {
+          org_id: string;
+          department_id: string;
+          impl_class_id: string;
+          impl_trainer_id: string;
+        } => !!x,
+      );
+    if (inserts.length > 0) {
+      const { error: ctErr } = await c.supabase.from("impl_class_trainers").insert(inserts);
+      if (ctErr) return { ok: false, error: { code: ctErr.code, message: ctErr.message } };
+    }
+  }
+
+  // ── prerequisites ── remap both sides
+  const { data: prereqs } = await c.supabase
+    .from("impl_class_prerequisites")
+    .select("impl_class_id, prerequisite_id, department_id")
+    .in("impl_class_id", [...classIdMap.keys(), "00000000-0000-0000-0000-000000000000"]);
+  if (prereqs && prereqs.length > 0) {
+    const inserts = prereqs
+      .map((p) => {
+        const newClassId = classIdMap.get(p.impl_class_id);
+        const newPrereqId = classIdMap.get(p.prerequisite_id);
+        if (!newClassId || !newPrereqId) return null;
+        return {
+          org_id: c.orgId,
+          department_id: p.department_id,
+          impl_class_id: newClassId,
+          prerequisite_id: newPrereqId,
+        };
+      })
+      .filter(
+        (
+          x,
+        ): x is {
+          org_id: string;
+          department_id: string;
+          impl_class_id: string;
+          prerequisite_id: string;
+        } => !!x,
+      );
+    if (inserts.length > 0) {
+      const { error: pErr } = await c.supabase.from("impl_class_prerequisites").insert(inserts);
+      if (pErr) return { ok: false, error: { code: pErr.code, message: pErr.message } };
+    }
+  }
+
+  // ── trainer unavailability ── remap trainer id
+  const { data: unavail } = await c.supabase
+    .from("impl_trainer_unavailability")
+    .select("*")
+    .in("impl_trainer_id", [...trainerIdMap.keys(), "00000000-0000-0000-0000-000000000000"]);
+  if (unavail && unavail.length > 0) {
+    const inserts = unavail
+      .map((u) => {
+        const newTrainerId = trainerIdMap.get(u.impl_trainer_id);
+        if (!newTrainerId) return null;
+        return {
+          org_id: c.orgId,
+          department_id: u.department_id,
+          impl_trainer_id: newTrainerId,
+          starts_at: u.starts_at,
+          ends_at: u.ends_at,
+          reason: u.reason,
+        };
+      })
+      .filter(
+        (
+          x,
+        ): x is {
+          org_id: string;
+          department_id: string;
+          impl_trainer_id: string;
+          starts_at: string;
+          ends_at: string;
+          reason: string | null;
+        } => !!x,
+      );
+    if (inserts.length > 0) {
+      const { error: uErr } = await c.supabase.from("impl_trainer_unavailability").insert(inserts);
+      if (uErr) return { ok: false, error: { code: uErr.code, message: uErr.message } };
+    }
+  }
+
+  revalidateImpl(newImplId);
+  return { ok: true, data: { id: newImplId } };
+}
+
 // ── impl_rooms ──────────────────────────────────────────────────────────────
 
 export async function createRoom(
