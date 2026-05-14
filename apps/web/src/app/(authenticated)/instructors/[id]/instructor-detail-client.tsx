@@ -60,49 +60,52 @@ type Props = {
   buckets: AllocationBucket[];
 };
 
-type Tab = "overview" | "skills" | "workload" | "audit";
+type Tab = "main" | "audit";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "skills", label: "Skills" },
-  { id: "workload", label: "Workload" },
+  { id: "main", label: "Overview" },
   { id: "audit", label: "Audit" },
 ];
 
-function OverviewTab({ instructor }: { instructor: Instructor }) {
-  const fields: { label: string; value: string | null | undefined }[] = [
-    { label: "Full name", value: instructor.full_name },
+// Horizontal "license-plate" strip — every populated profile field on one
+// row separated by middots so the eye scans left-to-right instead of
+// reading a vertical 2-column dl. Notes (if long) drop to a second line.
+function ProfileStrip({ instructor }: { instructor: Instructor }) {
+  type Item = { label: string; value: string | number | null | undefined };
+  const inlineFields: Item[] = [
     { label: "Email", value: instructor.email },
     { label: "Phone", value: instructor.phone },
     { label: "Department", value: instructor.department },
     { label: "Location", value: instructor.location },
     { label: "Job title", value: instructor.job_title },
     { label: "Start date", value: instructor.start_date },
-    { label: "Annual hours", value: String(instructor.annual_hours) },
+    { label: "Annual hours", value: `${String(instructor.annual_hours)} h/yr` },
     { label: "Status", value: instructor.status },
-    { label: "Notes", value: instructor.notes },
   ];
+  const populated = inlineFields.filter((f) => f.value != null && f.value !== "");
 
   return (
-    <div className="space-y-6">
-      <div className="border-border bg-background rounded-xl border p-6">
-        <h3 className="text-foreground mb-4 text-sm font-semibold">Profile</h3>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-          {fields.map(({ label, value }) =>
-            value ? (
-              <div key={label}>
-                <dt className="text-muted-foreground text-xs font-medium">{label}</dt>
-                <dd className="text-foreground mt-0.5 text-sm">{value}</dd>
-              </div>
-            ) : null,
-          )}
-        </dl>
+    <div className="border-border bg-background rounded-xl border p-4">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <span className="text-foreground text-base font-semibold">{instructor.full_name}</span>
+        {populated.map((f) => (
+          <span key={f.label} className="flex items-baseline gap-1.5 text-xs">
+            <span className="text-muted-foreground/40" aria-hidden>
+              ·
+            </span>
+            <span className="text-muted-foreground">{f.label}:</span>
+            <span className="text-foreground">{f.value}</span>
+          </span>
+        ))}
       </div>
-
-      <p className="text-muted-foreground text-xs italic">
-        Capacity forecast and allocation breakdown live on the{" "}
-        <strong className="text-foreground">Workload</strong> tab.
-      </p>
+      {instructor.notes && (
+        <p className="text-muted-foreground border-border mt-3 border-t pt-3 text-xs leading-relaxed">
+          <span className="text-muted-foreground font-medium uppercase tracking-wide">
+            Notes ·{" "}
+          </span>
+          {instructor.notes}
+        </p>
+      )}
     </div>
   );
 }
@@ -775,7 +778,7 @@ export default function InstructorDetailClient({
   buckets,
 }: Props) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [activeTab, setActiveTab] = useState<Tab>("main");
   const [pending, startTransition] = useTransition();
 
   const isDeleted = !!instructor.deleted_at;
@@ -898,22 +901,30 @@ export default function InstructorDetailClient({
 
       {/* Tab content */}
       <div className="p-6">
-        {activeTab === "overview" && <OverviewTab instructor={instructor} />}
-        {activeTab === "skills" && (
-          <SkillsTab
-            instructorId={instructor.id}
-            instructorSkills={instructorSkills}
-            allSkills={allSkills}
-          />
-        )}
-        {activeTab === "workload" && (
-          <WorkloadTab
-            capacity={capacity}
-            workloadRows={workloadRows}
-            forecast={forecast}
-            buckets={buckets}
-            annualHours={instructor.annual_hours}
-          />
+        {activeTab === "main" && (
+          <div className="space-y-6">
+            <ProfileStrip instructor={instructor} />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              {/* Workload — primary content, takes 2 of 3 columns at lg */}
+              <div className="lg:col-span-2">
+                <WorkloadTab
+                  capacity={capacity}
+                  workloadRows={workloadRows}
+                  forecast={forecast}
+                  buckets={buckets}
+                  annualHours={instructor.annual_hours}
+                />
+              </div>
+              {/* Skills — right sidebar at lg, stacked below on smaller screens */}
+              <div className="lg:col-span-1">
+                <SkillsTab
+                  instructorId={instructor.id}
+                  instructorSkills={instructorSkills}
+                  allSkills={allSkills}
+                />
+              </div>
+            </div>
+          </div>
         )}
         {activeTab === "audit" && <AuditTab entries={auditEntries} />}
       </div>
