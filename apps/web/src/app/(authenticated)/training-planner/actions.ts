@@ -1005,10 +1005,17 @@ export type ScheduleGenResult = {
     trainers_to_add?: number;
     weeks_to_extend?: number;
   };
+  // Names of the impls used as anchors for this run. Empty when not in
+  // anchor mode. Used by the UI to render "anchored against: X, Y" context.
+  anchor_impls?: { id: string; name: string }[];
+  // True when anchor mode produced gaps and the generator wrote nothing
+  // (atomic abort). The planner's existing schedule is preserved.
+  aborted?: boolean;
 };
 
 export async function generateSchedule(
   implementationId: string,
+  anchorImpls: string[] = [],
 ): Promise<ActionResult<ScheduleGenResult>> {
   const c = await ctx();
   if (!c.ok) return c;
@@ -1016,6 +1023,7 @@ export async function generateSchedule(
   const { data, error } = await c.supabase.rpc("generate_implementation_schedule", {
     p_implementation_id: implementationId,
     p_dry_run: false,
+    p_anchor_impls: anchorImpls,
   });
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
   revalidateImpl(implementationId);
