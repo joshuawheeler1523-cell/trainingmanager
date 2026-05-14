@@ -482,6 +482,22 @@ function WorkloadColumn({
         )}
       </div>
 
+      <ReadOnlyWorkloadSection
+        title="Education requests"
+        rows={workloadRows.filter((r) => r.source === "education_request")}
+        emptyMessage="No assigned education requests."
+        manageHref="/request-queue"
+        manageLabel="Manage in Request Queue →"
+      />
+
+      <ReadOnlyWorkloadSection
+        title="Projects & training implementations"
+        rows={workloadRows.filter((r) => r.source === "project_task")}
+        emptyMessage="No active project tasks or training-planner sessions."
+        manageHref="/projects"
+        manageLabel="Manage in Projects / Training Planner →"
+      />
+
       {individualAllocations.length > 0 && (
         <div className="border-border bg-background rounded-lg border p-3">
           <h2 className="text-foreground text-sm font-semibold">Allocation targets</h2>
@@ -582,6 +598,61 @@ function ClassAssignmentRow({
       </select>
       <span className="text-muted-foreground w-16 text-right tabular-nums">{annualHours}h</span>
     </li>
+  );
+}
+
+// Read-only fold-down for workload sources the 1:1 tool can't edit
+// in-place (education_request, project_task / impl_sessions). The hours
+// already roll into the capacity card at the top; this surfaces the line
+// items so the planner can talk about them during the meeting.
+function ReadOnlyWorkloadSection({
+  title,
+  rows,
+  emptyMessage,
+  manageHref,
+  manageLabel,
+}: {
+  title: string;
+  rows: WorkloadRow[];
+  emptyMessage: string;
+  manageHref: string;
+  manageLabel: string;
+}) {
+  const total = rows.reduce((sum, r) => sum + Number(r.annual_hours), 0);
+  return (
+    <div className="border-border bg-background rounded-lg border p-3">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-foreground text-sm font-semibold">{title}</h2>
+        {rows.length > 0 && (
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {Math.round(total).toString()}h · {rows.length.toString()}{" "}
+            {rows.length === 1 ? "item" : "items"}
+          </span>
+        )}
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-muted-foreground mt-1 text-xs italic">{emptyMessage}</p>
+      ) : (
+        <ul className="divide-border mt-1 divide-y">
+          {rows.map((r) => (
+            <li
+              key={`${r.source}-${r.source_id}`}
+              className="flex items-center gap-2 py-1.5 text-xs"
+            >
+              <span className="text-foreground flex-1 truncate">{r.source_label}</span>
+              <span className="text-muted-foreground w-16 text-right tabular-nums">
+                {Math.round(Number(r.annual_hours)).toString()}h
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-muted-foreground mt-2 text-[11px]">
+        <Link href={manageHref} className="underline">
+          {manageLabel}
+        </Link>
+      </p>
+    </div>
   );
 }
 
