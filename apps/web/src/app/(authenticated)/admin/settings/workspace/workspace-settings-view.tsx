@@ -239,8 +239,8 @@ export default function WorkspaceSettingsView({ initial }: { initial: WorkspaceI
           <h2 className="text-foreground text-lg font-semibold">Modules</h2>
           <p className="text-muted-foreground mt-1 text-sm">
             Hide modules your team doesn&apos;t use. Data is preserved when a module is off —
-            toggling back on restores access. Allocations, Projects, TRAs, Reports, People, and
-            Skills are always on.
+            toggling back on restores access. Allocations, Projects, Work Intake, Reports, People,
+            and Skills are always on.
           </p>
         </header>
 

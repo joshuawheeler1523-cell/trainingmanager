@@ -94,7 +94,7 @@ export default function DepartmentsClient({ departments }: { departments: DeptRo
               </Dialog.Title>
               <Dialog.Description className="text-muted-foreground mt-1 text-xs">
                 Departments are isolated workspaces inside your org — separate instructors, classes,
-                allocations, projects, and TRAs.
+                allocations, projects, and work intake.
               </Dialog.Description>
               <div className="mt-4 space-y-3">
                 <div>

@@ -126,7 +126,7 @@ export default async function ArborOrgDetailPage({ params }: { params: Promise<{
           }
         />
         <StatTile
-          label="TRAs"
+          label="Work intake"
           value={(trasCount as unknown as { count?: number } | null)?.count?.toString() ?? "0"}
         />
         <StatTile

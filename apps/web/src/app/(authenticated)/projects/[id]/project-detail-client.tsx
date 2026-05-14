@@ -66,7 +66,7 @@ const TABS = [
   { key: "milestones", label: "Milestones" },
   { key: "dependencies", label: "Dependencies" },
   { key: "action-items", label: "Action Items" },
-  { key: "tra", label: "TRA" },
+  { key: "tra", label: "Source Intake" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -301,23 +301,21 @@ function TraTab({ traId }: { traId: string | null }) {
   if (!traId) {
     return (
       <div className="border-border bg-surface flex flex-col items-center rounded-lg border border-dashed p-12 text-center">
-        <p className="text-foreground text-sm font-medium">No source TRA</p>
+        <p className="text-foreground text-sm font-medium">No source intake</p>
         <p className="text-muted-foreground mt-1 text-xs">
-          Projects converted from a TRA will show their source assessment here.
+          Projects converted from a work intake will show their source assessment here.
         </p>
       </div>
     );
   }
   return (
     <div className="border-border rounded-lg border p-6">
-      <p className="text-foreground text-sm">
-        This project was converted from a Training Request Assessment.
-      </p>
+      <p className="text-foreground text-sm">This project was converted from a work intake.</p>
       <Link
         href={`/tras/${traId}`}
         className="text-primary mt-2 inline-block text-sm hover:underline"
       >
-        Open source TRA →
+        Open source intake →
       </Link>
     </div>
   );

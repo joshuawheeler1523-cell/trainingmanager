@@ -56,7 +56,7 @@ export default function TraFormDialog({ trigger }: Props) {
         priority: values.priority || null,
       });
       if (result.ok) {
-        toast.success("TRA created");
+        toast.success("Work intake created");
         setOpen(false);
         reset();
         router.push(`/tras/${result.data.id}`);

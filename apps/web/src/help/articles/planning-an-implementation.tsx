@@ -27,7 +27,7 @@ export const planningImplementation: HelpArticle = {
       <ol className="list-decimal space-y-1 pl-5">
         <li>
           <strong>Setup</strong> — name, window dates, go-live date, optional links to a Project /
-          TRA.
+          Work Intake.
         </li>
         <li>
           <strong>Rooms</strong> — capacity, hours/day, days available, equipment notes.

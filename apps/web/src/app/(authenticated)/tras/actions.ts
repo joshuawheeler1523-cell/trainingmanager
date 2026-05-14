@@ -130,7 +130,7 @@ async function setTraStatus(
     .maybeSingle();
 
   if (readErr) return { ok: false, error: { code: readErr.code, message: readErr.message } };
-  if (!cur) return { ok: false, error: { code: "NOT_FOUND", message: "TRA not found" } };
+  if (!cur) return { ok: false, error: { code: "NOT_FOUND", message: "Work intake not found" } };
   if (!allowedFrom.includes(cur.status)) {
     return {
       ok: false,
@@ -318,7 +318,7 @@ async function replaceChildRows<TInput>(
     .eq("org_id", c.orgId)
     .maybeSingle();
   if (traErr) return { ok: false, error: { code: traErr.code, message: traErr.message } };
-  if (!tra) return { ok: false, error: { code: "NOT_FOUND", message: "TRA not found" } };
+  if (!tra) return { ok: false, error: { code: "NOT_FOUND", message: "Work intake not found" } };
 
   // Clear existing rows; insert new ones. The simple delete-and-insert is
   // fine here — these tables only contain user-managed metadata, no FK
@@ -535,7 +535,7 @@ export async function convertTraToProject(
     .eq("org_id", c.orgId)
     .maybeSingle();
   if (traErr) return { ok: false, error: { code: traErr.code, message: traErr.message } };
-  if (!tra) return { ok: false, error: { code: "NOT_FOUND", message: "TRA not found" } };
+  if (!tra) return { ok: false, error: { code: "NOT_FOUND", message: "Work intake not found" } };
 
   if (tra.status === "converted" && tra.converted_to_project_id) {
     return {
@@ -548,7 +548,7 @@ export async function convertTraToProject(
       ok: false,
       error: {
         code: "INVALID_TRANSITION",
-        message: "Only documented TRAs can be converted to projects.",
+        message: "Only documented work intake can be converted to projects.",
       },
     };
   }

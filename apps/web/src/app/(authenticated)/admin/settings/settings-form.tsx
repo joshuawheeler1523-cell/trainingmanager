@@ -19,9 +19,9 @@ export type SettingsInitial = {
 const FEATURE_FLAGS = [
   {
     key: "ai_estimation",
-    label: "AI estimation (TRAs)",
+    label: "AI estimation (Work Intake)",
     description:
-      "Enables the AI Assistant panel on TRA wizards. Requires ANTHROPIC_API_KEY + tra-suggest edge function.",
+      "Enables the AI Assistant panel on work intake wizards. Requires ANTHROPIC_API_KEY + tra-suggest edge function.",
   },
   {
     key: "public_share",

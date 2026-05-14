@@ -47,7 +47,7 @@ const TIERS = [
 
 const INCLUDED = [
   "Every feature — no per-feature add-ons",
-  "Unlimited departments + projects + TRAs",
+  "Unlimited departments + projects + work intake",
   "SAML SSO per organization",
   "Custom domain + branded login",
   "Audit log with 5-year retention",

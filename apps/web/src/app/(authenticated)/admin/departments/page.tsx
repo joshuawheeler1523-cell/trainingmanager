@@ -50,7 +50,7 @@ export default async function DepartmentsAdminPage() {
     <div>
       <PageHeader
         title="Departments"
-        description="Sub-org isolation. Each department has its own instructors, classes, allocations, projects, and TRAs."
+        description="Sub-org isolation. Each department has its own instructors, classes, allocations, projects, and work intake."
       />
       <div className="p-6">
         <DepartmentsClient departments={rows} />

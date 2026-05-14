@@ -53,7 +53,7 @@ function teamGroup(modules: ModuleFlags): NavGroup {
 function workGroup(modules: ModuleFlags): NavGroup {
   const items: NavItem[] = [
     { href: "/allocations", label: "Allocations", icon: AdjustmentsHorizontalIcon },
-    { href: "/tras", label: "TRAs", icon: ClipboardDocumentListIcon },
+    { href: "/tras", label: "Work Intake", icon: ClipboardDocumentListIcon },
   ];
   if (modules["module.education_requests"]) {
     items.push({ href: "/request-queue", label: "Request Queue", icon: InboxStackIcon });

@@ -25,9 +25,9 @@ const FEATURES = [
   },
   {
     icon: ClipboardDocumentListIcon,
-    title: "TRA workflow",
+    title: "Work intake workflow",
     description:
-      "Capture training resource asks in a structured 9-section wizard. Convert approved TRAs into projects with one click.",
+      "Capture training resource asks in a structured 9-section wizard. Convert approved intakes into projects with one click.",
   },
   {
     icon: CalendarDaysIcon,

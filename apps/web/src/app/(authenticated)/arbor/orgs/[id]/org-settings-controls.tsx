@@ -88,7 +88,7 @@ export default function OrgSettingsControls({
 
   const handleDelete = () => {
     const typed = prompt(
-      `Permanently delete ${orgName} and ALL its tenant data (instructors, classes, projects, TRAs, members, audit log). Type the org name to confirm:`,
+      `Permanently delete ${orgName} and ALL its tenant data (instructors, classes, projects, work intake, members, audit log). Type the org name to confirm:`,
     );
     if (typed !== orgName) {
       if (typed != null) toast.error("Name didn't match. Nothing deleted.");
@@ -180,8 +180,8 @@ export default function OrgSettingsControls({
         <div>
           <p className="text-foreground text-sm font-medium">Delete this org</p>
           <p className="text-muted-foreground mt-1 text-xs">
-            Permanent. Cascades to instructors, classes, projects, TRAs, members, audit log, data
-            exports, etc. Use with extreme care.
+            Permanent. Cascades to instructors, classes, projects, work intake, members, audit log,
+            data exports, etc. Use with extreme care.
           </p>
           <button
             type="button"

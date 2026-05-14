@@ -170,7 +170,7 @@ export default function SetupForm({ implementation, projects, tras }: Props) {
         </div>
         <div>
           <label htmlFor="linked_tra_id" className="text-foreground mb-1 block text-xs font-medium">
-            Linked TRA
+            Linked Work Intake
           </label>
           <select id="linked_tra_id" {...register("linked_tra_id")} className={fieldClass}>
             <option value="">— None —</option>

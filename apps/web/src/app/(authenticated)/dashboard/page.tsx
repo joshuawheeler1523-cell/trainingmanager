@@ -288,7 +288,7 @@ export default async function DashboardPage() {
             <QuickAction
               href="/tras"
               icon={<DocumentPlusIcon className="h-4 w-4" />}
-              label="New TRA"
+              label="New Work Intake"
             />
             <QuickAction
               href="/projects"
@@ -308,7 +308,7 @@ export default async function DashboardPage() {
           <KpiCard
             href="/tras"
             icon={<ClipboardDocumentCheckIcon className="h-4 w-4" />}
-            label="TRAs needing attention"
+            label="Work intake needing attention"
             value={trasNeedingAttention.toString()}
             sub={
               trasNeedingAttention === 0
@@ -560,7 +560,7 @@ export default async function DashboardPage() {
                       Active projects
                     </th>
                     <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
-                      Open TRAs
+                      Open intake
                     </th>
                     <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
                       Avg utilization

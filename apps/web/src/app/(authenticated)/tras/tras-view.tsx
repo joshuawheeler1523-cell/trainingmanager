@@ -138,7 +138,7 @@ export default function TrasView({ tras, departments }: Props) {
               className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
             >
               <PlusIcon className="h-4 w-4" />
-              New TRA
+              New work intake
             </button>
           }
         />
@@ -146,13 +146,13 @@ export default function TrasView({ tras, departments }: Props) {
 
       {tras.length === 0 ? (
         <EmptyState
-          title="No TRAs yet"
-          description='Click "New TRA" to capture a training request and produce an estimate.'
+          title="No work intake yet"
+          description='Click "New work intake" to capture a training request and produce an estimate.'
         />
       ) : filtered.length === 0 ? (
         <EmptyState
-          title="No TRAs match the current filters"
-          description="Clear the filters to see all TRAs."
+          title="No work intake matches the current filters"
+          description="Clear the filters to see everything."
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

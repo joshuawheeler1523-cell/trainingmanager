@@ -393,7 +393,7 @@ export default function Step5LearningDesign({
       <div className="border-border my-6 border-t" />
       <h4 className="text-foreground text-sm font-semibold">Deliverables breakdown</h4>
       <p className="text-muted-foreground text-xs">
-        Per-deliverable estimation. Auto-calculates total hours on the TRA.
+        Per-deliverable estimation. Auto-calculates total hours on the intake.
       </p>
       <StepDeliverables
         traId={tra.id}

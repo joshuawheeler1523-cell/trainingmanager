@@ -276,7 +276,7 @@ export default function Step9Review({
             </p>
           </div>
           <div>
-            <p className="text-muted-foreground text-xs font-medium">Stored on TRA</p>
+            <p className="text-muted-foreground text-xs font-medium">Stored on intake</p>
             <p className="text-foreground mt-1 text-2xl font-semibold tabular-nums">
               {tra.total_estimated_hours.toFixed(1)}
             </p>
@@ -316,7 +316,7 @@ export default function Step9Review({
       <section className="border-border bg-background rounded-xl border p-6">
         <h3 className="text-foreground mb-1 text-sm font-semibold">Adjustments / assumptions</h3>
         <p className="text-muted-foreground mb-3 text-xs">
-          Notes captured here travel with the TRA and into the generated document.
+          Notes captured here travel with the work intake and into the generated document.
         </p>
         <textarea
           rows={5}
