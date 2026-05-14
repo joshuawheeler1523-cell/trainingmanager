@@ -74,17 +74,22 @@ export default async function SkillsPage() {
     });
   }
 
-  // Walk every candidate class once. Gaps tab needs zero-qualified rows;
-  // Matrix tab needs the full per-class qualified instructor set. One pass
-  // through the RPC populates both.
+  // Bulk RPC returns (class_id, instructor_id) for every qualified
+  // pair in the org. Replaces an N+1 (one RPC per class) — same data
+  // in a single round-trip.
   const classGaps: ClassGap[] = [];
   const qualifiedByClass = new Map<string, Set<string>>();
+  const { data: qualifiedPairs } = await supabase.rpc("qualified_instructors_for_org", {
+    p_org_id: orgId,
+  });
+  for (const pair of qualifiedPairs ?? []) {
+    const set = qualifiedByClass.get(pair.class_id) ?? new Set<string>();
+    set.add(pair.instructor_id);
+    qualifiedByClass.set(pair.class_id, set);
+  }
   for (const c of candidateClasses) {
-    const { data: qualified } = await supabase.rpc("qualified_instructors_for_class", {
-      p_class_id: c.id,
-    });
-    const ids = new Set<string>((qualified ?? []).map((q) => q.instructor_id));
-    qualifiedByClass.set(c.id, ids);
+    const ids = qualifiedByClass.get(c.id) ?? new Set<string>();
+    if (!qualifiedByClass.has(c.id)) qualifiedByClass.set(c.id, ids);
     if (ids.size === 0) {
       classGaps.push({
         class_id: c.id,

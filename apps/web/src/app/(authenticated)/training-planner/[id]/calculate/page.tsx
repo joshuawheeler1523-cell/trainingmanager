@@ -18,7 +18,8 @@ import {
   type Recommendation,
   type TrainerUnavailability,
 } from "@/lib/training-planner/feasibility";
-import { dryRunSchedule, type ScheduleGenResult } from "../../actions";
+import { type ScheduleGenResult } from "../../actions";
+import { dryRunScheduleCached } from "@/lib/training-planner/cached-reads";
 import GenerateButton from "./generate-button";
 
 type Params = Promise<{ id: string }>;
@@ -164,8 +165,11 @@ export default async function CalculatePage({ params }: { params: Params }) {
   // dates, no classes, etc.) since the RPC would just raise.
   let dryRun: ScheduleGenResult | null = null;
   if (implTyped.window_start_date && implTyped.window_end_date && (classes?.length ?? 0) > 0) {
-    const result = await dryRunSchedule(id);
-    if (result.ok) dryRun = result.data;
+    // Cached read: bust on impl.updated_at so any edit to the impl row
+    // forces a recompute. The Calculate page renders frequently while a
+    // planner is iterating; without caching, every tab-switch reruns
+    // the SQL generator (200–800ms).
+    dryRun = await dryRunScheduleCached(id, implTyped.updated_at);
   }
   if (dryRun) {
     feas.unscheduledSessions = dryRun.capacity_gaps.length;

@@ -5764,6 +5764,13 @@ export type Database = {
           instructor_id: string;
         }[];
       };
+      qualified_instructors_for_org: {
+        Args: { p_org_id: string };
+        Returns: {
+          class_id: string;
+          instructor_id: string;
+        }[];
+      };
       set_share_token: { Args: { p_token: string }; Returns: undefined };
       user_department_ids: { Args: never; Returns: string[] };
       user_org_ids: { Args: never; Returns: string[] };
