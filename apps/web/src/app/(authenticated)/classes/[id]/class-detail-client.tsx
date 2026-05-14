@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -176,7 +176,32 @@ function InstructorsTab({
   const [addingId, setAddingId] = useState("");
   const instructorLower = useLabel("entity.instructor", { lower: true });
 
-  const assignedIds = new Set(assignments.map((a) => a.instructor_id));
+  // Optimistic assignments list — edits to role/offerings reflect
+  // instantly via the chip + input + aggregate totals at the top.
+  // useOptimistic auto-reverts on transition failure.
+  const [optimisticAssignments, applyAssignmentPatch] = useOptimistic(
+    assignments,
+    (
+      state,
+      patch: { instructor_id: string; role?: AssignmentRole; assigned_offerings?: number },
+    ) => {
+      const idx = state.findIndex((a) => a.instructor_id === patch.instructor_id);
+      if (idx < 0) return state;
+      const next = state.slice();
+      const cur = next[idx];
+      if (!cur) return state;
+      next[idx] = {
+        ...cur,
+        ...(patch.role !== undefined ? { role: patch.role } : {}),
+        ...(patch.assigned_offerings !== undefined
+          ? { assigned_offerings: patch.assigned_offerings }
+          : {}),
+      };
+      return next;
+    },
+  );
+
+  const assignedIds = new Set(optimisticAssignments.map((a) => a.instructor_id));
   const available = allInstructors.filter((i) => !assignedIds.has(i.id));
 
   function instructorName(id: string) {
@@ -185,23 +210,23 @@ function InstructorsTab({
 
   function saveRole(instructorId: string, nextRole: AssignmentRole, currentOfferings: number) {
     startTransition(async () => {
+      applyAssignmentPatch({ instructor_id: instructorId, role: nextRole });
       const result = await updateAssignment(classId, instructorId, {
         role: nextRole,
         assigned_offerings: currentOfferings,
       });
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
   function saveOfferings(instructorId: string, nextOfferings: number, currentRole: AssignmentRole) {
     startTransition(async () => {
+      applyAssignmentPatch({ instructor_id: instructorId, assigned_offerings: nextOfferings });
       const result = await updateAssignment(classId, instructorId, {
         role: currentRole,
         assigned_offerings: nextOfferings,
       });
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -249,7 +274,7 @@ function InstructorsTab({
     });
   }
 
-  const totalAssigned = assignments.reduce((s, a) => s + a.assigned_offerings, 0);
+  const totalAssigned = optimisticAssignments.reduce((s, a) => s + a.assigned_offerings, 0);
   const remaining = offeringsPerYear - totalAssigned;
 
   return (
@@ -301,7 +326,7 @@ function InstructorsTab({
               {remaining > 0 && <span className="ml-1">({remaining} unstaffed)</span>}
             </span>
           )}
-          {assignments.length >= 2 && offeringsPerYear > 0 && (
+          {optimisticAssignments.length >= 2 && offeringsPerYear > 0 && (
             <button
               type="button"
               disabled={pending}
@@ -316,7 +341,7 @@ function InstructorsTab({
         </div>
       </div>
 
-      {assignments.length === 0 ? (
+      {optimisticAssignments.length === 0 ? (
         <div className="border-border bg-surface rounded-xl border border-dashed p-10 text-center">
           <p className="text-muted-foreground text-sm">
             No <Label kind="entity.instructor" plural lower /> assigned yet.
@@ -343,7 +368,7 @@ function InstructorsTab({
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {assignments.map((a) => (
+              {optimisticAssignments.map((a) => (
                 <AssignmentRow
                   key={a.id}
                   assignment={a}
