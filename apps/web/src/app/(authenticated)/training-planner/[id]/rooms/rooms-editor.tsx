@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeftIcon, ArrowRightIcon, PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
@@ -29,6 +29,21 @@ export default function RoomsEditor({ implementationId, rooms }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
+  // Optimistic row state — see classes-editor for the pattern rationale.
+  const [optimisticRooms, applyRoomPatch] = useOptimistic(
+    rooms,
+    (state, action: { kind: "upsert"; row: ImplRoom } | { kind: "delete"; id: string }) => {
+      if (action.kind === "delete") return state.filter((r) => r.id !== action.id);
+      const existing = state.findIndex((r) => r.id === action.row.id);
+      if (existing >= 0) {
+        const next = state.slice();
+        next[existing] = action.row;
+        return next;
+      }
+      return [...state, action.row];
+    },
+  );
+
   const [newName, setNewName] = useState("");
   const [newCapacity, setNewCapacity] = useState("12");
   const [newHours, setNewHours] = useState("8");
@@ -55,9 +70,12 @@ export default function RoomsEditor({ implementationId, rooms }: Props) {
 
   function handleUpdate(r: ImplRoom, patch: Record<string, unknown>) {
     startTransition(async () => {
+      applyRoomPatch({
+        kind: "upsert",
+        row: { ...r, ...(patch as Partial<ImplRoom>), updated_at: new Date().toISOString() },
+      });
       const result = await updateRoom(r.id, implementationId, patch);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -90,7 +108,7 @@ export default function RoomsEditor({ implementationId, rooms }: Props) {
         place sessions and detect double-booking.
       </p>
 
-      {rooms.length === 0 ? (
+      {optimisticRooms.length === 0 ? (
         <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
           <p className="text-foreground text-sm font-medium">No rooms yet</p>
           <p className="text-muted-foreground mt-1 text-xs">Most implementations have 2–8 rooms.</p>
@@ -112,7 +130,7 @@ export default function RoomsEditor({ implementationId, rooms }: Props) {
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {rooms.map((r) => (
+              {optimisticRooms.map((r) => (
                 <tr key={r.id}>
                   <td className="px-3 py-2">
                     <input

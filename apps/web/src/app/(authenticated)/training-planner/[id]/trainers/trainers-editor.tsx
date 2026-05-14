@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -48,8 +48,27 @@ export default function TrainersEditor({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
+  // Optimistic row state — edits apply instantly so clicks feel snappy.
+  // useOptimistic auto-reverts on transition failure. router.refresh()
+  // is skipped on edits since the optimistic state already reflects
+  // the new value; we only refresh on add/delete/link where the row
+  // count changes.
+  const [optimisticTrainers, applyTrainerPatch] = useOptimistic(
+    trainers,
+    (state, action: { kind: "upsert"; row: ImplTrainer } | { kind: "delete"; id: string }) => {
+      if (action.kind === "delete") return state.filter((t) => t.id !== action.id);
+      const existing = state.findIndex((t) => t.id === action.row.id);
+      if (existing >= 0) {
+        const next = state.slice();
+        next[existing] = action.row;
+        return next;
+      }
+      return [...state, action.row];
+    },
+  );
+
   const usedInstructorIds = new Set(
-    trainers.map((t) => t.instructor_id).filter((x): x is string => !!x),
+    optimisticTrainers.map((t) => t.instructor_id).filter((x): x is string => !!x),
   );
   const internalInstructors = instructors.filter((i) => !i.is_external);
   const externalPool = instructors.filter((i) => i.is_external);
@@ -223,9 +242,13 @@ export default function TrainersEditor({
 
   function handleUpdate(t: ImplTrainer, patch: Record<string, unknown>) {
     startTransition(async () => {
+      // Optimistic: patch the row immediately, skip router.refresh on success.
+      applyTrainerPatch({
+        kind: "upsert",
+        row: { ...t, ...(patch as Partial<ImplTrainer>), updated_at: new Date().toISOString() },
+      });
       const result = await updateTrainer(t.id, implementationId, patch);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -255,7 +278,7 @@ export default function TrainersEditor({
         scheduler plans around it.
       </p>
 
-      {trainers.length === 0 ? (
+      {optimisticTrainers.length === 0 ? (
         <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
           <p className="text-foreground text-sm font-medium">No trainers yet</p>
         </div>
@@ -276,7 +299,7 @@ export default function TrainersEditor({
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {trainers.map((t) => {
+              {optimisticTrainers.map((t) => {
                 const trainerPto = ptoByTrainer.get(t.id) ?? [];
                 const isOpen = openPtoFor === t.id;
                 const linkedInstructor = t.instructor_id

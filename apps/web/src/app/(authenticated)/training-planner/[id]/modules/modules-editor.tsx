@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeftIcon, ArrowRightIcon, PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
@@ -18,6 +18,21 @@ const fieldClass =
 export default function ModulesEditor({ implementationId, modules }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+
+  const [optimisticModules, applyModulePatch] = useOptimistic(
+    modules,
+    (state, action: { kind: "upsert"; row: ImplModule } | { kind: "delete"; id: string }) => {
+      if (action.kind === "delete") return state.filter((m) => m.id !== action.id);
+      const existing = state.findIndex((m) => m.id === action.row.id);
+      if (existing >= 0) {
+        const next = state.slice();
+        next[existing] = action.row;
+        return next;
+      }
+      return [...state, action.row];
+    },
+  );
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
@@ -42,9 +57,12 @@ export default function ModulesEditor({ implementationId, modules }: Props) {
 
   function handleUpdate(m: ImplModule, patch: Record<string, unknown>) {
     startTransition(async () => {
+      applyModulePatch({
+        kind: "upsert",
+        row: { ...m, ...(patch as Partial<ImplModule>), updated_at: new Date().toISOString() },
+      });
       const result = await updateModule(m.id, implementationId, patch);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -71,13 +89,13 @@ export default function ModulesEditor({ implementationId, modules }: Props) {
         &ldquo;Provider EMR Module&rdquo;. Most implementations have 2–6 modules.
       </p>
 
-      {modules.length === 0 ? (
+      {optimisticModules.length === 0 ? (
         <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
           <p className="text-foreground text-sm font-medium">No modules yet</p>
         </div>
       ) : (
         <ul className="border-border divide-border divide-y rounded-lg border">
-          {modules.map((m, i) => (
+          {optimisticModules.map((m, i) => (
             <li key={m.id} className="grid grid-cols-12 items-center gap-2 px-3 py-2 text-sm">
               <span className="text-muted-foreground col-span-1 text-xs tabular-nums">
                 {(i + 1).toString()}.
