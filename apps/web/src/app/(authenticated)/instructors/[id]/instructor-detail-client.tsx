@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -118,6 +118,21 @@ function SkillsTab({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+
+  // Optimistic skill rows so edits (proficiency, cert flags, dates) flip
+  // in place instead of waiting on router.refresh.
+  const [optimisticSkills, applySkillPatch] = useOptimistic(
+    instructorSkills,
+    (state, patch: { id: string; updates: Partial<InstructorSkillRow> }) => {
+      const idx = state.findIndex((s) => s.id === patch.id);
+      if (idx < 0) return state;
+      const next = state.slice();
+      const cur = next[idx];
+      if (!cur) return state;
+      next[idx] = { ...cur, ...patch.updates };
+      return next;
+    },
+  );
   const [adding, setAdding] = useState(false);
   const [draftSkillId, setDraftSkillId] = useState("");
   const [draftProf, setDraftProf] = useState<Proficiency>("intermediate");
@@ -133,7 +148,7 @@ function SkillsTab({
   const [editExpiresAt, setEditExpiresAt] = useState("");
   const [editCertUrl, setEditCertUrl] = useState("");
 
-  const assignedSkillIds = new Set(instructorSkills.map((is) => is.skill_id));
+  const assignedSkillIds = new Set(optimisticSkills.map((is) => is.skill_id));
   const available = allSkills.filter((s) => !assignedSkillIds.has(s.id));
 
   function resetDraft() {
@@ -181,6 +196,16 @@ function SkillsTab({
 
   function saveEdit(rowId: string) {
     startTransition(async () => {
+      applySkillPatch({
+        id: rowId,
+        updates: {
+          proficiency: editProf,
+          is_certified: editIsCert,
+          certified_at: editCertifiedAt || null,
+          expires_at: editExpiresAt || null,
+          certificate_url: editCertUrl || null,
+        },
+      });
       const result = await updateInstructorSkill(rowId, instructorId, {
         proficiency: editProf,
         is_certified: editIsCert,
@@ -191,7 +216,6 @@ function SkillsTab({
       if (result.ok) {
         toast.success("Skill updated");
         setEditingId(null);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -377,7 +401,7 @@ function SkillsTab({
         </div>
       )}
 
-      {instructorSkills.length === 0 ? (
+      {optimisticSkills.length === 0 ? (
         <div className="border-border bg-surface rounded-xl border border-dashed p-10 text-center">
           <p className="text-muted-foreground text-sm">
             {available.length === 0
@@ -387,7 +411,7 @@ function SkillsTab({
         </div>
       ) : (
         <div className="space-y-2">
-          {instructorSkills.map((row) => {
+          {optimisticSkills.map((row) => {
             const isEditing = editingId === row.id;
             const expiring = expiringSoon(row.expires_at);
             return (
