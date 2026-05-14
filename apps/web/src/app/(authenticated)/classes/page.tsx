@@ -50,9 +50,10 @@ async function ClassContent({ searchParams }: { searchParams: SearchParams }) {
   ]);
 
   // Coverage warnings: a class is under-covered when 0 or 1 active
-  // instructors meet ALL its required skills. Run the qualified_… RPC
-  // only for classes that actually have requirements — classes with
-  // none can't be under-covered.
+  // instructors meet ALL its required skills. The bulk RPC returns
+  // (class_id, instructor_id) for every qualified pair in the org in
+  // one round-trip — much faster than the per-class N+1 we used to do
+  // (~40 RPC calls dropped to 1).
   const requirementCounts = new Map<string, number>();
   for (const r of (requirementRows ?? []) as { class_id: string }[]) {
     requirementCounts.set(r.class_id, (requirementCounts.get(r.class_id) ?? 0) + 1);
@@ -61,12 +62,19 @@ async function ClassContent({ searchParams }: { searchParams: SearchParams }) {
   const classesWithRequirements = classList.filter(
     (c) => !c.deleted_at && c.status === "active" && (requirementCounts.get(c.id) ?? 0) > 0,
   );
-  const coverage: ClassCoverageInput[] = await Promise.all(
-    classesWithRequirements.map(async (c) => {
-      const { data } = await supabase.rpc("qualified_instructors_for_class", { p_class_id: c.id });
-      return { class_id: c.id, class_name: c.name, qualified_count: data?.length ?? 0 };
-    }),
-  );
+
+  const { data: qualifiedPairs } = await supabase.rpc("qualified_instructors_for_org", {
+    p_org_id: orgId,
+  });
+  const qualifiedCountByClass = new Map<string, number>();
+  for (const pair of qualifiedPairs ?? []) {
+    qualifiedCountByClass.set(pair.class_id, (qualifiedCountByClass.get(pair.class_id) ?? 0) + 1);
+  }
+  const coverage: ClassCoverageInput[] = classesWithRequirements.map((c) => ({
+    class_id: c.id,
+    class_name: c.name,
+    qualified_count: qualifiedCountByClass.get(c.id) ?? 0,
+  }));
   const recommendations: Recommendation[] = recommendUndercoveredClasses(coverage);
 
   return (
