@@ -20,6 +20,7 @@ import {
 } from "@/lib/training-planner/feasibility";
 import { type ScheduleGenResult } from "../../actions";
 import { dryRunScheduleCached } from "@/lib/training-planner/cached-reads";
+import { fetchCrossImplConflictsForImpl } from "@/app/(authenticated)/training-planner/conflicts/queries";
 import GenerateButton from "./generate-button";
 
 type Params = Promise<{ id: string }>;
@@ -86,6 +87,10 @@ export default async function CalculatePage({ params }: { params: Params }) {
   ]);
 
   if (!impl) notFound();
+
+  // Pairs of draft sessions across impls where one side is this impl.
+  // Shares the layout's React.cache'd fetch, so this is effectively free.
+  const conflictPairsForImpl = await fetchCrossImplConflictsForImpl(orgId, id);
 
   // Build per-trainer cross-impl busy map: for each of THIS impl's trainers
   // whose underlying instructor also teaches in OTHER live implementations,
@@ -209,6 +214,8 @@ export default async function CalculatePage({ params }: { params: Params }) {
         </p>
       </div>
 
+      {conflictPairsForImpl.length > 0 && <ConflictsBanner count={conflictPairsForImpl.length} />}
+
       <YesNoPanel
         canSchedule={canSchedule}
         dryRun={dryRun}
@@ -263,6 +270,29 @@ export default async function CalculatePage({ params }: { params: Params }) {
 }
 
 // ── Components ─────────────────────────────────────────────────────────────
+
+function ConflictsBanner({ count }: { count: number }) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
+      <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+      <div className="flex-1">
+        <p className="text-foreground text-sm font-semibold">
+          {count.toString()} cross-impl conflict{count === 1 ? "" : "s"} involve this impl
+        </p>
+        <p className="text-muted-foreground mt-0.5 text-xs">
+          Draft sessions in this impl overlap with draft sessions in another impl that share a
+          trainer. Resolve them before publishing so the same person isn&apos;t double-booked.
+        </p>
+      </div>
+      <Link
+        href="/training-planner/conflicts"
+        className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600"
+      >
+        Open resolver →
+      </Link>
+    </div>
+  );
+}
 
 function YesNoPanel({
   canSchedule,

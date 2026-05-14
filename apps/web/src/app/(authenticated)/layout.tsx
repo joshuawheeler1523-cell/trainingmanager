@@ -9,6 +9,7 @@ import { isManager } from "@/lib/auth/role";
 import { isArborAdmin } from "@/lib/auth/arbor-admin";
 import { getOrgIdentity } from "@/lib/labels/get-org-identity";
 import { OrgIdentityProvider } from "@/components/labels";
+import { fetchCrossImplConflictCount } from "@/app/(authenticated)/training-planner/conflicts/queries";
 
 export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -25,7 +26,7 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
 
   // Initial notifications + admin flag + workspace identity, parallelized.
   const orgId = await getCurrentOrgId();
-  const [{ data: notifications }, admin, arborAdmin, identity] = await Promise.all([
+  const [{ data: notifications }, admin, arborAdmin, identity, conflictCount] = await Promise.all([
     supabase
       .from("notifications")
       .select("*")
@@ -35,6 +36,7 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
     orgId ? isManager(orgId) : Promise.resolve(false),
     isArborAdmin(),
     orgId ? getOrgIdentity(orgId) : Promise.resolve(null),
+    orgId ? fetchCrossImplConflictCount(orgId) : Promise.resolve(0),
   ]);
 
   return (
@@ -61,6 +63,7 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
             }
           }
           initialNotifications={notifications ?? []}
+          conflictCount={conflictCount}
         >
           {children}
         </AppShell>
