@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpTrayIcon } from "@heroicons/react/20/solid";
+import { ArrowUpTrayIcon, BookOpenIcon } from "@heroicons/react/20/solid";
 import type { ColumnDef } from "@tanstack/react-table";
 import DataTable from "@/components/ui/data-table";
 import RecommendationsBanner from "@/components/recommendations-banner";
@@ -126,6 +126,16 @@ export default function ClassesView({ classes, instructors, showDeleted, recomme
           Show archived
         </label>
         <div className="flex items-center gap-2">
+          <Link
+            href="/classes/catalog"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium"
+            title="Generate a printable PDF course catalog"
+          >
+            <BookOpenIcon className="h-4 w-4" />
+            Course Catalog
+          </Link>
           <CsvImportDialog
             entity="classes"
             description="Upsert classes by name (case-insensitive). Existing classes with a matching name will be updated; new names will be inserted. Class skill requirements are not imported — add them on each class detail page."
