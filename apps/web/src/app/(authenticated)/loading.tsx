@@ -7,8 +7,13 @@
 // second or two; with it, they get a clear "loading" signal immediately.
 
 export default function AuthenticatedLoading() {
+  // min-h-[calc(100vh-3.5rem)] fills the viewport below the 3.5rem (h-14)
+  // sticky header in AppShell, so the spinner sits visually centered in
+  // the content area instead of crammed at the top. `<main>` itself isn't
+  // a flex container, so `flex-1` on this child collapses to zero —
+  // hence the explicit min-height.
   return (
-    <div className="bg-canvas flex flex-1 items-center justify-center">
+    <div className="bg-canvas flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-6">
       <div className="flex flex-col items-center gap-3">
         <div
           aria-hidden="true"
