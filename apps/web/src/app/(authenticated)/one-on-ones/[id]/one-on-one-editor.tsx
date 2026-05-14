@@ -136,9 +136,11 @@ export default function OneOnOneEditor({
   }) {
     if (completed) return;
     startTransition(async () => {
+      // Sentiment/topics/concerns live in the form's own state, so we don't
+      // need a router.refresh to see the new value. Skipping it makes the
+      // click feel instant instead of waiting on the 14-query page reload.
       const result = await updateOneOnOne(session.id, values);
       if (!result.ok) toast.error(result.error.message);
-      router.refresh();
     });
   }
 
@@ -271,7 +273,10 @@ export default function OneOnOneEditor({
           buckets={buckets}
           individualAllocations={individualAllocations}
           onAfterMutate={() => {
-            router.refresh();
+            // No router.refresh on edits — each row keeps its own draft state
+            // and the server-side write is committed. The capacity card up
+            // top stays at the page-load value until navigation refreshes;
+            // that's an acceptable tradeoff for instant-feeling edits.
           }}
         />
 
