@@ -169,7 +169,31 @@ export default async function CalculatePage({ params }: { params: Params }) {
   }
   if (dryRun) {
     feas.unscheduledSessions = dryRun.capacity_gaps.length;
+    // Re-derive verdict from SQL truth. The verdict was computed inside
+    // computeFeasibility() using the simulator's drift-prone count; without
+    // this override the banner can disagree with the actual SQL plan (e.g.,
+    // sim says "infeasible" while dry-run cleanly placed everything). The
+    // utilization-based "tight" branch stays as the in-memory simulator's
+    // estimate since the SQL doesn't return per-resource utilization.
+    if (dryRun.capacity_gaps.length === 0 && feas.readyBlockers.length === 0) {
+      const trainerOver = feas.trainerUtilizationPct !== null && feas.trainerUtilizationPct >= 100;
+      const roomOver = feas.roomUtilizationPct !== null && feas.roomUtilizationPct >= 100;
+      const trainerTight = feas.trainerUtilizationPct !== null && feas.trainerUtilizationPct >= 80;
+      const roomTight = feas.roomUtilizationPct !== null && feas.roomUtilizationPct >= 80;
+      feas.verdict =
+        trainerOver || roomOver ? "infeasible" : trainerTight || roomTight ? "tight" : "feasible";
+    } else if (dryRun.capacity_gaps.length > 0) {
+      feas.verdict = "infeasible";
+    }
   }
+
+  // YES = SQL dry-run placed every needed session AND no setup blockers
+  //       (classes need rooms / trainers assigned, window dates set, etc.).
+  // NO  = anything below that. A "tight" verdict still answers YES — the
+  //       plan fits, it's just utilization-hot. The big banner says yes/no,
+  //       the lower VerdictBanner adds the tight nuance.
+  const canSchedule =
+    !!dryRun && dryRun.capacity_gaps.length === 0 && feas.readyBlockers.length === 0;
 
   return (
     <div className="space-y-6">
@@ -180,6 +204,13 @@ export default async function CalculatePage({ params }: { params: Params }) {
           exactly what to add. Run <strong>Generate Schedule</strong> below to commit a draft.
         </p>
       </div>
+
+      <YesNoPanel
+        canSchedule={canSchedule}
+        dryRun={dryRun}
+        readyBlockers={feas.readyBlockers}
+        verdict={feas.verdict}
+      />
 
       <VerdictBanner result={feas} />
 
@@ -222,6 +253,65 @@ export default async function CalculatePage({ params }: { params: Params }) {
 }
 
 // ── Components ─────────────────────────────────────────────────────────────
+
+function YesNoPanel({
+  canSchedule,
+  dryRun,
+  readyBlockers,
+  verdict,
+}: {
+  canSchedule: boolean;
+  dryRun: ScheduleGenResult | null;
+  readyBlockers: string[];
+  verdict: FeasibilityVerdict;
+}) {
+  // Sub-headline summarizes the *why*: setup blockers (no window dates, no
+  // rooms, classes missing trainers) take precedence over capacity gaps;
+  // either of those is a definitive NO. If dry-run couldn't run at all,
+  // surface that explicitly — the user shouldn't be guessing whether the
+  // page just failed to query the scheduler.
+  let why: string;
+  if (canSchedule) {
+    if (verdict === "tight") {
+      why =
+        "Every session fits — but a resource is ≥80% utilized, so any sick day or no-show puts the plan at risk.";
+    } else {
+      why = `All ${dryRun ? dryRun.sessions.toString() : ""} sessions fit within the window, before the go-live buffer.`;
+    }
+  } else if (!dryRun) {
+    why =
+      readyBlockers.length > 0
+        ? (readyBlockers[0] ?? "Setup is incomplete — finish earlier steps first.")
+        : "Set window start and end dates on the Setup step, then add at least one class.";
+  } else if (readyBlockers.length > 0) {
+    why = readyBlockers[0] ?? "Setup is incomplete.";
+  } else {
+    const gapCount = dryRun.capacity_gaps.length;
+    const classCount = new Set(dryRun.capacity_gaps.map((g) => g.class_id)).size;
+    why = `${gapCount.toString()} session${gapCount === 1 ? "" : "s"} across ${classCount.toString()} class${classCount === 1 ? "" : "es"} can't be placed — see "${gapCount === 1 ? "the reason" : "the reasons"}" below.`;
+  }
+
+  const cls = canSchedule
+    ? "border-emerald-300 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/30"
+    : "border-rose-300 bg-rose-50 dark:border-rose-700 dark:bg-rose-950/30";
+  const labelCls = canSchedule
+    ? "text-emerald-700 dark:text-emerald-200"
+    : "text-rose-700 dark:text-rose-200";
+
+  return (
+    <div className={`rounded-lg border p-4 ${cls}`}>
+      <div className="flex items-baseline gap-3">
+        <span className={`text-3xl font-bold tabular-nums ${labelCls}`}>
+          {canSchedule ? "YES" : "NO"}
+        </span>
+        <span className="text-foreground text-sm font-medium">
+          Can I run this schedule with my current rooms + trainers?
+        </span>
+      </div>
+      <p className="text-muted-foreground mt-1.5 text-xs">{why}</p>
+    </div>
+  );
+}
 
 function UnscheduledReasonsPanel({ dryRun }: { dryRun: ScheduleGenResult }) {
   // Group gaps by class so a class with N unscheduled sessions shows up as
