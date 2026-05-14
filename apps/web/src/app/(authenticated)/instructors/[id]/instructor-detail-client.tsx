@@ -99,21 +99,10 @@ function OverviewTab({ instructor }: { instructor: Instructor }) {
         </dl>
       </div>
 
-      {/* Capacity forecast placeholder */}
-      <div className="border-border bg-surface rounded-xl border border-dashed p-6 text-center">
-        <p className="text-foreground text-sm font-medium">8-Week Capacity Forecast</p>
-        <p className="text-muted-foreground mt-1 text-xs">
-          Forecast available after workload sources are configured (Phase 3).
-        </p>
-      </div>
-
-      {/* Allocation buckets placeholder */}
-      <div className="border-border bg-surface rounded-xl border border-dashed p-6 text-center">
-        <p className="text-foreground text-sm font-medium">Allocation Buckets</p>
-        <p className="text-muted-foreground mt-1 text-xs">
-          No allocation set yet — bucket usage will appear here after Phase 2.
-        </p>
-      </div>
+      <p className="text-muted-foreground text-xs italic">
+        Capacity forecast and allocation breakdown live on the{" "}
+        <strong className="text-foreground">Workload</strong> tab.
+      </p>
     </div>
   );
 }
