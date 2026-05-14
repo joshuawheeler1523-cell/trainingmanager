@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeftIcon, ArrowRightIcon, PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
@@ -70,6 +70,26 @@ export default function ClassesEditor({
   const [pending, startTransition] = useTransition();
   const [openClassId, setOpenClassId] = useState<string | null>(null);
 
+  // Optimistic row state — edits apply instantly so clicks feel snappy.
+  // useOptimistic auto-reverts on transition failure (e.g., server action
+  // returns ok:false), so the row snaps back to the server value if the
+  // mutation can't land. router.refresh() is skipped on edits since the
+  // user's typed value already shows; we only refresh on add/delete where
+  // the row count changes.
+  const [optimisticClasses, applyClassPatch] = useOptimistic(
+    classes,
+    (state, action: { kind: "upsert"; row: ImplClass } | { kind: "delete"; id: string }) => {
+      if (action.kind === "delete") return state.filter((c) => c.id !== action.id);
+      const existing = state.findIndex((c) => c.id === action.row.id);
+      if (existing >= 0) {
+        const next = state.slice();
+        next[existing] = action.row;
+        return next;
+      }
+      return [...state, action.row];
+    },
+  );
+
   const trainersByClass = useMemo(() => {
     const m = new Map<string, string[]>();
     for (const ct of classTrainers) {
@@ -90,7 +110,10 @@ export default function ClassesEditor({
     return m;
   }, [prerequisites]);
 
-  const classMap = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
+  const classMap = useMemo(
+    () => new Map(optimisticClasses.map((c) => [c.id, c])),
+    [optimisticClasses],
+  );
 
   const feasibilityById = useMemo(
     () => new Map(classFeasibility.map((cf) => [cf.classId, cf])),
@@ -127,9 +150,15 @@ export default function ClassesEditor({
 
   function handleUpdate(c: ImplClass, patch: Record<string, unknown>) {
     startTransition(async () => {
+      // Optimistic: render the patched row immediately. Skip router.refresh
+      // on success — the page state is already correct and a refetch would
+      // cost ~300-800ms of re-running server-component queries.
+      applyClassPatch({
+        kind: "upsert",
+        row: { ...c, ...(patch as Partial<ImplClass>), updated_at: new Date().toISOString() },
+      });
       const result = await updateClass(c.id, implementationId, patch);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -160,8 +189,11 @@ export default function ClassesEditor({
   const windowWeeks = computeWindowWeeks(windowStartDate, windowEndDate);
   const fteDenominator = windowWeeks * FTE_HOURS_PER_WEEK; // 0 when window unset
 
-  const totalSessions = classes.reduce((acc, c) => acc + sessionsNeeded(c), 0);
-  const totalHours = classes.reduce((acc, c) => acc + sessionsNeeded(c) * c.hours_per_session, 0);
+  const totalSessions = optimisticClasses.reduce((acc, c) => acc + sessionsNeeded(c), 0);
+  const totalHours = optimisticClasses.reduce(
+    (acc, c) => acc + sessionsNeeded(c) * c.hours_per_session,
+    0,
+  );
   // Aggregate FTE / rooms computed from total hours (not summed per-class)
   // so the bottom-line is honest about resource sharing across classes —
   // summing per-class rounding-ups would inflate.
@@ -181,7 +213,7 @@ export default function ClassesEditor({
         edit prerequisites and assigned trainers.
       </p>
 
-      {classes.length === 0 ? (
+      {optimisticClasses.length === 0 ? (
         <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
           <p className="text-foreground text-sm font-medium">No classes yet</p>
           <p className="text-muted-foreground mt-1 text-xs">Most implementations have 5–20.</p>
@@ -207,7 +239,7 @@ export default function ClassesEditor({
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {classes.map((c) => {
+              {optimisticClasses.map((c) => {
                 const sessions = sessionsNeeded(c);
                 const hours = sessions * c.hours_per_session;
                 const trainerFte = fteDenominator > 0 ? hours / fteDenominator : null;
@@ -517,7 +549,7 @@ export default function ClassesEditor({
         <ClassDrawer
           implementationId={implementationId}
           klass={open}
-          allClasses={classes}
+          allClasses={optimisticClasses}
           trainers={trainers}
           assignedTrainerIds={trainersByClass.get(open.id) ?? []}
           prerequisites={prereqsByClass.get(open.id) ?? []}
