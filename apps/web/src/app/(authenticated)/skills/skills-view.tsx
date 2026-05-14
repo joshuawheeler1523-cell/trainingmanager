@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -18,11 +18,12 @@ import { archiveSkill, importSkillsCsv, unarchiveSkill } from "./actions";
 import { PROFICIENCY_VALUES } from "@arbor/shared";
 import type { Skill, Proficiency } from "@arbor/shared";
 
-type Tab = "library" | "coverage" | "gaps";
+type Tab = "library" | "coverage" | "matrix" | "gaps";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "library", label: "Library" },
   { id: "coverage", label: "Coverage" },
+  { id: "matrix", label: "Matrix" },
   { id: "gaps", label: "Gaps" },
 ];
 
@@ -49,12 +50,21 @@ export type ExpiringCert = {
   days_until: number;
 };
 
+export type MatrixData = {
+  instructors: { id: string; name: string }[];
+  classes: { id: string; name: string; requiredSkillCount: number }[];
+  // Per-class array of qualified instructor ids. Plain Record so this
+  // serializes cleanly across the RSC boundary.
+  qualifiedByClass: Record<string, string[]>;
+};
+
 type Props = {
   skills: Skill[];
   coverage: CoverageCount[];
   classGaps: ClassGap[];
   uncoveredSkillIds: string[];
   expiringCerts: ExpiringCert[];
+  matrix: MatrixData;
 };
 
 export default function SkillsView({
@@ -63,6 +73,7 @@ export default function SkillsView({
   classGaps,
   uncoveredSkillIds,
   expiringCerts,
+  matrix,
 }: Props) {
   const [tab, setTab] = useState<Tab>("library");
   const [showArchived, setShowArchived] = useState(false);
@@ -104,6 +115,7 @@ export default function SkillsView({
         {tab === "coverage" && (
           <CoverageTab skills={skills.filter((s) => !s.is_archived)} coverage={coverage} />
         )}
+        {tab === "matrix" && <MatrixTab matrix={matrix} />}
         {tab === "gaps" && (
           <GapsTab
             skills={skills}
@@ -398,6 +410,227 @@ function CoverageTab({ skills, coverage }: { skills: Skill[]; coverage: Coverage
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ── Matrix tab ──────────────────────────────────────────────────────────────
+// Instructor × Class pivot of who can teach what. Reuses the
+// qualified_instructors_for_class RPC data already fetched on the page,
+// so no new SQL. Cells: ✓ green if qualified, blank rose if not, "—" gray
+// when the class has no required skills (then everyone "qualifies"
+// vacuously). Filters for single-point-of-failure spotting.
+
+function MatrixTab({ matrix }: { matrix: MatrixData }) {
+  const [filter, setFilter] = useState<"all" | "spof" | "uncovered">("all");
+  const [query, setQuery] = useState("");
+
+  const qualifiedSets = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const [cid, ids] of Object.entries(matrix.qualifiedByClass)) {
+      m.set(cid, new Set(ids));
+    }
+    return m;
+  }, [matrix.qualifiedByClass]);
+
+  // Per-class qualified count, for SPOF filter + footer.
+  const qualifiedCountByClass = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of matrix.classes) {
+      m.set(c.id, qualifiedSets.get(c.id)?.size ?? 0);
+    }
+    return m;
+  }, [matrix.classes, qualifiedSets]);
+
+  // Per-instructor qualified count, for the right-hand column.
+  const qualifiedCountByInstructor = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const i of matrix.instructors) m.set(i.id, 0);
+    for (const ids of qualifiedSets.values()) {
+      for (const iid of ids) {
+        m.set(iid, (m.get(iid) ?? 0) + 1);
+      }
+    }
+    return m;
+  }, [matrix.instructors, qualifiedSets]);
+
+  // Apply filters.
+  const visibleClasses = useMemo(() => {
+    let cs = matrix.classes;
+    if (filter === "spof") cs = cs.filter((c) => (qualifiedCountByClass.get(c.id) ?? 0) === 1);
+    if (filter === "uncovered") cs = cs.filter((c) => (qualifiedCountByClass.get(c.id) ?? 0) === 0);
+    const q = query.trim().toLowerCase();
+    if (q) cs = cs.filter((c) => c.name.toLowerCase().includes(q));
+    return cs;
+  }, [matrix.classes, filter, qualifiedCountByClass, query]);
+
+  if (matrix.classes.length === 0) {
+    return (
+      <p className="text-muted-foreground py-8 text-sm italic">
+        No classes have required skills yet. Add skill requirements to a class via{" "}
+        <Link href="/classes" className="underline">
+          /classes
+        </Link>{" "}
+        to populate the matrix.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="text-muted-foreground text-xs">
+        <p>
+          Rows are instructors. Columns are classes with required skills.{" "}
+          <span className="text-emerald-600 dark:text-emerald-400">✓</span> means the instructor has
+          every required skill at the required proficiency.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+          }}
+          placeholder="Filter classes…"
+          className="border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm"
+        />
+        <div
+          role="tablist"
+          className="border-border bg-background inline-flex rounded-md border p-0.5"
+        >
+          {(
+            [
+              { id: "all", label: "All", count: matrix.classes.length },
+              {
+                id: "spof",
+                label: "Single point of failure",
+                count: matrix.classes.filter((c) => (qualifiedCountByClass.get(c.id) ?? 0) === 1)
+                  .length,
+              },
+              {
+                id: "uncovered",
+                label: "Uncovered",
+                count: matrix.classes.filter((c) => (qualifiedCountByClass.get(c.id) ?? 0) === 0)
+                  .length,
+              },
+            ] as const
+          ).map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => {
+                setFilter(f.id);
+              }}
+              className={`rounded px-2 py-1 text-xs font-medium ${
+                filter === f.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-surface"
+              }`}
+            >
+              {f.label}
+              <span className="ml-1 tabular-nums opacity-70">{f.count.toString()}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {visibleClasses.length === 0 ? (
+        <p className="text-muted-foreground py-8 text-sm italic">No classes match the filter.</p>
+      ) : (
+        <div className="border-border overflow-auto rounded-lg border">
+          <table className="text-xs">
+            <thead className="bg-surface sticky top-0 z-10">
+              <tr>
+                <th className="bg-surface border-border sticky left-0 z-20 min-w-48 border-r px-3 py-2 text-left font-medium uppercase tracking-wide">
+                  Trainer
+                </th>
+                {visibleClasses.map((c) => {
+                  const qCount = qualifiedCountByClass.get(c.id) ?? 0;
+                  return (
+                    <th
+                      key={c.id}
+                      className="text-muted-foreground border-border min-w-28 max-w-40 border-r px-2 py-2 text-left align-bottom font-medium"
+                      title={`${c.name} — ${qCount.toString()} qualified · ${c.requiredSkillCount.toString()} required skills`}
+                    >
+                      <div className="truncate">{c.name}</div>
+                      <div
+                        className={`mt-0.5 text-[10px] tabular-nums ${
+                          qCount === 0
+                            ? "text-rose-600 dark:text-rose-400"
+                            : qCount === 1
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-muted-foreground"
+                        }`}
+                      >
+                        {qCount.toString()} qual.
+                      </div>
+                    </th>
+                  );
+                })}
+                <th className="bg-surface border-border sticky right-0 z-10 min-w-20 border-l px-2 py-2 text-right font-medium uppercase tracking-wide">
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-border divide-y">
+              {matrix.instructors.map((i) => {
+                const total = qualifiedCountByInstructor.get(i.id) ?? 0;
+                return (
+                  <tr key={i.id} className="hover:bg-surface/30">
+                    <td className="bg-background border-border sticky left-0 border-r px-3 py-1.5 font-medium">
+                      <Link
+                        href={`/instructors/${i.id}`}
+                        className="text-foreground hover:text-primary truncate underline-offset-2 hover:underline"
+                      >
+                        {i.name}
+                      </Link>
+                    </td>
+                    {visibleClasses.map((c) => {
+                      const qualified = qualifiedSets.get(c.id)?.has(i.id) ?? false;
+                      return (
+                        <td
+                          key={c.id}
+                          className="border-border border-r px-2 py-1.5 text-center"
+                          title={qualified ? "Qualified" : "Missing required skill(s)"}
+                        >
+                          {qualified ? (
+                            <span className="text-emerald-600 dark:text-emerald-400">✓</span>
+                          ) : (
+                            <span className="text-muted-foreground/30">·</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="bg-background border-border sticky right-0 border-l px-2 py-1.5 text-right tabular-nums">
+                      <span
+                        className={
+                          total === 0 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"
+                        }
+                      >
+                        {total.toString()}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p className="text-muted-foreground text-[11px]">
+        <strong>Single point of failure</strong> = a class only one trainer can teach (amber).{" "}
+        <strong>Uncovered</strong> = nobody qualifies (rose). Fix on a class&apos;s{" "}
+        <Link href="/classes" className="underline">
+          /classes
+        </Link>{" "}
+        skill requirements, or add a skill cert via{" "}
+        <Link href="/instructors" className="underline">
+          /instructors
+        </Link>
+        .
+      </p>
     </div>
   );
 }

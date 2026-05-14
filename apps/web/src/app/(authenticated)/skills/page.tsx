@@ -1,7 +1,12 @@
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import SkillsView, { type CoverageCount, type ClassGap, type ExpiringCert } from "./skills-view";
+import SkillsView, {
+  type ClassGap,
+  type CoverageCount,
+  type ExpiringCert,
+  type MatrixData,
+} from "./skills-view";
 import type { Skill, Proficiency } from "@arbor/shared";
 
 export default async function SkillsPage() {
@@ -69,21 +74,49 @@ export default async function SkillsPage() {
     });
   }
 
+  // Walk every candidate class once. Gaps tab needs zero-qualified rows;
+  // Matrix tab needs the full per-class qualified instructor set. One pass
+  // through the RPC populates both.
   const classGaps: ClassGap[] = [];
+  const qualifiedByClass = new Map<string, Set<string>>();
   for (const c of candidateClasses) {
     const { data: qualified } = await supabase.rpc("qualified_instructors_for_class", {
       p_class_id: c.id,
     });
-    const qualifiedCount = qualified?.length ?? 0;
-    if (qualifiedCount === 0) {
+    const ids = new Set<string>((qualified ?? []).map((q) => q.instructor_id));
+    qualifiedByClass.set(c.id, ids);
+    if (ids.size === 0) {
       classGaps.push({
         class_id: c.id,
         class_name: c.name,
         required_count: c.required_count,
-        qualified_count: qualifiedCount,
+        qualified_count: 0,
       });
     }
   }
+
+  // Matrix data — every active non-external instructor × every class with at
+  // least one required skill. Cell is true when the instructor is in the
+  // qualified set for that class.
+  const { data: matrixInstructorsRaw } = await supabase
+    .from("instructors")
+    .select("id, full_name")
+    .eq("org_id", orgId)
+    .eq("status", "active")
+    .eq("is_external", false)
+    .is("deleted_at", null)
+    .order("full_name");
+  const matrix: MatrixData = {
+    instructors: (matrixInstructorsRaw ?? []).map((i) => ({ id: i.id, name: i.full_name })),
+    classes: candidateClasses.map((c) => ({
+      id: c.id,
+      name: c.name,
+      requiredSkillCount: c.required_count,
+    })),
+    qualifiedByClass: Object.fromEntries(
+      [...qualifiedByClass.entries()].map(([cid, set]) => [cid, [...set]]),
+    ),
+  };
 
   // ── Gap B: Skills with zero qualified instructors ──────────────────────────
   const uncoveredSkillIds = skills
@@ -132,6 +165,7 @@ export default async function SkillsPage() {
         classGaps={classGaps}
         uncoveredSkillIds={uncoveredSkillIds}
         expiringCerts={expiringCerts}
+        matrix={matrix}
       />
     </div>
   );
