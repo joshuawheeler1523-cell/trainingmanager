@@ -236,6 +236,12 @@ export default async function CalculatePage({ params }: { params: Params }) {
         implementationId={id}
         ready={feas.ready}
         existingSessions={sessionCount ?? 0}
+        availableAnchors={(orgImpls ?? [])
+          .filter(
+            (i) =>
+              i.id !== id && !i.deleted_at && i.status !== "archived" && i.status !== "cancelled",
+          )
+          .map((i) => ({ id: i.id, name: i.name }))}
       />
 
       <div className="border-border flex items-center justify-between border-t pt-4">
