@@ -5652,6 +5652,19 @@ export type Database = {
           expired_domain: string;
         }[];
       };
+      find_alternative_slots: {
+        Args: { p_max_results?: number; p_session_id: string };
+        Returns: {
+          impl_room_id: string;
+          impl_trainer_id: string;
+          room_name: string;
+          same_trainer: boolean;
+          scheduled_end: string;
+          scheduled_start: string;
+          time_distance_hours: number;
+          trainer_name: string;
+        }[];
+      };
       frequency_to_annual: { Args: { p_frequency: string }; Returns: number };
       generate_implementation_schedule: {
         Args: {

@@ -17,6 +17,7 @@ import {
   CalendarDaysIcon,
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
+  ExclamationTriangleIcon,
   Cog6ToothIcon,
   WrenchScrewdriverIcon,
   Bars3Icon,
@@ -30,7 +31,12 @@ import { logout } from "@/app/(authenticated)/actions";
 
 type IconType = React.ComponentType<{ className?: string }>;
 
-type NavItem = { href: string; label: React.ReactNode; icon: IconType };
+type NavItem = {
+  href: string;
+  label: React.ReactNode;
+  icon: IconType;
+  badge?: number;
+};
 type NavGroup = { title: string; items: NavItem[] };
 type ModuleFlags = Record<ToggleableModule, boolean>;
 
@@ -50,7 +56,7 @@ function teamGroup(modules: ModuleFlags): NavGroup {
   return { title: "Team", items };
 }
 
-function workGroup(modules: ModuleFlags): NavGroup {
+function workGroup(modules: ModuleFlags, conflictCount: number): NavGroup {
   const items: NavItem[] = [
     { href: "/allocations", label: "Allocations", icon: AdjustmentsHorizontalIcon },
     { href: "/tras", label: "Work Intake", icon: ClipboardDocumentListIcon },
@@ -61,6 +67,14 @@ function workGroup(modules: ModuleFlags): NavGroup {
   items.push({ href: "/projects", label: "Special Projects", icon: BriefcaseIcon });
   if (modules["module.training_planner"]) {
     items.push({ href: "/training-planner", label: "Training Planner", icon: CalendarDaysIcon });
+    if (conflictCount > 0) {
+      items.push({
+        href: "/training-planner/conflicts",
+        label: "Conflicts",
+        icon: ExclamationTriangleIcon,
+        badge: conflictCount,
+      });
+    }
   }
   items.push({ href: "/one-on-ones", label: "1:1s", icon: ChatBubbleLeftRightIcon });
   return { title: "Work", items };
@@ -111,6 +125,17 @@ function NavLink({
     >
       <Icon className={cn("h-4 w-4 shrink-0", !active && "text-muted-foreground")} />
       <span className="truncate">{item.label}</span>
+      {typeof item.badge === "number" && item.badge > 0 && (
+        <span
+          className={cn(
+            "ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+            active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-amber-500 text-white",
+          )}
+          aria-label={`${item.badge.toString()} pending`}
+        >
+          {item.badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -139,15 +164,17 @@ function NavGroupBlock({
 function SidebarContent({
   isAdmin,
   modules,
+  conflictCount,
   onNavigate,
 }: {
   isAdmin: boolean;
   modules: ModuleFlags;
+  conflictCount: number;
   onNavigate?: (() => void) | undefined;
 }) {
   const pathname = usePathname();
   const team = teamGroup(modules);
-  const work = workGroup(modules);
+  const work = workGroup(modules, conflictCount);
   return (
     <>
       <div className="border-border flex h-16 shrink-0 items-center border-b px-4">
@@ -202,16 +229,32 @@ function SidebarContent({
 }
 
 /** Desktop sidebar — visible on md+, sticky full-height. */
-export function DesktopSidebar({ isAdmin, modules }: { isAdmin: boolean; modules: ModuleFlags }) {
+export function DesktopSidebar({
+  isAdmin,
+  modules,
+  conflictCount = 0,
+}: {
+  isAdmin: boolean;
+  modules: ModuleFlags;
+  conflictCount?: number;
+}) {
   return (
     <aside className="border-border bg-background sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r md:flex">
-      <SidebarContent isAdmin={isAdmin} modules={modules} />
+      <SidebarContent isAdmin={isAdmin} modules={modules} conflictCount={conflictCount} />
     </aside>
   );
 }
 
 /** Mobile drawer — hamburger trigger + slide-in panel. */
-export function MobileSidebar({ isAdmin, modules }: { isAdmin: boolean; modules: ModuleFlags }) {
+export function MobileSidebar({
+  isAdmin,
+  modules,
+  conflictCount = 0,
+}: {
+  isAdmin: boolean;
+  modules: ModuleFlags;
+  conflictCount?: number;
+}) {
   const [open, setOpen] = useState(false);
   const close = () => {
     setOpen(false);
@@ -241,7 +284,12 @@ export function MobileSidebar({ isAdmin, modules }: { isAdmin: boolean; modules:
               <XMarkIcon className="h-5 w-5" />
             </button>
           </Dialog.Close>
-          <SidebarContent isAdmin={isAdmin} modules={modules} onNavigate={close} />
+          <SidebarContent
+            isAdmin={isAdmin}
+            modules={modules}
+            conflictCount={conflictCount}
+            onNavigate={close}
+          />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
