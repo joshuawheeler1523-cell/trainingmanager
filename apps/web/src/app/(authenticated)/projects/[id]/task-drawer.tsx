@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
@@ -60,7 +60,28 @@ export default function TaskDrawer({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  // Local mirror of editable fields so blur-save feels snappy without flickering
+  // Optimistic mirror of the task so controlled <select>s (status,
+  // priority, milestone) reflect changes instantly instead of waiting
+  // for a router.refresh. useOptimistic auto-reverts on transition
+  // failure, so a server-side reject snaps the chip back.
+  const [optimisticTask, applyTaskPatch] = useOptimistic(task, (state, patch: Partial<Task>) => ({
+    ...state,
+    ...patch,
+  }));
+  // Same pattern for the action-items list — checkbox toggles need to
+  // flip without a 400-800ms refresh round-trip.
+  const [optimisticActionItems, applyActionItemPatch] = useOptimistic(
+    actionItems,
+    (state, action: { kind: "update"; item: TaskActionItem }) => {
+      const idx = state.findIndex((i) => i.id === action.item.id);
+      if (idx < 0) return state;
+      const next = state.slice();
+      next[idx] = action.item;
+      return next;
+    },
+  );
+
+  // Local mirror of editable text fields so blur-save feels snappy without flickering
   const [name, setName] = useState(task.name);
   const [description, setDescription] = useState(task.description ?? "");
   const [startDate, setStartDate] = useState(task.start_date ?? "");
@@ -80,9 +101,12 @@ export default function TaskDrawer({
 
   function patch(p: Record<string, unknown>) {
     startTransition(async () => {
+      // Optimistic: render the patched task immediately so chips and
+      // % complete don't snap back. Skip router.refresh on success —
+      // saves ~400-800ms of server-component re-fetch per field edit.
+      applyTaskPatch(p);
       const result = await updateTask(task.id, project.id, p);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -183,11 +207,14 @@ export default function TaskDrawer({
 
   function handleToggleActionItem(item: TaskActionItem) {
     startTransition(async () => {
+      applyActionItemPatch({
+        kind: "update",
+        item: { ...item, is_complete: !item.is_complete },
+      });
       const result = await updateActionItem(item.id, project.id, {
         is_complete: !item.is_complete,
       });
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -239,8 +266,8 @@ export default function TaskDrawer({
               className="text-foreground w-full bg-transparent text-base font-semibold focus:outline-none"
             />
             <p className="text-muted-foreground mt-0.5 text-xs">
-              <span className="capitalize">{task.status.replace(/_/g, " ")}</span> ·{" "}
-              {task.percent_complete.toString()}%
+              <span className="capitalize">{optimisticTask.status.replace(/_/g, " ")}</span> ·{" "}
+              {optimisticTask.percent_complete.toString()}%
             </p>
           </div>
           <div className="flex items-center gap-1">
@@ -270,7 +297,7 @@ export default function TaskDrawer({
             <div>
               <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">Status</p>
               <select
-                value={task.status}
+                value={optimisticTask.status}
                 disabled={pending}
                 onChange={(e) => {
                   const s = e.target.value as TaskStatus;
@@ -290,7 +317,7 @@ export default function TaskDrawer({
             <div>
               <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">Priority</p>
               <select
-                value={task.priority}
+                value={optimisticTask.priority}
                 disabled={pending}
                 onChange={(e) => {
                   patch({ priority: e.target.value });
@@ -373,7 +400,7 @@ export default function TaskDrawer({
             <div>
               <p className="text-muted-foreground mb-1 text-xs font-medium uppercase">Milestone</p>
               <select
-                value={task.milestone_id ?? ""}
+                value={optimisticTask.milestone_id ?? ""}
                 disabled={pending}
                 onChange={(e) => {
                   patch({ milestone_id: e.target.value || null });
@@ -557,7 +584,7 @@ export default function TaskDrawer({
               <p className="text-muted-foreground text-xs">No action items yet.</p>
             ) : (
               <ul className="space-y-1">
-                {actionItems.map((item) => (
+                {optimisticActionItems.map((item) => (
                   <li key={item.id} className="flex items-start gap-2 py-1">
                     <input
                       type="checkbox"
