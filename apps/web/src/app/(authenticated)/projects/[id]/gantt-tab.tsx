@@ -35,11 +35,37 @@ const BAR_OFFSET = (ROW_HEIGHT - BAR_HEIGHT) / 2;
 
 const PIXELS_PER_DAY: Record<Zoom, number> = { day: 48, week: 14, month: 5 };
 
-const STATUS_COLOR: Record<TaskStatus, { bar: string; border: string }> = {
-  not_started: { bar: "fill-slate-300 dark:fill-slate-600", border: "stroke-slate-400" },
-  in_progress: { bar: "fill-blue-400", border: "stroke-blue-600" },
-  on_hold: { bar: "fill-amber-300", border: "stroke-amber-500" },
-  completed: { bar: "fill-emerald-400", border: "stroke-emerald-600" },
+// Bar classes use `bg-*` because the rendered bars are <div>s — the
+// previous `fill-*` classes silently no-op'd, leaving every status
+// looking the same washed-out gray. `ring` is the inset border so the
+// bar reads as solid even when overlapping grid lines.
+//
+// Color intent:
+//   not_started → muted slate (visible but quiet, hasn't started yet)
+//   in_progress → primary brand color (active work)
+//   on_hold     → amber (paused / blocked)
+//   completed   → emerald (done)
+const STATUS_COLOR: Record<TaskStatus, { bar: string; ring: string; text: string }> = {
+  not_started: {
+    bar: "bg-slate-200 dark:bg-slate-700",
+    ring: "ring-slate-400 dark:ring-slate-500",
+    text: "text-slate-900 dark:text-slate-100",
+  },
+  in_progress: {
+    bar: "bg-primary/80",
+    ring: "ring-primary",
+    text: "text-primary-foreground",
+  },
+  on_hold: {
+    bar: "bg-amber-300 dark:bg-amber-500/60",
+    ring: "ring-amber-500",
+    text: "text-amber-950 dark:text-amber-50",
+  },
+  completed: {
+    bar: "bg-emerald-400 dark:bg-emerald-500/70",
+    ring: "ring-emerald-600",
+    text: "text-emerald-950 dark:text-emerald-50",
+  },
 };
 
 // ── date helpers ────────────────────────────────────────────────────────────
@@ -506,7 +532,7 @@ export default function GanttTab({
                           onClick={() => {
                             setOpenTaskId(t.id);
                           }}
-                          className={`absolute cursor-grab rounded-md ${color.bar} ring-1 ring-inset hover:ring-2`}
+                          className={`absolute cursor-grab rounded-md ${color.bar} ${color.ring} ring-1 ring-inset hover:ring-2`}
                           style={{
                             left: x,
                             width: w,
@@ -532,14 +558,16 @@ export default function GanttTab({
                             onPointerUp={handleBarPointerUp}
                             className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize"
                           />
-                          {/* Progress fill */}
+                          {/* Progress fill — darker overlay over the bar's color */}
                           {t.percent_complete > 0 && (
                             <div
-                              className="absolute inset-y-0 left-0 rounded-md bg-black/20"
+                              className="absolute inset-y-0 left-0 rounded-md bg-black/25 dark:bg-white/15"
                               style={{ width: `${t.percent_complete.toString()}%` }}
                             />
                           )}
-                          <span className="text-foreground line-clamp-1 px-2 pt-0.5 text-xs leading-[22px]">
+                          <span
+                            className={`relative line-clamp-1 px-2 pt-0.5 text-xs font-medium leading-[22px] ${color.text}`}
+                          >
                             {t.name}
                           </span>
                         </div>
