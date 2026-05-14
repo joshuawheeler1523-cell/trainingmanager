@@ -480,9 +480,11 @@ function MatrixTab({ matrix }: { matrix: MatrixData }) {
     <div className="space-y-3">
       <div className="text-muted-foreground text-xs">
         <p>
-          Rows are instructors. Columns are classes with required skills.{" "}
-          <span className="text-emerald-600 dark:text-emerald-400">✓</span> means the instructor has
-          every required skill at the required proficiency.
+          Rows are instructors. Columns are classes with required skills. A green{" "}
+          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 align-middle text-[10px] font-bold text-white">
+            ✓
+          </span>{" "}
+          means the instructor has every required skill at the required proficiency.
         </p>
       </div>
 
@@ -591,13 +593,27 @@ function MatrixTab({ matrix }: { matrix: MatrixData }) {
                       return (
                         <td
                           key={c.id}
-                          className="border-border border-r px-2 py-1.5 text-center"
+                          className={`border-border border-r p-0 text-center ${
+                            qualified
+                              ? "bg-emerald-50 dark:bg-emerald-900/30"
+                              : "bg-rose-50/40 dark:bg-rose-950/20"
+                          }`}
                           title={qualified ? "Qualified" : "Missing required skill(s)"}
                         >
                           {qualified ? (
-                            <span className="text-emerald-600 dark:text-emerald-400">✓</span>
+                            <span
+                              aria-label="Qualified"
+                              className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white dark:bg-emerald-600"
+                            >
+                              ✓
+                            </span>
                           ) : (
-                            <span className="text-muted-foreground/30">·</span>
+                            <span
+                              aria-label="Not qualified"
+                              className="text-base font-medium text-rose-400/70 dark:text-rose-500/70"
+                            >
+                              ✕
+                            </span>
                           )}
                         </td>
                       );
