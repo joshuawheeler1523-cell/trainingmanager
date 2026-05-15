@@ -108,6 +108,48 @@ export async function updateInstructor(
   return { ok: true, data: data as Instructor };
 }
 
+const bulkAnnualHoursSchema = z.object({
+  annual_hours: z.coerce.number().int().min(0).max(4000),
+});
+
+export async function bulkSetAnnualHours(
+  input: unknown,
+): Promise<ActionResult<{ updated: number }>> {
+  const parsed = bulkAnnualHoursSchema.safeParse(input);
+  if (!parsed.success) {
+    const first = parsed.error.errors[0];
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: first?.message ?? "Invalid input",
+        ...(first?.path[0] ? { field: String(first.path[0]) } : {}),
+      },
+    };
+  }
+
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
+  if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
+
+  const { data, error } = await supabase
+    .from("instructors")
+    .update({ annual_hours: parsed.data.annual_hours })
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .select("id");
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+
+  revalidatePath("/instructors");
+  return { ok: true, data: { updated: data.length } };
+}
+
 export async function softDeleteInstructor(id: string): Promise<ActionResult<{ id: string }>> {
   const [supabase, orgId, departmentId] = await Promise.all([
     createClient(),

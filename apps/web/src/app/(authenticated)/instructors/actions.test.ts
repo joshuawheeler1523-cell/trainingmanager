@@ -24,7 +24,7 @@ vi.mock("@/lib/auth/current-department", () => ({
   getCurrentDepartmentId: mockGetCurrentDepartmentId,
 }));
 
-const { createInstructor, softDeleteInstructor } = await import("./actions");
+const { createInstructor, softDeleteInstructor, bulkSetAnnualHours } = await import("./actions");
 
 const ORG_ID = "org-aaaa-0000-0000-000000000000";
 const INSTRUCTOR_ID = "inst-bbbb-0000-0000-000000000000";
@@ -165,6 +165,55 @@ describe("softDeleteInstructor", () => {
   it("returns NO_ORG error when org context is missing", async () => {
     mockGetCurrentOrgId.mockResolvedValue(null);
     const result = await softDeleteInstructor(INSTRUCTOR_ID);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("NO_ORG");
+  });
+});
+
+describe("bulkSetAnnualHours", () => {
+  function makeBulkChain(rows: { id: string }[]) {
+    return {
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      select: vi.fn().mockResolvedValue({ data: rows, error: null }),
+    };
+  }
+
+  it("rejects negative values", async () => {
+    const result = await bulkSetAnnualHours({ annual_hours: -1 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("VALIDATION");
+  });
+
+  it("rejects values above 4000", async () => {
+    const result = await bulkSetAnnualHours({ annual_hours: 5000 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("VALIDATION");
+  });
+
+  it("rejects non-integer values", async () => {
+    const result = await bulkSetAnnualHours({ annual_hours: 1880.5 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("VALIDATION");
+  });
+
+  it("updates every non-archived instructor in the org and returns count", async () => {
+    const chain = makeBulkChain([{ id: "1" }, { id: "2" }, { id: "3" }]);
+    mockFrom.mockReturnValue(chain);
+
+    const result = await bulkSetAnnualHours({ annual_hours: 2000 });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.updated).toBe(3);
+
+    expect(chain.update).toHaveBeenCalledWith({ annual_hours: 2000 });
+    expect(chain.eq).toHaveBeenCalledWith("org_id", ORG_ID);
+    expect(chain.is).toHaveBeenCalledWith("deleted_at", null);
+  });
+
+  it("returns NO_ORG when org context is missing", async () => {
+    mockGetCurrentOrgId.mockResolvedValue(null);
+    const result = await bulkSetAnnualHours({ annual_hours: 1880 });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("NO_ORG");
   });

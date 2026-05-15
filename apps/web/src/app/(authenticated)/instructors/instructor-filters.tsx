@@ -2,17 +2,23 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback } from "react";
-import { ArrowUpTrayIcon, MagnifyingGlassIcon } from "@heroicons/react/20/solid";
+import {
+  AdjustmentsHorizontalIcon,
+  ArrowUpTrayIcon,
+  MagnifyingGlassIcon,
+} from "@heroicons/react/20/solid";
 import InstructorFormDialog from "./instructor-form-dialog";
+import BulkAnnualHoursDialog from "./bulk-annual-hours-dialog";
 import CsvImportDialog from "@/components/csv-import-dialog";
 import { Label } from "@/components/labels";
 import { importInstructorsCsv } from "./actions";
 
 type Props = {
   departments: string[];
+  activeInstructorCount: number;
 };
 
-export default function InstructorFilters({ departments }: Props) {
+export default function InstructorFilters({ departments, activeInstructorCount }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
@@ -102,6 +108,21 @@ export default function InstructorFilters({ departments }: Props) {
 
       {/* Add / import instructors */}
       <div className="ml-auto flex items-center gap-2">
+        {activeInstructorCount > 0 && (
+          <BulkAnnualHoursDialog
+            instructorCount={activeInstructorCount}
+            trigger={
+              <button
+                type="button"
+                className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium"
+                title="Set annual hours on every active instructor"
+              >
+                <AdjustmentsHorizontalIcon className="h-4 w-4" />
+                Set annual hours…
+              </button>
+            }
+          />
+        )}
         <CsvImportDialog
           entity="instructors"
           description="Upsert instructors by email (case-insensitive). Rows with no email always insert. Existing instructors with a matching email will be updated."
