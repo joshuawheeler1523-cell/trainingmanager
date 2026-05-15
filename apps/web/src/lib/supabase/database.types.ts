@@ -4153,6 +4153,92 @@ export type Database = {
         };
         Relationships: [];
       };
+      super_users: {
+        Row: {
+          class_id: string | null;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          department_id: string;
+          email: string | null;
+          full_name: string;
+          id: string;
+          org_id: string;
+          phone: string | null;
+          topic: string | null;
+          trained_at: string | null;
+          unit: string | null;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          class_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          department_id: string;
+          email?: string | null;
+          full_name: string;
+          id?: string;
+          org_id: string;
+          phone?: string | null;
+          topic?: string | null;
+          trained_at?: string | null;
+          unit?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          class_id?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          department_id?: string;
+          email?: string | null;
+          full_name?: string;
+          id?: string;
+          org_id?: string;
+          phone?: string | null;
+          topic?: string | null;
+          trained_at?: string | null;
+          unit?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "super_users_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "super_users_class_id_fkey";
+            columns: ["class_id"];
+            isOneToOne: false;
+            referencedRelation: "classes_with_hours";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "super_users_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "super_users_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       support_ticket_messages: {
         Row: {
           author_id: string | null;
