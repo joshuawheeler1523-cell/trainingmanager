@@ -41,6 +41,7 @@ type Props = {
   sourceBreakdownByInstructor: Map<string, SourceBreakdown>;
   recommendations: Recommendation[];
   showDeleted: boolean;
+  activeInstructorCount: number;
 };
 
 export default function InstructorsView(props: Props) {
@@ -98,6 +99,7 @@ export default function InstructorsView(props: Props) {
             capacityByInstructor={props.capacityByInstructor}
             sourceBreakdownByInstructor={props.sourceBreakdownByInstructor}
             showDeleted={props.showDeleted}
+            activeInstructorCount={props.activeInstructorCount}
           />
         )}
         {tab === "capacity" && (
@@ -126,12 +128,14 @@ function RosterTab({
   capacityByInstructor,
   sourceBreakdownByInstructor,
   showDeleted,
+  activeInstructorCount,
 }: {
   instructors: Instructor[];
   departments: string[];
   capacityByInstructor: Map<string, CapacityRow>;
   sourceBreakdownByInstructor: Map<string, SourceBreakdown>;
   showDeleted: boolean;
+  activeInstructorCount: number;
 }) {
   const sp = useSearchParams();
   const utilizationFilter = sp.get("utilization");
@@ -226,7 +230,10 @@ function RosterTab({
   if (instructors.length === 0) {
     return (
       <>
-        <InstructorFilters departments={departments} />
+        <InstructorFilters
+          departments={departments}
+          activeInstructorCount={activeInstructorCount}
+        />
         <EmptyState
           title={
             showDeleted ? (
@@ -257,7 +264,7 @@ function RosterTab({
 
   return (
     <>
-      <InstructorFilters departments={departments} />
+      <InstructorFilters departments={departments} activeInstructorCount={activeInstructorCount} />
 
       {/* View toggle */}
       <div className="flex items-center justify-between gap-3">

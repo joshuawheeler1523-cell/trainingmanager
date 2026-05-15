@@ -49,6 +49,7 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
     { data: deptRows },
     { data: capacityRows },
     { data: workloadRows },
+    { count: activeInstructorCount },
   ] = await Promise.all([
     query,
     supabase
@@ -60,6 +61,12 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
       .not("department", "is", null),
     supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId),
     supabase.from("v_instructor_workload").select("*").eq("org_id", orgId),
+    supabase
+      .from("instructors")
+      .select("*", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("is_external", false)
+      .is("deleted_at", null),
   ]);
 
   const list = (instructors ?? []) as Instructor[];
@@ -105,6 +112,7 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
       sourceBreakdownByInstructor={sourceBreakdownByInstructor}
       recommendations={recommendations}
       showDeleted={showDeleted}
+      activeInstructorCount={activeInstructorCount ?? 0}
     />
   );
 }
