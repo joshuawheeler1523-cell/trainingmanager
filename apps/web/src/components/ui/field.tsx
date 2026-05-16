@@ -53,7 +53,7 @@ export function Field({
     <div className={cn("space-y-1", className)}>
       <label
         htmlFor={id}
-        className="text-muted-foreground block text-xs font-medium uppercase tracking-wide"
+        className="text-muted-foreground block font-mono text-[10px] font-medium uppercase tracking-[0.08em]"
       >
         {label}
         {required && <span className="text-destructive ml-0.5">*</span>}
