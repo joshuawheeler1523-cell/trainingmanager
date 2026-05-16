@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { createAdminClient } from "@/lib/supabase/admin";
 import UserActions from "./user-actions";
+import Memberships from "./memberships";
 
 export const metadata = { title: "User" };
 
@@ -15,6 +16,7 @@ export default async function ArborUserDetailPage({ params }: { params: Promise<
     { data: orgMems },
     { data: agencyMems },
     { data: recentAudit },
+    { data: allOrgsData },
   ] = await Promise.all([
     admin.auth.admin.getUserById(id),
     admin
@@ -31,7 +33,40 @@ export default async function ArborUserDetailPage({ params }: { params: Promise<
       .eq("actor_id", id)
       .order("occurred_at", { ascending: false })
       .limit(30),
+    admin.from("organizations").select("id, name, slug").order("name"),
   ]);
+
+  const orgMemberships = (orgMems ?? [])
+    .filter(
+      (m): m is typeof m & { role: "manager" | "instructor" | "viewer" } =>
+        m.role === "manager" || m.role === "instructor" || m.role === "viewer",
+    )
+    .map((m) => {
+      const org = m.organizations as { name: string; slug: string } | null;
+      return {
+        org_id: m.org_id,
+        role: m.role,
+        org_name: org?.name ?? m.org_id.slice(0, 8),
+        org_slug: org?.slug ?? "—",
+      };
+    });
+
+  const agencyMemberships = (agencyMems ?? [])
+    .filter(
+      (m): m is typeof m & { role: "agency_admin" | "agency_member" } =>
+        m.role === "agency_admin" || m.role === "agency_member",
+    )
+    .map((m) => {
+      const ag = m.agencies as { name: string; slug: string } | null;
+      return {
+        agency_id: m.agency_id,
+        role: m.role,
+        agency_name: ag?.name ?? m.agency_id.slice(0, 8),
+        agency_slug: ag?.slug ?? "—",
+      };
+    });
+
+  const allOrgs = (allOrgsData ?? []) as { id: string; name: string; slug: string }[];
 
   if (error) notFound();
   const user = userResp.user;
@@ -84,63 +119,13 @@ export default async function ArborUserDetailPage({ params }: { params: Promise<
       </section>
 
       {/* Memberships */}
-      <section className="border-border bg-background overflow-hidden rounded-xl border">
-        <div className="border-border border-b px-5 py-3">
-          <h2 className="text-foreground text-base font-bold">
-            Memberships ({((orgMems ?? []).length + (agencyMems ?? []).length).toString()})
-          </h2>
-        </div>
-        {(orgMems ?? []).length === 0 && (agencyMems ?? []).length === 0 ? (
-          <p className="text-muted-foreground p-6 text-center text-sm italic">No memberships.</p>
-        ) : (
-          <ul className="divide-border divide-y text-sm">
-            {(orgMems ?? []).map((m) => {
-              const org = m.organizations as { name: string; slug: string } | null;
-              return (
-                <li
-                  key={`org-${m.org_id}`}
-                  className="flex items-center justify-between px-5 py-2.5"
-                >
-                  <div>
-                    <Link
-                      href={`/arbor/orgs/${m.org_id}`}
-                      className="text-foreground hover:text-primary font-medium"
-                    >
-                      {org?.name ?? m.org_id.slice(0, 8)}
-                    </Link>
-                    <p className="text-muted-foreground mt-0.5 font-mono text-xs">
-                      org · {org?.slug ?? "—"}
-                    </p>
-                  </div>
-                  <span className="text-muted-foreground text-xs capitalize">{m.role}</span>
-                </li>
-              );
-            })}
-            {(agencyMems ?? []).map((m) => {
-              const ag = m.agencies as { name: string; slug: string } | null;
-              return (
-                <li
-                  key={`ag-${m.agency_id}`}
-                  className="flex items-center justify-between px-5 py-2.5"
-                >
-                  <div>
-                    <Link
-                      href={`/arbor/agencies/${m.agency_id}`}
-                      className="text-foreground hover:text-primary font-medium"
-                    >
-                      {ag?.name ?? m.agency_id.slice(0, 8)}
-                    </Link>
-                    <p className="text-muted-foreground mt-0.5 font-mono text-xs">
-                      agency · {ag?.slug ?? "—"}
-                    </p>
-                  </div>
-                  <span className="text-muted-foreground text-xs capitalize">{m.role}</span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      <Memberships
+        userId={user.id}
+        userEmail={user.email ?? "(no email)"}
+        orgMemberships={orgMemberships}
+        agencyMemberships={agencyMemberships}
+        allOrgs={allOrgs}
+      />
 
       {/* Recent activity */}
       <section className="border-border bg-background overflow-hidden rounded-xl border">

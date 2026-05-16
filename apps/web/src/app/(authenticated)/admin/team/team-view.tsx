@@ -6,12 +6,14 @@ import { toast } from "sonner";
 import { PaperAirplaneIcon, TrashIcon } from "@heroicons/react/20/solid";
 import { inviteUser, removeMember, updateMember } from "../actions";
 
+export type Role = "manager" | "instructor" | "viewer";
+
 export type MemberRow = {
   id: string;
   user_id: string;
   email: string | null;
   display_name: string | null;
-  role: "member" | "org_admin";
+  role: Role;
   visibility: "full" | "limited";
   accepted_at: string | null;
   invited_at: string | null;
@@ -20,8 +22,21 @@ export type MemberRow = {
 
 type Props = { members: MemberRow[] };
 
-const ROLE_LABEL = { member: "Member", org_admin: "Admin" };
+const ROLE_LABEL: Record<Role, string> = {
+  manager: "Manager",
+  instructor: "Instructor",
+  viewer: "Viewer",
+};
+const ROLE_HELP: Record<Role, string> = {
+  manager: "Full control: invite/remove users, change roles, edit all settings.",
+  instructor: "Can view + edit operational data (classes, schedules) but cannot manage users.",
+  viewer: "Read-only access to selected modules.",
+};
 const VIS_LABEL = { full: "Full", limited: "Limited" };
+const VIS_HELP = {
+  full: "Sees all data in the org.",
+  limited: "Sees only items they're explicitly assigned to.",
+};
 
 const fieldClass =
   "border-input bg-background text-foreground rounded-md border px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-ring";
@@ -31,7 +46,7 @@ export default function TeamView({ members }: Props) {
   const [pending, startTransition] = useTransition();
 
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"member" | "org_admin">("member");
+  const [inviteRole, setInviteRole] = useState<Role>("instructor");
   const [inviteVisibility, setInviteVisibility] = useState<"full" | "limited">("full");
 
   function handleInvite() {
@@ -113,13 +128,18 @@ export default function TeamView({ members }: Props) {
           <select
             value={inviteRole}
             onChange={(e) => {
-              setInviteRole(e.target.value as "member" | "org_admin");
+              setInviteRole(e.target.value as Role);
             }}
+            title={ROLE_HELP[inviteRole]}
             className={fieldClass}
           >
-            <option value="member">Member</option>
-            <option value="org_admin">Admin</option>
+            <option value="manager">Manager</option>
+            <option value="instructor">Instructor</option>
+            <option value="viewer">Viewer</option>
           </select>
+          <p className="text-muted-foreground mt-1 max-w-[14rem] text-[10px] leading-snug">
+            {ROLE_HELP[inviteRole]}
+          </p>
         </div>
         <div>
           <p className="text-muted-foreground mb-1 text-xs font-medium">Visibility</p>
@@ -128,11 +148,15 @@ export default function TeamView({ members }: Props) {
             onChange={(e) => {
               setInviteVisibility(e.target.value as "full" | "limited");
             }}
+            title={VIS_HELP[inviteVisibility]}
             className={fieldClass}
           >
             <option value="full">Full</option>
             <option value="limited">Limited</option>
           </select>
+          <p className="text-muted-foreground mt-1 max-w-[14rem] text-[10px] leading-snug">
+            {VIS_HELP[inviteVisibility]}
+          </p>
         </div>
         <button
           type="button"
@@ -192,12 +216,14 @@ export default function TeamView({ members }: Props) {
                       value={m.role}
                       disabled={pending}
                       onChange={(e) => {
-                        handleUpdate(m, { role: e.target.value as MemberRow["role"] });
+                        handleUpdate(m, { role: e.target.value as Role });
                       }}
+                      title={ROLE_HELP[m.role]}
                       className={fieldClass}
                     >
-                      <option value="member">{ROLE_LABEL.member}</option>
-                      <option value="org_admin">{ROLE_LABEL.org_admin}</option>
+                      <option value="manager">{ROLE_LABEL.manager}</option>
+                      <option value="instructor">{ROLE_LABEL.instructor}</option>
+                      <option value="viewer">{ROLE_LABEL.viewer}</option>
                     </select>
                   </td>
                   <td className="px-3 py-2">

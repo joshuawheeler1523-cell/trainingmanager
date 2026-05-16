@@ -139,6 +139,185 @@ export async function deleteUserAction(args: { userId: string }): Promise<Action
   return { ok: true, data: true };
 }
 
+// ── Membership management ──────────────────────────────────────────────────
+//
+// Per-org and per-agency role management. Arbor admins can promote/demote
+// a user in any org or agency, add them to a new org/agency, or remove them
+// outright. All actions are audit-logged so we have provenance for support.
+
+const ORG_ROLES = ["manager", "instructor", "viewer"] as const;
+type OrgRole = (typeof ORG_ROLES)[number];
+
+const AGENCY_ROLES = ["agency_admin", "agency_member"] as const;
+type AgencyRole = (typeof AGENCY_ROLES)[number];
+
+export async function changeUserOrgRoleAction(args: {
+  userId: string;
+  orgId: string;
+  role: OrgRole;
+}): Promise<ActionResult<true>> {
+  await requireArborAdmin();
+  if (!ORG_ROLES.includes(args.role)) {
+    return { ok: false, error: { code: "BAD_ROLE", message: "Invalid org role" } };
+  }
+  const admin = createAdminClient();
+  const { data: existing, error: lookupErr } = await admin
+    .from("org_memberships")
+    .select("role")
+    .eq("user_id", args.userId)
+    .eq("org_id", args.orgId)
+    .maybeSingle();
+  if (lookupErr) return { ok: false, error: { code: lookupErr.code, message: lookupErr.message } };
+  if (!existing) {
+    return {
+      ok: false,
+      error: { code: "NOT_A_MEMBER", message: "User is not a member of that org" },
+    };
+  }
+  if (existing.role === args.role) return { ok: true, data: true };
+
+  const { error } = await admin
+    .from("org_memberships")
+    .update({ role: args.role })
+    .eq("user_id", args.userId)
+    .eq("org_id", args.orgId);
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+
+  await writeArborUserAuditLog(admin, args.userId, "ARBOR_ADMIN_USER_ORG_ROLE_CHANGED", {
+    org_id: args.orgId,
+    from: existing.role,
+    to: args.role,
+  });
+  revalidatePath(`/arbor/users/${args.userId}`);
+  revalidatePath(`/arbor/orgs/${args.orgId}`);
+  return { ok: true, data: true };
+}
+
+export async function addUserToOrgAction(args: {
+  userId: string;
+  orgId: string;
+  role: OrgRole;
+}): Promise<ActionResult<true>> {
+  await requireArborAdmin();
+  if (!ORG_ROLES.includes(args.role)) {
+    return { ok: false, error: { code: "BAD_ROLE", message: "Invalid org role" } };
+  }
+  const admin = createAdminClient();
+  const { data: existing } = await admin
+    .from("org_memberships")
+    .select("role")
+    .eq("user_id", args.userId)
+    .eq("org_id", args.orgId)
+    .maybeSingle();
+  if (existing) {
+    return {
+      ok: false,
+      error: { code: "ALREADY_MEMBER", message: "User is already a member of that org" },
+    };
+  }
+  const nowIso = new Date().toISOString();
+  const { error } = await admin.from("org_memberships").insert({
+    user_id: args.userId,
+    org_id: args.orgId,
+    role: args.role,
+    invited_at: nowIso,
+    accepted_at: nowIso,
+  });
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+
+  await writeArborUserAuditLog(admin, args.userId, "ARBOR_ADMIN_USER_ADDED_TO_ORG", {
+    org_id: args.orgId,
+    role: args.role,
+  });
+  revalidatePath(`/arbor/users/${args.userId}`);
+  revalidatePath(`/arbor/orgs/${args.orgId}`);
+  return { ok: true, data: true };
+}
+
+export async function removeUserFromOrgAction(args: {
+  userId: string;
+  orgId: string;
+}): Promise<ActionResult<true>> {
+  await requireArborAdmin();
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("org_memberships")
+    .delete()
+    .eq("user_id", args.userId)
+    .eq("org_id", args.orgId);
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+
+  await writeArborUserAuditLog(admin, args.userId, "ARBOR_ADMIN_USER_REMOVED_FROM_ORG", {
+    org_id: args.orgId,
+  });
+  revalidatePath(`/arbor/users/${args.userId}`);
+  revalidatePath(`/arbor/orgs/${args.orgId}`);
+  return { ok: true, data: true };
+}
+
+export async function changeUserAgencyRoleAction(args: {
+  userId: string;
+  agencyId: string;
+  role: AgencyRole;
+}): Promise<ActionResult<true>> {
+  await requireArborAdmin();
+  if (!AGENCY_ROLES.includes(args.role)) {
+    return { ok: false, error: { code: "BAD_ROLE", message: "Invalid agency role" } };
+  }
+  const admin = createAdminClient();
+  const { data: existing, error: lookupErr } = await admin
+    .from("agency_memberships")
+    .select("role")
+    .eq("user_id", args.userId)
+    .eq("agency_id", args.agencyId)
+    .maybeSingle();
+  if (lookupErr) return { ok: false, error: { code: lookupErr.code, message: lookupErr.message } };
+  if (!existing) {
+    return {
+      ok: false,
+      error: { code: "NOT_A_MEMBER", message: "User is not a member of that agency" },
+    };
+  }
+  if (existing.role === args.role) return { ok: true, data: true };
+
+  const { error } = await admin
+    .from("agency_memberships")
+    .update({ role: args.role })
+    .eq("user_id", args.userId)
+    .eq("agency_id", args.agencyId);
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+
+  await writeArborUserAuditLog(admin, args.userId, "ARBOR_ADMIN_USER_AGENCY_ROLE_CHANGED", {
+    agency_id: args.agencyId,
+    from: existing.role,
+    to: args.role,
+  });
+  revalidatePath(`/arbor/users/${args.userId}`);
+  revalidatePath(`/arbor/agencies/${args.agencyId}`);
+  return { ok: true, data: true };
+}
+
+export async function removeUserFromAgencyAction(args: {
+  userId: string;
+  agencyId: string;
+}): Promise<ActionResult<true>> {
+  await requireArborAdmin();
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("agency_memberships")
+    .delete()
+    .eq("user_id", args.userId)
+    .eq("agency_id", args.agencyId);
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+
+  await writeArborUserAuditLog(admin, args.userId, "ARBOR_ADMIN_USER_REMOVED_FROM_AGENCY", {
+    agency_id: args.agencyId,
+  });
+  revalidatePath(`/arbor/users/${args.userId}`);
+  revalidatePath(`/arbor/agencies/${args.agencyId}`);
+  return { ok: true, data: true };
+}
+
 async function writeArborUserAuditLog(
   admin: ReturnType<typeof createAdminClient>,
   userId: string,
