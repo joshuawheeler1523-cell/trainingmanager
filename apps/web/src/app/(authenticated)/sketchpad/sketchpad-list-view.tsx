@@ -11,6 +11,8 @@ import {
   ArrowTopRightOnSquareIcon,
 } from "@heroicons/react/20/solid";
 import type { SketchpadSchedule } from "@arbor/shared";
+import { Eyebrow } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { createSchedule, deleteSchedule, duplicateSchedule } from "./actions";
 
 type Row = SketchpadSchedule & { room_count: number; session_count: number };
@@ -72,16 +74,14 @@ export default function SketchpadListView({ rows }: { rows: Row[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="border-border bg-background flex items-end gap-2 rounded-lg border p-3">
-        <div className="flex-1">
-          <label
-            htmlFor="new-name"
-            className="text-muted-foreground mb-1 block text-xs font-medium uppercase tracking-wide"
-          >
+      <div className="border-border bg-background flex items-end gap-3 rounded-xl border p-4">
+        <div className="flex flex-1 flex-col gap-1.5">
+          <Eyebrow variant="section" id="new-name-label">
             New sketch
-          </label>
+          </Eyebrow>
           <input
             id="new-name"
+            aria-labelledby="new-name-label"
             value={newName}
             onChange={(e) => {
               setNewName(e.target.value);
@@ -109,17 +109,19 @@ export default function SketchpadListView({ rows }: { rows: Row[] }) {
       </div>
 
       {rows.length === 0 ? (
-        <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
-          <p className="text-foreground text-sm font-medium">No sketches yet</p>
-          <p className="text-muted-foreground mt-1 text-xs">
+        <div className="border-border bg-surface rounded-xl border border-dashed p-8 text-center">
+          <p className="font-display text-foreground text-base font-medium leading-tight">
+            No sketches yet
+          </p>
+          <p className="text-muted-foreground mt-2 text-sm">
             Name a sketch above to get started. Each sketch is a standalone mockup — no roster, no
             implementations, no capacity math. Just rooms, trainers, classes, and a calendar.
           </p>
         </div>
       ) : (
-        <div className="border-border overflow-hidden rounded-lg border">
+        <div className="border-border bg-background overflow-hidden rounded-xl border">
           <table className="w-full text-sm">
-            <thead className="bg-surface text-muted-foreground text-xs">
+            <thead className="border-border border-b border-dashed">
               <tr>
                 <Th>Name</Th>
                 <Th>Window</Th>
@@ -131,27 +133,33 @@ export default function SketchpadListView({ rows }: { rows: Row[] }) {
             </thead>
             <tbody className="divide-border divide-y">
               {rows.map((r) => (
-                <tr key={r.id} className="hover:bg-surface/40">
-                  <td className="px-3 py-2">
+                <tr key={r.id} className="hover:bg-surface">
+                  <td className="px-4 py-3">
                     <Link
                       href={`/sketchpad/${r.id}`}
-                      className="text-foreground hover:text-primary font-medium underline-offset-2 hover:underline"
+                      className="font-display text-foreground text-base font-medium leading-tight hover:underline"
                     >
                       {r.name}
                     </Link>
                     {r.notes && (
-                      <p className="text-muted-foreground mt-0.5 truncate text-xs">{r.notes}</p>
+                      <p className="text-muted-foreground mt-0.5 truncate font-mono text-[10.5px] tracking-[0.02em]">
+                        {r.notes}
+                      </p>
                     )}
                   </td>
-                  <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+                  <td className="text-muted-foreground px-4 py-3 font-mono text-[10.5px] tabular-nums">
                     {r.start_date} · {r.day_count}d · {r.hours_start}:00–{r.hours_end}:00
                   </td>
-                  <td className="px-3 py-2 text-right text-xs tabular-nums">{r.room_count}</td>
-                  <td className="px-3 py-2 text-right text-xs tabular-nums">{r.session_count}</td>
-                  <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+                  <td className="text-foreground px-4 py-3 text-right font-mono text-[11.5px] tabular-nums">
+                    {r.room_count}
+                  </td>
+                  <td className="text-foreground px-4 py-3 text-right font-mono text-[11.5px] tabular-nums">
+                    {r.session_count}
+                  </td>
+                  <td className="text-muted-foreground px-4 py-3 font-mono text-[10.5px] tabular-nums">
                     {formatRelativeShort(r.updated_at)}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <Link
                         href={`/sketchpad/${r.id}`}
@@ -200,9 +208,10 @@ export default function SketchpadListView({ rows }: { rows: Row[] }) {
 function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th
-      className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wide ${
-        className ?? ""
-      }`}
+      className={cn(
+        "text-muted-foreground px-4 py-3 text-left font-mono text-[10px] font-medium uppercase tracking-[0.08em]",
+        className,
+      )}
     >
       {children}
     </th>

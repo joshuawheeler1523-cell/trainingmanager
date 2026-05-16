@@ -45,6 +45,7 @@ import {
   updateActionItem,
   updateOneOnOne,
 } from "../actions";
+import { Badge, Eyebrow } from "@/components/ui";
 
 type WorkloadRow = {
   source: string;
@@ -163,26 +164,38 @@ export default function OneOnOneEditor({
         <div className="min-w-0 flex-1">
           <Link
             href="/one-on-ones"
-            className="text-muted-foreground hover:text-foreground mb-1 inline-flex items-center gap-1 text-xs"
+            className="text-muted-foreground hover:text-foreground mb-2 inline-flex items-center gap-1 text-xs"
           >
             <ArrowLeftIcon className="h-3.5 w-3.5" />
             All 1:1s
           </Link>
-          <h1 className="text-foreground text-xl font-semibold">{instructor.full_name}</h1>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            {completed ? "Completed " : "Started "}
-            {new Date(session.scheduled_for).toLocaleString(undefined, {
-              dateStyle: "medium",
-              timeStyle: "short",
-            })}
+          <Eyebrow className="mb-2">1:1 conversation</Eyebrow>
+          <div className="flex flex-wrap items-baseline gap-3">
+            <h1 className="font-display text-foreground text-2xl font-medium leading-tight tracking-[-0.005em]">
+              {instructor.full_name}
+            </h1>
+            <Badge variant={completed ? "success" : "warning"}>
+              {completed ? "Complete" : "In progress"}
+            </Badge>
+          </div>
+          <p className="text-muted-foreground mt-2 font-mono text-[10.5px] uppercase tracking-[0.04em]">
+            {completed ? "Completed · " : "Started · "}
+            <span className="normal-case tabular-nums">
+              {new Date(session.scheduled_for).toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </span>
             {completed && session.completed_at && (
               <>
                 {" "}
                 · closed{" "}
-                {new Date(session.completed_at).toLocaleString(undefined, {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                })}
+                <span className="normal-case tabular-nums">
+                  {new Date(session.completed_at).toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </span>
               </>
             )}
           </p>
@@ -201,23 +214,34 @@ export default function OneOnOneEditor({
       </div>
 
       {/* Capacity snapshot */}
-      <div className="border-border bg-background rounded-lg border p-4">
+      <div className="border-border bg-background rounded-xl border p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
-            <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">
+            <Eyebrow variant="mute" className="mb-1.5">
               Capacity at start
-            </p>
-            <p className="text-foreground text-2xl font-semibold tabular-nums">
+            </Eyebrow>
+            <p className="font-display text-foreground text-3xl font-medium tabular-nums leading-none tracking-[-0.01em]">
               {utilPctRounded != null ? `${utilPctRounded.toString()}%` : "—"}
               {band && (
-                <span className={`ml-2 text-xs font-medium ${band.color}`}>{band.label}</span>
+                <span
+                  className={`ml-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.04em] ${band.color}`}
+                >
+                  {band.label}
+                </span>
               )}
             </p>
           </div>
-          <p className="text-muted-foreground text-xs tabular-nums">
-            {capacity
-              ? `${Math.round(capacity.assigned_hours).toString()} / ${capacity.annual_hours.toString()} h`
-              : ""}
+          <p className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
+            {capacity ? (
+              <>
+                <b className="text-foreground font-medium normal-case tabular-nums">
+                  {Math.round(capacity.assigned_hours).toString()} /{" "}
+                  {capacity.annual_hours.toString()} h
+                </b>
+              </>
+            ) : (
+              ""
+            )}
           </p>
         </div>
         {capacity && band && (
@@ -418,7 +442,7 @@ function WorkloadColumn({
   return (
     <div className="space-y-3">
       <div className="border-border bg-background rounded-lg border p-3">
-        <h2 className="text-foreground text-sm font-semibold">Classes</h2>
+        <Eyebrow>Classes</Eyebrow>
         {classAssignments.length === 0 ? (
           <p className="text-muted-foreground mt-1 text-xs italic">No class assignments.</p>
         ) : (
@@ -444,7 +468,7 @@ function WorkloadColumn({
       </div>
 
       <div className="border-border bg-background rounded-lg border p-3">
-        <h2 className="text-foreground text-sm font-semibold">Recurring tasks</h2>
+        <Eyebrow>Recurring tasks</Eyebrow>
         {recurringAssignments.length === 0 ? (
           <p className="text-muted-foreground mt-1 text-xs italic">No recurring assignments.</p>
         ) : (
@@ -470,7 +494,7 @@ function WorkloadColumn({
       </div>
 
       <div className="border-border bg-background rounded-lg border p-3">
-        <h2 className="text-foreground text-sm font-semibold">Ad-hoc tasks (open)</h2>
+        <Eyebrow>Ad-hoc tasks (open)</Eyebrow>
         {adHocTasks.length === 0 ? (
           <p className="text-muted-foreground mt-1 text-xs italic">No open ad-hoc tasks.</p>
         ) : (
@@ -509,7 +533,7 @@ function WorkloadColumn({
 
       {individualAllocations.length > 0 && (
         <div className="border-border bg-background rounded-lg border p-3">
-          <h2 className="text-foreground text-sm font-semibold">Allocation targets</h2>
+          <Eyebrow>Allocation targets</Eyebrow>
           <ul className="divide-border mt-1 divide-y">
             {individualAllocations.map((a) => (
               <li key={a.id} className="flex items-center justify-between py-1.5 text-xs">
@@ -631,7 +655,7 @@ function ReadOnlyWorkloadSection({
   return (
     <div className="border-border bg-background rounded-lg border p-3">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-foreground text-sm font-semibold">{title}</h2>
+        <Eyebrow>{title}</Eyebrow>
         {rows.length > 0 && (
           <span className="text-muted-foreground text-xs tabular-nums">
             {Math.round(total).toString()}h · {rows.length.toString()}{" "}
@@ -855,7 +879,7 @@ function ConversationColumn({
     <div className="space-y-3">
       {/* Sentiment */}
       <div className="border-border bg-background rounded-lg border p-3">
-        <h2 className="text-foreground text-sm font-semibold">Overall sentiment</h2>
+        <Eyebrow>Overall sentiment</Eyebrow>
         <div className="mt-2 flex flex-wrap gap-1">
           {ONE_ON_ONE_SENTIMENTS.map((s) => {
             const active = session.sentiment === s;
@@ -882,7 +906,7 @@ function ConversationColumn({
 
       {/* Topics */}
       <div className="border-border bg-background rounded-lg border p-3">
-        <h2 className="text-foreground text-sm font-semibold">Topics discussed</h2>
+        <Eyebrow>Topics discussed</Eyebrow>
         <p className="text-muted-foreground text-[11px]">Pick all that apply.</p>
         <div className="mt-2 flex flex-wrap gap-1">
           {ONE_ON_ONE_TOPIC_CODES.map((t) => {
@@ -910,7 +934,7 @@ function ConversationColumn({
 
       {/* Concerns */}
       <div className="border-border bg-background rounded-lg border p-3">
-        <h2 className="text-foreground text-sm font-semibold">Concerns flagged</h2>
+        <Eyebrow>Concerns flagged</Eyebrow>
         <div className="mt-2 flex flex-wrap gap-1">
           {ONE_ON_ONE_CONCERN_CODES.map((c) => {
             const active = concerns.has(c);
@@ -938,9 +962,7 @@ function ConversationColumn({
       {/* Carry-over action items */}
       {carriedOverItems.length > 0 && (
         <div className="border-border bg-background rounded-lg border p-3">
-          <h2 className="text-foreground text-sm font-semibold">
-            From last 1:1 ({carriedOverItems.length.toString()})
-          </h2>
+          <Eyebrow>From last 1:1 ({carriedOverItems.length.toString()})</Eyebrow>
           <ul className="divide-border mt-1 divide-y">
             {carriedOverItems.map((item) => (
               <CarriedItemRow
@@ -957,7 +979,7 @@ function ConversationColumn({
 
       {/* New action items */}
       <div className="border-border bg-background rounded-lg border p-3">
-        <h2 className="text-foreground text-sm font-semibold">Action items for next time</h2>
+        <Eyebrow>Action items for next time</Eyebrow>
         <ul className="divide-border mt-1 divide-y">
           {thisActionItems.map((item) => (
             <ThisItemRow
@@ -1207,9 +1229,7 @@ function NewItemRow({
 function ChangeLogPanel({ changes }: { changes: OneOnOneWorkloadChange[] }) {
   return (
     <div className="border-border bg-background rounded-lg border p-3">
-      <h2 className="text-foreground text-sm font-semibold">
-        Reconcile log ({changes.length.toString()})
-      </h2>
+      <Eyebrow>Reconcile log ({changes.length.toString()})</Eyebrow>
       <p className="text-muted-foreground text-[11px]">Every workload edit made during this 1:1.</p>
       <ul className="divide-border mt-2 divide-y">
         {changes.map((c) => (
