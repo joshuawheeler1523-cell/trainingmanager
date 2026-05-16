@@ -10,6 +10,7 @@ export { Drawer, type DrawerSize } from "./drawer";
 export { Eyebrow, type EyebrowVariant } from "./eyebrow";
 export { Field } from "./field";
 export { Heading, type HeadingLevel } from "./heading";
+export { HeatStrip, HeatStripLegend, type HeatWeek } from "./heat-strip";
 export { Input, Select, Textarea } from "./input";
 export { Modal, type ModalSize } from "./modal";
 export { Skeleton, SkeletonLine, SkeletonStack } from "./skeleton";
