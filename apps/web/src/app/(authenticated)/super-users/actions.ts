@@ -70,11 +70,43 @@ export async function updateSuperUser(
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
 
+  // Enforce the (class_id IS NOT NULL OR topic non-empty) constraint
+  // against the POST-MERGE state. The schema can only catch the case
+  // where both are explicitly nulled in the same payload; partial
+  // patches need the existing row to validate correctly.
+  const patch = parsed.data;
+  if (patch.class_id === null || patch.topic === null || patch.topic === "") {
+    const { data: existing } = await supabase
+      .from("super_users")
+      .select("class_id, topic")
+      .eq("id", id)
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!existing) {
+      return { ok: false, error: { code: "NOT_FOUND", message: "Super user not found" } };
+    }
+    const nextClassId = patch.class_id !== undefined ? patch.class_id : existing.class_id;
+    const nextTopicRaw = patch.topic !== undefined ? patch.topic : existing.topic;
+    const nextTopic =
+      typeof nextTopicRaw === "string" && nextTopicRaw.trim().length > 0 ? nextTopicRaw : null;
+    if (nextClassId == null && nextTopic == null) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION",
+          message: "Either link a class or enter a topic",
+          field: "topic",
+        },
+      };
+    }
+  }
+
   const { data, error } = await supabase
     .from("super_users")
     .update(
       Object.fromEntries(
-        Object.entries(parsed.data as Record<string, unknown>).filter(([, v]) => v !== undefined),
+        Object.entries(patch as Record<string, unknown>).filter(([, v]) => v !== undefined),
       ) as unknown as TablesUpdate<"super_users">,
     )
     .eq("id", id)

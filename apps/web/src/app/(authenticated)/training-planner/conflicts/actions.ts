@@ -87,13 +87,27 @@ export async function moveSession(
     };
   }
 
-  // Race-condition check: another planner may have placed something in
-  // this slot since we fetched alternatives. Verify the destination is
-  // still free for the chosen trainer + room. We don't need to redo
-  // the FULL constraint check here — the alternatives RPC already
-  // returned only valid candidates, and a fresh refetch would be
-  // expensive. We do a narrow same-resource overlap check to catch
-  // the obvious race.
+  // Validate the new slot at write time. find_alternative_slots is a
+  // SUGGESTION engine — it filters by binary trainer/room overlap but
+  // doesn't enforce max_concurrent_sessions or weekly hour budgets. This
+  // is the final gate so manual moves can't create states the generator
+  // wouldn't.
+  //
+  //  (1) Room not double-booked
+  //  (2) Trainer concurrency — overlapping sessions on this trainer must
+  //      not exceed their max_concurrent_sessions
+  //  (3) Trainer weekly hours — same ISO week must stay under
+  //      availability_hours_per_week
+  const newStart = new Date(to.scheduled_start);
+  const newEnd = new Date(to.scheduled_end);
+  const durationHours = (newEnd.getTime() - newStart.getTime()) / 3_600_000;
+  if (!Number.isFinite(durationHours) || durationHours <= 0) {
+    return {
+      ok: false,
+      error: { code: "BAD_SLOT", message: "Invalid time range" },
+    };
+  }
+
   const { count: roomConflicts } = await supabase
     .from("impl_sessions")
     .select("*", { count: "exact", head: true })
@@ -111,7 +125,21 @@ export async function moveSession(
       },
     };
   }
-  const { count: trainerConflicts } = await supabase
+
+  // Trainer concurrency: count overlapping sessions, compare to cap.
+  const { data: trainerRow, error: trainerErr } = await supabase
+    .from("impl_trainers")
+    .select("id, max_concurrent_sessions, availability_hours_per_week, implementation_id")
+    .eq("id", to.impl_trainer_id)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (trainerErr)
+    return { ok: false, error: { code: trainerErr.code, message: trainerErr.message } };
+  if (!trainerRow) {
+    return { ok: false, error: { code: "BAD_TRAINER", message: "Trainer not found" } };
+  }
+
+  const { count: trainerOverlapCount } = await supabase
     .from("impl_sessions")
     .select("*", { count: "exact", head: true })
     .eq("org_id", orgId)
@@ -119,12 +147,40 @@ export async function moveSession(
     .neq("id", sessionId)
     .lt("scheduled_start", to.scheduled_end)
     .gt("scheduled_end", to.scheduled_start);
-  if ((trainerConflicts ?? 0) > 0) {
+  if ((trainerOverlapCount ?? 0) >= trainerRow.max_concurrent_sessions) {
     return {
       ok: false,
       error: {
-        code: "RACE",
-        message: "That trainer slot was just booked. Refresh and pick again.",
+        code: "TRAINER_CONCURRENCY",
+        message: `Trainer is already at their concurrency cap (${trainerRow.max_concurrent_sessions.toString()}) in that slot.`,
+      },
+    };
+  }
+
+  // Trainer weekly hours: sum existing hours for this trainer in the
+  // ISO week of the new slot. Exclude this session (so a move within
+  // the same week doesn't double-count). Compare to cap.
+  const weekStart = startOfIsoWeek(newStart);
+  const weekEnd = new Date(weekStart.getTime() + 7 * 86_400_000);
+  const { data: weekSessions } = await supabase
+    .from("impl_sessions")
+    .select("scheduled_start, scheduled_end")
+    .eq("org_id", orgId)
+    .eq("impl_trainer_id", to.impl_trainer_id)
+    .neq("id", sessionId)
+    .gte("scheduled_start", weekStart.toISOString())
+    .lt("scheduled_start", weekEnd.toISOString());
+  const existingHours = (weekSessions ?? []).reduce((acc, s) => {
+    const start = new Date(s.scheduled_start).getTime();
+    const end = new Date(s.scheduled_end).getTime();
+    return acc + (end - start) / 3_600_000;
+  }, 0);
+  if (existingHours + durationHours > trainerRow.availability_hours_per_week) {
+    return {
+      ok: false,
+      error: {
+        code: "WEEKLY_HOURS_EXCEEDED",
+        message: `Trainer would exceed their weekly budget (${trainerRow.availability_hours_per_week.toString()}h) — already at ${existingHours.toFixed(1)}h that week.`,
       },
     };
   }
@@ -144,4 +200,14 @@ export async function moveSession(
   revalidatePath("/training-planner/conflicts");
   revalidatePath(`/training-planner/${cur.implementation_id}`, "layout");
   return { ok: true, data: { id: sessionId } };
+}
+
+// Start-of-ISO-week (Monday 00:00 UTC) for the given date. ISO weeks
+// run Monday→Sunday — matches the generator's bucketing.
+function startOfIsoWeek(d: Date): Date {
+  const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  // getUTCDay: 0 = Sun .. 6 = Sat. Shift so Mon=0..Sun=6.
+  const dow = (dt.getUTCDay() + 6) % 7;
+  dt.setUTCDate(dt.getUTCDate() - dow);
+  return dt;
 }
