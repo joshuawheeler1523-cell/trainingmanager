@@ -3,9 +3,11 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import BucketsTab from "./buckets-tab";
+import BucketConsumptionPanel from "./bucket-consumption-panel";
+import TeamUtilizationRoster, { type TeamRosterRow } from "./team-utilization-roster";
 import RecommendationsBanner from "@/components/recommendations-banner";
 
-// Buckets is the default landing tab — keep it eager so the first paint
+// Summary is the default landing tab — keep it eager so the first paint
 // is fully hydrated. Off-landing tabs lazy-load on demand.
 const TabLoading = () => <div className="text-muted-foreground p-6 text-sm">Loading…</div>;
 const GlobalTab = dynamic(() => import("./global-tab"), { loading: TabLoading });
@@ -18,6 +20,7 @@ import type {
   AllocationBucket,
   AllocationGroup,
   AllocationGroupMember,
+  BucketConsumptionInput,
   GlobalAllocation,
   GroupAllocation,
   IndividualAllocation,
@@ -27,9 +30,10 @@ import type {
   RecurringTaskAssignment,
 } from "@arbor/shared";
 
-type Tab = "buckets" | "global" | "groups" | "individuals" | "recurring" | "adhoc";
+type Tab = "summary" | "buckets" | "global" | "groups" | "individuals" | "recurring" | "adhoc";
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: "summary", label: "Summary" },
   { id: "buckets", label: "Buckets" },
   { id: "global", label: "Global (Default)" },
   { id: "groups", label: "Groups" },
@@ -51,10 +55,14 @@ type Props = {
   recurringAssignments: RecurringTaskAssignment[];
   adHocTasks: AdHocTask[];
   recommendations: Recommendation[];
+  /** Read-only summary inputs for the Summary tab. */
+  rosterRows: TeamRosterRow[];
+  bucketConsumption: BucketConsumptionInput[];
+  totalOrgHours: number;
 };
 
 export default function AllocationsView(props: Props) {
-  const [tab, setTab] = useState<Tab>("buckets");
+  const [tab, setTab] = useState<Tab>("summary");
 
   return (
     <div>
@@ -81,12 +89,24 @@ export default function AllocationsView(props: Props) {
 
       <div className="space-y-4 p-6">
         {/* Bucket-overconsumption warnings live here — the fix (rebalancing
-            targets or reassigning hours) happens on this page. */}
-        <RecommendationsBanner
-          title="Bucket warnings"
-          recommendations={props.recommendations}
-          defaultExpanded={false}
-        />
+            targets or reassigning hours) happens on this page. Hidden on
+            the Summary tab since the same info renders in the panel. */}
+        {tab !== "summary" && (
+          <RecommendationsBanner
+            title="Bucket warnings"
+            recommendations={props.recommendations}
+            defaultExpanded={false}
+          />
+        )}
+        {tab === "summary" && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.65fr_1fr]">
+            <TeamUtilizationRoster buckets={props.buckets} rows={props.rosterRows} />
+            <BucketConsumptionPanel
+              consumption={props.bucketConsumption}
+              totalOrgHours={props.totalOrgHours}
+            />
+          </div>
+        )}
         {tab === "buckets" && <BucketsTab buckets={props.buckets} />}
         {tab === "global" && (
           <GlobalTab

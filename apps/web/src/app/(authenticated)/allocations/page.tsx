@@ -2,6 +2,7 @@ import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import AllocationsView from "./allocations-view";
+import { type TeamRosterRow } from "./team-utilization-roster";
 import {
   recommendOverConsumedBuckets,
   type AdHocTask,
@@ -44,8 +45,15 @@ export default async function AllocationsPage() {
     { data: recurringAssignmentRows },
     { data: adHocRows },
     { data: bucketConsumptionRows },
+    { data: capacityRows },
+    { data: workloadRows },
   ] = await Promise.all([
-    supabase.from("allocation_buckets").select("*").eq("org_id", orgId).order("display_order"),
+    supabase
+      .from("allocation_buckets")
+      .select("*")
+      .eq("org_id", orgId)
+      .eq("is_archived", false)
+      .order("display_order"),
     supabase.from("global_allocations").select("*").eq("org_id", orgId),
     supabase.from("allocation_groups").select("*").eq("org_id", orgId).order("name"),
     supabase.from("allocation_group_members").select("*").eq("org_id", orgId),
@@ -71,6 +79,9 @@ export default async function AllocationsPage() {
       .eq("org_id", orgId)
       .order("created_at", { ascending: false }),
     supabase.from("v_bucket_consumption").select("*").eq("org_id", orgId),
+    // For the summary dashboard at the top of the page.
+    supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId),
+    supabase.from("v_instructor_workload").select("*").eq("org_id", orgId),
   ]);
 
   const buckets = (bucketRows ?? []) as AllocationBucket[];
@@ -123,11 +134,55 @@ export default async function AllocationsPage() {
     totalOrgAnnualHours,
   );
 
+  // Build per-instructor roster rows for the summary dashboard. We need
+  // hours per bucket so the capacity bar can render bucket-colored
+  // segments. v_instructor_workload has bucket_id at the row level for
+  // every workload entry; aggregate to (instructor_id, bucket_id) -> hrs.
+  const capacityByInstructor = new Map<
+    string,
+    { assigned_hours: number; utilization_pct: number | null }
+  >();
+  for (const c of (capacityRows ?? []) as {
+    instructor_id: string;
+    assigned_hours: number;
+    utilization_pct: number | null;
+  }[]) {
+    capacityByInstructor.set(c.instructor_id, {
+      assigned_hours: c.assigned_hours,
+      utilization_pct: c.utilization_pct,
+    });
+  }
+  const hoursByInstructorByBucket = new Map<string, Map<string, number>>();
+  for (const w of (workloadRows ?? []) as {
+    instructor_id: string;
+    bucket_id: string | null;
+    annual_hours: number;
+  }[]) {
+    if (!w.bucket_id) continue;
+    const m = hoursByInstructorByBucket.get(w.instructor_id) ?? new Map<string, number>();
+    m.set(w.bucket_id, (m.get(w.bucket_id) ?? 0) + (w.annual_hours || 0));
+    hoursByInstructorByBucket.set(w.instructor_id, m);
+  }
+  const rosterRows: TeamRosterRow[] = instructors
+    .filter((i) => i.status === "active")
+    .map((i) => {
+      const cap = capacityByInstructor.get(i.id);
+      return {
+        id: i.id,
+        full_name: i.full_name,
+        department: i.department,
+        annual_hours: i.annual_hours,
+        assigned_hours: cap?.assigned_hours ?? 0,
+        utilization_pct: cap?.utilization_pct ?? null,
+        hoursPerBucket: hoursByInstructorByBucket.get(i.id) ?? new Map(),
+      };
+    });
+
   return (
     <div>
       <PageHeader
         title="Allocations"
-        description="Buckets, global defaults, groups, and individual overrides."
+        description="Summary of where capacity is going, plus buckets, global defaults, groups, and individual overrides."
       />
       <AllocationsView
         buckets={buckets}
@@ -142,6 +197,9 @@ export default async function AllocationsPage() {
         recurringAssignments={recurringAssignments}
         adHocTasks={adHocTasks}
         recommendations={recommendations}
+        rosterRows={rosterRows}
+        bucketConsumption={bucketConsumption}
+        totalOrgHours={totalOrgAnnualHours}
       />
     </div>
   );
