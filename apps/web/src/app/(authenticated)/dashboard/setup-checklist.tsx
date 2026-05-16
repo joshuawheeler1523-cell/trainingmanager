@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CheckCircleIcon, ArrowRightIcon } from "@heroicons/react/20/solid";
+import { Eyebrow } from "@/components/ui";
 
 type Props = {
   hasMembers: boolean; // > 1 (you + at least one teammate)
@@ -42,12 +43,22 @@ export default function SetupChecklist(props: Props) {
   const allDone = items.every((i) => i.done);
   if (allDone) return null;
 
+  const doneCount = items.filter((i) => i.done).length;
+
   return (
-    <section className="border-primary/30 bg-primary/[0.03] rounded-xl border p-5">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 className="text-foreground text-sm font-semibold">Get your workspace set up</h2>
-        <span className="text-muted-foreground text-xs">
-          {items.filter((i) => i.done).length} of {items.length} complete
+    <section className="rounded-xl border border-[rgba(45,74,46,0.20)] bg-[rgba(45,74,46,0.04)] p-5">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
+        <div>
+          <Eyebrow className="mb-1.5">Setup</Eyebrow>
+          <h2 className="font-display text-foreground text-lg font-medium leading-tight tracking-[-0.005em]">
+            Get your workspace set up.
+          </h2>
+        </div>
+        <span className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
+          <b className="text-foreground font-medium tabular-nums">
+            {doneCount} / {items.length}
+          </b>{" "}
+          complete
         </span>
       </div>
       <ul className="space-y-2">
@@ -59,7 +70,7 @@ export default function SetupChecklist(props: Props) {
             >
               <CheckCircleIcon
                 className={`mt-0.5 h-5 w-5 shrink-0 ${
-                  item.done ? "text-emerald-500" : "text-muted-foreground/30"
+                  item.done ? "text-[var(--forest)]" : "text-muted-foreground/30"
                 }`}
               />
               <div className="min-w-0 flex-1">

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import EmptyState from "@/components/ui/empty-state";
+import { Badge, Eyebrow, type BadgeVariant } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import ProjectFormDialog from "./project-form-dialog";
 import {
   PROJECT_STATUS_VALUES,
@@ -23,19 +25,34 @@ type ProjectRow = Project & {
 
 type Props = { projects: ProjectRow[] };
 
-const STATUS_BADGE: Record<ProjectStatus, string> = {
-  planning: "bg-surface text-muted-foreground",
-  active: "bg-primary/10 text-primary",
-  on_hold: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
-  cancelled: "bg-destructive/10 text-destructive",
+const STATUS_VARIANT: Record<ProjectStatus, BadgeVariant> = {
+  planning: "neutral",
+  active: "info",
+  on_hold: "warning",
+  completed: "success",
+  cancelled: "danger",
 };
 
-const PRIORITY_BADGE: Record<ProjectPriority, string> = {
-  low: "bg-surface text-muted-foreground",
-  medium: "bg-primary/10 text-primary",
-  high: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-  critical: "bg-destructive/10 text-destructive",
+const STATUS_LABEL: Record<ProjectStatus, string> = {
+  planning: "Planning",
+  active: "Active",
+  on_hold: "On hold",
+  completed: "Complete",
+  cancelled: "Cancelled",
+};
+
+const PRIORITY_VARIANT: Record<ProjectPriority, BadgeVariant> = {
+  low: "neutral",
+  medium: "info",
+  high: "warning",
+  critical: "danger",
+};
+
+const PRIORITY_LABEL: Record<ProjectPriority, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  critical: "Critical",
 };
 
 export default function ProjectsView({ projects }: Props) {
@@ -72,50 +89,47 @@ export default function ProjectsView({ projects }: Props) {
     });
   }, [projects, statusFilter, priorityFilter]);
 
-  const inputCls =
-    "border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-xs";
+  // Editorial footer summary line.
+  const summary = useMemo(() => {
+    const active = filtered.filter((p) => p.status === "active").length;
+    const planning = filtered.filter((p) => p.status === "planning").length;
+    const tasks = filtered.reduce((s, p) => s + p.task_count, 0);
+    return { active, planning, tasks };
+  }, [filtered]);
+
+  const statusChips: { value: ProjectStatus | "all"; label: string }[] = [
+    { value: "all", label: "All" },
+    ...PROJECT_STATUS_VALUES.map((s) => ({ value: s, label: STATUS_LABEL[s] })),
+  ];
 
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-wrap items-end gap-2">
-          <div>
-            <p className="text-muted-foreground mb-1 text-xs font-medium">Status</p>
-            <select
-              aria-label="Filter by status"
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as ProjectStatus | "all");
-              }}
-              className={`${inputCls} capitalize`}
-            >
-              <option value="all">All</option>
-              {PROJECT_STATUS_VALUES.map((s) => (
-                <option key={s} value={s} className="capitalize">
-                  {s.replace(/_/g, " ")}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <p className="text-muted-foreground mb-1 text-xs font-medium">Priority</p>
-            <select
-              aria-label="Filter by priority"
-              value={priorityFilter}
-              onChange={(e) => {
-                setPriorityFilter(e.target.value as ProjectPriority | "all");
-              }}
-              className={`${inputCls} capitalize`}
-            >
-              <option value="all">All</option>
-              {PROJECT_PRIORITY_VALUES.map((p) => (
-                <option key={p} value={p} className="capitalize">
-                  {p}
-                </option>
-              ))}
-            </select>
+    <div className="space-y-5 p-6">
+      {/* Status chip row + new-project action */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-2">
+          <Eyebrow variant="section">Filter</Eyebrow>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {statusChips.map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(c.value);
+                }}
+                aria-pressed={statusFilter === c.value}
+                className={cn(
+                  "rounded-[3px] px-2 py-1 font-mono text-[10px] font-medium uppercase leading-none tracking-[0.06em] transition-colors",
+                  statusFilter === c.value
+                    ? "bg-[var(--ink,var(--foreground))] text-[var(--cream,var(--background))]"
+                    : "bg-surface text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {c.label}
+              </button>
+            ))}
           </div>
         </div>
+
         <button
           type="button"
           onClick={() => {
@@ -128,6 +142,28 @@ export default function ProjectsView({ projects }: Props) {
         </button>
       </div>
 
+      {/* Priority filter, secondary */}
+      <div className="border-border flex flex-wrap items-end gap-3 border-t pt-4">
+        <div className="flex flex-col gap-1.5">
+          <Eyebrow variant="section">Priority</Eyebrow>
+          <select
+            aria-label="Filter by priority"
+            value={priorityFilter}
+            onChange={(e) => {
+              setPriorityFilter(e.target.value as ProjectPriority | "all");
+            }}
+            className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-xs"
+          >
+            <option value="all">All</option>
+            {PROJECT_PRIORITY_VALUES.map((p) => (
+              <option key={p} value={p}>
+                {PRIORITY_LABEL[p]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {filtered.length === 0 ? (
         <EmptyState
           title={projects.length === 0 ? "No projects yet" : "No projects match these filters"}
@@ -138,9 +174,9 @@ export default function ProjectsView({ projects }: Props) {
           }
         />
       ) : (
-        <div className="border-border overflow-hidden rounded-lg border">
+        <div className="border-border bg-background overflow-hidden rounded-xl border">
           <table className="w-full text-sm">
-            <thead className="bg-surface text-muted-foreground text-xs">
+            <thead className="border-border border-b border-dashed">
               <tr>
                 <Th className="w-1/3">Project</Th>
                 <Th>Status</Th>
@@ -152,39 +188,35 @@ export default function ProjectsView({ projects }: Props) {
             </thead>
             <tbody className="divide-border divide-y">
               {filtered.map((p) => (
-                <tr key={p.id} className="hover:bg-surface/50">
-                  <td className="px-3 py-2">
+                <tr key={p.id} className="hover:bg-surface">
+                  <td className="px-4 py-3">
                     <Link
                       href={`/projects/${p.id}`}
-                      className="text-primary font-medium hover:underline"
+                      className="font-display text-foreground text-base font-medium leading-tight hover:underline"
                     >
                       {p.name}
                     </Link>
                     {p.description && (
-                      <p className="text-muted-foreground line-clamp-1 text-xs">{p.description}</p>
+                      <p className="text-muted-foreground mt-0.5 line-clamp-1 font-mono text-[10.5px] tracking-[0.02em]">
+                        {p.description}
+                      </p>
                     )}
                   </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_BADGE[p.status]}`}
-                    >
-                      {p.status.replace(/_/g, " ")}
-                    </span>
+                  <td className="px-4 py-3">
+                    <Badge variant={STATUS_VARIANT[p.status]}>{STATUS_LABEL[p.status]}</Badge>
                   </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${PRIORITY_BADGE[p.priority]}`}
-                    >
-                      {p.priority}
-                    </span>
+                  <td className="px-4 py-3">
+                    <Badge variant={PRIORITY_VARIANT[p.priority]}>
+                      {PRIORITY_LABEL[p.priority]}
+                    </Badge>
                   </td>
-                  <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+                  <td className="text-muted-foreground px-4 py-3 font-mono text-[10.5px] tabular-nums">
                     {formatDateRange(p.start_date, p.end_date)}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <ProgressBar percent={p.percent_complete} taskCount={p.task_count} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <button
                       type="button"
                       disabled={pending}
@@ -201,6 +233,20 @@ export default function ProjectsView({ projects }: Props) {
               ))}
             </tbody>
           </table>
+
+          {/* Editorial footer summary */}
+          <div className="border-border text-muted-foreground flex flex-wrap items-center justify-between gap-2 border-t border-dashed px-4 py-3 font-mono text-[10.5px] tracking-[0.04em]">
+            <span>
+              {filtered.length} shown ·{" "}
+              <b className="text-foreground font-medium">{summary.tasks}</b> tasks total
+              {summary.active > 0 && <> · {summary.active} active</>}
+            </span>
+            {summary.planning > 0 && (
+              <span>
+                <b className="text-foreground font-medium">{summary.planning}</b> in planning
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -219,7 +265,10 @@ export default function ProjectsView({ projects }: Props) {
 function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th
-      className={`bg-surface px-3 py-2 text-left text-xs font-medium uppercase tracking-wide ${className ?? ""}`}
+      className={cn(
+        "text-muted-foreground px-4 py-3 text-left font-mono text-[10px] font-medium uppercase tracking-[0.08em]",
+        className,
+      )}
     >
       {children}
     </th>
@@ -233,10 +282,13 @@ function ProgressBar({ percent, taskCount }: { percent: number | null; taskCount
   const p = percent ?? 0;
   return (
     <div className="flex items-center gap-2">
-      <div className="bg-surface h-2 flex-1 overflow-hidden rounded-full">
-        <div className="bg-primary h-full" style={{ width: `${p.toString()}%` }} />
+      <div className="h-1.5 flex-1 overflow-hidden rounded-sm bg-[var(--hair-soft,rgba(28,31,28,0.06))]">
+        <div
+          className="h-full bg-[var(--forest,var(--primary))]"
+          style={{ width: `${p.toString()}%` }}
+        />
       </div>
-      <span className="text-muted-foreground w-12 shrink-0 text-right text-xs tabular-nums">
+      <span className="text-muted-foreground w-12 shrink-0 text-right font-mono text-[10.5px] tabular-nums">
         {p.toString()}%
       </span>
     </div>
