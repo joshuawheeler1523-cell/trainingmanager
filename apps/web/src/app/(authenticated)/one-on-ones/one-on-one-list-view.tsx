@@ -6,6 +6,8 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import type { Instructor, OneOnOne } from "@arbor/shared";
+import { Badge, Eyebrow } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { createOneOnOne, deleteOneOnOne } from "./actions";
 
 type Row = OneOnOne & { instructor_name: string };
@@ -55,16 +57,14 @@ export default function OneOnOneListView({
 
   return (
     <div className="space-y-4">
-      <div className="border-border bg-background flex items-end gap-2 rounded-lg border p-3">
-        <div className="flex-1">
-          <label
-            htmlFor="start-instructor"
-            className="text-muted-foreground mb-1 block text-xs font-medium uppercase tracking-wide"
-          >
+      <div className="border-border bg-background flex items-end gap-3 rounded-xl border p-4">
+        <div className="flex flex-1 flex-col gap-1.5">
+          <Eyebrow variant="section" id="start-instructor-label">
             Start a new 1:1 with…
-          </label>
+          </Eyebrow>
           <select
             id="start-instructor"
+            aria-labelledby="start-instructor-label"
             value={pickInstructor}
             onChange={(e) => {
               setPickInstructor(e.target.value);
@@ -94,17 +94,19 @@ export default function OneOnOneListView({
       </div>
 
       {rows.length === 0 ? (
-        <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
-          <p className="text-foreground text-sm font-medium">No 1:1s yet</p>
-          <p className="text-muted-foreground mt-1 text-xs">
+        <div className="border-border bg-surface rounded-xl border border-dashed p-8 text-center">
+          <p className="font-display text-foreground text-base font-medium leading-tight">
+            No 1:1s yet
+          </p>
+          <p className="text-muted-foreground mt-2 text-sm">
             Start a 1:1 above. Capacity is captured at the start so the next session can show how
             things changed.
           </p>
         </div>
       ) : (
-        <div className="border-border overflow-hidden rounded-lg border">
+        <div className="border-border bg-background overflow-hidden rounded-xl border">
           <table className="w-full text-sm">
-            <thead className="bg-surface text-muted-foreground text-xs">
+            <thead className="border-border border-b border-dashed">
               <tr>
                 <Th>Instructor</Th>
                 <Th>Status</Th>
@@ -118,38 +120,32 @@ export default function OneOnOneListView({
               {rows.map((r) => {
                 const isComplete = r.completed_at !== null;
                 return (
-                  <tr key={r.id} className="hover:bg-surface/40">
-                    <td className="px-3 py-2">
+                  <tr key={r.id} className="hover:bg-surface">
+                    <td className="px-4 py-3">
                       <Link
                         href={`/one-on-ones/${r.id}`}
-                        className="text-foreground hover:text-primary font-medium underline-offset-2 hover:underline"
+                        className="font-display text-foreground text-base font-medium leading-tight hover:underline"
                       >
                         {r.instructor_name}
                       </Link>
                     </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                          isComplete
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
-                        }`}
-                      >
+                    <td className="px-4 py-3">
+                      <Badge variant={isComplete ? "success" : "warning"}>
                         {isComplete ? "Complete" : "In progress"}
-                      </span>
+                      </Badge>
                     </td>
-                    <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+                    <td className="text-muted-foreground px-4 py-3 font-mono text-[10.5px] tabular-nums">
                       {formatRelativeShort(r.scheduled_for)}
                     </td>
-                    <td className="px-3 py-2 text-right text-xs tabular-nums">
+                    <td className="text-foreground px-4 py-3 text-right font-mono text-[11.5px] tabular-nums">
                       {r.snapshot_utilization_pct != null
                         ? `${Math.round(r.snapshot_utilization_pct).toString()}%`
                         : "—"}
                     </td>
-                    <td className="text-muted-foreground px-3 py-2 text-xs capitalize">
+                    <td className="text-muted-foreground px-4 py-3 font-mono text-[10.5px] uppercase tracking-[0.04em]">
                       {r.sentiment ? r.sentiment.replace(/_/g, " ") : "—"}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-4 py-3 text-right">
                       <button
                         type="button"
                         onClick={() => {
@@ -176,9 +172,10 @@ export default function OneOnOneListView({
 function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th
-      className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wide ${
-        className ?? ""
-      }`}
+      className={cn(
+        "text-muted-foreground px-4 py-3 text-left font-mono text-[10px] font-medium uppercase tracking-[0.08em]",
+        className,
+      )}
     >
       {children}
     </th>

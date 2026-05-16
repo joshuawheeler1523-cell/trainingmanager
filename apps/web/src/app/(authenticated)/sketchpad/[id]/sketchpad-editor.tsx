@@ -25,6 +25,7 @@ import {
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import type { SketchpadRoom, SketchpadSchedule, SketchpadSession } from "@arbor/shared";
+import { Eyebrow } from "@/components/ui";
 import {
   bulkCreateSessions,
   createRoom,
@@ -896,34 +897,57 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
         <div className="min-w-0 flex-1">
           <Link
             href="/sketchpad"
-            className="text-muted-foreground hover:text-foreground mb-1 inline-flex items-center gap-1 text-xs"
+            className="text-muted-foreground hover:text-foreground mb-2 inline-flex items-center gap-1 text-xs"
           >
             <ArrowLeftIcon className="h-3.5 w-3.5" />
             All sketches
           </Link>
+          <Eyebrow className="mb-2">Sketch</Eyebrow>
           <input
             defaultValue={schedule.name}
             onBlur={(e) => {
               renameSchedule(e.target.value);
             }}
             disabled={pending}
-            className="text-foreground focus:ring-ring -mx-1 w-full rounded bg-transparent px-1 text-xl font-semibold focus:outline-none focus:ring-2"
+            className="font-display text-foreground focus:ring-ring -mx-1 w-full rounded bg-transparent px-1 text-2xl font-medium leading-tight tracking-[-0.005em] focus:outline-none focus:ring-2"
           />
-          <p className="text-muted-foreground mt-1 text-xs">
-            {schedule.start_date} · {schedule.day_count.toString()} day
-            {schedule.day_count === 1 ? "" : "s"} · {schedule.hours_start.toString()}:00–
-            {schedule.hours_end.toString()}:00 · {rooms.length.toString()} room
-            {rooms.length === 1 ? "" : "s"} · {optimisticSessions.length.toString()} session
-            {optimisticSessions.length === 1 ? "" : "s"}
-            {unassignedSessions.length > 0 &&
-              ` (${unassignedSessions.length.toString()} unassigned)`}
+          <p className="text-muted-foreground mt-2 font-mono text-[10.5px] uppercase tracking-[0.04em]">
+            <span className="normal-case tabular-nums">{schedule.start_date}</span> ·{" "}
+            <b className="text-foreground font-medium normal-case tabular-nums">
+              {schedule.day_count.toString()}
+            </b>{" "}
+            day{schedule.day_count === 1 ? "" : "s"} ·{" "}
+            <span className="normal-case tabular-nums">
+              {schedule.hours_start.toString()}:00–{schedule.hours_end.toString()}:00
+            </span>{" "}
+            ·{" "}
+            <b className="text-foreground font-medium normal-case tabular-nums">
+              {rooms.length.toString()}
+            </b>{" "}
+            room{rooms.length === 1 ? "" : "s"} ·{" "}
+            <b className="text-foreground font-medium normal-case tabular-nums">
+              {optimisticSessions.length.toString()}
+            </b>{" "}
+            session{optimisticSessions.length === 1 ? "" : "s"}
+            {unassignedSessions.length > 0 && (
+              <>
+                {" "}
+                ·{" "}
+                <span className="text-[var(--persimmon-deep)]">
+                  <b className="font-medium normal-case tabular-nums">
+                    {unassignedSessions.length.toString()}
+                  </b>{" "}
+                  unassigned
+                </span>
+              </>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <div
             role="tablist"
             aria-label="Calendar view"
-            className="border-border bg-background inline-flex rounded-md border p-0.5"
+            className="inline-flex flex-wrap items-center gap-1.5"
           >
             {(["day", "week", "month"] as const).map((v) => {
               const active = view === v;
@@ -936,11 +960,11 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
                   onClick={() => {
                     setView(v);
                   }}
-                  className={`rounded px-2.5 py-1 text-xs font-medium capitalize ${
+                  className={
                     active
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-surface"
-                  }`}
+                      ? "rounded-[3px] bg-[var(--ink,var(--foreground))] px-2 py-1 font-mono text-[10px] font-medium uppercase leading-none tracking-[0.06em] text-[var(--cream,var(--background))]"
+                      : "bg-surface text-muted-foreground hover:text-foreground rounded-[3px] px-2 py-1 font-mono text-[10px] font-medium uppercase leading-none tracking-[0.06em] transition-colors"
+                  }
                 >
                   {v}
                 </button>
@@ -1572,8 +1596,8 @@ function SettingsPanel({
 
       <div className="border-border border-t pt-3">
         <div className="mb-2 flex items-baseline justify-between">
-          <h3 className="text-foreground text-xs font-semibold uppercase tracking-wide">Rooms</h3>
-          <p className="text-muted-foreground text-[11px]">
+          <Eyebrow>Rooms</Eyebrow>
+          <p className="text-muted-foreground font-mono text-[10px] tracking-[0.02em]">
             Each room becomes a column in the day grid.
           </p>
         </div>
@@ -1639,10 +1663,8 @@ function SettingsPanel({
 
       <div className="border-border border-t pt-3">
         <div className="mb-2 flex items-baseline justify-between">
-          <h3 className="text-foreground text-xs font-semibold uppercase tracking-wide">
-            Danger zone
-          </h3>
-          <p className="text-muted-foreground text-[11px]">
+          <Eyebrow>Danger zone</Eyebrow>
+          <p className="text-muted-foreground font-mono text-[10px] tracking-[0.02em]">
             Destructive operations. Confirmation required.
           </p>
         </div>
