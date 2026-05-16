@@ -13,6 +13,7 @@ import {
 } from "@heroicons/react/20/solid";
 import { toast } from "sonner";
 import EmptyState from "@/components/ui/empty-state";
+import { cn } from "@/lib/utils";
 import SuperUserFormDialog from "./super-user-form-dialog";
 import { markSuperUserTrained, restoreSuperUser, softDeleteSuperUser } from "./actions";
 import type { SuperUserWithClass } from "@arbor/shared";
@@ -195,9 +196,13 @@ export default function SuperUsersView(props: Props) {
       </div>
 
       {!props.showDeleted && props.superUsers.length > 0 && (
-        <p className="text-muted-foreground text-xs">
-          {props.superUsers.length} super user{props.superUsers.length === 1 ? "" : "s"} ·{" "}
-          {trainedCount} trained · {untrainedCount} pending
+        <p className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
+          <b className="text-foreground font-medium normal-case tabular-nums">
+            {props.superUsers.length}
+          </b>{" "}
+          super user{props.superUsers.length === 1 ? "" : "s"} ·{" "}
+          <b className="text-foreground font-medium tabular-nums">{trainedCount}</b> trained ·{" "}
+          <b className="text-foreground font-medium tabular-nums">{untrainedCount}</b> pending
         </p>
       )}
 
@@ -227,16 +232,16 @@ function SuperUsersTable({
   classes: { id: string; name: string }[];
 }) {
   return (
-    <div className="border-border bg-background overflow-x-auto rounded-lg border">
+    <div className="border-border bg-background overflow-x-auto rounded-xl border">
       <table className="divide-border min-w-full divide-y text-sm">
-        <thead className="bg-surface">
-          <tr className="text-muted-foreground text-left text-[11px] font-medium uppercase tracking-wide">
-            <th className="px-3 py-2">Name</th>
-            <th className="px-3 py-2">Class / topic</th>
-            <th className="px-3 py-2">Unit</th>
-            <th className="px-3 py-2">Contact</th>
-            <th className="px-3 py-2">Trained</th>
-            <th className="px-3 py-2 text-right">Actions</th>
+        <thead className="border-border border-b border-dashed">
+          <tr className="text-muted-foreground text-left">
+            <Th>Name</Th>
+            <Th>Class / topic</Th>
+            <Th>Unit</Th>
+            <Th>Contact</Th>
+            <Th>Trained</Th>
+            <Th className="text-right">Actions</Th>
           </tr>
         </thead>
         <tbody className="divide-border divide-y">
@@ -246,6 +251,19 @@ function SuperUsersTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
+  return (
+    <th
+      className={cn(
+        "text-muted-foreground px-4 py-3 text-left font-mono text-[10px] font-medium uppercase tracking-[0.08em]",
+        className,
+      )}
+    >
+      {children}
+    </th>
   );
 }
 
@@ -296,13 +314,15 @@ function SuperUserRow({
   }
 
   return (
-    <tr className={archived ? "opacity-60" : ""}>
-      <td className="px-3 py-2">
-        <p className="text-foreground font-medium">{su.full_name}</p>
+    <tr className={cn("hover:bg-surface", archived && "opacity-60")}>
+      <td className="px-4 py-3">
+        <p className="font-display text-foreground text-base font-medium leading-tight">
+          {su.full_name}
+        </p>
       </td>
-      <td className="px-3 py-2">
+      <td className="px-4 py-3 text-sm">
         {su.class_name ? (
-          <Link href={`/classes/${su.class_id ?? ""}`} className="text-primary hover:underline">
+          <Link href={`/classes/${su.class_id ?? ""}`} className="text-foreground hover:underline">
             {su.class_name}
           </Link>
         ) : null}
@@ -310,37 +330,38 @@ function SuperUserRow({
         {su.topic && <span className="text-foreground">{su.topic}</span>}
         {!su.class_name && !su.topic && <span className="text-muted-foreground">—</span>}
       </td>
-      <td className="text-muted-foreground px-3 py-2">{su.unit ?? "—"}</td>
-      <td className="text-muted-foreground px-3 py-2">
+      <td className="text-muted-foreground px-4 py-3 text-sm">{su.unit ?? "—"}</td>
+      <td className="text-muted-foreground px-4 py-3 font-mono text-[11px] tracking-[0.02em]">
         {su.email ? (
           <a href={`mailto:${su.email}`} className="hover:text-foreground block">
             {su.email}
           </a>
         ) : null}
         {su.phone ? (
-          <a href={`tel:${su.phone}`} className="hover:text-foreground block text-xs">
+          <a href={`tel:${su.phone}`} className="hover:text-foreground block text-[10.5px]">
             {su.phone}
           </a>
         ) : null}
         {!su.email && !su.phone && "—"}
       </td>
-      <td className="px-3 py-2">
+      <td className="px-4 py-3">
         <button
           type="button"
           onClick={toggleTrained}
           disabled={pending || archived}
           aria-label={su.trained_at ? "Mark as not trained" : "Mark as trained"}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+          className={cn(
+            "inline-flex items-center gap-1 rounded-[3px] px-2 py-1 font-mono text-[9.5px] font-medium uppercase leading-none tracking-[0.06em] transition-colors disabled:opacity-50",
             su.trained_at
-              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
-              : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300"
-          } disabled:opacity-50`}
+              ? "bg-[rgba(59,122,68,0.10)] text-[var(--forest)] hover:bg-[rgba(59,122,68,0.18)]"
+              : "bg-[rgba(201,138,58,0.14)] text-[var(--persimmon-deep)] hover:bg-[rgba(201,138,58,0.22)]",
+          )}
         >
-          <CheckCircleIcon className="h-3.5 w-3.5" />
+          <CheckCircleIcon className="h-3 w-3" />
           {su.trained_at ? `Trained · ${su.trained_at}` : "Not trained"}
         </button>
       </td>
-      <td className="px-3 py-2 text-right">
+      <td className="px-4 py-3 text-right">
         <div className="inline-flex items-center gap-1">
           {!archived && (
             <SuperUserFormDialog

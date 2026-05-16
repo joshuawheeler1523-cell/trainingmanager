@@ -14,6 +14,8 @@ import {
 import SkillFormDialog from "./skill-form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import CsvImportDialog from "@/components/csv-import-dialog";
+import { Badge, Eyebrow, Tabs, type TabItem } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { archiveSkill, importSkillsCsv, unarchiveSkill } from "./actions";
 import { PROFICIENCY_VALUES } from "@arbor/shared";
 import type { Skill, Proficiency } from "@arbor/shared";
@@ -80,29 +82,17 @@ export default function SkillsView({
 
   const visibleSkills = skills.filter((s) => (showArchived ? s.is_archived : !s.is_archived));
 
+  const tabItems: TabItem<Tab>[] = TABS.map((t) => ({ id: t.id, label: t.label }));
+
   return (
     <div>
-      {/* Tabs */}
-      <div className="border-border bg-background border-b px-6">
-        <nav className="-mb-px flex gap-6">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => {
-                setTab(t.id);
-              }}
-              className={`border-b-2 pb-3 pt-3 text-sm font-medium transition-colors ${
-                tab === t.id
-                  ? "border-primary text-primary"
-                  : "text-muted-foreground hover:text-foreground border-transparent"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </nav>
-      </div>
+      <Tabs<Tab>
+        tabs={tabItems}
+        value={tab}
+        onChange={(id) => {
+          setTab(id);
+        }}
+      />
 
       <div className="p-6">
         {tab === "library" && (
@@ -237,38 +227,32 @@ function LibraryTab({
       ) : (
         <div className="border-border bg-background overflow-hidden rounded-xl border">
           <table className="w-full text-sm">
-            <thead className="border-border bg-surface border-b">
+            <thead className="border-border border-b border-dashed">
               <tr>
-                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
-                  Name
-                </th>
-                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
-                  Category
-                </th>
-                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
-                  Type
-                </th>
-                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
-                  Authority
-                </th>
-                <th className="px-4 py-2.5" />
+                <ThSkills>Name</ThSkills>
+                <ThSkills>Category</ThSkills>
+                <ThSkills>Type</ThSkills>
+                <ThSkills>Authority</ThSkills>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
               {skills.map((s) => (
                 <tr key={s.id} className="hover:bg-surface">
-                  <td className="text-foreground px-4 py-3 text-sm font-medium">{s.name}</td>
+                  <td className="font-display text-foreground px-4 py-3 text-base font-medium leading-tight">
+                    {s.name}
+                  </td>
                   <td className="text-muted-foreground px-4 py-3 text-xs">{s.category ?? "—"}</td>
                   <td className="px-4 py-3">
                     {s.is_certification ? (
-                      <span className="bg-primary/10 text-primary inline-flex rounded-full px-2 py-0.5 text-xs font-medium">
-                        Certification
-                      </span>
+                      <Badge variant="info">Certification</Badge>
                     ) : (
-                      <span className="text-muted-foreground text-xs">Skill</span>
+                      <span className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
+                        Skill
+                      </span>
                     )}
                   </td>
-                  <td className="text-muted-foreground px-4 py-3 text-xs">
+                  <td className="text-muted-foreground px-4 py-3 font-mono text-[11px] tracking-[0.02em]">
                     {s.certifying_authority ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -341,6 +325,20 @@ function LibraryTab({
   );
 }
 
+// Shared mono uppercase table header for the editorial skills tables.
+function ThSkills({ children, className }: { children?: React.ReactNode; className?: string }) {
+  return (
+    <th
+      className={cn(
+        "text-muted-foreground px-4 py-3 text-left font-mono text-[10px] font-medium uppercase tracking-[0.08em]",
+        className,
+      )}
+    >
+      {children}
+    </th>
+  );
+}
+
 // ── Coverage tab ────────────────────────────────────────────────────────────
 
 function CoverageTab({ skills, coverage }: { skills: Skill[]; coverage: CoverageCount[] }) {
@@ -361,22 +359,15 @@ function CoverageTab({ skills, coverage }: { skills: Skill[]; coverage: Coverage
   return (
     <div className="border-border bg-background overflow-hidden rounded-xl border">
       <table className="w-full text-sm">
-        <thead className="border-border bg-surface border-b">
+        <thead className="border-border border-b border-dashed">
           <tr>
-            <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
-              Skill
-            </th>
+            <ThSkills>Skill</ThSkills>
             {PROFICIENCY_VALUES.map((p) => (
-              <th
-                key={p}
-                className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium capitalize"
-              >
+              <ThSkills key={p} className="text-right capitalize">
                 {p}
-              </th>
+              </ThSkills>
             ))}
-            <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
-              Total
-            </th>
+            <ThSkills className="text-right">Total</ThSkills>
           </tr>
         </thead>
         <tbody className="divide-border divide-y">
@@ -384,24 +375,28 @@ function CoverageTab({ skills, coverage }: { skills: Skill[]; coverage: Coverage
             const total = PROFICIENCY_VALUES.reduce((sum, p) => sum + countAt(s.id, p), 0);
             return (
               <tr key={s.id} className="hover:bg-surface">
-                <td className="text-foreground px-4 py-3 text-sm font-medium">{s.name}</td>
+                <td className="font-display text-foreground px-4 py-3 text-base font-medium leading-tight">
+                  {s.name}
+                </td>
                 {PROFICIENCY_VALUES.map((p) => {
                   const n = countAt(s.id, p);
                   return (
                     <td
                       key={p}
-                      className={`px-4 py-3 text-right text-sm ${
-                        n === 0 ? "text-muted-foreground" : "text-foreground font-medium"
-                      }`}
+                      className={cn(
+                        "px-4 py-3 text-right font-mono text-[11.5px] tabular-nums",
+                        n === 0 ? "text-muted-foreground" : "text-foreground font-medium",
+                      )}
                     >
                       {n}
                     </td>
                   );
                 })}
                 <td
-                  className={`px-4 py-3 text-right text-sm font-semibold ${
-                    total === 0 ? "text-destructive" : "text-foreground"
-                  }`}
+                  className={cn(
+                    "font-display px-4 py-3 text-right text-base font-medium tabular-nums",
+                    total === 0 ? "text-[var(--red)]" : "text-foreground",
+                  )}
                 >
                   {total}
                 </td>
@@ -497,10 +492,7 @@ function MatrixTab({ matrix }: { matrix: MatrixData }) {
           placeholder="Filter classes…"
           className="border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm"
         />
-        <div
-          role="tablist"
-          className="border-border bg-background inline-flex rounded-md border p-0.5"
-        >
+        <div role="tablist" className="inline-flex flex-wrap items-center gap-1.5">
           {(
             [
               { id: "all", label: "All", count: matrix.classes.length },
@@ -524,14 +516,16 @@ function MatrixTab({ matrix }: { matrix: MatrixData }) {
               onClick={() => {
                 setFilter(f.id);
               }}
-              className={`rounded px-2 py-1 text-xs font-medium ${
+              aria-pressed={filter === f.id}
+              className={cn(
+                "rounded-[3px] px-2 py-1 font-mono text-[10px] font-medium uppercase leading-none tracking-[0.06em] transition-colors",
                 filter === f.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-surface"
-              }`}
+                  ? "bg-[var(--ink,var(--foreground))] text-[var(--cream,var(--background))]"
+                  : "bg-surface text-muted-foreground hover:text-foreground",
+              )}
             >
               {f.label}
-              <span className="ml-1 tabular-nums opacity-70">{f.count.toString()}</span>
+              <span className="ml-1.5 tabular-nums opacity-70">{f.count.toString()}</span>
             </button>
           ))}
         </div>
@@ -677,8 +671,9 @@ function GapsTab({
     <div className="space-y-6">
       {/* 1. Classes lacking qualified instructors */}
       <section className="border-border bg-background rounded-xl border p-6">
-        <h3 className="text-foreground mb-4 text-sm font-semibold">
-          Classes without enough qualified instructors
+        <Eyebrow className="mb-1.5">Coverage gaps</Eyebrow>
+        <h3 className="font-display text-foreground mb-4 text-lg font-medium leading-tight tracking-[-0.005em]">
+          Classes without enough qualified instructors.
         </h3>
         {classGaps.length === 0 ? (
           <p className="text-muted-foreground text-sm">
@@ -690,12 +685,13 @@ function GapsTab({
               <li key={g.class_id} className="flex items-center justify-between py-2.5">
                 <Link
                   href={`/classes/${g.class_id}`}
-                  className="text-foreground text-sm font-medium hover:underline"
+                  className="font-display text-foreground text-base font-medium leading-tight hover:underline"
                 >
                   {g.class_name}
                 </Link>
-                <span className="text-destructive text-xs font-medium">
-                  {g.qualified_count} qualified, {g.required_count} required skill
+                <span className="font-mono text-[10.5px] uppercase tracking-[0.04em] text-[var(--red)]">
+                  <b className="font-medium tabular-nums">{g.qualified_count}</b> qualified ·{" "}
+                  <b className="font-medium tabular-nums">{g.required_count}</b> required skill
                   {g.required_count === 1 ? "" : "s"}
                 </span>
               </li>
@@ -706,8 +702,9 @@ function GapsTab({
 
       {/* 2. Skills with zero qualified instructors */}
       <section className="border-border bg-background rounded-xl border p-6">
-        <h3 className="text-foreground mb-4 text-sm font-semibold">
-          Skills with no qualified instructors
+        <Eyebrow className="mb-1.5">Orphan skills</Eyebrow>
+        <h3 className="font-display text-foreground mb-4 text-lg font-medium leading-tight tracking-[-0.005em]">
+          Skills with no qualified instructors.
         </h3>
         {uncovered.length === 0 ? (
           <p className="text-muted-foreground text-sm">
@@ -717,8 +714,12 @@ function GapsTab({
           <ul className="divide-border divide-y">
             {uncovered.map((s) => (
               <li key={s.id} className="flex items-center justify-between py-2.5">
-                <span className="text-foreground text-sm font-medium">{s.name}</span>
-                <span className="text-destructive text-xs font-medium">0 instructors</span>
+                <span className="font-display text-foreground text-base font-medium leading-tight">
+                  {s.name}
+                </span>
+                <span className="font-mono text-[10.5px] uppercase tracking-[0.04em] text-[var(--red)]">
+                  0 instructors
+                </span>
               </li>
             ))}
           </ul>
@@ -727,19 +728,25 @@ function GapsTab({
 
       {/* 3. Expiring certifications */}
       <section className="border-border bg-background rounded-xl border p-6">
-        <h3 className="text-foreground mb-4 text-sm font-semibold">Expiring certifications</h3>
+        <Eyebrow className="mb-1.5">Expiring soon</Eyebrow>
+        <h3 className="font-display text-foreground mb-4 text-lg font-medium leading-tight tracking-[-0.005em]">
+          Certifications expiring in 90 days.
+        </h3>
         {expiringCerts.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No certifications expiring in the next 90 days.
           </p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {(["0-30", "31-60", "61-90"] as const).map((bucket) =>
               buckets[bucket].length === 0 ? null : (
                 <div key={bucket}>
-                  <p className="text-muted-foreground mb-2 text-xs font-medium">
-                    {bucket} days ({buckets[bucket].length})
-                  </p>
+                  <Eyebrow variant="mute" className="mb-2">
+                    {bucket} days
+                    <span className="text-muted-foreground ml-1 font-normal normal-case tracking-normal">
+                      ({buckets[bucket].length})
+                    </span>
+                  </Eyebrow>
                   <ul className="divide-border divide-y">
                     {buckets[bucket].map((c) => (
                       <li
@@ -749,18 +756,22 @@ function GapsTab({
                         <div className="flex flex-col">
                           <Link
                             href={`/instructors/${c.instructor_id}`}
-                            className="text-foreground text-sm font-medium hover:underline"
+                            className="font-display text-foreground text-base font-medium leading-tight hover:underline"
                           >
                             {c.instructor_name}
                           </Link>
-                          <span className="text-muted-foreground text-xs">{c.skill_name}</span>
+                          <span className="text-muted-foreground font-mono text-[10.5px] tracking-[0.02em]">
+                            {c.skill_name}
+                          </span>
                         </div>
                         <span
-                          className={`text-xs font-medium ${
-                            bucket === "0-30" ? "text-destructive" : "text-muted-foreground"
-                          }`}
+                          className={cn(
+                            "font-mono text-[10.5px] uppercase tracking-[0.04em]",
+                            bucket === "0-30" ? "text-[var(--red)]" : "text-muted-foreground",
+                          )}
                         >
-                          {c.days_until}d ({c.expires_at})
+                          <b className="font-medium tabular-nums">{c.days_until}d</b> ·{" "}
+                          <span className="tabular-nums">{c.expires_at}</span>
                         </span>
                       </li>
                     ))}

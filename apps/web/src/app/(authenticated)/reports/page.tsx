@@ -1,5 +1,6 @@
 import Link from "next/link";
 import PageHeader from "@/components/ui/page-header";
+import { Eyebrow } from "@/components/ui";
 import { REPORT_METADATA, REPORT_SLUGS } from "@arbor/shared";
 
 const CATEGORY_LABEL = {
@@ -19,7 +20,7 @@ export default function ReportsPage() {
         <div>
           <Link
             href="/reports/saved"
-            className="border-input bg-background text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm"
+            className="border-border text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-md border px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.06em] transition-colors"
           >
             View saved reports →
           </Link>
@@ -31,15 +32,15 @@ export default function ReportsPage() {
               <Link
                 key={slug}
                 href={`/reports/${slug}`}
-                className="border-border bg-background hover:border-primary group block rounded-xl border p-5 transition-colors"
+                className="border-border bg-background hover:border-foreground/30 group block rounded-xl border p-5 transition-colors"
               >
-                <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                  {CATEGORY_LABEL[meta.category]}
-                </p>
-                <p className="text-foreground group-hover:text-primary mt-1 text-base font-semibold">
+                <Eyebrow variant="mute">{CATEGORY_LABEL[meta.category]}</Eyebrow>
+                <p className="font-display text-foreground group-hover:text-primary mt-2 text-lg font-medium leading-tight tracking-[-0.005em]">
                   {meta.name}
                 </p>
-                <p className="text-muted-foreground mt-2 text-sm">{meta.description}</p>
+                <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+                  {meta.description}
+                </p>
               </Link>
             );
           })}
