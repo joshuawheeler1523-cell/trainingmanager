@@ -4,6 +4,7 @@
 
 export { Badge, type BadgeVariant } from "./badge";
 export { Button, type ButtonSize, type ButtonVariant } from "./button";
+export { CapacityBar, BUCKET_COLORS, type CapacitySegment } from "./capacity-bar";
 export { Card, type CardVariant } from "./card";
 export { Drawer, type DrawerSize } from "./drawer";
 export { Eyebrow, type EyebrowVariant } from "./eyebrow";
