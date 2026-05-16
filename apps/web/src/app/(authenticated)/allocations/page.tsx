@@ -48,7 +48,12 @@ export default async function AllocationsPage() {
     { data: capacityRows },
     { data: workloadRows },
   ] = await Promise.all([
-    supabase.from("allocation_buckets").select("*").eq("org_id", orgId).order("display_order"),
+    supabase
+      .from("allocation_buckets")
+      .select("*")
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .order("display_order"),
     supabase.from("global_allocations").select("*").eq("org_id", orgId),
     supabase.from("allocation_groups").select("*").eq("org_id", orgId).order("name"),
     supabase.from("allocation_group_members").select("*").eq("org_id", orgId),
