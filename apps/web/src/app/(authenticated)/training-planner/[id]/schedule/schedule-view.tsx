@@ -18,6 +18,7 @@ import {
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import type { ImplClass, ImplRoom, ImplSession, ImplTrainer, Implementation } from "@arbor/shared";
+import { Badge, Eyebrow } from "@/components/ui";
 import { toCalendarLocal, fromCalendarLocal } from "@/lib/timezone";
 import {
   publishImplementation,
@@ -61,10 +62,11 @@ const localizer = dateFnsLocalizer({
 const DnDCalendar = withDragAndDrop<CalEvent>(Calendar);
 
 // Conflict status drives the BORDER. Per-class color drives the FILL.
+// Editorial palette: persimmon for partial, red for full.
 const CONFLICT_BORDER: Record<ImplSession["conflict_status"], string> = {
   none: "transparent",
-  partial: "#f59e0b", // amber-500
-  full: "#e11d48", // rose-600
+  partial: "#c98a3a", // var(--persimmon-deep)
+  full: "#b73d3d", // var(--red)
 };
 
 // Per-class fill palette. Chosen to be visually distinct, accessible against
@@ -281,36 +283,39 @@ export default function ScheduleView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Pill color="emerald">No conflict: {conflictCounts.none.toString()}</Pill>
-          <Pill color="amber">Partial: {conflictCounts.partial.toString()}</Pill>
-          <Pill color="rose">Full: {conflictCounts.full.toString()}</Pill>
+          <Badge variant="success">No conflict · {conflictCounts.none.toString()}</Badge>
+          <Badge variant="warning">Partial · {conflictCounts.partial.toString()}</Badge>
+          <Badge variant="danger">Full · {conflictCounts.full.toString()}</Badge>
         </div>
       </div>
 
       {/* Exports + publish */}
-      <div className="border-border bg-background flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
-        <p className="text-muted-foreground text-xs">
-          {sessions.length.toString()} total · {draftCount.toString()} draft ·{" "}
-          {publishedCount.toString()} published
+      <div className="border-border bg-background flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">
+        <p className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
+          <b className="text-foreground font-medium normal-case tabular-nums">{sessions.length}</b>{" "}
+          total ·{" "}
+          <b className="text-foreground font-medium normal-case tabular-nums">{draftCount}</b> draft
+          · <b className="text-foreground font-medium normal-case tabular-nums">{publishedCount}</b>{" "}
+          published
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <a
             href={`/api/training-planner/${implementation.id}/schedule.xlsx`}
-            className="border-input bg-background text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium"
+            className="border-border bg-background text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium"
           >
             <ArrowDownTrayIcon className="h-3.5 w-3.5" />
             Excel
           </a>
           <a
             href={`/api/training-planner/${implementation.id}/schedule.pdf`}
-            className="border-input bg-background text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium"
+            className="border-border bg-background text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium"
           >
             <DocumentArrowDownIcon className="h-3.5 w-3.5" />
             PDF
           </a>
           <a
             href={`/api/training-planner/${implementation.id}/schedule.ics`}
-            className="border-input bg-background text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium"
+            className="border-border bg-background text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium"
           >
             <CalendarDaysIcon className="h-3.5 w-3.5" />
             iCal
@@ -328,7 +333,7 @@ export default function ScheduleView({
       </div>
 
       {/* Calendar */}
-      <div className="border-border bg-background rounded-lg border p-3" style={{ height: 700 }}>
+      <div className="border-border bg-background rounded-xl border p-4" style={{ height: 700 }}>
         <DnDCalendar
           localizer={localizer}
           events={events}
@@ -367,9 +372,9 @@ export default function ScheduleView({
           style={{ height: "100%" }}
         />
       </div>
-      <p className="text-muted-foreground text-[11px]">
-        Times shown in <strong>{orgTimeZone}</strong> (the org&apos;s timezone). Drag any session to
-        move it. Click for details.
+      <p className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
+        Times shown in <b className="text-foreground font-medium normal-case">{orgTimeZone}</b> ·
+        drag any session to move · click for details
       </p>
 
       <div className="border-border flex items-center justify-between border-t pt-4">
@@ -410,8 +415,8 @@ function Filter({
   options: { value: string; label: string }[];
 }) {
   return (
-    <div>
-      <p className="text-muted-foreground mb-1 text-xs font-medium">{label}</p>
+    <div className="flex flex-col gap-1.5">
+      <Eyebrow variant="section">{label}</Eyebrow>
       <select
         value={value}
         onChange={(e) => {
@@ -426,25 +431,6 @@ function Filter({
         ))}
       </select>
     </div>
-  );
-}
-
-function Pill({
-  color,
-  children,
-}: {
-  color: "emerald" | "amber" | "rose";
-  children: React.ReactNode;
-}) {
-  const cls = {
-    emerald: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
-    amber: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-    rose: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200",
-  }[color];
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${cls}`}>
-      {children}
-    </span>
   );
 }
 
