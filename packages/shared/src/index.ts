@@ -11,6 +11,7 @@ export * from "./schemas/education-request";
 export * from "./schemas/project";
 export * from "./schemas/training-planner";
 export * from "./schemas/sketchpad";
+export * from "./schemas/super-user";
 export * from "./schemas/one-on-one";
 export * from "./reports";
 export * from "./types";

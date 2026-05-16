@@ -23,6 +23,7 @@ const STEPS = [
   { slug: "classes", label: "5. Classes", readyKey: "classes" as const },
   { slug: "calculate", label: "6. Calculate", readyKey: null },
   { slug: "schedule", label: "7. Schedule", readyKey: "sessions" as const },
+  { slug: "super-users", label: "Super Users", readyKey: null },
 ];
 
 export default function StepNav({ implementationId, readiness }: Props) {

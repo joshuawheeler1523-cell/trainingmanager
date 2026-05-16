@@ -49,7 +49,9 @@ import type {
   Proficiency,
   Requirement,
   ClassModality,
+  SuperUser,
 } from "@arbor/shared";
+import ClassSuperUsersTab from "./class-super-users-tab";
 import { Label, useLabel } from "@/components/labels";
 import type { Assignment, RequirementRow, RoadmapStep } from "./page";
 
@@ -72,9 +74,10 @@ type Props = {
   allSkills: Skill[];
   qualifiedInstructorCount: number;
   roadmapSteps: RoadmapStep[];
+  superUsers: SuperUser[];
 };
 
-type Tab = "overview" | "roadmap" | "instructors" | "skills" | "audit";
+type Tab = "overview" | "roadmap" | "instructors" | "skills" | "super_users" | "audit";
 
 // Tab labels are computed inside the component now so the "instructors" tab
 // can carry the org's terminology label. Constant kept as a fallback shape.
@@ -1374,6 +1377,7 @@ export default function ClassDetailClient({
   allSkills,
   qualifiedInstructorCount,
   roadmapSteps,
+  superUsers,
 }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
@@ -1385,6 +1389,19 @@ export default function ClassDetailClient({
     { id: "roadmap", label: "Roadmap" },
     { id: "instructors", label: instructorPlural },
     { id: "skills", label: "Skill Requirements" },
+    {
+      id: "super_users",
+      label: (
+        <>
+          Super Users
+          {superUsers.length > 0 && (
+            <span className="bg-surface text-muted-foreground ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+              {superUsers.length}
+            </span>
+          )}
+        </>
+      ),
+    },
     { id: "audit", label: "Audit" },
   ];
 
@@ -1531,6 +1548,9 @@ export default function ClassDetailClient({
             allSkills={allSkills}
             qualifiedInstructorCount={qualifiedInstructorCount}
           />
+        )}
+        {activeTab === "super_users" && (
+          <ClassSuperUsersTab classId={cls.id} className={cls.name} superUsers={superUsers} />
         )}
         {activeTab === "audit" && <AuditTab entries={auditEntries} />}
       </div>

@@ -23,6 +23,7 @@ import {
   Bars3Icon,
   XMarkIcon,
   ArrowRightEndOnRectangleIcon,
+  StarIcon,
 } from "@heroicons/react/24/outline";
 import type { ToggleableModule } from "@arbor/shared";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,7 @@ function teamGroup(modules: ModuleFlags): NavGroup {
     items.push({ href: "/classes", label: "Classes", icon: AcademicCapIcon });
   }
   items.push({ href: "/skills", label: "Skills", icon: SparklesIcon });
+  items.push({ href: "/super-users", label: "Super Users", icon: StarIcon });
   return { title: "Team", items };
 }
 

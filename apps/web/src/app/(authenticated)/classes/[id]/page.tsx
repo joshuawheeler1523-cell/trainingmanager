@@ -76,6 +76,14 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       .order("position", { ascending: true }),
   ]);
 
+  const { data: superUsers } = await supabase
+    .from("super_users")
+    .select("*")
+    .eq("class_id", id)
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .order("full_name");
+
   if (!cls) notFound();
 
   return (
@@ -88,6 +96,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       allSkills={allSkills ?? []}
       qualifiedInstructorCount={qualified?.length ?? 0}
       roadmapSteps={(roadmapSteps ?? []) as RoadmapStep[]}
+      superUsers={superUsers ?? []}
     />
   );
 }
