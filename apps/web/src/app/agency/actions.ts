@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { PRESETS, TOGGLEABLE_MODULES, type PresetKey } from "@arbor/shared";
 import { createClient } from "@/lib/supabase/server";
@@ -8,6 +9,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentAgencyId, isAgencyAdmin } from "@/lib/auth/agency";
 import { writeAuditDenial } from "@/lib/auth/audit-denial";
 import { toSlug } from "@/lib/utils/slug";
+import { inviteEmailHtml, inviteEmailText, sendEmail } from "@/lib/email";
+import { brandFromHeader, getBrandForOrg } from "@/lib/brand";
 import type { Json } from "@/lib/supabase/database.types";
 
 type ActionResult<T> =
@@ -179,4 +182,97 @@ export async function createClientOrgAction(
 
   revalidatePath("/agency");
   return { ok: true, data: { orgId: org.id, slug: org.slug } };
+}
+
+// ── invite a user to a client org (agency_admin only) ──────────────────────
+//
+// Lets the agency_admin send an invite email to the org's first manager
+// without bouncing through that org's workspace. Mirrors /admin/inviteUser
+// but checks agency ownership instead of org membership.
+
+const inviteOrgMemberSchema = z.object({
+  orgId: z.string().uuid(),
+  email: z.string().email("Must be a valid email"),
+  role: z.enum(["manager", "instructor", "viewer"]).default("manager"),
+});
+
+async function appOrigin(): Promise<string> {
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return `${proto}://${host}`;
+}
+
+/** @requiredAgencyRole agency_admin */
+export async function agencyInviteOrgMemberAction(
+  input: unknown,
+): Promise<ActionResult<{ acceptUrl: string; emailDelivered: boolean }>> {
+  const parsed = inviteOrgMemberSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const agencyId = await getCurrentAgencyId();
+  if (!agencyId) {
+    return { ok: false, error: { code: "NO_AGENCY", message: "Not a member of any agency" } };
+  }
+  if (!(await isAgencyAdmin(agencyId))) {
+    await writeAuditDenial(agencyId, "agency", "agencyInviteOrgMember", "not_agency_admin");
+    return { ok: false, error: { code: "FORBIDDEN", message: "Agency admin only" } };
+  }
+
+  const admin = createAdminClient();
+  // Verify the org belongs to this agency.
+  const { data: org } = await admin
+    .from("organizations")
+    .select("id, name, agency_id")
+    .eq("id", parsed.data.orgId)
+    .maybeSingle();
+  if (!org || org.agency_id !== agencyId) {
+    return { ok: false, error: { code: "NOT_YOUR_ORG", message: "Org is not under your agency" } };
+  }
+
+  // Insert the invitation row (trigger generates the token).
+  const { data: invite, error } = await admin
+    .from("org_invitations")
+    .insert({
+      org_id: org.id,
+      email: parsed.data.email,
+      role: parsed.data.role,
+      visibility: "full",
+    })
+    .select("id, token, email")
+    .single();
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+
+  const origin = await appOrigin();
+  const acceptUrl = `${origin}/accept-invite/${invite.token}`;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const inviterName = (user?.user_metadata.full_name as string | undefined) ?? user?.email ?? null;
+  const brand = await getBrandForOrg(org.id);
+
+  const sendResult = await sendEmail({
+    to: invite.email,
+    subject: `${inviterName ?? "An admin"} invited you to ${org.name}`,
+    html: inviteEmailHtml({
+      orgName: org.name,
+      inviterName,
+      acceptUrl,
+      brand: { primaryColor: brand.primaryColor, logoUrl: brand.logoUrl },
+    }),
+    text: inviteEmailText({ orgName: org.name, inviterName, acceptUrl }),
+    ...(brand.source === "agency" ? { from: brandFromHeader(brand) } : {}),
+  });
+
+  revalidatePath("/agency");
+  return {
+    ok: true,
+    data: {
+      acceptUrl,
+      emailDelivered: sendResult.ok && !("degraded" in sendResult ? sendResult.degraded : false),
+    },
+  };
 }

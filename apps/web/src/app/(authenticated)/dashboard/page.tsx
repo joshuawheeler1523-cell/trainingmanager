@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
 import { Label } from "@/components/labels";
+import SetupChecklist from "./setup-checklist";
 import type { CapacityRow, Instructor } from "@arbor/shared";
 
 export default async function DashboardPage() {
@@ -98,6 +99,17 @@ export default async function DashboardPage() {
       ? supabase.from("departments").select("id, name").eq("org_id", orgId).order("name")
       : Promise.resolve({ data: null }),
   ]);
+
+  // Member count drives the setup checklist (need >1 to be considered
+  // "team invited"). Cheap head count; skip when not an admin since the
+  // checklist only renders for managers anyway.
+  const { count: memberCount } = orgAdmin
+    ? await supabase
+        .from("org_memberships")
+        .select("*", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .not("accepted_at", "is", null)
+    : { count: null };
 
   // Compute counts from the fetched rows instead of separate count queries.
   const trasOpenList = (trasOpenRows ?? []) as {
@@ -272,6 +284,17 @@ export default async function DashboardPage() {
       />
 
       <div className="space-y-6 p-6">
+        {/* Setup checklist — shows only for managers on brand-new orgs.
+            Disappears as items are completed. */}
+        {orgAdmin && (
+          <SetupChecklist
+            hasMembers={(memberCount ?? 0) > 1}
+            hasInstructors={(instructors ?? []).length > 0}
+            hasDepartments={(departments ?? []).length > 1}
+            hasClasses={(classRows ?? []).length > 0}
+          />
+        )}
+
         {/* Quick actions — top of page so common starts are one click away */}
         <section className="border-border bg-background rounded-xl border p-4">
           <h3 className="text-foreground mb-3 text-sm font-semibold">Quick actions</h3>

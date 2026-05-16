@@ -37,7 +37,7 @@ const createAgencySchema = z.object({
  */
 export async function createAgencyAsArborAdminAction(
   input: unknown,
-): Promise<ActionResult<{ agencyId: string; emailSent: boolean }>> {
+): Promise<ActionResult<{ agencyId: string; emailSent: boolean; signInLink: string | null }>> {
   await requireArborAdmin();
   const parsed = createAgencySchema.safeParse(input);
   if (!parsed.success) {
@@ -132,19 +132,21 @@ export async function createAgencyAsArborAdminAction(
   });
 
   let emailSent = false;
-  if (!linkErr && linkData.properties.action_link) {
+  const signInLink: string | null =
+    !linkErr && linkData.properties.action_link ? linkData.properties.action_link : null;
+  if (signInLink) {
     const result = await sendEmail({
       to: parsed.data.adminEmail,
       subject: `Welcome to Arbor — your agency ${parsed.data.agencyName} is ready`,
       html: inviteEmailHtml({
         orgName: parsed.data.agencyName,
         inviterName: "The Arbor team",
-        acceptUrl: linkData.properties.action_link,
+        acceptUrl: signInLink,
       }),
       text: inviteEmailText({
         orgName: parsed.data.agencyName,
         inviterName: "The Arbor team",
-        acceptUrl: linkData.properties.action_link,
+        acceptUrl: signInLink,
       }),
     });
     emailSent = result.ok && !("degraded" in result ? result.degraded : false);
@@ -171,7 +173,7 @@ export async function createAgencyAsArborAdminAction(
 
   revalidatePath("/arbor/agencies");
   revalidatePath("/arbor");
-  return { ok: true, data: { agencyId: agencyRow.id, emailSent } };
+  return { ok: true, data: { agencyId: agencyRow.id, emailSent, signInLink } };
 }
 
 const updateAgencySchema = z.object({

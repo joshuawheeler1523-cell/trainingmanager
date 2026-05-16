@@ -2,11 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   ArrowPathIcon,
   CheckIcon,
   ClipboardDocumentIcon,
+  PaperAirplaneIcon,
   TrashIcon,
 } from "@heroicons/react/20/solid";
 import { resendInvitation, revokeInvitation } from "../actions";
@@ -14,7 +16,7 @@ import { resendInvitation, revokeInvitation } from "../actions";
 export type InvitationRow = {
   id: string;
   email: string;
-  role: "member" | "org_admin";
+  role: "manager" | "instructor" | "viewer";
   visibility: "full" | "limited";
   token: string;
   accept_url: string;
@@ -70,6 +72,18 @@ export default function InvitationsView({ invitations }: { invitations: Invitati
 
   return (
     <div className="space-y-6">
+      <div className="border-border bg-surface/40 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+        <p className="text-muted-foreground text-xs">
+          Send new invites and manage roles from the Team page.
+        </p>
+        <Link
+          href="/admin/team"
+          className="bg-primary text-primary-foreground inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium hover:opacity-90"
+        >
+          <PaperAirplaneIcon className="h-4 w-4" />
+          New invite
+        </Link>
+      </div>
       <Section title={`Pending (${pendingInvites.length.toString()})`}>
         {pendingInvites.length === 0 ? (
           <Empty message="No pending invitations." />
@@ -92,9 +106,7 @@ export default function InvitationsView({ invitations }: { invitations: Invitati
                 return (
                   <tr key={i.id}>
                     <td className="text-foreground px-3 py-2">{i.email}</td>
-                    <td className="text-muted-foreground px-3 py-2 text-xs capitalize">
-                      {i.role.replace("org_admin", "admin")}
-                    </td>
+                    <td className="text-muted-foreground px-3 py-2 text-xs capitalize">{i.role}</td>
                     <td className="text-muted-foreground px-3 py-2 text-xs capitalize">
                       {i.visibility}
                     </td>
