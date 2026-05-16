@@ -17,6 +17,8 @@ import {
 } from "@heroicons/react/20/solid";
 import ClassFormDialog from "@/app/(authenticated)/classes/class-form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
+import { Badge, Eyebrow, Tabs, type TabItem } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import {
   softDeleteClass,
   restoreClass,
@@ -84,79 +86,155 @@ type Tab = "overview" | "roadmap" | "instructors" | "skills" | "super_users" | "
 type TabDef = { id: Tab; label: React.ReactNode };
 
 function OverviewTab({ cls }: { cls: ClassWithHours }) {
-  const fields: { label: string; value: string | null | undefined }[] = [
-    { label: "Status", value: cls.status },
-    { label: "Description", value: cls.description },
-    {
-      label: "Type",
-      value: cls.is_multi_day ? `Multi-day (${String(cls.total_days)} days)` : "Single-day",
-    },
-    { label: "Hours per day", value: cls.hours_per_day != null ? String(cls.hours_per_day) : null },
-    { label: "Offerings per year", value: String(cls.offerings_per_year) },
-    { label: "Prep hrs/offering", value: String(cls.prep_hours_per_offering) },
-    { label: "Logistics hrs/offering", value: String(cls.logistics_hours_per_offering) },
-  ];
+  // Day-by-day teaching hours feeding the calc panel. Uniform when
+  // hours_per_day is set; per-day when custom_day_hours is populated.
+  const days: { day: number; hours: number }[] = (() => {
+    if (
+      cls.is_multi_day &&
+      Array.isArray(cls.custom_day_hours) &&
+      cls.custom_day_hours.length > 0
+    ) {
+      return cls.custom_day_hours.map((h, i) => ({ day: i + 1, hours: h || 0 }));
+    }
+    const total = cls.is_multi_day ? cls.total_days : 1;
+    const hpd = cls.hours_per_day ?? 0;
+    return Array.from({ length: total }, (_, i) => ({ day: i + 1, hours: hpd }));
+  })();
+
+  const prep = cls.prep_hours_per_offering;
+  const logistics = cls.logistics_hours_per_offering;
+  const teaching = days.reduce((s, d) => s + d.hours, 0);
+  const perOffering = teaching + prep + logistics;
+  const offerings = cls.offerings_per_year || 0;
+  const annual = perOffering * offerings;
+
+  // Top-of-tab structural facts the mock's "Structure" header surfaces.
+  const structureMeta = cls.is_multi_day
+    ? `Multi-day · ${String(cls.total_days)} day${cls.total_days === 1 ? "" : "s"}`
+    : "Single-day";
 
   return (
     <div className="space-y-6">
-      <div className="border-border bg-background rounded-xl border p-6">
-        <h3 className="text-foreground mb-4 text-sm font-semibold">Class details</h3>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-          {fields.map(({ label, value }) =>
-            value != null ? (
-              <div key={label}>
-                <dt className="text-muted-foreground text-xs font-medium">{label}</dt>
-                <dd className="text-foreground mt-0.5 text-sm">{value}</dd>
-              </div>
-            ) : null,
-          )}
-        </dl>
-      </div>
+      {/* Description, if present — sits above the calc as light context. */}
+      {cls.description && (
+        <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">{cls.description}</p>
+      )}
 
-      {cls.is_multi_day &&
-        Array.isArray(cls.custom_day_hours) &&
-        cls.custom_day_hours.length > 0 && (
-          <div className="border-border bg-background rounded-xl border p-6">
-            <h3 className="text-foreground mb-4 text-sm font-semibold">Custom day hours</h3>
-            <div className="flex flex-wrap gap-2">
-              {cls.custom_day_hours.map((h, i) => (
-                <div
-                  key={i}
-                  className="border-border bg-surface rounded-md border px-3 py-1.5 text-sm"
-                >
-                  <span className="text-muted-foreground text-xs">Day {i + 1}</span>
-                  <span className="text-foreground ml-2 font-medium">{h}h</span>
-                </div>
-              ))}
-            </div>
+      {/* Structural inputs — the raw values that feed the calculation. */}
+      <section className="border-border bg-background rounded-xl border p-6">
+        <div className="border-border mb-4 flex items-baseline justify-between border-b border-dashed pb-3">
+          <Eyebrow>Structure</Eyebrow>
+          <span className="text-muted-foreground font-mono text-[10.5px] tracking-[0.04em]">
+            {structureMeta}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <CdField label="Offerings / year" value={String(offerings)} unit="cohorts" />
+          {days.map((d) => (
+            <CdField
+              key={d.day}
+              label={days.length === 1 ? "Hours" : `Day ${String(d.day)} hours`}
+              value={d.hours ? d.hours.toString() : "0"}
+              unit="h"
+            />
+          ))}
+          <CdField label="Prep / offering" value={prep.toString()} unit="h" />
+          <CdField label="Logistics / offering" value={logistics.toString()} unit="h" />
+        </div>
+
+        {/* The "show the math" panel — vertical stack with op markers and a
+            forest-green serif total. Signature element of the editorial
+            class definition view. */}
+        <div className="bg-surface border-border mt-6 rounded-xl border p-5">
+          <Eyebrow variant="mute" className="mb-3">
+            Computed annual hours
+          </Eyebrow>
+          <div className="flex flex-col gap-1.5">
+            {days.map((d) => (
+              <CalcRow
+                key={d.day}
+                label={days.length === 1 ? "Teaching" : `Day ${String(d.day)} teaching`}
+                value={`${d.hours.toString()} h`}
+              />
+            ))}
+            <CalcOp />
+            <CalcRow label="Prep (per offering)" value={`${prep.toString()} h`} />
+            <CalcOp />
+            <CalcRow label="Logistics (per offering)" value={`${logistics.toString()} h`} />
+            <CalcRow
+              label="Per-offering total"
+              value={`${perOffering.toFixed(perOffering % 1 === 0 ? 0 : 1)} h`}
+              emphasis
+            />
+            <CalcOp text="× offerings/year" value={`× ${String(offerings)}`} />
+            <CalcTotal
+              label="Annual instructor hours"
+              value={annual.toFixed(annual % 1 === 0 ? 0 : 1)}
+              unit="h / yr"
+            />
           </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// Small structural-input tile (used inside the OverviewTab Structure block).
+function CdField({ label, value, unit }: { label: string; value: string; unit?: string }) {
+  return (
+    <div className="bg-surface border-border rounded-md border px-3 py-2">
+      <div className="text-muted-foreground font-mono text-[9.5px] uppercase tracking-[0.08em]">
+        {label}
+      </div>
+      <div className="font-display text-foreground mt-0.5 flex items-baseline gap-1.5 text-lg leading-none">
+        <span className="tabular-nums">{value}</span>
+        {unit && (
+          <span className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.04em]">
+            {unit}
+          </span>
         )}
-
-      <div className="border-border bg-background rounded-xl border p-6">
-        <h3 className="text-foreground mb-4 text-sm font-semibold">Computed hours</h3>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-          <div>
-            <dt className="text-muted-foreground text-xs font-medium">Instruction hrs/offering</dt>
-            <dd className="text-foreground mt-0.5 text-sm">
-              {cls.instruction_hours_per_offering != null
-                ? cls.instruction_hours_per_offering.toFixed(1)
-                : "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground text-xs font-medium">Total hrs/offering</dt>
-            <dd className="text-foreground mt-0.5 text-sm">
-              {cls.total_hours_per_offering != null ? cls.total_hours_per_offering.toFixed(1) : "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground text-xs font-medium">Annual class hours</dt>
-            <dd className="text-foreground mt-0.5 text-sm">
-              {cls.annual_class_hours != null ? cls.annual_class_hours.toFixed(1) : "—"}
-            </dd>
-          </div>
-        </dl>
       </div>
+    </div>
+  );
+}
+
+function CalcRow({ label, value, emphasis }: { label: string; value: string; emphasis?: boolean }) {
+  return (
+    <div
+      className={cn(
+        "flex items-baseline justify-between border-b border-dashed border-[var(--hair-soft)] py-1 font-mono text-[11px] last:border-b-0",
+        emphasis ? "text-foreground border-b-[var(--hair)] pt-2" : "text-muted-foreground",
+      )}
+    >
+      <span>{label}</span>
+      <span
+        className={cn("tabular-nums", emphasis ? "text-foreground font-medium" : "text-foreground")}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function CalcOp({ text = "+", value = "·" }: { text?: string; value?: string }) {
+  return (
+    <div className="text-muted-foreground flex items-baseline justify-between py-0 font-mono text-[10.5px] leading-none">
+      <span>{text}</span>
+      <span className="tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+function CalcTotal({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <div className="mt-2 flex items-baseline justify-between border-t border-[var(--hair)] pt-2.5 font-mono text-[10.5px] uppercase tracking-[0.04em]">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-display flex items-baseline gap-1.5 text-[22px] font-medium normal-case leading-none tracking-[-0.01em] text-[var(--forest)]">
+        <span className="tabular-nums">{value}</span>
+        <span className="text-muted-foreground font-mono text-[10px] tracking-[0.04em]">
+          {unit}
+        </span>
+      </span>
     </div>
   );
 }
@@ -353,21 +431,21 @@ function InstructorsTab({
       ) : (
         <div className="border-border bg-background overflow-hidden rounded-xl border">
           <table className="w-full text-sm">
-            <thead className="border-border bg-surface border-b">
+            <thead className="border-border border-b border-dashed">
               <tr>
-                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
+                <th className="text-muted-foreground px-4 py-3 text-left font-mono text-[10px] font-medium uppercase tracking-[0.08em]">
                   <Label kind="entity.instructor" />
                 </th>
-                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
+                <th className="text-muted-foreground px-4 py-3 text-left font-mono text-[10px] font-medium uppercase tracking-[0.08em]">
                   Role
                 </th>
-                <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
-                  Assigned offerings
+                <th className="text-muted-foreground px-4 py-3 text-left font-mono text-[10px] font-medium uppercase tracking-[0.08em]">
+                  Offerings
                   {offeringsPerYear > 0 && (
-                    <span className="ml-1 font-normal">/ {offeringsPerYear}</span>
+                    <span className="ml-1 normal-case">/ {offeringsPerYear}</span>
                   )}
                 </th>
-                <th className="px-4 py-2.5" />
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
@@ -393,6 +471,38 @@ function InstructorsTab({
               ))}
             </tbody>
           </table>
+
+          {/* Editorial summary footer — mirrors the mock's
+              "Sum · X / Y · Fully staffed" line under the assignment list. */}
+          {offeringsPerYear > 0 && (
+            <div className="border-border text-muted-foreground flex flex-wrap items-center justify-between gap-2 border-t border-dashed px-4 py-3 font-mono text-[10.5px] tracking-[0.04em]">
+              <span>
+                Sum ·{" "}
+                <b
+                  className={cn(
+                    "font-medium tabular-nums",
+                    remaining < 0 ? "text-[var(--red)]" : "text-foreground",
+                  )}
+                >
+                  {totalAssigned} / {offeringsPerYear}
+                </b>{" "}
+                · capped at offerings/year
+              </span>
+              <span>
+                {remaining === 0 ? (
+                  <b className="font-medium text-[var(--forest)]">✓ Fully staffed</b>
+                ) : remaining > 0 ? (
+                  <span>
+                    <b className="text-foreground font-medium">{remaining}</b> unstaffed
+                  </span>
+                ) : (
+                  <b className="font-medium text-[var(--red)]">
+                    {Math.abs(remaining)} over offerings/year
+                  </b>
+                )}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -437,30 +547,64 @@ function AssignmentRow({
   const inputCls =
     "border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring";
 
+  // Role chip styling — mono uppercase pill in the editorial palette.
+  // Mirrors the mock's `.eligible-tag.primary|backup|eligible` chips.
+  const roles: { value: AssignmentRole; label: string; cls: string }[] = [
+    {
+      value: "primary",
+      label: "Primary",
+      cls: "bg-[rgba(45,74,46,0.10)] text-[var(--forest)]",
+    },
+    {
+      value: "backup",
+      label: "Backup",
+      cls: "bg-[rgba(201,138,58,0.14)] text-[var(--persimmon-deep)]",
+    },
+    {
+      value: "eligible",
+      label: "Eligible",
+      cls: "bg-[rgba(139,157,131,0.18)] text-[#5a6855]",
+    },
+  ];
+
   return (
     <tr className="hover:bg-surface">
       <td className="px-4 py-3">
         <Link
           href={`/instructors/${assignment.instructor_id}`}
-          className="text-foreground font-medium hover:underline"
+          className="font-display text-foreground hover:underline"
         >
           {instructorName}
         </Link>
       </td>
       <td className="px-4 py-3">
-        <select
-          value={assignment.role}
-          disabled={pending}
-          onChange={(e) => {
-            onRoleChange(e.target.value as AssignmentRole);
-          }}
-          className={inputCls}
+        <div
+          className="inline-flex gap-1"
+          role="radiogroup"
           aria-label={`Role for ${instructorName}`}
         >
-          <option value="eligible">Eligible</option>
-          <option value="primary">Primary</option>
-          <option value="backup">Backup</option>
-        </select>
+          {roles.map((r) => {
+            const active = assignment.role === r.value;
+            return (
+              <button
+                key={r.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                disabled={pending}
+                onClick={() => {
+                  if (!active) onRoleChange(r.value);
+                }}
+                className={cn(
+                  "rounded-[3px] px-2 py-1 font-mono text-[9.5px] font-medium uppercase leading-none tracking-[0.06em] transition-colors disabled:opacity-50",
+                  active ? r.cls : "text-muted-foreground hover:text-foreground bg-transparent",
+                )}
+              >
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
       </td>
       <td className="px-4 py-3">
         <input
@@ -868,6 +1012,48 @@ function formatDuration(totalMinutes: number): string {
   return `${String(h)}h ${String(m)}m`;
 }
 
+// Editorial modality pill — mirrors the mock's `.modality.<key>` color
+// system (forest for ILT, persimmon for video, amber for assessment, …).
+// Mono uppercase 9.5px text on a tinted background.
+const MODALITY_STYLE: Record<ClassModality, string> = {
+  ilt: "bg-[var(--forest)] text-[var(--cream)]",
+  vilt: "bg-[var(--sage)] text-[var(--ink)]",
+  elearning: "bg-[#4a5b6e] text-[var(--cream)]",
+  video: "bg-[var(--persimmon)] text-[var(--ink)]",
+  reading: "bg-[var(--sage-soft)] text-[var(--forest-deep)]",
+  simulation: "bg-[var(--forest-deep)] text-[var(--cream)]",
+  ojt: "bg-[rgba(28,31,28,0.08)] text-[var(--ink-soft)] border border-[var(--hair)]",
+  assessment: "bg-[var(--amber)] text-[var(--ink)]",
+  blended: "bg-[var(--cream-2)] text-[var(--ink-soft)] border border-[var(--hair)]",
+};
+
+const MODALITY_SHORT: Record<ClassModality, string> = {
+  ilt: "ILT",
+  vilt: "vILT",
+  elearning: "eLearn",
+  video: "Video",
+  reading: "Read",
+  simulation: "Sim",
+  ojt: "OJT",
+  assessment: "Assess",
+  blended: "Blend",
+};
+
+function ModalityPill({ modality, className }: { modality: ClassModality; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-[3px] px-2 py-1 font-mono text-[9.5px] font-medium uppercase leading-none tracking-[0.06em]",
+        MODALITY_STYLE[modality],
+        className,
+      )}
+      title={CLASS_MODALITY_LABELS[modality]}
+    >
+      {MODALITY_SHORT[modality]}
+    </span>
+  );
+}
+
 function RoadmapTab({
   classId,
   steps,
@@ -1175,9 +1361,7 @@ function RoadmapTab({
                           ))}
                         </select>
                       ) : (
-                        <span className="text-foreground bg-surface inline-flex rounded-full px-2 py-0.5 text-xs font-medium">
-                          {CLASS_MODALITY_LABELS[row.modality]}
-                        </span>
+                        <ModalityPill modality={row.modality} />
                       )}
                     </td>
                     <td className="px-3 py-3 tabular-nums">
@@ -1291,33 +1475,44 @@ function RoadmapTab({
                 );
               })}
             </tbody>
-            <tfoot className="border-border bg-surface border-t">
+            <tfoot className="border-border border-t border-dashed">
               <tr>
-                <td colSpan={3} className="text-muted-foreground px-3 py-2.5 text-xs font-medium">
-                  Total
-                </td>
-                <td className="text-foreground px-3 py-2.5 text-sm font-semibold tabular-nums">
-                  {formatDuration(totalMinutes)}
-                </td>
-                <td colSpan={2} className="text-muted-foreground px-3 py-2.5 text-xs">
+                <td
+                  colSpan={3}
+                  className="text-muted-foreground px-3 py-3 font-mono text-[10.5px] uppercase tracking-[0.04em]"
+                >
+                  {steps.length} step{steps.length === 1 ? "" : "s"} ·{" "}
                   {expectedMinutes != null && (
-                    <>Class instruction time: {formatDuration(expectedMinutes)}</>
+                    <span>declared {formatDuration(expectedMinutes)}</span>
                   )}
                 </td>
+                <td className="font-display text-foreground px-3 py-3 text-base font-medium tabular-nums">
+                  {formatDuration(totalMinutes)}
+                </td>
+                <td colSpan={2} />
               </tr>
             </tfoot>
           </table>
         </div>
       )}
 
+      {/* Editorial soft warning — "guide, don't gate" callout when the
+          roadmap totals drift from the declared structural hours. */}
       {mismatch && (
-        <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-          <div>
-            Roadmap total is {formatDuration(totalMinutes)}, but the class instruction time is{" "}
-            {formatDuration(expectedMinutes)} ({diffMinutes > 0 ? "+" : ""}
-            {formatDuration(Math.abs(diffMinutes))} {diffMinutes > 0 ? "over" : "under"}). Adjust
-            the steps or the class&apos;s hours so they agree.
+        <div className="border-border bg-surface flex items-start gap-3 rounded-xl border border-l-[3px] border-l-[var(--persimmon)] p-4">
+          <span className="mt-0.5 shrink-0 text-[var(--persimmon-deep)]">
+            <ExclamationTriangleIcon className="h-4 w-4" />
+          </span>
+          <div className="flex-1">
+            <p className="text-foreground text-sm font-medium">
+              Roadmap is {formatDuration(Math.abs(diffMinutes))}{" "}
+              {diffMinutes > 0 ? "over" : "under"} the declared instruction time.
+            </p>
+            <p className="text-muted-foreground mt-1 font-mono text-[10.5px] tracking-[0.02em]">
+              Declared {formatDuration(expectedMinutes)} · roadmap sums to{" "}
+              {formatDuration(totalMinutes)}. Nudge — not a blocker. Adjust the structure or trim a
+              step.
+            </p>
           </div>
         </div>
       )}
@@ -1431,20 +1626,27 @@ export default function ClassDetailClient({
     });
   }
 
+  // Map TabDef → editorial Tabs primitive's TabItem shape.
+  const tabItems: TabItem<Tab>[] = TABS.map((t) => ({ id: t.id, label: t.label }));
+
   return (
     <div>
-      {/* Header */}
-      <div className="border-border bg-background flex items-start justify-between gap-4 border-b px-6 py-4">
+      {/* Header — eyebrow breadcrumb + serif title + status badge */}
+      <div className="border-border bg-background flex items-start justify-between gap-4 border-b px-6 py-5">
         <div>
-          <h1 className="text-foreground text-lg font-semibold">{cls.name}</h1>
-          {cls.description && (
-            <p className="text-muted-foreground mt-0.5 text-sm">{cls.description}</p>
-          )}
-          {isDeleted && (
-            <span className="mt-1 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-              Archived
-            </span>
-          )}
+          <Eyebrow className="mb-2">Catalog · Class definition</Eyebrow>
+          <div className="flex items-center gap-3">
+            <h1 className="font-display text-foreground text-2xl font-medium leading-tight tracking-[-0.005em]">
+              {cls.name}
+            </h1>
+            {isDeleted ? (
+              <Badge variant="neutral">Archived</Badge>
+            ) : cls.status === "active" ? (
+              <Badge variant="success">Active</Badge>
+            ) : (
+              <Badge variant="neutral">{cls.status}</Badge>
+            )}
+          </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -1502,26 +1704,13 @@ export default function ClassDetailClient({
       </div>
 
       {/* Tabs */}
-      <div className="border-border bg-background border-b px-6">
-        <nav className="-mb-px flex gap-6">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                setActiveTab(tab.id);
-              }}
-              className={`border-b-2 pb-3 pt-3 text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? "border-primary text-primary"
-                  : "text-muted-foreground hover:text-foreground border-transparent"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
+      <Tabs<Tab>
+        tabs={tabItems}
+        value={activeTab}
+        onChange={(id) => {
+          setActiveTab(id);
+        }}
+      />
 
       {/* Tab content */}
       <div className="p-6">
