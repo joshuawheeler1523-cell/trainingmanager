@@ -37,7 +37,6 @@ import type {
 import type { InstructorSkillRow } from "./page";
 import CapacityBar from "@/components/charts/capacity-bar";
 import BucketDonut from "@/components/charts/bucket-donut";
-import ForecastBars from "@/components/charts/forecast-bars";
 import { HeatStrip, HeatStripLegend } from "@/components/ui";
 
 type AuditEntry = {
@@ -623,28 +622,22 @@ function WorkloadTab({
         </div>
       </div>
 
-      {/* Forecast — heat strip (utilization tier per week) + bars (raw hrs) */}
-      <div className="border-border bg-background space-y-5 rounded-xl border p-6">
-        <div>
-          <h3 className="text-foreground mb-3 text-sm font-semibold">8-week capacity forecast</h3>
-          <HeatStrip
-            weeks={forecast.map((w) => ({
-              week_start: w.week_start,
-              utilization_pct: w.utilization_pct,
-              label: new Date(w.week_start).toLocaleDateString(undefined, {
-                month: "numeric",
-                day: "numeric",
-              }),
-            }))}
-          />
-          <HeatStripLegend className="mt-3" />
-        </div>
-        <div className="border-border border-t pt-5">
-          <p className="text-muted-foreground mb-2 font-mono text-[10px] uppercase tracking-[0.08em]">
-            Projected hours per week
-          </p>
-          <ForecastBars weeks={forecast} />
-        </div>
+      {/* Forecast — heat strip per week. Tooltip on each cell shows the
+          exact percentage; the tier color tells you the actionable signal
+          at a glance. */}
+      <div className="border-border bg-background rounded-xl border p-6">
+        <h3 className="text-foreground mb-3 text-sm font-semibold">8-week capacity forecast</h3>
+        <HeatStrip
+          weeks={forecast.map((w) => ({
+            week_start: w.week_start,
+            utilization_pct: w.utilization_pct,
+            label: new Date(w.week_start).toLocaleDateString(undefined, {
+              month: "numeric",
+              day: "numeric",
+            }),
+          }))}
+        />
+        <HeatStripLegend className="mt-3" />
       </div>
 
       {/* Per-source sections */}
