@@ -10,6 +10,7 @@ import {
   ChartPieIcon,
 } from "@heroicons/react/20/solid";
 import PageHeader from "@/components/ui/page-header";
+import { Eyebrow } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
@@ -296,8 +297,8 @@ export default async function DashboardPage() {
         )}
 
         {/* Quick actions — top of page so common starts are one click away */}
-        <section className="border-border bg-background rounded-xl border p-4">
-          <h3 className="text-foreground mb-3 text-sm font-semibold">Quick actions</h3>
+        <section className="border-border bg-background rounded-xl border p-5">
+          <Eyebrow className="mb-3">Quick actions</Eyebrow>
           <div className="flex flex-wrap gap-2">
             <QuickAction
               href="/instructors"
@@ -392,14 +393,15 @@ export default async function DashboardPage() {
         <section className="border-border bg-background rounded-xl border p-5">
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <div>
-              <h3 className="text-foreground text-base font-bold tracking-tight">
-                Capacity health
+              <Eyebrow className="mb-1.5">Capacity health</Eyebrow>
+              <h3 className="font-display text-foreground text-lg font-medium leading-tight tracking-[-0.005em]">
+                Where to rebalance first.
               </h3>
-              <p className="text-muted-foreground mt-0.5 text-xs">
-                Where to rebalance assignments first.
-              </p>
             </div>
-            <Link href="/instructors" className="text-primary text-xs font-medium hover:underline">
+            <Link
+              href="/instructors"
+              className="text-muted-foreground hover:text-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]"
+            >
               View all instructors →
             </Link>
           </div>
@@ -419,8 +421,8 @@ export default async function DashboardPage() {
             />
           </div>
 
-          <p className="text-muted-foreground border-border mt-5 border-t pt-3 text-xs">
-            <span className="text-foreground font-medium tabular-nums">{balancedCount}</span>{" "}
+          <p className="text-muted-foreground border-border mt-5 border-t border-dashed pt-3 font-mono text-[10.5px] tracking-[0.04em]">
+            <b className="text-foreground font-medium tabular-nums">{balancedCount}</b>{" "}
             <Label kind="entity.instructor" plural={balancedCount !== 1} lower /> in the balanced
             range (40–79%).
           </p>
@@ -429,23 +431,21 @@ export default async function DashboardPage() {
         {/* At-risk commitments — full width */}
         <section className="border-border bg-background rounded-xl border p-5">
           <div className="mb-4">
-            <h3 className="text-foreground text-base font-bold tracking-tight">
-              At-risk commitments
+            <Eyebrow className="mb-1.5">At-risk commitments</Eyebrow>
+            <h3 className="font-display text-foreground text-lg font-medium leading-tight tracking-[-0.005em]">
+              Deadlines slipping, schedule conflicts, coverage gaps.
             </h3>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              Deadlines slipping, schedule conflicts, and coverage gaps that need a decision.
-            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-3">
             {/* Overdue milestones */}
             <div>
-              <p className="text-muted-foreground mb-2 text-xs font-semibold">
+              <Eyebrow variant="mute" className="mb-2">
                 Overdue milestones{" "}
-                <span className="text-muted-foreground font-normal normal-case tracking-normal">
+                <span className="text-muted-foreground ml-1 font-normal normal-case tracking-normal">
                   ({overdueMilestones.length})
                 </span>
-              </p>
+              </Eyebrow>
               {overdueMilestones.length === 0 ? (
                 <p className="text-muted-foreground py-3 text-sm italic">
                   Nothing overdue right now.
@@ -478,12 +478,12 @@ export default async function DashboardPage() {
 
             {/* Schedule conflicts */}
             <div>
-              <p className="text-muted-foreground mb-2 text-xs font-semibold">
+              <Eyebrow variant="mute" className="mb-2">
                 Schedule conflicts{" "}
-                <span className="text-muted-foreground font-normal normal-case tracking-normal">
+                <span className="text-muted-foreground ml-1 font-normal normal-case tracking-normal">
                   ({conflictRollups.length})
                 </span>
-              </p>
+              </Eyebrow>
               {conflictRollups.length === 0 ? (
                 <p className="text-muted-foreground py-3 text-sm italic">All sessions clear.</p>
               ) : (
@@ -517,12 +517,12 @@ export default async function DashboardPage() {
 
             {/* Coverage gaps */}
             <div>
-              <p className="text-muted-foreground mb-2 text-xs font-semibold">
+              <Eyebrow variant="mute" className="mb-2">
                 Coverage gaps{" "}
-                <span className="text-muted-foreground font-normal normal-case tracking-normal">
+                <span className="text-muted-foreground ml-1 font-normal normal-case tracking-normal">
                   ({coverageGaps.length})
                 </span>
-              </p>
+              </Eyebrow>
               {coverageGaps.length === 0 ? (
                 <p className="text-muted-foreground py-3 text-sm italic">
                   Every class is fully staffed.
@@ -557,35 +557,38 @@ export default async function DashboardPage() {
             see the whole org without leaving the dashboard. */}
         {orgAdmin && deptRollups.length > 1 && (
           <section className="border-border bg-background rounded-xl border p-5">
-            <div className="mb-4">
-              <h3 className="text-foreground text-base font-bold tracking-tight">
-                Departments overview
-              </h3>
-              <p className="text-muted-foreground mt-0.5 text-xs">
-                Org-wide rollup. Visible to org admins only.{" "}
-                <Link href="/admin/departments" className="text-primary hover:underline">
-                  Manage departments →
-                </Link>
-              </p>
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+              <div>
+                <Eyebrow className="mb-1.5">Departments overview</Eyebrow>
+                <h3 className="font-display text-foreground text-lg font-medium leading-tight tracking-[-0.005em]">
+                  Org-wide rollup.
+                </h3>
+              </div>
+              <Link
+                href="/admin/departments"
+                className="text-muted-foreground hover:text-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]"
+              >
+                Manage departments →
+              </Link>
             </div>
 
-            <div className="border-border overflow-hidden rounded-lg border">
+            <div className="border-border bg-background overflow-hidden rounded-xl border">
               <table className="w-full text-sm">
-                <thead className="border-border bg-surface border-b">
+                <thead className="border-border border-b border-dashed">
                   <tr>
-                    <th className="text-muted-foreground px-4 py-2.5 text-left text-xs font-medium">
+                    <th className="text-muted-foreground px-4 py-3 text-left font-mono text-[10px] font-medium uppercase tracking-[0.08em]">
                       Department
                     </th>
-                    <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
+                    <th className="text-muted-foreground px-4 py-3 text-right font-mono text-[10px] font-medium uppercase tracking-[0.08em]">
                       <Label kind="entity.instructor" plural />
                     </th>
-                    <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
+                    <th className="text-muted-foreground px-4 py-3 text-right font-mono text-[10px] font-medium uppercase tracking-[0.08em]">
                       Active projects
                     </th>
-                    <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
+                    <th className="text-muted-foreground px-4 py-3 text-right font-mono text-[10px] font-medium uppercase tracking-[0.08em]">
                       Open intake
                     </th>
-                    <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
+                    <th className="text-muted-foreground px-4 py-3 text-right font-mono text-[10px] font-medium uppercase tracking-[0.08em]">
                       Avg utilization
                     </th>
                   </tr>
@@ -596,24 +599,26 @@ export default async function DashboardPage() {
                       d.avgUtilization == null
                         ? "var(--muted-foreground)"
                         : d.avgUtilization >= 95
-                          ? "var(--destructive)"
+                          ? "var(--red)"
                           : d.avgUtilization >= 80
-                            ? "var(--highlight)"
-                            : "var(--foreground)";
+                            ? "var(--persimmon-deep)"
+                            : "var(--forest)";
                     return (
                       <tr key={d.id} className="hover:bg-surface">
-                        <td className="text-foreground px-4 py-3 font-medium">{d.name}</td>
-                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
+                        <td className="font-display text-foreground px-4 py-3 font-medium">
+                          {d.name}
+                        </td>
+                        <td className="text-foreground px-4 py-3 text-right font-mono text-[11.5px] tabular-nums">
                           {d.instructorCount}
                         </td>
-                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
+                        <td className="text-foreground px-4 py-3 text-right font-mono text-[11.5px] tabular-nums">
                           {d.projectCount}
                         </td>
-                        <td className="text-foreground px-4 py-3 text-right tabular-nums">
+                        <td className="text-foreground px-4 py-3 text-right font-mono text-[11.5px] tabular-nums">
                           {d.traCount}
                         </td>
                         <td
-                          className="px-4 py-3 text-right text-sm font-semibold tabular-nums"
+                          className="font-display px-4 py-3 text-right text-base font-medium tabular-nums"
                           style={{ color: utilColor }}
                         >
                           {d.avgUtilization == null ? "—" : `${d.avgUtilization.toFixed(0)}%`}
@@ -639,28 +644,28 @@ function kpiToneStyles(tone: KpiTone): { value: string; iconBg: string; iconFg: 
   switch (tone) {
     case "danger":
       return {
-        value: "var(--destructive)",
-        iconBg: "color-mix(in oklab, var(--destructive) 14%, transparent)",
-        iconFg: "var(--destructive)",
+        value: "var(--red)",
+        iconBg: "rgba(183,61,61,0.12)",
+        iconFg: "var(--red)",
       };
     case "warning":
       return {
-        value: "var(--highlight)",
-        iconBg: "color-mix(in oklab, var(--highlight) 25%, transparent)",
-        iconFg: "color-mix(in oklab, var(--highlight) 90%, var(--foreground))",
+        value: "var(--persimmon-deep)",
+        iconBg: "rgba(201,138,58,0.14)",
+        iconFg: "var(--persimmon-deep)",
       };
     case "info":
       return {
-        value: "var(--primary)",
-        iconBg: "color-mix(in oklab, var(--primary) 14%, transparent)",
-        iconFg: "var(--primary)",
+        value: "var(--forest)",
+        iconBg: "rgba(45,74,46,0.10)",
+        iconFg: "var(--forest)",
       };
     case "ok":
     default:
       return {
         value: "var(--foreground)",
-        iconBg: "color-mix(in oklab, var(--accent) 22%, transparent)",
-        iconFg: "color-mix(in oklab, var(--accent) 90%, var(--foreground))",
+        iconBg: "rgba(139,157,131,0.18)",
+        iconFg: "#5a6855",
       };
   }
 }
@@ -684,25 +689,27 @@ function KpiCard({
   return (
     <Link
       href={href}
-      className="border-border bg-background hover:border-primary group block rounded-xl border p-4 transition-colors"
+      className="border-border bg-background hover:border-foreground/30 group block rounded-xl border p-4 transition-colors"
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-muted-foreground text-xs font-medium">{label}</p>
+        <p className="text-muted-foreground font-mono text-[10px] font-medium uppercase tracking-[0.08em]">
+          {label}
+        </p>
         <span
           aria-hidden="true"
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[3px]"
           style={{ backgroundColor: styles.iconBg, color: styles.iconFg }}
         >
           {icon}
         </span>
       </div>
       <p
-        className="mt-2 text-3xl font-bold tabular-nums tracking-tight"
+        className="font-display mt-3 text-3xl font-medium tabular-nums leading-none tracking-[-0.01em]"
         style={{ color: styles.value }}
       >
         {value}
       </p>
-      <p className="text-muted-foreground mt-1 text-xs">{sub}</p>
+      <p className="text-muted-foreground mt-2 font-mono text-[10.5px] tracking-[0.02em]">{sub}</p>
     </Link>
   );
 }
@@ -743,13 +750,13 @@ function CapacityColumn({
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <p className="text-muted-foreground text-xs font-semibold">
+        <Eyebrow variant="mute">
           {title}{" "}
-          <span className="text-muted-foreground font-normal normal-case tracking-normal">
+          <span className="text-muted-foreground ml-1 font-normal normal-case tracking-normal">
             ({rows.length})
           </span>
-        </p>
-        <p className="text-muted-foreground text-[11px]">{caption}</p>
+        </Eyebrow>
+        <p className="text-muted-foreground font-mono text-[10px] tracking-[0.02em]">{caption}</p>
       </div>
       {rows.length === 0 ? (
         <p className="text-muted-foreground py-3 text-sm italic">{emptyMessage}</p>
@@ -779,28 +786,28 @@ function bandFor(pct: number): {
   if (pct >= 95) {
     return {
       label: "Over",
-      fg: "var(--destructive)",
-      bg: "color-mix(in oklab, var(--destructive) 18%, transparent)",
+      fg: "var(--red)",
+      bg: "rgba(183,61,61,0.12)",
     };
   }
   if (pct >= 80) {
     return {
       label: "At risk",
-      fg: "var(--highlight)",
-      bg: "color-mix(in oklab, var(--highlight) 30%, transparent)",
+      fg: "var(--persimmon-deep)",
+      bg: "rgba(201,138,58,0.14)",
     };
   }
   if (pct < 40) {
     return {
       label: "Light",
-      fg: "var(--accent)",
-      bg: "color-mix(in oklab, var(--accent) 30%, transparent)",
+      fg: "#5a6855",
+      bg: "rgba(139,157,131,0.18)",
     };
   }
   return {
     label: "Healthy",
-    fg: "var(--primary)",
-    bg: "color-mix(in oklab, var(--primary) 18%, transparent)",
+    fg: "var(--forest)",
+    bg: "rgba(59,122,68,0.10)",
   };
 }
 
@@ -878,19 +885,20 @@ function CapacityChartCard({
     <section className="border-border bg-background rounded-xl border p-5">
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h3 className="text-foreground text-base font-bold tracking-tight">
-            Department capacity
-          </h3>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Annual hours across {instructorCount.toString()} active instructor
+          <Eyebrow className="mb-1.5">Department capacity</Eyebrow>
+          <h3 className="font-display text-foreground text-lg font-medium leading-tight tracking-[-0.005em]">
+            Annual hours · {instructorCount.toString()} active instructor
             {instructorCount === 1 ? "" : "s"}.
-          </p>
+          </h3>
         </div>
         <p
-          className="text-2xl font-bold tabular-nums tracking-tight"
+          className="font-display text-3xl font-medium tabular-nums leading-none tracking-[-0.01em]"
           style={{ color: headlineColor }}
         >
-          {utilizationPct.toFixed(0)}% utilized
+          {utilizationPct.toFixed(0)}%{" "}
+          <span className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
+            utilized
+          </span>
         </p>
       </div>
 
