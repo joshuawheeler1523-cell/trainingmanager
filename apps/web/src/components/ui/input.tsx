@@ -11,8 +11,11 @@ import { cn } from "@/lib/utils";
 // place. Tabular-numbers is opt-in via the `tabular` prop for hour /
 // percentage / count inputs where the digits should align.
 
+// Editorial field treatment: paper bg, hair-soft border at rest, forest
+// border + 3px forest tint glow on focus. Slightly more padding than the
+// previous compact style, to match the design's "breathable" feel.
 const FIELD_BASE =
-  "border-input bg-background text-foreground focus:ring-ring w-full rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50";
+  "border-[var(--hair)] bg-background text-foreground w-full rounded-sm border px-3 py-2 text-sm focus:outline-none focus:border-[var(--forest)] focus:ring-[3px] focus:ring-[rgba(45,74,46,0.12)] disabled:cursor-not-allowed disabled:opacity-50 transition-[border-color,box-shadow] duration-150";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & { tabular?: boolean };
 

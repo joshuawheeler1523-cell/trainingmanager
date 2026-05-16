@@ -6,6 +6,7 @@ export { Badge, type BadgeVariant } from "./badge";
 export { Button, type ButtonSize, type ButtonVariant } from "./button";
 export { Card, type CardVariant } from "./card";
 export { Drawer, type DrawerSize } from "./drawer";
+export { Eyebrow, type EyebrowVariant } from "./eyebrow";
 export { Field } from "./field";
 export { Heading, type HeadingLevel } from "./heading";
 export { Input, Select, Textarea } from "./input";
