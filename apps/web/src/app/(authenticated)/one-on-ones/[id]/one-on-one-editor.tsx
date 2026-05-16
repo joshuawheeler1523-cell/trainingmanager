@@ -273,10 +273,14 @@ export default function OneOnOneEditor({
           buckets={buckets}
           individualAllocations={individualAllocations}
           onAfterMutate={() => {
-            // No router.refresh on edits — each row keeps its own draft state
-            // and the server-side write is committed. The capacity card up
-            // top stays at the page-load value until navigation refreshes;
-            // that's an acceptable tradeoff for instant-feeling edits.
+            // Refresh after each workload edit so the capacity card and
+            // utilization % up top reflect the change immediately. The
+            // workload views (v_instructor_capacity, v_instructor_workload)
+            // recompute on every read, so this is the only piece needed
+            // for "edits adjust allocation percentages automatically."
+            // Each row's input keeps its own local state, so the refresh
+            // doesn't disrupt in-progress typing in other rows.
+            router.refresh();
           }}
         />
 
