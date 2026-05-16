@@ -52,7 +52,7 @@ export default async function AllocationsPage() {
       .from("allocation_buckets")
       .select("*")
       .eq("org_id", orgId)
-      .is("archived_at", null)
+      .eq("is_archived", false)
       .order("display_order"),
     supabase.from("global_allocations").select("*").eq("org_id", orgId),
     supabase.from("allocation_groups").select("*").eq("org_id", orgId).order("name"),
