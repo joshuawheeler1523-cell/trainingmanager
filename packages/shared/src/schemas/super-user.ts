@@ -43,6 +43,10 @@ export const superUserInsertSchema = z
     path: ["topic"],
   });
 
+// Schema-level validation only catches the obvious case (both fields
+// explicitly nulled in one payload). The full constraint (the post-merge
+// row must have class_id OR topic populated) needs the existing row,
+// so it's enforced in updateSuperUser by fetching + merging first.
 export const superUserUpdateSchema = z
   .object({
     full_name: trimmedString(200).optional(),
@@ -53,17 +57,10 @@ export const superUserUpdateSchema = z
     topic: optionalText.optional(),
     trained_at: optionalDate.optional(),
   })
-  .refine(
-    (v) => {
-      const hasClass = v.class_id !== undefined ? v.class_id != null : true;
-      const hasTopic =
-        v.topic !== undefined ? typeof v.topic === "string" && v.topic.length > 0 : true;
-      if (v.class_id === null && v.topic === null) return false;
-      if (v.class_id === null && v.topic === undefined) return false;
-      return hasClass || hasTopic;
-    },
-    { message: "Either link a class or enter a topic", path: ["topic"] },
-  );
+  .refine((v) => !(v.class_id === null && v.topic === null), {
+    message: "Either link a class or enter a topic",
+    path: ["topic"],
+  });
 
 export type SuperUserInsert = z.infer<typeof superUserInsertSchema>;
 export type SuperUserUpdate = z.infer<typeof superUserUpdateSchema>;
@@ -108,6 +105,8 @@ export const implSuperUserInsertSchema = z
     path: ["topic"],
   });
 
+// Same partial-update caveat as superUserUpdateSchema — full constraint
+// is enforced in updateImplSuperUser via fetch + merge.
 export const implSuperUserUpdateSchema = z
   .object({
     full_name: trimmedString(200).optional(),
@@ -118,14 +117,10 @@ export const implSuperUserUpdateSchema = z
     topic: optionalText.optional(),
     trained_at: optionalDate.optional(),
   })
-  .refine(
-    (v) => {
-      if (v.impl_class_id === null && v.topic === null) return false;
-      if (v.impl_class_id === null && v.topic === undefined) return false;
-      return true;
-    },
-    { message: "Either link a class or enter a topic", path: ["topic"] },
-  );
+  .refine((v) => !(v.impl_class_id === null && v.topic === null), {
+    message: "Either link a class or enter a topic",
+    path: ["topic"],
+  });
 
 export type ImplSuperUserInsert = z.infer<typeof implSuperUserInsertSchema>;
 export type ImplSuperUserUpdate = z.infer<typeof implSuperUserUpdateSchema>;

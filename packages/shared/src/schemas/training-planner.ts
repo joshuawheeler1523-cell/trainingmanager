@@ -63,8 +63,8 @@ export const implementationSetupSchema = z
     business_hours_start_local: z.coerce.number().min(0).max(24).default(0),
     business_hours_end_local: z.coerce.number().min(0).max(24).default(24),
   })
-  .refine((v) => v.business_hours_end_local >= v.business_hours_start_local, {
-    message: "Business hours end must be ≥ start",
+  .refine((v) => v.business_hours_end_local > v.business_hours_start_local, {
+    message: "Business hours end must be after start",
     path: ["business_hours_end_local"],
   });
 
@@ -148,7 +148,9 @@ export const implTrainerInsertSchema = z.object({
   instructor_id: optionalUuid,
   name: z.string().min(1, "Trainer name is required").max(200),
   email: emptyToNull,
-  availability_hours_per_week: z.coerce.number().min(0),
+  availability_hours_per_week: z.coerce
+    .number()
+    .min(1, "Trainer must have at least 1 hour/week available"),
   max_concurrent_sessions: z.coerce.number().int().min(1).default(1),
   sort_order: z.coerce.number().int().default(0),
 });

@@ -75,11 +75,42 @@ export async function updateImplSuperUser(
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
 
+  // Enforce (impl_class_id IS NOT NULL OR topic non-empty) against the
+  // POST-MERGE state. Same logic as updateSuperUser.
+  const patch = parsed.data;
+  if (patch.impl_class_id === null || patch.topic === null || patch.topic === "") {
+    const { data: existing } = await supabase
+      .from("impl_super_users")
+      .select("impl_class_id, topic")
+      .eq("id", id)
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!existing) {
+      return { ok: false, error: { code: "NOT_FOUND", message: "Super user not found" } };
+    }
+    const nextClassId =
+      patch.impl_class_id !== undefined ? patch.impl_class_id : existing.impl_class_id;
+    const nextTopicRaw = patch.topic !== undefined ? patch.topic : existing.topic;
+    const nextTopic =
+      typeof nextTopicRaw === "string" && nextTopicRaw.trim().length > 0 ? nextTopicRaw : null;
+    if (nextClassId == null && nextTopic == null) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION",
+          message: "Either link a class or enter a topic",
+          field: "topic",
+        },
+      };
+    }
+  }
+
   const { data, error } = await supabase
     .from("impl_super_users")
     .update(
       Object.fromEntries(
-        Object.entries(parsed.data as Record<string, unknown>).filter(([, v]) => v !== undefined),
+        Object.entries(patch as Record<string, unknown>).filter(([, v]) => v !== undefined),
       ) as unknown as TablesUpdate<"impl_super_users">,
     )
     .eq("id", id)
