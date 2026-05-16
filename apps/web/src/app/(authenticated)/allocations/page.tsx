@@ -2,8 +2,7 @@ import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import AllocationsView from "./allocations-view";
-import BucketConsumptionPanel from "./bucket-consumption-panel";
-import TeamUtilizationRoster, { type TeamRosterRow } from "./team-utilization-roster";
+import { type TeamRosterRow } from "./team-utilization-roster";
 import {
   recommendOverConsumedBuckets,
   type AdHocTask,
@@ -178,20 +177,8 @@ export default async function AllocationsPage() {
     <div>
       <PageHeader
         title="Allocations"
-        description="Buckets, global defaults, groups, and individual overrides."
+        description="Summary of where capacity is going, plus buckets, global defaults, groups, and individual overrides."
       />
-
-      {/* Summary dashboard — read-only view of where capacity is actually
-          going right now. The tabbed editor below remains the place to
-          adjust targets. */}
-      <div className="grid grid-cols-1 gap-4 px-6 pt-6 lg:grid-cols-[1.65fr_1fr]">
-        <TeamUtilizationRoster buckets={buckets} rows={rosterRows} />
-        <BucketConsumptionPanel
-          consumption={bucketConsumption}
-          totalOrgHours={totalOrgAnnualHours}
-        />
-      </div>
-
       <AllocationsView
         buckets={buckets}
         globals={globals}
@@ -205,6 +192,9 @@ export default async function AllocationsPage() {
         recurringAssignments={recurringAssignments}
         adHocTasks={adHocTasks}
         recommendations={recommendations}
+        rosterRows={rosterRows}
+        bucketConsumption={bucketConsumption}
+        totalOrgHours={totalOrgAnnualHours}
       />
     </div>
   );
