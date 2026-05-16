@@ -90,3 +90,66 @@ export type SuperUser = {
 export type SuperUserWithClass = SuperUser & {
   class_name: string | null;
 };
+
+// ── Implementation-scoped super users ────────────────────────────────────────
+
+export const implSuperUserInsertSchema = z
+  .object({
+    full_name: trimmedString(200),
+    email: optionalText,
+    phone: optionalText,
+    unit: optionalText,
+    impl_class_id: optionalUuid,
+    topic: optionalText,
+    trained_at: optionalDate,
+  })
+  .refine((v) => v.impl_class_id != null || (typeof v.topic === "string" && v.topic.length > 0), {
+    message: "Either link a class or enter a topic",
+    path: ["topic"],
+  });
+
+export const implSuperUserUpdateSchema = z
+  .object({
+    full_name: trimmedString(200).optional(),
+    email: optionalText.optional(),
+    phone: optionalText.optional(),
+    unit: optionalText.optional(),
+    impl_class_id: optionalUuid.optional(),
+    topic: optionalText.optional(),
+    trained_at: optionalDate.optional(),
+  })
+  .refine(
+    (v) => {
+      if (v.impl_class_id === null && v.topic === null) return false;
+      if (v.impl_class_id === null && v.topic === undefined) return false;
+      return true;
+    },
+    { message: "Either link a class or enter a topic", path: ["topic"] },
+  );
+
+export type ImplSuperUserInsert = z.infer<typeof implSuperUserInsertSchema>;
+export type ImplSuperUserUpdate = z.infer<typeof implSuperUserUpdateSchema>;
+
+export type ImplSuperUser = {
+  id: string;
+  org_id: string;
+  department_id: string;
+  implementation_id: string;
+  impl_class_id: string | null;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  unit: string | null;
+  topic: string | null;
+  trained_at: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+  version: number;
+};
+
+export type ImplSuperUserWithClass = ImplSuperUser & {
+  impl_class_name: string | null;
+};

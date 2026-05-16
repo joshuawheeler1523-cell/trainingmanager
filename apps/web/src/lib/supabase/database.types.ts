@@ -2207,6 +2207,95 @@ export type Database = {
           },
         ];
       };
+      impl_super_users: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          department_id: string;
+          email: string | null;
+          full_name: string;
+          id: string;
+          impl_class_id: string | null;
+          implementation_id: string;
+          org_id: string;
+          phone: string | null;
+          topic: string | null;
+          trained_at: string | null;
+          unit: string | null;
+          updated_at: string;
+          updated_by: string | null;
+          version: number;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          department_id: string;
+          email?: string | null;
+          full_name: string;
+          id?: string;
+          impl_class_id?: string | null;
+          implementation_id: string;
+          org_id: string;
+          phone?: string | null;
+          topic?: string | null;
+          trained_at?: string | null;
+          unit?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          department_id?: string;
+          email?: string | null;
+          full_name?: string;
+          id?: string;
+          impl_class_id?: string | null;
+          implementation_id?: string;
+          org_id?: string;
+          phone?: string | null;
+          topic?: string | null;
+          trained_at?: string | null;
+          unit?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "impl_super_users_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_super_users_impl_class_id_fkey";
+            columns: ["impl_class_id"];
+            isOneToOne: false;
+            referencedRelation: "impl_classes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_super_users_implementation_id_fkey";
+            columns: ["implementation_id"];
+            isOneToOne: false;
+            referencedRelation: "implementations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "impl_super_users_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       impl_trainer_unavailability: {
         Row: {
           created_at: string;
