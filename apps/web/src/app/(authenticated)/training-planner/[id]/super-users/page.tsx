@@ -16,14 +16,15 @@ export default async function ImplSuperUsersPage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const search = typeof sp["search"] === "string" ? sp["search"] : "";
-  const classFilter = typeof sp["class"] === "string" ? sp["class"] : "";
-  const trainedFilter = typeof sp["trained"] === "string" ? sp["trained"] : "";
   const showDeleted = sp["deleted"] === "1";
 
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) notFound();
 
+  // Fetch every super user for this implementation (no class/trained
+  // filter at SQL level — the view groups by class and filters at render
+  // time, so empty classes still need to render). Search is also
+  // client-side for the same reason.
   let query = supabase
     .from("impl_super_users")
     .select("*, impl_classes ( id, name )")
@@ -35,22 +36,6 @@ export default async function ImplSuperUsersPage({
     query = query.not("deleted_at", "is", null);
   } else {
     query = query.is("deleted_at", null);
-  }
-  if (search) {
-    const term = `%${search}%`;
-    query = query.or(
-      `full_name.ilike.${term},email.ilike.${term},topic.ilike.${term},unit.ilike.${term}`,
-    );
-  }
-  if (classFilter === "__none__") {
-    query = query.is("impl_class_id", null);
-  } else if (classFilter) {
-    query = query.eq("impl_class_id", classFilter);
-  }
-  if (trainedFilter === "yes") {
-    query = query.not("trained_at", "is", null);
-  } else if (trainedFilter === "no") {
-    query = query.is("trained_at", null);
   }
 
   const { data: rows } = await query;

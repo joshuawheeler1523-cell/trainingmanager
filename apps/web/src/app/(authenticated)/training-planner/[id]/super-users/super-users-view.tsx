@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   ArrowDownTrayIcon,
   CheckCircleIcon,
+  ExclamationTriangleIcon,
   MagnifyingGlassIcon,
   PencilSquareIcon,
+  PlusIcon,
   TrashIcon,
 } from "@heroicons/react/20/solid";
 import { toast } from "sonner";
@@ -22,14 +24,17 @@ type Props = {
   showDeleted: boolean;
 };
 
+type ClassOption = { id: string; name: string };
+
+// Special key for the bucket of super users with no class link.
+const NO_CLASS_KEY = "__none__";
+
 export default function SuperUsersView(props: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
 
   const search = sp.get("search") ?? "";
-  const classFilter = sp.get("class") ?? "";
-  const trainedFilter = sp.get("trained") ?? "";
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(sp.toString());
@@ -38,11 +43,28 @@ export default function SuperUsersView(props: Props) {
     router.push(`${pathname}?${params.toString()}`);
   }
 
-  const trainedCount = useMemo(
-    () => props.superUsers.filter((s) => s.trained_at != null).length,
-    [props.superUsers],
-  );
-  const untrainedCount = props.superUsers.length - trainedCount;
+  // Group super users by impl_class_id (or NO_CLASS_KEY for topic-only).
+  const byClass = useMemo(() => {
+    const map = new Map<string, ImplSuperUserWithClass[]>();
+    for (const cls of props.classes) {
+      map.set(cls.id, []);
+    }
+    map.set(NO_CLASS_KEY, []);
+    for (const su of props.superUsers) {
+      const key = su.impl_class_id ?? NO_CLASS_KEY;
+      const list = map.get(key) ?? [];
+      list.push(su);
+      map.set(key, list);
+    }
+    return map;
+  }, [props.superUsers, props.classes]);
+
+  // Roll-up stats across all super users (for the summary strip).
+  const totalSU = props.superUsers.length;
+  const trainedCount = props.superUsers.filter((s) => s.trained_at != null).length;
+  const untrainedCount = totalSU - trainedCount;
+  const classesWithSU = props.classes.filter((c) => (byClass.get(c.id) ?? []).length > 0).length;
+  const classesWithoutSU = props.classes.length - classesWithSU;
 
   function downloadCsv() {
     const headers = [
@@ -86,8 +108,24 @@ export default function SuperUsersView(props: Props) {
     URL.revokeObjectURL(url);
   }
 
+  // Filter applied at render time. We don't filter classes, so empty
+  // classes still show — that's the whole point (visible gaps).
+  function matchesSearch(su: ImplSuperUserWithClass): boolean {
+    if (!search) return true;
+    const term = search.toLowerCase();
+    return (
+      su.full_name.toLowerCase().includes(term) ||
+      (su.email?.toLowerCase().includes(term) ?? false) ||
+      (su.unit?.toLowerCase().includes(term) ?? false) ||
+      (su.topic?.toLowerCase().includes(term) ?? false)
+    );
+  }
+
+  const noClassList = (byClass.get(NO_CLASS_KEY) ?? []).filter(matchesSearch);
+
   return (
     <div className="space-y-4">
+      {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
           <MagnifyingGlassIcon className="text-muted-foreground absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
@@ -97,38 +135,10 @@ export default function SuperUsersView(props: Props) {
             onChange={(e) => {
               setParam("search", e.target.value);
             }}
-            placeholder="Search name, email, topic, unit…"
+            placeholder="Search name, email, unit, topic…"
             className="border-input bg-background text-foreground focus:ring-ring w-72 rounded-md border py-1.5 pl-8 pr-3 text-sm focus:outline-none focus:ring-2"
           />
         </div>
-
-        <select
-          value={classFilter}
-          onChange={(e) => {
-            setParam("class", e.target.value);
-          }}
-          className="border-input bg-background text-foreground focus:ring-ring rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2"
-        >
-          <option value="">All classes / topics</option>
-          <option value="__none__">— No class (topic only) —</option>
-          {props.classes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={trainedFilter}
-          onChange={(e) => {
-            setParam("trained", e.target.value);
-          }}
-          className="border-input bg-background text-foreground focus:ring-ring rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2"
-        >
-          <option value="">All (trained & not)</option>
-          <option value="yes">Trained</option>
-          <option value="no">Not trained yet</option>
-        </select>
 
         <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-sm">
           <input
@@ -146,7 +156,7 @@ export default function SuperUsersView(props: Props) {
           <button
             type="button"
             onClick={downloadCsv}
-            disabled={props.superUsers.length === 0}
+            disabled={totalSU === 0}
             className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50"
           >
             <ArrowDownTrayIcon className="h-4 w-4" />
@@ -168,85 +178,212 @@ export default function SuperUsersView(props: Props) {
         </div>
       </div>
 
-      {!props.showDeleted && props.superUsers.length > 0 && (
-        <p className="text-muted-foreground text-xs">
-          {props.superUsers.length} super user{props.superUsers.length === 1 ? "" : "s"} ·{" "}
-          {trainedCount} trained · {untrainedCount} pending
-        </p>
+      {/* Summary strip */}
+      {(props.classes.length > 0 || totalSU > 0) && (
+        <div className="border-border bg-surface flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-lg border p-3 text-xs">
+          <span className="text-foreground font-semibold">
+            {classesWithSU} of {props.classes.length} classes covered
+          </span>
+          {classesWithoutSU > 0 && (
+            <span className="text-amber-700 dark:text-amber-300">
+              {classesWithoutSU} {classesWithoutSU === 1 ? "class needs" : "classes need"} a super
+              user
+            </span>
+          )}
+          <span className="text-muted-foreground">·</span>
+          <span className="text-muted-foreground">
+            {totalSU} super user{totalSU === 1 ? "" : "s"} total · {trainedCount} trained ·{" "}
+            {untrainedCount} pending
+          </span>
+        </div>
       )}
 
-      {props.superUsers.length === 0 ? (
+      {/* No classes case */}
+      {props.classes.length === 0 && noClassList.length === 0 && (
         <EmptyState
-          title={
-            props.showDeleted
-              ? "No archived super users for this plan"
-              : "No super users tracked yet for this plan"
-          }
-          description={
-            props.showDeleted
-              ? "Archived super users for this plan appear here."
-              : "Add staff members who emerged as super users from this rollout. This list is separate from the org-wide super users."
+          title="No classes in this training plan yet"
+          description="Add classes on Step 5 first. Once you have classes, you can assign super users to each from this page."
+        />
+      )}
+
+      {/* Per-class cards */}
+      {props.classes.length > 0 && (
+        <ul className="space-y-3">
+          {props.classes.map((cls) => {
+            const list = (byClass.get(cls.id) ?? []).filter(matchesSearch);
+            return (
+              <li key={cls.id}>
+                <ClassCard
+                  implementationId={props.implementationId}
+                  cls={cls}
+                  classes={props.classes}
+                  superUsers={list}
+                  totalForClass={(byClass.get(cls.id) ?? []).length}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* Topic-only / unassigned bucket. Always render the section header
+          so users know it exists, even if empty. */}
+      {(noClassList.length > 0 || (byClass.get(NO_CLASS_KEY) ?? []).length > 0) && (
+        <div className="pt-2">
+          <UnassignedSection
+            implementationId={props.implementationId}
+            classes={props.classes}
+            superUsers={noClassList}
+            total={(byClass.get(NO_CLASS_KEY) ?? []).length}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClassCard({
+  implementationId,
+  cls,
+  classes,
+  superUsers,
+  totalForClass,
+}: {
+  implementationId: string;
+  cls: ClassOption;
+  classes: ClassOption[];
+  superUsers: ImplSuperUserWithClass[];
+  totalForClass: number;
+}) {
+  const trained = superUsers.filter((s) => s.trained_at != null).length;
+  const isEmpty = totalForClass === 0;
+
+  return (
+    <div className="border-border bg-background overflow-hidden rounded-xl border">
+      <div
+        className={`flex flex-wrap items-center gap-3 border-b px-4 py-2.5 ${
+          isEmpty
+            ? "border-amber-200 bg-amber-50/60 dark:border-amber-900/40 dark:bg-amber-950/20"
+            : "border-border bg-surface/40"
+        }`}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-foreground text-sm font-semibold">{cls.name}</p>
+          <p
+            className={`mt-0.5 text-xs ${isEmpty ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground"}`}
+          >
+            {isEmpty ? (
+              <>
+                <ExclamationTriangleIcon className="mr-1 inline h-3 w-3" />
+                No super users assigned
+              </>
+            ) : (
+              <>
+                {totalForClass} super user{totalForClass === 1 ? "" : "s"} · {trained} trained
+              </>
+            )}
+          </p>
+        </div>
+        <SuperUserFormDialog
+          mode="create"
+          implementationId={implementationId}
+          classes={classes}
+          defaultClassId={cls.id}
+          trigger={
+            <button
+              type="button"
+              className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium"
+            >
+              <PlusIcon className="h-3.5 w-3.5" />
+              Add
+            </button>
           }
         />
-      ) : (
-        <SuperUsersTable rows={props.superUsers} classes={props.classes} />
+      </div>
+
+      {superUsers.length > 0 && (
+        <ul className="divide-border divide-y">
+          {superUsers.map((su) => (
+            <li key={su.id}>
+              <SuperUserRow su={su} classes={classes} />
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
 }
 
-function SuperUsersTable({
-  rows,
+function UnassignedSection({
+  implementationId,
   classes,
+  superUsers,
+  total,
 }: {
-  rows: ImplSuperUserWithClass[];
-  classes: { id: string; name: string }[];
+  implementationId: string;
+  classes: ClassOption[];
+  superUsers: ImplSuperUserWithClass[];
+  total: number;
 }) {
   return (
-    <div className="border-border bg-background overflow-x-auto rounded-lg border">
-      <table className="divide-border min-w-full divide-y text-sm">
-        <thead className="bg-surface">
-          <tr className="text-muted-foreground text-left text-[11px] font-medium uppercase tracking-wide">
-            <th className="px-3 py-2">Name</th>
-            <th className="px-3 py-2">Class / topic</th>
-            <th className="px-3 py-2">Unit</th>
-            <th className="px-3 py-2">Contact</th>
-            <th className="px-3 py-2">Trained</th>
-            <th className="px-3 py-2 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-border divide-y">
-          {rows.map((su) => (
-            <Row key={su.id} su={su} classes={classes} />
+    <div className="border-border bg-background overflow-hidden rounded-xl border">
+      <div className="border-border bg-surface/40 flex flex-wrap items-center gap-3 border-b px-4 py-2.5">
+        <div className="min-w-0 flex-1">
+          <p className="text-foreground text-sm font-semibold">Topic only — no class link</p>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {total} super user{total === 1 ? "" : "s"} tracked by free-text topic
+          </p>
+        </div>
+        <SuperUserFormDialog
+          mode="create"
+          implementationId={implementationId}
+          classes={classes}
+          trigger={
+            <button
+              type="button"
+              className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium"
+            >
+              <PlusIcon className="h-3.5 w-3.5" />
+              Add
+            </button>
+          }
+        />
+      </div>
+      {superUsers.length > 0 && (
+        <ul className="divide-border divide-y">
+          {superUsers.map((su) => (
+            <li key={su.id}>
+              <SuperUserRow su={su} classes={classes} />
+            </li>
           ))}
-        </tbody>
-      </table>
+        </ul>
+      )}
     </div>
   );
 }
 
-function Row({
-  su,
-  classes,
-}: {
-  su: ImplSuperUserWithClass;
-  classes: { id: string; name: string }[];
-}) {
+function SuperUserRow({ su, classes }: { su: ImplSuperUserWithClass; classes: ClassOption[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [busy, setBusy] = useState(false);
   const archived = su.deleted_at != null;
 
   function toggleTrained() {
+    setBusy(true);
     startTransition(async () => {
       const result = await markImplSuperUserTrained(su.id, su.trained_at == null);
+      setBusy(false);
       if (result.ok) router.refresh();
       else toast.error(result.error.message);
     });
   }
 
   function handleArchive() {
+    if (!confirm(`Archive ${su.full_name}?`)) return;
+    setBusy(true);
     startTransition(async () => {
       const result = await softDeleteImplSuperUser(su.id);
+      setBusy(false);
       if (result.ok) {
         toast.success("Archived");
         router.refresh();
@@ -257,8 +394,10 @@ function Row({
   }
 
   function handleRestore() {
+    setBusy(true);
     startTransition(async () => {
       const result = await restoreImplSuperUser(su.id);
+      setBusy(false);
       if (result.ok) {
         toast.success("Restored");
         router.refresh();
@@ -268,17 +407,20 @@ function Row({
     });
   }
 
+  const disabled = pending || busy;
+
   return (
-    <tr className={archived ? "opacity-60" : ""}>
-      <td className="text-foreground px-3 py-2 font-medium">{su.full_name}</td>
-      <td className="px-3 py-2">
-        {su.impl_class_name && <span className="text-foreground">{su.impl_class_name}</span>}
-        {su.impl_class_name && su.topic && <span className="text-muted-foreground"> · </span>}
-        {su.topic && <span className="text-foreground">{su.topic}</span>}
-        {!su.impl_class_name && !su.topic && <span className="text-muted-foreground">—</span>}
-      </td>
-      <td className="text-muted-foreground px-3 py-2">{su.unit ?? "—"}</td>
-      <td className="text-muted-foreground px-3 py-2 text-xs">
+    <div
+      className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 ${archived ? "opacity-60" : ""}`}
+    >
+      <div className="min-w-[10rem] flex-1">
+        <p className="text-foreground text-sm font-medium">{su.full_name}</p>
+        <p className="text-muted-foreground mt-0.5 text-xs">
+          {su.unit ?? <span className="italic">no unit</span>}
+          {su.topic && <span> · {su.topic}</span>}
+        </p>
+      </div>
+      <div className="text-muted-foreground text-xs">
         {su.email && (
           <a href={`mailto:${su.email}`} className="hover:text-foreground block">
             {su.email}
@@ -289,63 +431,58 @@ function Row({
             {su.phone}
           </a>
         )}
-        {!su.email && !su.phone && "—"}
-      </td>
-      <td className="px-3 py-2">
-        <button
-          type="button"
-          onClick={toggleTrained}
-          disabled={pending || archived}
-          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-            su.trained_at
-              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
-              : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300"
-          } disabled:opacity-50`}
-        >
-          <CheckCircleIcon className="h-3.5 w-3.5" />
-          {su.trained_at ? `Trained · ${su.trained_at}` : "Not trained"}
-        </button>
-      </td>
-      <td className="px-3 py-2 text-right">
-        <div className="inline-flex items-center gap-1">
-          {!archived && (
-            <SuperUserFormDialog
-              mode="edit"
-              classes={classes}
-              superUser={su}
-              trigger={
-                <button
-                  type="button"
-                  className="text-muted-foreground hover:text-foreground rounded p-1"
-                  aria-label="Edit"
-                >
-                  <PencilSquareIcon className="h-4 w-4" />
-                </button>
-              }
-            />
-          )}
-          {archived ? (
-            <button
-              type="button"
-              onClick={handleRestore}
-              disabled={pending}
-              className="text-muted-foreground hover:text-foreground rounded px-2 py-1 text-xs disabled:opacity-50"
-            >
-              Restore
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleArchive}
-              disabled={pending}
-              className="text-muted-foreground hover:text-destructive rounded p-1 disabled:opacity-50"
-              aria-label="Archive"
-            >
-              <TrashIcon className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      </td>
-    </tr>
+      </div>
+      <button
+        type="button"
+        onClick={toggleTrained}
+        disabled={disabled || archived}
+        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+          su.trained_at
+            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+            : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300"
+        } disabled:opacity-50`}
+      >
+        <CheckCircleIcon className="h-3.5 w-3.5" />
+        {su.trained_at ? `Trained · ${su.trained_at}` : "Not trained"}
+      </button>
+      <div className="inline-flex items-center gap-1">
+        {!archived && (
+          <SuperUserFormDialog
+            mode="edit"
+            classes={classes}
+            superUser={su}
+            trigger={
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground rounded p-1"
+                aria-label="Edit"
+              >
+                <PencilSquareIcon className="h-4 w-4" />
+              </button>
+            }
+          />
+        )}
+        {archived ? (
+          <button
+            type="button"
+            onClick={handleRestore}
+            disabled={disabled}
+            className="text-muted-foreground hover:text-foreground rounded px-2 py-1 text-xs disabled:opacity-50"
+          >
+            Restore
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleArchive}
+            disabled={disabled}
+            className="text-muted-foreground hover:text-destructive rounded p-1 disabled:opacity-50"
+            aria-label="Archive"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
