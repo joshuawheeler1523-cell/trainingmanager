@@ -12,6 +12,7 @@ export { Field } from "./field";
 export { Heading, type HeadingLevel } from "./heading";
 export { HeatStrip, HeatStripLegend, type HeatWeek } from "./heat-strip";
 export { Input, Select, Textarea } from "./input";
+export { SectionRail, type SectionRailItem, type SectionState } from "./section-rail";
 export { Modal, type ModalSize } from "./modal";
 export { Skeleton, SkeletonLine, SkeletonStack } from "./skeleton";
 export { Tabs, type TabItem } from "./tabs";

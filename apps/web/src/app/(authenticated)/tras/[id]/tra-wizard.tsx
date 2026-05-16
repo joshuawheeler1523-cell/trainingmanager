@@ -3,13 +3,9 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import {
-  CheckCircleIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  SparklesIcon,
-} from "@heroicons/react/20/solid";
+import { ChevronLeftIcon, ChevronRightIcon, SparklesIcon } from "@heroicons/react/20/solid";
 import PageHeader from "@/components/ui/page-header";
+import { Badge, SectionRail, type SectionRailItem } from "@/components/ui";
 import { useIsModuleEnabled } from "@/components/labels";
 import Step1Basics from "./step-1-basics";
 import Step2Need from "./step-2-need";
@@ -59,12 +55,12 @@ const STEPS: { id: Step; label: string }[] = [
   { id: 9, label: "Review & generate" },
 ];
 
-const STATUS_BADGE: Record<TraStatus, string> = {
-  draft: "bg-surface text-muted-foreground",
-  documented: "bg-primary/10 text-primary",
-  converted: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
-  cancelled: "bg-destructive/10 text-destructive",
+const STATUS_VARIANT: Record<TraStatus, "neutral" | "info" | "warning" | "success" | "danger"> = {
+  draft: "neutral",
+  documented: "info",
+  converted: "warning",
+  completed: "success",
+  cancelled: "danger",
 };
 
 type Props = {
@@ -192,11 +188,7 @@ export default function TraWizard({
         }
         actions={
           <div className="flex items-center gap-2">
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_BADGE[tra.status]}`}
-            >
-              {tra.status}
-            </span>
+            <Badge variant={STATUS_VARIANT[tra.status]}>{tra.status}</Badge>
             {aiAssistantEnabled && (
               <button
                 type="button"
@@ -213,32 +205,32 @@ export default function TraWizard({
         }
       />
 
-      {/* Step indicator */}
-      <div className="border-border bg-background border-b px-6 py-3">
-        <ol className="flex flex-wrap gap-1.5">
-          {visibleSteps.map((s) => (
-            <li key={s.id} className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setStep(s.id);
-                }}
-                className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                  step === s.id
-                    ? "bg-primary text-primary-foreground"
-                    : step > s.id
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
-                      : "bg-surface text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span className="tabular-nums">
-                  {step > s.id ? <CheckCircleIcon className="h-3.5 w-3.5" /> : s.id}
-                </span>
-                <span>{s.label}</span>
-              </button>
-            </li>
-          ))}
-        </ol>
+      {/* Section rail — replaces the step-pill row. 4px segments + numeric
+          labels; click a label to jump to the section. */}
+      <div className="border-border bg-background border-b px-6 py-4">
+        <SectionRail
+          sections={visibleSteps.map<SectionRailItem>((s) => ({
+            id: s.id,
+            label: s.label,
+            state: s.id < step ? "done" : s.id === step ? "current" : "upcoming",
+          }))}
+          onSelect={(id) => {
+            setStep(id as Step);
+          }}
+        />
+      </div>
+
+      {/* Per-section header — eyebrow + serif title, matches the mock's
+          "Section 0X / 09 — Title" pattern */}
+      <div className="border-border bg-background border-b px-6 py-4">
+        <div className="flex items-baseline gap-3">
+          <span className="rounded-[3px] bg-[rgba(217,149,80,0.12)] px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--persimmon-deep)]">
+            Section {String(step).padStart(2, "0")} / 09
+          </span>
+          <h2 className="font-display text-foreground text-lg font-medium leading-tight tracking-[-0.005em]">
+            {STEPS.find((s) => s.id === step)?.label}
+          </h2>
+        </div>
       </div>
 
       <div className="p-6">

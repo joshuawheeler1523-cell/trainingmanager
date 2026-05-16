@@ -36,8 +36,8 @@ export default async function TrasPage() {
   return (
     <div>
       <PageHeader
-        title="TRAs"
-        description="Training Request Assessments — capture, estimate, and convert into projects."
+        title="Work Intake"
+        description="Capture training requests, estimate the work, and convert into projects."
       />
       <TrasView tras={tras} departments={departments} />
     </div>
