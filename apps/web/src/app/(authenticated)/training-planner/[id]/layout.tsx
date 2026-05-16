@@ -3,8 +3,17 @@ import Link from "next/link";
 import { ArrowLeftIcon } from "@heroicons/react/20/solid";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import type { Implementation } from "@arbor/shared";
+import { Badge, Eyebrow, type BadgeVariant } from "@/components/ui";
+import type { Implementation, ImplStatus } from "@arbor/shared";
 import StepNav from "./step-nav";
+
+const STATUS_VARIANT: Record<ImplStatus, BadgeVariant> = {
+  draft: "neutral",
+  active: "info",
+  completed: "success",
+  archived: "neutral",
+  cancelled: "danger",
+};
 
 type Params = Promise<{ id: string }>;
 
@@ -68,8 +77,8 @@ export default async function ImplementationLayout({
 
   return (
     <div>
-      {/* Header */}
-      <div className="border-border bg-background border-b px-6 py-4">
+      {/* Header — editorial breadcrumb eyebrow + serif title + Badge */}
+      <div className="border-border bg-background border-b px-6 py-5">
         <Link
           href="/training-planner"
           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
@@ -77,18 +86,33 @@ export default async function ImplementationLayout({
           <ArrowLeftIcon className="h-3.5 w-3.5" />
           Training Planner
         </Link>
-        <h1 className="text-foreground mt-1 truncate text-xl font-semibold">{impl.name}</h1>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <Eyebrow className="mr-1">Implementation</Eyebrow>
+          <h1 className="font-display text-foreground truncate text-2xl font-medium leading-tight tracking-[-0.005em]">
+            {impl.name}
+          </h1>
+          <Badge variant={STATUS_VARIANT[impl.status]}>{impl.status}</Badge>
+        </div>
         {impl.description && (
-          <p className="text-muted-foreground mt-1 max-w-3xl text-sm">{impl.description}</p>
+          <p className="text-muted-foreground mt-2 max-w-3xl text-sm">{impl.description}</p>
         )}
-        <div className="text-muted-foreground mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
+        <div className="text-muted-foreground mt-3 flex flex-wrap gap-x-5 gap-y-1 font-mono text-[10.5px] uppercase tracking-[0.04em]">
           {impl.window_start_date && impl.window_end_date && (
             <span>
-              Window: {impl.window_start_date} → {impl.window_end_date}
+              Window ·{" "}
+              <b className="text-foreground font-medium normal-case tabular-nums">
+                {impl.window_start_date} → {impl.window_end_date}
+              </b>
             </span>
           )}
-          {impl.go_live_date && <span>Go-live: {impl.go_live_date}</span>}
-          <span className="capitalize">Status: {impl.status}</span>
+          {impl.go_live_date && (
+            <span>
+              Go-live ·{" "}
+              <b className="text-foreground font-medium normal-case tabular-nums">
+                {impl.go_live_date}
+              </b>
+            </span>
+          )}
         </div>
       </div>
 

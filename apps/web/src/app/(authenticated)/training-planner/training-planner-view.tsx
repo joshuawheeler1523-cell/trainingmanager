@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DocumentDuplicateIcon, PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import EmptyState from "@/components/ui/empty-state";
+import { Badge, Eyebrow, type BadgeVariant } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { IMPL_STATUS_VALUES, type Implementation, type ImplStatus } from "@arbor/shared";
 import { archiveImplementation, createImplementation, duplicateImplementation } from "./actions";
 
@@ -17,12 +19,20 @@ type PlannerRow = Implementation & {
 
 type Props = { implementations: PlannerRow[] };
 
-const STATUS_BADGE: Record<ImplStatus, string> = {
-  draft: "bg-surface text-muted-foreground",
-  active: "bg-primary/10 text-primary",
-  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
-  archived: "bg-surface text-muted-foreground",
-  cancelled: "bg-destructive/10 text-destructive",
+const STATUS_VARIANT: Record<ImplStatus, BadgeVariant> = {
+  draft: "neutral",
+  active: "info",
+  completed: "success",
+  archived: "neutral",
+  cancelled: "danger",
+};
+
+const STATUS_LABEL: Record<ImplStatus, string> = {
+  draft: "Draft",
+  active: "Active",
+  completed: "Complete",
+  archived: "Archived",
+  cancelled: "Cancelled",
 };
 
 export default function TrainingPlannerView({ implementations }: Props) {
@@ -82,26 +92,45 @@ export default function TrainingPlannerView({ implementations }: Props) {
     return true;
   });
 
+  // Editorial footer summary, matches the planner mock's "62 sessions
+  // placed · 2 conflicts" style line under the schedule view.
+  const summary = useMemo(() => {
+    const sessions = filtered.reduce((s, i) => s + i.session_count, 0);
+    const active = filtered.filter((i) => i.status === "active").length;
+    const drafts = filtered.filter((i) => i.status === "draft").length;
+    return { sessions, active, drafts };
+  }, [filtered]);
+
+  const statusChips: { value: ImplStatus | "all"; label: string }[] = [
+    { value: "all", label: "All" },
+    ...IMPL_STATUS_VALUES.map((s) => ({ value: s, label: STATUS_LABEL[s] })),
+  ];
+
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-muted-foreground mb-1 text-xs font-medium">Status</p>
-          <select
-            aria-label="Filter by status"
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as ImplStatus | "all");
-            }}
-            className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-xs capitalize"
-          >
-            <option value="all">All</option>
-            {IMPL_STATUS_VALUES.map((s) => (
-              <option key={s} value={s} className="capitalize">
-                {s}
-              </option>
+    <div className="space-y-5 p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-2">
+          <Eyebrow variant="section">Filter</Eyebrow>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {statusChips.map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => {
+                  setStatusFilter(c.value);
+                }}
+                aria-pressed={statusFilter === c.value}
+                className={cn(
+                  "rounded-[3px] px-2 py-1 font-mono text-[10px] font-medium uppercase leading-none tracking-[0.06em] transition-colors",
+                  statusFilter === c.value
+                    ? "bg-[var(--ink,var(--foreground))] text-[var(--cream,var(--background))]"
+                    : "bg-surface text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {c.label}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
 
         <div className="flex items-end gap-2">
@@ -143,9 +172,9 @@ export default function TrainingPlannerView({ implementations }: Props) {
           }
         />
       ) : (
-        <div className="border-border overflow-hidden rounded-lg border">
+        <div className="border-border bg-background overflow-hidden rounded-xl border">
           <table className="w-full text-sm">
-            <thead className="bg-surface text-muted-foreground text-xs">
+            <thead className="border-border border-b border-dashed">
               <tr>
                 <Th className="w-1/3">Implementation</Th>
                 <Th>Status</Th>
@@ -159,41 +188,39 @@ export default function TrainingPlannerView({ implementations }: Props) {
             </thead>
             <tbody className="divide-border divide-y">
               {filtered.map((i) => (
-                <tr key={i.id} className="hover:bg-surface/50">
-                  <td className="px-3 py-2">
+                <tr key={i.id} className="hover:bg-surface">
+                  <td className="px-4 py-3">
                     <Link
                       href={`/training-planner/${i.id}/setup`}
-                      className="text-primary font-medium hover:underline"
+                      className="font-display text-foreground text-base font-medium leading-tight hover:underline"
                     >
                       {i.name}
                     </Link>
                     {i.description && (
-                      <p className="text-muted-foreground line-clamp-1 text-xs">{i.description}</p>
+                      <p className="text-muted-foreground mt-0.5 line-clamp-1 font-mono text-[10.5px] tracking-[0.02em]">
+                        {i.description}
+                      </p>
                     )}
                   </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_BADGE[i.status]}`}
-                    >
-                      {i.status}
-                    </span>
+                  <td className="px-4 py-3">
+                    <Badge variant={STATUS_VARIANT[i.status]}>{STATUS_LABEL[i.status]}</Badge>
                   </td>
-                  <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+                  <td className="text-muted-foreground px-4 py-3 font-mono text-[10.5px] tabular-nums">
                     {formatRange(i.window_start_date, i.window_end_date)}
                   </td>
-                  <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+                  <td className="text-muted-foreground px-4 py-3 font-mono text-[10.5px] tabular-nums">
                     {i.go_live_date ?? "—"}
                   </td>
-                  <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+                  <td className="text-foreground px-4 py-3 font-mono text-[11.5px] tabular-nums">
                     {i.class_count.toString()}
                   </td>
-                  <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
+                  <td className="text-foreground px-4 py-3 font-mono text-[11.5px] tabular-nums">
                     {i.session_count.toString()}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <CompletionBar percent={i.completion_pct} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         type="button"
@@ -225,6 +252,20 @@ export default function TrainingPlannerView({ implementations }: Props) {
               ))}
             </tbody>
           </table>
+
+          {/* Editorial footer summary line */}
+          <div className="border-border text-muted-foreground flex flex-wrap items-center justify-between gap-2 border-t border-dashed px-4 py-3 font-mono text-[10.5px] tracking-[0.04em]">
+            <span>
+              {filtered.length} shown ·{" "}
+              <b className="text-foreground font-medium">{summary.sessions}</b> sessions placed
+              {summary.active > 0 && <> · {summary.active} active</>}
+            </span>
+            {summary.drafts > 0 && (
+              <span>
+                <b className="text-foreground font-medium">{summary.drafts}</b> in draft
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -234,7 +275,10 @@ export default function TrainingPlannerView({ implementations }: Props) {
 function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th
-      className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wide ${className ?? ""}`}
+      className={cn(
+        "text-muted-foreground px-4 py-3 text-left font-mono text-[10px] font-medium uppercase tracking-[0.08em]",
+        className,
+      )}
     >
       {children}
     </th>
@@ -247,10 +291,13 @@ function CompletionBar({ percent }: { percent: number | null }) {
   }
   return (
     <div className="flex items-center gap-2">
-      <div className="bg-surface h-2 flex-1 overflow-hidden rounded-full">
-        <div className="bg-primary h-full" style={{ width: `${percent.toString()}%` }} />
+      <div className="h-1.5 flex-1 overflow-hidden rounded-sm bg-[var(--hair-soft,rgba(28,31,28,0.06))]">
+        <div
+          className="h-full bg-[var(--forest,var(--primary))]"
+          style={{ width: `${percent.toString()}%` }}
+        />
       </div>
-      <span className="text-muted-foreground w-9 shrink-0 text-right text-xs tabular-nums">
+      <span className="text-muted-foreground w-9 shrink-0 text-right font-mono text-[10.5px] tabular-nums">
         {percent.toString()}%
       </span>
     </div>
