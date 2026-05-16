@@ -133,6 +133,17 @@ export default function RequestQueueView({
     return m;
   }, [requests, statusOverride]);
 
+  // Always show the six "active" columns. Surface archived / rejected
+  // columns only when they have items — otherwise a status change via
+  // the sheet to one of those terminal states would silently disappear
+  // the card.
+  const visibleColumns = useMemo<RequestStatus[]>(() => {
+    const cols: RequestStatus[] = [...REQUEST_KANBAN_STATUS_VALUES];
+    if (byColumn.archived.length > 0) cols.push("archived");
+    if (byColumn.rejected.length > 0) cols.push("rejected");
+    return cols;
+  }, [byColumn]);
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over) return;
@@ -224,19 +235,20 @@ export default function RequestQueueView({
       </div>
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-6">
-          {REQUEST_KANBAN_STATUS_VALUES.map((status) => (
-            <KanbanColumn
-              key={status}
-              status={status}
-              label={COLUMN_LABELS[status]}
-              requests={byColumn[status]}
-              assignmentsByRequest={assignmentsByRequest}
-              onOpen={(id) => {
-                setOpenId(id);
-              }}
-              pending={pending}
-            />
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          {visibleColumns.map((status) => (
+            <div key={status} className="w-72 shrink-0">
+              <KanbanColumn
+                status={status}
+                label={COLUMN_LABELS[status]}
+                requests={byColumn[status]}
+                assignmentsByRequest={assignmentsByRequest}
+                onOpen={(id) => {
+                  setOpenId(id);
+                }}
+                pending={pending}
+              />
+            </div>
           ))}
         </div>
       </DndContext>
