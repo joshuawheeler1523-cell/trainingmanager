@@ -5,27 +5,17 @@ import Link from "next/link";
 import { ArrowUpTrayIcon, BookOpenIcon } from "@heroicons/react/20/solid";
 import type { ColumnDef } from "@tanstack/react-table";
 import DataTable from "@/components/ui/data-table";
+import { Badge } from "@/components/ui";
 import RecommendationsBanner from "@/components/recommendations-banner";
 import CsvImportDialog from "@/components/csv-import-dialog";
 import ClassFormDialog from "./class-form-dialog";
 import { importClassesCsv } from "./actions";
 import type { ClassWithHours, Instructor, Recommendation } from "@arbor/shared";
 
-const STATUS_STYLES: Record<string, string> = {
-  active: "bg-green-100 text-green-800",
-  archived: "bg-gray-100 text-gray-600",
-};
-
 function StatusBadge({ status, deleted }: { status: string; deleted: boolean }) {
-  const label = deleted ? "Archived" : status;
-  const cls = deleted
-    ? "bg-gray-100 text-gray-600"
-    : (STATUS_STYLES[status] ?? "bg-gray-100 text-gray-600");
-  return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
-      {label}
-    </span>
-  );
+  if (deleted) return <Badge variant="neutral">Archived</Badge>;
+  if (status === "active") return <Badge variant="success">Active</Badge>;
+  return <Badge variant="neutral">{status}</Badge>;
 }
 
 const columns: ColumnDef<ClassWithHours>[] = [
