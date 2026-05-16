@@ -16,6 +16,8 @@ import {
 import { ClipboardDocumentIcon, CheckIcon, PlusIcon, LinkIcon } from "@heroicons/react/20/solid";
 import RequestSheet from "./request-sheet";
 import NewRequestDialog from "./new-request-dialog";
+import { Badge, type BadgeVariant } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import {
   publicIntakeUrl,
   REQUEST_KANBAN_STATUS_VALUES,
@@ -35,11 +37,11 @@ type Props = {
   origin: string;
 };
 
-const URGENCY_BADGE: Record<string, string> = {
-  low: "bg-surface text-muted-foreground",
-  standard: "bg-primary/10 text-primary",
-  high: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-  urgent: "bg-destructive/10 text-destructive",
+const URGENCY_VARIANT: Record<string, BadgeVariant> = {
+  low: "neutral",
+  standard: "info",
+  high: "warning",
+  urgent: "danger",
 };
 
 const COLUMN_LABELS: Record<RequestStatus, string> = {
@@ -177,13 +179,15 @@ export default function RequestQueueView({
 
   return (
     <div className="space-y-4 p-6">
-      <div className="border-border bg-background flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+      <div className="border-border bg-background flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <LinkIcon className="text-muted-foreground h-4 w-4 shrink-0" />
           {activeLink ? (
             <>
-              <span className="text-muted-foreground text-xs">External intake form:</span>
-              <code className="bg-surface text-foreground truncate rounded px-2 py-0.5 text-xs">
+              <span className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
+                External intake form ·
+              </span>
+              <code className="bg-surface text-foreground truncate rounded px-2 py-0.5 font-mono text-[11px]">
                 {publicIntakeUrl(origin, activeLink.token)}
               </code>
               <button
@@ -191,11 +195,11 @@ export default function RequestQueueView({
                 onClick={() => {
                   void copyShareLink();
                 }}
-                className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 text-xs"
+                className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.04em]"
                 aria-label="Copy intake link"
               >
                 {copied ? (
-                  <CheckIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <CheckIcon className="h-4 w-4 text-[var(--forest)]" />
                 ) : (
                   <ClipboardDocumentIcon className="h-4 w-4" />
                 )}
@@ -204,12 +208,14 @@ export default function RequestQueueView({
             </>
           ) : (
             <>
-              <span className="text-muted-foreground text-xs">No external intake link yet.</span>
+              <span className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
+                No external intake link yet.
+              </span>
               <button
                 type="button"
                 disabled={pending}
                 onClick={quickCreateLink}
-                className="text-primary hover:text-primary/80 text-xs font-medium disabled:opacity-50"
+                className="text-foreground hover:text-primary font-mono text-[10.5px] font-medium uppercase tracking-[0.04em] underline disabled:opacity-50"
               >
                 Create one
               </button>
@@ -217,7 +223,7 @@ export default function RequestQueueView({
           )}
           <Link
             href="/admin/intake-links"
-            className="text-muted-foreground hover:text-foreground ml-auto whitespace-nowrap text-xs underline-offset-4 hover:underline sm:ml-2"
+            className="text-muted-foreground hover:text-foreground ml-auto whitespace-nowrap font-mono text-[10.5px] uppercase tracking-[0.04em] underline-offset-4 hover:underline sm:ml-2"
           >
             Manage links →
           </Link>
@@ -294,19 +300,24 @@ function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`border-border bg-surface flex h-full min-h-[200px] flex-col rounded-xl border ${
-        isOver ? "border-primary ring-primary/30 ring-2" : ""
-      }`}
+      className={cn(
+        "border-border bg-surface flex h-full min-h-[200px] flex-col rounded-xl border",
+        isOver && "border-foreground/40 ring-foreground/20 ring-2",
+      )}
     >
-      <div className="border-border bg-background flex items-center justify-between rounded-t-xl border-b px-3 py-2">
-        <span className="text-foreground text-xs font-semibold">{label}</span>
-        <span className="bg-surface text-muted-foreground rounded-full px-1.5 text-xs tabular-nums">
+      <div className="border-border bg-background flex items-center justify-between rounded-t-xl border-b border-dashed px-4 py-3">
+        <span className="text-foreground font-mono text-[10px] font-medium uppercase tracking-[0.08em]">
+          {label}
+        </span>
+        <span className="text-muted-foreground font-mono text-[10.5px] tabular-nums tracking-[0.04em]">
           {requests.length}
         </span>
       </div>
       <div className="flex-1 space-y-2 p-2">
         {requests.length === 0 ? (
-          <p className="text-muted-foreground py-6 text-center text-xs">No requests</p>
+          <p className="text-muted-foreground py-6 text-center font-mono text-[10.5px] uppercase tracking-[0.04em]">
+            No requests
+          </p>
         ) : (
           requests.map((r) => (
             <KanbanCard
@@ -351,9 +362,10 @@ function KanbanCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`border-border bg-background rounded-lg border p-3 shadow-sm ${
-        disabled ? "cursor-wait opacity-70" : ""
-      }`}
+      className={cn(
+        "border-border bg-background rounded-lg border p-3 shadow-sm",
+        disabled && "cursor-wait opacity-70",
+      )}
     >
       <div
         {...attributes}
@@ -363,23 +375,25 @@ function KanbanCard({
         className="cursor-grab active:cursor-grabbing"
       >
         <div className="flex items-start justify-between gap-2">
-          <p className="text-foreground line-clamp-2 text-sm font-medium">{request.title}</p>
-          <span
-            className={`shrink-0 rounded-full px-1.5 py-0.5 text-xs font-medium capitalize ${URGENCY_BADGE[request.urgency] ?? ""}`}
-          >
-            {request.urgency}
-          </span>
+          <p className="font-display text-foreground line-clamp-2 text-base font-medium leading-tight">
+            {request.title}
+          </p>
+          <Badge variant={URGENCY_VARIANT[request.urgency] ?? "neutral"}>{request.urgency}</Badge>
         </div>
-        <p className="text-muted-foreground mt-1 truncate text-xs">
+        <p className="text-muted-foreground mt-1.5 truncate font-mono text-[10.5px] tracking-[0.02em]">
           {request.requested_by_name}
           {request.requested_by_department && ` · ${request.requested_by_department}`}
         </p>
       </div>
-      <div className="border-border mt-2 flex items-center justify-between border-t pt-2 text-xs">
+      <div className="border-border mt-2 flex items-center justify-between border-t border-dashed pt-2 font-mono text-[10.5px] tracking-[0.04em]">
         <span className="text-muted-foreground tabular-nums">
           {new Date(request.created_at).toLocaleDateString()}
         </span>
-        <button type="button" onClick={onOpen} className="text-primary hover:underline">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="text-foreground hover:text-primary uppercase tracking-[0.04em]"
+        >
           {assignmentCount > 0
             ? `${assignmentCount.toString()} assigned`
             : request.submitted_via === "public_form"
