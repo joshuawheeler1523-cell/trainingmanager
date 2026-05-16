@@ -259,57 +259,60 @@ export default function Step9Review({
         </div>
       )}
 
-      {/* Summary */}
+      {/* Inline effort estimator — the "estimation happens during input"
+          signature element from the editorial design. Forest-tinted card,
+          deliverables aggregated by type, big serif total in forest green. */}
       <section className="border-border bg-background rounded-xl border p-6">
-        <h3 className="text-foreground mb-4 text-sm font-semibold">Summary</h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <p className="text-muted-foreground text-xs font-medium">Total deliverables</p>
-            <p className="text-foreground mt-1 text-2xl font-semibold tabular-nums">
-              {deliverables.length}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs font-medium">Total estimated hours</p>
-            <p className="text-foreground mt-1 text-2xl font-semibold tabular-nums">
-              {total.toFixed(1)}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs font-medium">Stored on intake</p>
-            <p className="text-foreground mt-1 text-2xl font-semibold tabular-nums">
-              {tra.total_estimated_hours.toFixed(1)}
-            </p>
-          </div>
+        <div className="mb-3 flex items-center justify-between font-mono text-[10px] uppercase leading-none tracking-[0.08em]">
+          <span className="text-muted-foreground">Effort estimate · auto-calculated</span>
+          <span className="text-muted-foreground">From section 5 deliverables</span>
         </div>
-      </section>
 
-      {/* Breakdown by type */}
-      <section className="border-border bg-background rounded-xl border p-6">
-        <h3 className="text-foreground mb-4 text-sm font-semibold">
-          Breakdown by deliverable type
-        </h3>
         {breakdown.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground py-2 text-sm">
             No deliverables yet. Go back to Section 5 to add some.
           </p>
         ) : (
-          <ul className="divide-border divide-y">
+          <div className="flex flex-col gap-1.5">
             {breakdown.map((b) => (
-              <li key={b.name} className="flex items-center justify-between py-2.5">
-                <div>
-                  <p className="text-foreground text-sm font-medium">{b.name}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {b.count} deliverable{b.count === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <span className="text-foreground text-base font-semibold tabular-nums">
-                  {b.hours.toFixed(1)} h
+              <div
+                key={b.name}
+                className="grid grid-cols-[1fr_50px_50px] gap-2.5 border-b border-dashed border-[var(--hair-soft,rgba(28,31,28,0.10))] py-1 font-mono text-[11px] leading-tight last:border-b-0"
+              >
+                <span className="text-muted-foreground truncate">
+                  {b.name}
+                  <span className="ml-1.5 text-[10px]">
+                    · {b.count} deliverable{b.count === 1 ? "" : "s"}
+                  </span>
                 </span>
-              </li>
+                <span className="text-muted-foreground text-right tabular-nums">
+                  {b.hours.toFixed(0)} h
+                </span>
+                <span className="text-foreground text-right tabular-nums">
+                  {b.hours.toFixed(0)}
+                </span>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
+
+        <div className="mt-3 flex items-baseline justify-between border-t border-[var(--hair,rgba(28,31,28,0.16))] pt-2.5 font-mono text-[11px] uppercase leading-none tracking-[0.04em]">
+          <span className="text-muted-foreground">Total trainer hours</span>
+          <span className="font-display text-[22px] font-medium normal-case leading-none tracking-[-0.01em] text-[var(--forest,var(--primary))]">
+            {total.toFixed(0)} h
+          </span>
+        </div>
+
+        {/* Secondary stats — kept understated under the estimator */}
+        <div className="border-border text-muted-foreground mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-dashed pt-3 font-mono text-[10.5px] tracking-[0.04em]">
+          <span>
+            {deliverables.length} deliverable{deliverables.length === 1 ? "" : "s"}
+          </span>
+          <span>
+            Stored on intake ·{" "}
+            <b className="text-foreground font-medium">{tra.total_estimated_hours.toFixed(0)} h</b>
+          </span>
+        </div>
       </section>
 
       {/* Adjustments */}
