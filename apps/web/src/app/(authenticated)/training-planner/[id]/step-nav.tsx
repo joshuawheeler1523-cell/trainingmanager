@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
-import { SectionRail, type SectionRailItem } from "@/components/ui";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 type Readiness = {
@@ -22,6 +21,8 @@ type Step = {
   readyKey: keyof Readiness | null;
 };
 
+type StepState = "done" | "current" | "upcoming";
+
 // The 7-step wizard rail. Super Users is auxiliary (no step number, sits
 // next to the rail as a trailing chip — matches the mock's pattern of
 // keeping the main flow visually weighted and the side rails light.
@@ -35,55 +36,68 @@ const STEPS: Step[] = [
   { slug: "schedule", label: "Schedule", readyKey: "sessions" },
 ];
 
+const BAR: Record<StepState, string> = {
+  done: "bg-[var(--forest)]",
+  current: "bg-[var(--persimmon)]",
+  upcoming: "bg-[var(--hair-soft,rgba(28,31,28,0.10))]",
+};
+
 export default function StepNav({ implementationId, readiness }: Props) {
-  const router = useRouter();
   const pathname = usePathname();
 
   const activeIdx = STEPS.findIndex((s) => pathname.endsWith(`/${s.slug}`));
   const superUsersActive = pathname.endsWith("/super-users");
 
-  const sections: SectionRailItem[] = STEPS.map((s, i) => {
-    const ready = s.readyKey ? readiness[s.readyKey] : false;
-    return {
-      id: i + 1,
-      label: s.label,
-      state: activeIdx === i ? "current" : ready ? "done" : "upcoming",
-    };
-  });
-
   return (
     <div className="border-border bg-background sticky top-0 z-10 border-b px-6 py-3">
       <div className="flex items-end gap-6">
         <div className="min-w-0 flex-1">
-          <SectionRail
-            sections={sections}
-            onSelect={(id) => {
-              const step = STEPS[id - 1];
-              if (step) {
-                router.push(`/training-planner/${implementationId}/${step.slug}`);
-              }
-            }}
-          />
-          {/* Visible labels under the rail — match the mock's "step name"
-              callouts below the numeric labels. Lit when current. */}
+          {/* Each step is a single clickable column — number, bar, and
+              title share one large hit target so users don't have to aim
+              at the 4px bar. Matches the editorial rail mock visually. */}
           <div
-            className="mt-2 grid gap-1 font-mono text-[9.5px] uppercase leading-none tracking-[0.04em]"
+            className="grid gap-1"
             style={{ gridTemplateColumns: `repeat(${String(STEPS.length)}, minmax(0, 1fr))` }}
           >
-            {STEPS.map((s, i) => (
-              <Link
-                key={s.slug}
-                href={`/training-planner/${implementationId}/${s.slug}`}
-                className={cn(
-                  "hover:text-foreground truncate text-center transition-colors",
-                  activeIdx === i
-                    ? "font-medium text-[var(--persimmon-deep)]"
-                    : "text-muted-foreground",
-                )}
-              >
-                {s.label}
-              </Link>
-            ))}
+            {STEPS.map((s, i) => {
+              const ready = s.readyKey ? readiness[s.readyKey] : false;
+              const state: StepState = activeIdx === i ? "current" : ready ? "done" : "upcoming";
+              const isCurrent = state === "current";
+              return (
+                <Link
+                  key={s.slug}
+                  href={`/training-planner/${implementationId}/${s.slug}`}
+                  aria-current={isCurrent ? "step" : undefined}
+                  aria-label={`Step ${String(i + 1).padStart(2, "0")} — ${s.label}`}
+                  className="hover:bg-surface group flex flex-col items-stretch gap-1.5 rounded-sm px-1 py-1 transition-colors"
+                >
+                  <span
+                    className={cn(
+                      "text-center font-mono text-[9px] uppercase leading-none tracking-[0.04em] transition-colors",
+                      isCurrent
+                        ? "font-medium text-[var(--persimmon-deep)]"
+                        : "text-muted-foreground group-hover:text-foreground",
+                    )}
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span
+                    aria-hidden
+                    className={cn("h-1 rounded-sm transition-colors", BAR[state])}
+                  />
+                  <span
+                    className={cn(
+                      "truncate text-center font-mono text-[9.5px] uppercase leading-none tracking-[0.04em] transition-colors",
+                      isCurrent
+                        ? "font-medium text-[var(--persimmon-deep)]"
+                        : "text-muted-foreground group-hover:text-foreground",
+                    )}
+                  >
+                    {s.label}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
 
