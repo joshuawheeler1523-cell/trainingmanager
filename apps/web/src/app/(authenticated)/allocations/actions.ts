@@ -150,13 +150,14 @@ export async function unarchiveBucket(id: string): Promise<ActionResult<{ id: st
 
 /**
  * Apply a bucket template: archive every existing non-archived bucket,
- * create the template's slate fresh, and set global allocation
- * percentages to match. The template defines the entire slate so totals
- * are guaranteed to sum to 100%.
+ * create the template's slate fresh, set global allocation percentages
+ * to match, and remap any references to the old buckets so historical
+ * assignments re-categorize under the new buckets by case-insensitive
+ * name match.
  *
  * Buckets aren't hard-deleted — they're archived (soft delete) so any
- * existing allocation rows pointing at them stay valid for historical
- * reads. The user can restore them later from "Show archived".
+ * unmatched allocation rows stay valid for historical reads. The user
+ * can restore them later from "Show archived".
  */
 export async function applyBucketTemplate(
   templateId: string,
@@ -169,7 +170,18 @@ export async function applyBucketTemplate(
   const c = await ctx();
   if (!c.ok) return c;
 
-  // 1. Archive every active bucket — preserves history, hides from pickers.
+  // 1. Capture active old buckets BEFORE archiving so we can remap
+  //    workload + override rows to the template's equivalents.
+  const { data: oldBuckets, error: oldErr } = await c.supabase
+    .from("allocation_buckets")
+    .select("id, name")
+    .eq("org_id", c.orgId)
+    .eq("is_archived", false);
+  if (oldErr) {
+    return { ok: false, error: { code: oldErr.code, message: oldErr.message } };
+  }
+
+  // 2. Archive every active bucket — preserves history, hides from pickers.
   const { error: archiveErr } = await c.supabase
     .from("allocation_buckets")
     .update({ is_archived: true })
@@ -179,7 +191,7 @@ export async function applyBucketTemplate(
     return { ok: false, error: { code: archiveErr.code, message: archiveErr.message } };
   }
 
-  // 2. Insert the template's bucket slate. display_order matches array
+  // 3. Insert the template's bucket slate. display_order matches array
   //    order so the UI shows them in template-defined sequence.
   const newRows = template.buckets.map((b, i) => ({
     org_id: c.orgId,
@@ -202,7 +214,59 @@ export async function applyBucketTemplate(
     return { ok: false, error: { code: insertErr.code, message } };
   }
 
-  // 3. Replace global_allocations with the template's percentages.
+  // 4. Remap workload + override rows from old bucket IDs to the new
+  //    template bucket IDs by case-insensitive name match. Without this,
+  //    every class / recurring task / ad-hoc task / project / group +
+  //    individual override would still point at the now-archived bucket,
+  //    causing the per-instructor segmented bars (and bucket consumption
+  //    panel) to render blank even though the % totals still compute.
+  const newByName = new Map(inserted.map((b) => [b.name.toLowerCase().trim(), b.id] as const));
+  const remap: { oldId: string; newId: string }[] = [];
+  for (const old of oldBuckets) {
+    const newId = newByName.get(old.name.toLowerCase().trim());
+    if (newId) remap.push({ oldId: old.id, newId });
+  }
+  for (const { oldId, newId } of remap) {
+    const results = await Promise.all([
+      c.supabase
+        .from("classes")
+        .update({ allocation_bucket_id: newId })
+        .eq("org_id", c.orgId)
+        .eq("allocation_bucket_id", oldId),
+      c.supabase
+        .from("recurring_tasks")
+        .update({ bucket_id: newId })
+        .eq("org_id", c.orgId)
+        .eq("bucket_id", oldId),
+      c.supabase
+        .from("ad_hoc_tasks")
+        .update({ bucket_id: newId })
+        .eq("org_id", c.orgId)
+        .eq("bucket_id", oldId),
+      c.supabase
+        .from("projects")
+        .update({ bucket_id: newId })
+        .eq("org_id", c.orgId)
+        .eq("bucket_id", oldId),
+      c.supabase
+        .from("group_allocations")
+        .update({ bucket_id: newId })
+        .eq("org_id", c.orgId)
+        .eq("bucket_id", oldId),
+      c.supabase
+        .from("individual_allocations")
+        .update({ bucket_id: newId })
+        .eq("org_id", c.orgId)
+        .eq("bucket_id", oldId),
+    ]);
+    for (const r of results) {
+      if (r.error) {
+        return { ok: false, error: { code: r.error.code, message: r.error.message } };
+      }
+    }
+  }
+
+  // 5. Replace global_allocations with the template's percentages.
   //    Older global rows for archived buckets are removed so the
   //    Global tab shows a clean slate.
   const { error: clearErr } = await c.supabase
