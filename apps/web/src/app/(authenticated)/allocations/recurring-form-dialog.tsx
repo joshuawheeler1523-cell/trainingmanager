@@ -53,7 +53,7 @@ type FormValues = {
   status: "active" | "paused" | "archived";
 };
 
-type AssignmentDraft = { instructor_id: string; share_percent: number };
+type AssignmentDraft = { instructor_id: string };
 
 function fieldClass(error?: boolean) {
   return `w-full rounded-md border px-3 py-2 text-sm text-foreground bg-background focus:outline-none focus:ring-2 focus:ring-ring ${
@@ -136,10 +136,7 @@ export default function RecurringFormDialog(props: Props) {
 
   // Local assignment slate (not part of zodResolver — we save it after the task)
   const initialAssignments: AssignmentDraft[] = isEdit
-    ? props.assignments.map((a) => ({
-        instructor_id: a.instructor_id,
-        share_percent: a.share_percent,
-      }))
+    ? props.assignments.map((a) => ({ instructor_id: a.instructor_id }))
     : [];
   const [assignments, setAssignments] = useState<AssignmentDraft[]>(initialAssignments);
   const [pickInstructor, setPickInstructor] = useState("");
@@ -154,43 +151,25 @@ export default function RecurringFormDialog(props: Props) {
     .filter((i) => !assignedIds.has(i.id) && i.deleted_at === null)
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
-  function distributeEvenly(rows: AssignmentDraft[]): AssignmentDraft[] {
-    if (rows.length === 0) return rows;
-    const each = Math.floor((100 / rows.length) * 100) / 100;
-    const remainder = Math.round((100 - each * rows.length) * 100) / 100;
-    return rows.map((r, i) => ({
-      ...r,
-      share_percent: i === 0 ? each + remainder : each,
-    }));
-  }
-
   function addAssignment() {
     if (!pickInstructor) return;
-    const next = [...assignments, { instructor_id: pickInstructor, share_percent: 0 }];
-    setAssignments(distributeEvenly(next));
+    setAssignments((prev) => [...prev, { instructor_id: pickInstructor }]);
     setPickInstructor("");
   }
 
-  function updateShare(idx: number, share: number) {
-    setAssignments((prev) => prev.map((a, i) => (i === idx ? { ...a, share_percent: share } : a)));
-  }
-
   function removeAssignment(idx: number) {
-    setAssignments((prev) => distributeEvenly(prev.filter((_, i) => i !== idx)));
+    setAssignments((prev) => prev.filter((_, i) => i !== idx));
   }
 
   function instructorName(id: string) {
     return props.instructors.find((i) => i.id === id)?.full_name ?? id;
   }
 
-  const shareSum = Math.round(assignments.reduce((acc, a) => acc + a.share_percent, 0) * 100) / 100;
-  const shareValid = assignments.length === 0 || Math.abs(shareSum - 100) < 0.005;
-
   async function onSubmit(data: FormValues) {
     if (assignments.length > 0) {
       const validate = recurringAssignmentSlateSchema.safeParse(assignments);
       if (!validate.success) {
-        toast.error(validate.error.errors[0]?.message ?? "Invalid assignment shares.");
+        toast.error(validate.error.errors[0]?.message ?? "Invalid assignment list.");
         return;
       }
     }
@@ -358,20 +337,14 @@ export default function RecurringFormDialog(props: Props) {
               </span>
             </div>
 
-            {/* Instructor assignments */}
+            {/* Instructor assignments — every assignee is charged the task's full hours. */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h4 className="text-foreground text-sm font-semibold">
                   Instructor assignments ({assignments.length})
                 </h4>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${
-                    shareValid
-                      ? "bg-surface text-muted-foreground"
-                      : "bg-destructive/10 text-destructive"
-                  }`}
-                >
-                  {assignments.length === 0 ? "Unassigned" : `${shareSum.toFixed(1)}% total`}
+                <span className="bg-surface text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium tabular-nums">
+                  {assignments.length === 0 ? "Unassigned" : `${annual.toFixed(1)} h/yr each`}
                 </span>
               </div>
 
@@ -383,9 +356,6 @@ export default function RecurringFormDialog(props: Props) {
                         <th className="text-muted-foreground px-3 py-2 text-left text-xs font-medium">
                           Instructor
                         </th>
-                        <th className="text-muted-foreground px-3 py-2 text-left text-xs font-medium">
-                          Share %
-                        </th>
                         <th className="w-8 px-3 py-2" />
                       </tr>
                     </thead>
@@ -394,19 +364,6 @@ export default function RecurringFormDialog(props: Props) {
                         <tr key={a.instructor_id}>
                           <td className="text-foreground px-3 py-2 text-xs">
                             {instructorName(a.instructor_id)}
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              step="0.5"
-                              value={a.share_percent}
-                              onChange={(e) => {
-                                updateShare(i, Number(e.target.value));
-                              }}
-                              className="border-input bg-background text-foreground w-20 rounded border px-2 py-1 text-right text-xs tabular-nums"
-                            />
                           </td>
                           <td className="px-3 py-2 text-right">
                             <button
@@ -454,12 +411,6 @@ export default function RecurringFormDialog(props: Props) {
                   </button>
                 </div>
               )}
-
-              {!shareValid && (
-                <p className="text-destructive text-xs">
-                  Share percentages must sum to 100% before saving.
-                </p>
-              )}
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
@@ -473,7 +424,7 @@ export default function RecurringFormDialog(props: Props) {
               </Dialog.Close>
               <button
                 type="submit"
-                disabled={isSubmitting || !shareValid}
+                disabled={isSubmitting}
                 className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Create task"}

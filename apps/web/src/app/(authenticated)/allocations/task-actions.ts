@@ -143,8 +143,8 @@ export async function setRecurringTaskStatus(
   return { ok: true, data: { id } };
 }
 
-// Replace the assignment slate for a recurring task. Validates that share
-// percentages sum to 100 (when there are any assignments).
+// Replace the assignment slate for a recurring task. Every assignee
+// is charged the task's full hours, so no share percentage is needed.
 export async function saveRecurringAssignments(
   recurringTaskId: string,
   input: unknown,
@@ -179,7 +179,7 @@ export async function saveRecurringAssignments(
         department_id: c.departmentId,
         recurring_task_id: recurringTaskId,
         instructor_id: r.instructor_id,
-        share_percent: r.share_percent,
+        share_percent: 100,
       })),
       { onConflict: "recurring_task_id,instructor_id" },
     );

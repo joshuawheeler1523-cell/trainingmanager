@@ -207,13 +207,9 @@ export default function RecurringTab({ tasks, assignments, buckets, instructors 
                           {taskAssignments.map((a) => (
                             <span
                               key={a.instructor_id}
-                              className="bg-surface text-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
-                              title={`${String(a.share_percent)}%`}
+                              className="bg-surface text-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs"
                             >
                               {instructorsById.get(a.instructor_id)?.full_name ?? a.instructor_id}
-                              <span className="text-muted-foreground tabular-nums">
-                                {a.share_percent}%
-                              </span>
                             </span>
                           ))}
                         </div>
