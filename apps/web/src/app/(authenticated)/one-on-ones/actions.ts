@@ -409,11 +409,14 @@ export async function setClassAssignment(
 // recurring_task_assignments has a composite key (recurring_task_id,
 // instructor_id) — no synthetic id column. Look up + mutate by both.
 // The workload change log uses recurring_task_id as the source_id.
-export async function setRecurringAssignment(
+//
+// Recurring tasks are per-attendee (every assignee is charged the full
+// hours), so the only meaningful 1:1 edit is "remove this instructor
+// from the task".
+export async function removeRecurringAssignment(
   oneOnOneId: string,
   recurringTaskId: string,
   instructorId: string,
-  newSharePercent: number,
   rationale: string | null,
 ): Promise<ActionResult<{ id: string }>> {
   const c = await ctx();
@@ -421,52 +424,32 @@ export async function setRecurringAssignment(
 
   const { data: before } = await c.supabase
     .from("recurring_task_assignments")
-    .select("share_percent")
+    .select("recurring_task_id")
     .eq("recurring_task_id", recurringTaskId)
     .eq("instructor_id", instructorId)
     .eq("org_id", c.orgId)
     .maybeSingle();
   if (!before) return { ok: false, error: { code: "NOT_FOUND", message: "Assignment not found" } };
 
-  if (newSharePercent <= 0) {
-    await c.supabase
-      .from("recurring_task_assignments")
-      .delete()
-      .eq("recurring_task_id", recurringTaskId)
-      .eq("instructor_id", instructorId)
-      .eq("org_id", c.orgId);
-    await c.supabase.from("one_on_one_workload_changes").insert({
-      one_on_one_id: oneOnOneId,
-      org_id: c.orgId,
-      department_id: c.departmentId,
-      source_kind: "recurring_assignment",
-      source_id: recurringTaskId,
-      change_kind: "removed",
-      before_value: { share_percent: before.share_percent },
-      after_value: null,
-      rationale_category: rationale,
-      actor_id: c.userId,
-    });
-  } else {
-    await c.supabase
-      .from("recurring_task_assignments")
-      .update({ share_percent: newSharePercent })
-      .eq("recurring_task_id", recurringTaskId)
-      .eq("instructor_id", instructorId)
-      .eq("org_id", c.orgId);
-    await c.supabase.from("one_on_one_workload_changes").insert({
-      one_on_one_id: oneOnOneId,
-      org_id: c.orgId,
-      department_id: c.departmentId,
-      source_kind: "recurring_assignment",
-      source_id: recurringTaskId,
-      change_kind: "modified",
-      before_value: { share_percent: before.share_percent },
-      after_value: { share_percent: newSharePercent },
-      rationale_category: rationale,
-      actor_id: c.userId,
-    });
-  }
+  await c.supabase
+    .from("recurring_task_assignments")
+    .delete()
+    .eq("recurring_task_id", recurringTaskId)
+    .eq("instructor_id", instructorId)
+    .eq("org_id", c.orgId);
+  await c.supabase.from("one_on_one_workload_changes").insert({
+    one_on_one_id: oneOnOneId,
+    org_id: c.orgId,
+    department_id: c.departmentId,
+    source_kind: "recurring_assignment",
+    source_id: recurringTaskId,
+    change_kind: "removed",
+    before_value: { assigned: true },
+    after_value: null,
+    rationale_category: rationale,
+    actor_id: c.userId,
+  });
+
   revalidate(oneOnOneId);
   return { ok: true, data: { id: recurringTaskId } };
 }

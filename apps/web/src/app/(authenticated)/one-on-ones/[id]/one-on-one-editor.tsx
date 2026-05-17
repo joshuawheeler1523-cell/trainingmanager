@@ -39,9 +39,9 @@ import {
   createActionItem,
   deleteActionItem,
   markAdHocTaskDone,
+  removeRecurringAssignment,
   resolveActionItem,
   setClassAssignment,
-  setRecurringAssignment,
   updateActionItem,
   updateOneOnOne,
 } from "../actions";
@@ -74,7 +74,6 @@ type Props = {
   classAssignments: Array<{ id: string; class_id: string; assigned_offerings: number }>;
   recurringAssignments: Array<{
     recurring_task_id: string;
-    share_percent: number;
     instructor_id: string;
   }>;
   adHocTasks: Array<{
@@ -402,7 +401,6 @@ function WorkloadColumn({
   classAssignments: Array<{ id: string; class_id: string; assigned_offerings: number }>;
   recurringAssignments: Array<{
     recurring_task_id: string;
-    share_percent: number;
     instructor_id: string;
   }>;
   adHocTasks: Array<{
@@ -482,7 +480,6 @@ function WorkloadColumn({
                   recurringTaskId={a.recurring_task_id}
                   instructorId={a.instructor_id}
                   taskName={recurringNameById.get(a.recurring_task_id) ?? "—"}
-                  sharePercent={a.share_percent}
                   annualHours={hours}
                   disabled={completed || pending}
                   onAfterMutate={onAfterMutate}
@@ -694,7 +691,6 @@ function RecurringAssignmentRow({
   recurringTaskId,
   instructorId,
   taskName,
-  sharePercent,
   annualHours,
   disabled,
   onAfterMutate,
@@ -703,28 +699,24 @@ function RecurringAssignmentRow({
   recurringTaskId: string;
   instructorId: string;
   taskName: string;
-  sharePercent: number;
   annualHours: number;
   disabled: boolean;
   onAfterMutate: () => void;
 }) {
-  const [draft, setDraft] = useState(sharePercent.toString());
   const [pending, startTransition] = useTransition();
   const [rationale, setRationale] = useState<OneOnOneChangeRationale | "">("");
 
-  function commit(newVal: number) {
-    if (newVal === sharePercent) return;
+  function handleRemove() {
     startTransition(async () => {
-      const result = await setRecurringAssignment(
+      const result = await removeRecurringAssignment(
         oneOnOneId,
         recurringTaskId,
         instructorId,
-        newVal,
         rationale || null,
       );
       if (!result.ok) toast.error(result.error.message);
       else {
-        toast.success("Updated");
+        toast.success("Removed from task");
         onAfterMutate();
       }
     });
@@ -733,26 +725,6 @@ function RecurringAssignmentRow({
   return (
     <li className="flex flex-wrap items-center gap-2 py-1.5 text-xs">
       <span className="text-foreground flex-1 truncate">{taskName}</span>
-      <div className="flex items-center gap-1">
-        <input
-          type="number"
-          min={0}
-          max={100}
-          step={5}
-          value={draft}
-          disabled={disabled || pending}
-          onChange={(e) => {
-            setDraft(e.target.value);
-          }}
-          onBlur={() => {
-            const n = Number(draft);
-            if (Number.isFinite(n) && n >= 0 && n <= 100) commit(n);
-            else setDraft(sharePercent.toString());
-          }}
-          className={fieldClass + " w-14 tabular-nums"}
-        />
-        <span className="text-muted-foreground text-[11px]">%</span>
-      </div>
       <select
         value={rationale}
         onChange={(e) => {
@@ -768,6 +740,14 @@ function RecurringAssignmentRow({
           </option>
         ))}
       </select>
+      <button
+        type="button"
+        onClick={handleRemove}
+        disabled={disabled || pending}
+        className="text-muted-foreground hover:text-destructive text-[11px] underline disabled:opacity-50"
+      >
+        Remove
+      </button>
       <span className="text-muted-foreground w-16 text-right tabular-nums">{annualHours}h</span>
     </li>
   );

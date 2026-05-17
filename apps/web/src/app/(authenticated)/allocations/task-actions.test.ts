@@ -111,18 +111,6 @@ describe("setRecurringTaskStatus", () => {
 });
 
 describe("saveRecurringAssignments", () => {
-  it("rejects when shares don't sum to 100", async () => {
-    const result = await saveRecurringAssignments(TASK_ID, [
-      { instructor_id: INSTRUCTOR_ID, share_percent: 50 },
-      { instructor_id: INSTRUCTOR_ID_2, share_percent: 40 },
-    ]);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.code).toBe("VALIDATION");
-      expect(result.error.message).toContain("100");
-    }
-  });
-
   it("accepts an empty slate (unassigned task)", async () => {
     mockFrom.mockReturnValue({
       delete: vi.fn().mockReturnThis(),
@@ -135,11 +123,28 @@ describe("saveRecurringAssignments", () => {
   });
 
   it("rejects a non-uuid instructor_id", async () => {
-    const result = await saveRecurringAssignments(TASK_ID, [
-      { instructor_id: "not-a-uuid", share_percent: 100 },
-    ]);
+    const result = await saveRecurringAssignments(TASK_ID, [{ instructor_id: "not-a-uuid" }]);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("VALIDATION");
+  });
+
+  it("accepts multiple instructors without any share percentage", async () => {
+    // Pre-stub the chains the action issues in order:
+    //   1. delete().eq().eq().not()  (filter out un-listed members)
+    //   2. upsert()  (insert/update the slate)
+    const deleteChain = {
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      not: vi.fn().mockResolvedValue({ error: null }),
+    };
+    const upsertChain = { upsert: vi.fn().mockResolvedValue({ error: null }) };
+    mockFrom.mockReturnValueOnce(deleteChain).mockReturnValueOnce(upsertChain);
+
+    const result = await saveRecurringAssignments(TASK_ID, [
+      { instructor_id: INSTRUCTOR_ID },
+      { instructor_id: INSTRUCTOR_ID_2 },
+    ]);
+    expect(result.ok).toBe(true);
   });
 });
 
@@ -193,17 +198,6 @@ describe("recurringAnnualHours (DOD: matches expected values)", () => {
       hours_per_occurrence: 2,
     });
     expect(annual).toBe(60);
-  });
-
-  it("share_percent reduces annual hours proportionally", () => {
-    // Weekly + 2hrs default = 104. 25% share = 26.
-    const annual = recurringAnnualHours({
-      frequency: "weekly",
-      occurrences_per_year: null,
-      hours_per_occurrence: 2,
-      share_percent: 25,
-    });
-    expect(annual).toBe(26);
   });
 
   it("effectiveOccurrencesPerYear falls back to per-frequency default", () => {

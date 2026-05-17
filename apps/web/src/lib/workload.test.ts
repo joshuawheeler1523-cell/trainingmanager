@@ -41,17 +41,6 @@ describe("recurringHoursPerWeek", () => {
     ).toBeCloseTo(80 / 52, 6);
   });
 
-  it("share_percent halves the per-week contribution", () => {
-    expect(
-      recurringHoursPerWeek({
-        frequency: "weekly",
-        occurrences_per_year: null,
-        hours_per_occurrence: 2,
-        share_percent: 50,
-      }),
-    ).toBeCloseTo(1, 6);
-  });
-
   it("annually + 40 hrs default ≈ 40/52 hrs/week", () => {
     expect(
       recurringHoursPerWeek({

@@ -85,44 +85,27 @@ export function effectiveOccurrencesPerYear(t: {
   return t.occurrences_per_year ?? FREQUENCY_TO_ANNUAL[t.frequency];
 }
 
-// Effective annual hours for a recurring task. share_percent is the per-assignee
-// slice (0–100); pass 100 for the unsharded total.
+// Effective annual hours for a recurring task. Each assigned instructor
+// is charged the full task total — recurring work (weekly meetings,
+// daily emails) is per-attendee, not split across attendees.
 export function recurringAnnualHours(args: {
   frequency: Frequency;
   occurrences_per_year: number | null;
   hours_per_occurrence: number;
-  share_percent?: number;
 }): number {
   const occ = effectiveOccurrencesPerYear(args);
-  const share = args.share_percent ?? 100;
-  return args.hours_per_occurrence * occ * (share / 100);
+  return args.hours_per_occurrence * occ;
 }
 
 // ── recurring_task_assignments ──────────────────────────────────────────────
 
-const sharePercentSchema = z.coerce.number().min(0).max(100);
-
-// Slate of (instructor_id, share_percent) tuples for one recurring_task.
-// Validated to sum to exactly 100 across the slate.
-export const recurringAssignmentSlateSchema = z
-  .array(
-    z.object({
-      instructor_id: z.string().uuid(),
-      share_percent: sharePercentSchema,
-    }),
-  )
-  .superRefine((rows, ctx) => {
-    if (rows.length === 0) return; // no assignments is allowed (unassigned task)
-    const sum = rows.reduce((acc, r) => acc + (r.share_percent || 0), 0);
-    const rounded = Math.round(sum * 100) / 100;
-    if (Math.abs(rounded - 100) > 0.005) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Share percentages must sum to 100% (got ${rounded.toFixed(1)}%).`,
-        path: [0, "share_percent"],
-      });
-    }
-  });
+// Slate of instructor_ids for one recurring_task. No share_percent —
+// every assignee is charged the task's full hours.
+export const recurringAssignmentSlateSchema = z.array(
+  z.object({
+    instructor_id: z.string().uuid(),
+  }),
+);
 
 export type RecurringAssignmentSlate = z.infer<typeof recurringAssignmentSlateSchema>;
 
@@ -130,6 +113,7 @@ export type RecurringTaskAssignment = {
   recurring_task_id: string;
   instructor_id: string;
   org_id: string;
+  /** Legacy column; ignored by the workload view as of 2026-05-17. New rows default to 100. */
   share_percent: number;
   created_at: string;
 };

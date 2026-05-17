@@ -79,7 +79,8 @@ export function classHoursPerWeek(annualHours: number): number {
 
 // Per-week recurring hours: hours_per_occurrence × occurrences_per_week,
 // where occurrences_per_week = effective_occurrences_per_year / 52.
-// share_percent (0–100) splits the task's total across assignees.
+// Every assignee is charged the full per-week contribution — recurring
+// tasks (meetings, daily emails) aren't split across attendees.
 function defaultOccurrencesPerYear(frequency: Frequency): number {
   switch (frequency) {
     case "daily":
@@ -101,11 +102,9 @@ export function recurringHoursPerWeek(args: {
   frequency: Frequency;
   occurrences_per_year: number | null;
   hours_per_occurrence: number;
-  share_percent?: number;
 }): number {
   const occ = args.occurrences_per_year ?? defaultOccurrencesPerYear(args.frequency);
-  const share = args.share_percent ?? 100;
-  return (args.hours_per_occurrence * occ * (share / 100)) / 52;
+  return (args.hours_per_occurrence * occ) / 52;
 }
 
 // Whether a date falls in the same ISO week (Mon-anchored) as the given
