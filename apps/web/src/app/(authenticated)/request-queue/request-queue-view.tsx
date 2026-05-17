@@ -13,7 +13,13 @@ import {
   useDroppable,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { ClipboardDocumentIcon, CheckIcon, PlusIcon, LinkIcon } from "@heroicons/react/20/solid";
+import {
+  ClipboardDocumentIcon,
+  CheckIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  LinkIcon,
+} from "@heroicons/react/20/solid";
 import RequestSheet from "./request-sheet";
 import NewRequestDialog from "./new-request-dialog";
 import { Badge, type BadgeVariant } from "@/components/ui";
@@ -363,16 +369,27 @@ function KanbanCard({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "border-border bg-background rounded-lg border p-3 shadow-sm",
+        "border-border bg-background relative rounded-lg border p-3 shadow-sm",
         disabled && "cursor-wait opacity-70",
       )}
     >
+      {/* Edit affordance — outside the drag area so click goes to onOpen
+          (the request sheet) instead of being absorbed as a drag start. */}
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label="Edit request"
+        title="Edit request"
+        className="text-muted-foreground hover:bg-surface hover:text-foreground absolute right-2 top-2 z-10 rounded p-1 transition-colors"
+      >
+        <PencilSquareIcon className="h-4 w-4" />
+      </button>
       <div
         {...attributes}
         {...listeners}
         role="button"
         tabIndex={-1}
-        className="cursor-grab active:cursor-grabbing"
+        className="cursor-grab pr-7 active:cursor-grabbing"
       >
         <div className="flex items-start justify-between gap-2">
           <p className="font-display text-foreground line-clamp-2 text-base font-medium leading-tight">
