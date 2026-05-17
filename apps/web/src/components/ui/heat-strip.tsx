@@ -31,7 +31,7 @@ export type HeatWeek = {
 
 type Props = {
   weeks: HeatWeek[];
-  /** Cell height in px. Default 28 — matches the design. */
+  /** Cell height in px. Default 44 to fit the stacked date + percent. */
   cellHeight?: number;
   className?: string;
 };
@@ -54,7 +54,7 @@ const TIER_STYLES: Record<"h0" | "h1" | "h2" | "h3" | "h4" | "h5", string> = {
   h5: "bg-[rgba(183,61,61,0.85)] text-[var(--cream)]",
 };
 
-export function HeatStrip({ weeks, cellHeight = 28, className }: Props) {
+export function HeatStrip({ weeks, cellHeight = 44, className }: Props) {
   return (
     <div
       className={cn("grid gap-1", className)}
@@ -63,6 +63,8 @@ export function HeatStrip({ weeks, cellHeight = 28, className }: Props) {
       {weeks.map((w, i) => {
         const tier = tierFor(w.utilization_pct);
         const label = w.label ?? `Wk ${(i + 1).toString()}`;
+        const pctText =
+          w.utilization_pct == null ? "—" : `${Math.round(w.utilization_pct).toString()}%`;
         const title = w.on_leave
           ? "On leave"
           : `${label} — ${w.utilization_pct == null ? "no data" : `${Math.round(w.utilization_pct).toString()}%`}`;
@@ -72,14 +74,21 @@ export function HeatStrip({ weeks, cellHeight = 28, className }: Props) {
             title={title}
             aria-label={title}
             className={cn(
-              "flex items-center justify-center rounded-[3px] font-mono text-[10px] tracking-[0.02em]",
+              "flex flex-col items-center justify-center rounded-[3px] font-mono leading-tight tracking-[0.02em]",
               w.on_leave
                 ? "bg-[repeating-linear-gradient(-45deg,rgba(28,31,28,0.06),rgba(28,31,28,0.06)_3px,transparent_3px,transparent_6px)] text-[var(--ink-mute)]"
                 : TIER_STYLES[tier],
             )}
             style={{ height: `${cellHeight.toString()}px` }}
           >
-            {w.on_leave ? "—" : label}
+            {w.on_leave ? (
+              <span className="text-[10px]">—</span>
+            ) : (
+              <>
+                <span className="text-[10px] opacity-80">{label}</span>
+                <span className="text-[12px] font-semibold tabular-nums">{pctText}</span>
+              </>
+            )}
           </div>
         );
       })}
