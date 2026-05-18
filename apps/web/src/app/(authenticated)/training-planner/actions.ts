@@ -492,7 +492,11 @@ export async function updateRoom(
     .single();
 
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
-  revalidateImpl(implementationId);
+  // Scope to just the rooms page: an in-place edit never changes any layout
+  // count, so the layout-wide revalidate `revalidateImpl` would do is wasted
+  // refetches on every day-button toggle. createRoom/deleteRoom still need
+  // it because they move the roomCount readiness marker.
+  revalidatePath(`/training-planner/${implementationId}/rooms`);
   return { ok: true, data };
 }
 

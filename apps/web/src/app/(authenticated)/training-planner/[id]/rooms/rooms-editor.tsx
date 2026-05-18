@@ -205,15 +205,20 @@ export default function RoomsEditor({ implementationId, rooms }: Props) {
                     <div className="flex gap-0.5">
                       {DAYS.map((d) => {
                         const active = r.available_days_of_week.includes(d.num);
+                        // Intentionally NOT disabled while a save is pending —
+                        // toggles are optimistic and idempotent, so rapid taps
+                        // should feel instant. Each click computes the next
+                        // state from the optimistic row, so concurrent saves
+                        // converge correctly.
                         return (
                           <button
                             key={d.num}
                             type="button"
-                            disabled={pending}
                             onClick={() => {
                               handleToggleDay(r, d.num);
                             }}
                             aria-label={`Toggle ${d.short}`}
+                            aria-pressed={active}
                             className={`h-6 w-6 rounded text-[10px] font-medium ${
                               active
                                 ? "bg-primary text-primary-foreground"
