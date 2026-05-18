@@ -17,6 +17,7 @@ import {
   type ClassDiagnosis,
   type ClassTrainerLink,
   type HeadlineFix,
+  type SolverOptions,
   type Placement,
   type SolverInput,
 } from "./schedule-solver";
@@ -52,7 +53,7 @@ export async function runSchedule(
   departmentId: string,
   implementationId: string,
   anchorImpls: string[],
-  options: { dryRun: boolean },
+  options: { dryRun: boolean; solverOptions?: SolverOptions },
 ): Promise<
   { ok: true; data: ScheduleRunResult } | { ok: false; error: { code: string; message: string } }
 > {
@@ -304,7 +305,7 @@ export async function runSchedule(
     anchoredImplNames: anchorImplNames.map((a) => a.name),
   };
 
-  const solverResult = solve(solverInput);
+  const solverResult = solve(solverInput, options.solverOptions ?? {});
 
   // 5. Recommendations math (matches the old SQL deficit formula).
   const windowWeeks = Math.max(
