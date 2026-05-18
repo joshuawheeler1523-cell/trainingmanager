@@ -55,6 +55,7 @@ import type { ImplClass, ImplClassPrerequisite, ImplRoom, ImplTrainer } from "@a
 export type DiagnosisBottleneck =
   | "no_trainers_assigned" // class has empty trainer slate
   | "no_eligible_room" // no room passes seat / equipment filter
+  | "room_capacity" // eligible rooms saturated — forced demand > pool hours, no smaller-room fallback
   | "trainer_capacity" // slate hours < hours this class needs
   | "trainer_blocked" // slate has hours, but anchor / PTO / cross-impl eats them
   | "room_busy_or_window"; // resources exist but the search couldn't find clean slots
@@ -783,6 +784,35 @@ function placedHoursOnSlate(slateIds: Set<string>, placements: Placement[]): num
   return total;
 }
 
+/** Estimate how many hours a room is bookable across the window. Counts only
+ *  days-of-week the room is open, multiplied by its per-day hours. Doesn't
+ *  intersect with business hours / lunch — that would under-state the pool
+ *  because a single class only needs a slice of it. Good enough for a
+ *  saturation ratio. */
+function roomHoursInWindow(room: ImplRoom, windowStartDate: string, windowEndDate: string): number {
+  const openSet = new Set(room.available_days_of_week);
+  let openDays = 0;
+  const start = parseUtcDate(windowStartDate);
+  const end = parseUtcDate(windowEndDate);
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    if (openSet.has(cursor.getUTCDay())) openDays++;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return openDays * room.available_hours_per_day;
+}
+
+/** Subtract hours of placed sessions in the given rooms (so room pool reflects
+ *  remaining capacity, not theoretical max). */
+function placedHoursInRooms(roomIds: Set<string>, placements: Placement[]): number {
+  let total = 0;
+  for (const p of placements) {
+    if (!roomIds.has(p.roomId)) continue;
+    total += (new Date(p.end).getTime() - new Date(p.start).getTime()) / 3_600_000;
+  }
+  return total;
+}
+
 function buildDiagnoses(
   gaps: Gap[],
   input: SolverInput,
@@ -861,6 +891,7 @@ function buildDiagnoses(
         recommendedFix = `No room can host "${cls.name}" — review room day-of-week availability and the implementation window.`;
       }
     } else {
+      // ── Slate (trainer) capacity math ──
       const slateIdSet = new Set(slateIds);
       const slateCap = slateTrainers.reduce(
         (acc, t) => acc + t.availability_hours_per_week * windowWeeks,
@@ -874,19 +905,90 @@ function buildDiagnoses(
       );
       const slateUsed = placedHoursOnSlate(slateIdSet, placements);
       const slateAvail = Math.max(0, slateCap - slateBusy - slateUsed);
+      const slateRatio = slateAvail > 0 ? hoursNeeded / slateAvail : 999;
+
+      // ── Room capacity math ──
+      // Pool = eligible rooms' bookable hours in window, minus what we've
+      // already placed. Forced demand = hours from EVERY class that can ONLY
+      // use rooms this class can use (i.e., no smaller-seat fallback). This
+      // captures the "TR1 is the only 18-seat room and 7 classes all need it"
+      // pattern.
+      const eligibleRoomIds = new Set(eligibleRooms.map((r) => r.id));
+      const roomPoolRaw = eligibleRooms.reduce(
+        (acc, r) => acc + roomHoursInWindow(r, input.windowStartDate, input.windowEndDate),
+        0,
+      );
+      const roomUsedByPlacements = placedHoursInRooms(eligibleRoomIds, placements);
+      const roomAvail = Math.max(0, roomPoolRaw - roomUsedByPlacements);
+
+      // Largest seat capacity among rooms NOT eligible for this class.
+      // Classes whose required seats exceed this number have no fallback
+      // outside this class's eligible-room set — they "force" demand into
+      // the same pool.
+      const ineligibleSeats = input.rooms
+        .filter((r) => !eligibleRoomIds.has(r.id))
+        .map((r) => r.seat_capacity);
+      const fallbackCapacity = ineligibleSeats.length > 0 ? Math.max(...ineligibleSeats) : -1;
+
+      // Sum hours from forced competitors (including this class).
+      let forcedDemandHours = 0;
+      for (const c2 of input.classes) {
+        if (c2.expected_learners_per_session <= fallbackCapacity) continue;
+        // Equipment match: skip classes whose equipment requirements wouldn't
+        // also need this room subset. Approximation: any class with equipment
+        // tags ⊆ first eligible room's tags. Conservative: include all forced
+        // by seat alone.
+        const sessions = classSessionsNeeded(c2);
+        forcedDemandHours += sessions * c2.hours_per_session;
+      }
+      const roomRatio = roomAvail > 0 ? forcedDemandHours / roomAvail : 999;
 
       const slateNames = assignedTrainers.map((t) => t.name).join(", ");
+      const eligibleRoomNames = eligibleRooms.map((r) => r.name).join(", ");
+      const anchorLabel =
+        anchorNames.length === 1
+          ? `the anchored impl (${anchorNames[0] ?? ""})`
+          : `the ${anchorNames.length.toString()} anchored impls`;
 
-      if (hoursNeeded > slateAvail && !anchored) {
+      // ── Bottleneck classification ──
+      //
+      // Priority is INTENTIONALLY: room_capacity BEFORE trainer_*. Hiring a
+      // trainer when rooms are the constraint is expensive and unhelpful —
+      // we want the message to clearly disambiguate.
+      //
+      // Decision rules:
+      //   1. If room saturation >= 50% AND room ratio >= slate ratio → rooms
+      //   2. If slate is over capacity (>100%) and not in anchor mode → trainers
+      //   3. If anchor mode AND slate is at all stretched (>70%) → anchor
+      //   4. Anchor mode catch-all → anchor
+      //   5. Non-anchor catch-all → room_busy_or_window
+      const roomIsTighter = roomRatio >= slateRatio && roomRatio >= 0.5;
+      const slateIsOverbooked = slateRatio > 1.0;
+      const slateIsStretched = slateRatio > 0.7;
+
+      if (roomIsTighter) {
+        bottleneck = "room_capacity";
+        const fallbackSuggestion =
+          fallbackCapacity > 0
+            ? ` Or split "${cls.name}" into smaller cohorts (≤${fallbackCapacity.toString()} learners/session) so smaller rooms can host it.`
+            : "";
+        let fix = `"${cls.name}" needs ${requiredSeats.toString()}+ seats — only ${eligibleRooms.length.toString()} room${eligibleRooms.length === 1 ? "" : "s"} fit${eligibleRooms.length === 1 ? "s" : ""} (${eligibleRoomNames}). Across all classes that have no smaller-room fallback, ${forcedDemandHours.toFixed(0)}h of training is competing for ${roomAvail.toFixed(0)}h of room time in the window. Add another ${requiredSeats.toString()}+ seat room.${fallbackSuggestion}`;
+        if (slateRatio < 0.5) {
+          fix += ` Trainers are NOT the bottleneck — assigned trainers (${slateNames}) have ~${slateAvail.toFixed(0)}h free vs ${hoursNeeded.toFixed(0)}h needed for this class. Adding trainers will not help; fix the room.`;
+        }
+        recommendedFix = fix;
+      } else if (slateIsOverbooked && !anchored) {
         bottleneck = "trainer_capacity";
         recommendedFix = `Add another trainer to "${cls.name}". Its slate (${slateNames}) has only ~${slateAvail.toFixed(0)}h free in the window, but the ${unplaced.toString()} remaining session${unplaced === 1 ? "" : "s"} need ${hoursNeeded.toFixed(0)}h.`;
-      } else if (anchored) {
+      } else if (anchored && slateIsStretched) {
         bottleneck = "trainer_blocked";
-        const anchorLabel =
-          anchorNames.length === 1
-            ? `the anchored impl (${anchorNames[0] ?? ""})`
-            : `the ${anchorNames.length.toString()} anchored impls`;
-        recommendedFix = `Trainers on "${cls.name}" (${slateNames}) are committed by ${anchorLabel} during the available slots. Add another trainer to this class, or un-anchor and broaden the window.`;
+        recommendedFix = `Trainers on "${cls.name}" (${slateNames}) are committed by ${anchorLabel} during the available slots — only ~${slateAvail.toFixed(0)}h free vs ${hoursNeeded.toFixed(0)}h needed. Add another trainer to this class, or un-anchor and broaden the window.`;
+      } else if (anchored) {
+        // Anchor mode catch-all: scheduling failed but no single resource is
+        // obviously tight. Likely the anchor's session timing collides with
+        // when this class's resources would otherwise be free.
+        bottleneck = "trainer_blocked";
+        recommendedFix = `"${cls.name}" couldn't be placed alongside ${anchorLabel}. Trainers (${slateNames}) and rooms (${eligibleRoomNames}) have hours, but their free time doesn't line up. Try un-anchoring or extending the window past ${input.windowEndDate}.`;
       } else {
         bottleneck = "room_busy_or_window";
         recommendedFix = `Rooms big enough for "${cls.name}" (${requiredSeats.toString()}+ seats) are fully booked across the available days. Add another ${requiredSeats.toString()}+ seat room, or extend the window past ${input.windowEndDate}.`;

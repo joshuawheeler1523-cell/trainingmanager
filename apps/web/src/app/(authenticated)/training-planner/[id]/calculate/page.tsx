@@ -512,6 +512,8 @@ function bottleneckLabel(b: ClassDiagnosis["bottleneck"]): string {
       return "no trainer";
     case "no_eligible_room":
       return "no room";
+    case "room_capacity":
+      return "room capacity";
     case "trainer_capacity":
       return "trainer hours";
     case "trainer_blocked":
