@@ -496,16 +496,32 @@ function popBusy(map: Map<string, BusyInterval[]>, resourceId: string): void {
   if (list.length === 0) map.delete(resourceId);
 }
 
+type SearchContext = {
+  deadline: number;
+  now: () => number;
+  gaps: Gap[];
+  abortFlag: { timedOut: boolean };
+  /** Deepest placement set seen during search. When the search can't
+   *  find a complete assignment, we fall back to this so the user gets
+   *  the best partial — matching what the greedy generator would have
+   *  produced on a partially-infeasible input, instead of "everything
+   *  is a gap." Snapshotted via slice() each time the depth advances. */
+  best: Placement[];
+};
+
 function search(
   variables: Variable[],
   trainersById: Map<string, ImplTrainer>,
   state: WorkingState,
   placements: Placement[],
-  options: { deadline: number; now: () => number; gaps: Gap[]; abortFlag: { timedOut: boolean } },
+  options: SearchContext,
 ): boolean {
   if (options.now() > options.deadline) {
     options.abortFlag.timedOut = true;
     return false;
+  }
+  if (placements.length > options.best.length) {
+    options.best = placements.slice();
   }
   if (variables.length === placements.length) return true;
 
@@ -733,16 +749,30 @@ export function solve(input: SolverInput, options: SolverOptions = {}): SolverRe
     }
   }
 
-  search(searchable, trainersById, state, placements, {
+  const ctx: SearchContext = {
     deadline,
     now,
     gaps,
     abortFlag,
-  });
+    best: [],
+  };
+  const found = search(searchable, trainersById, state, placements, ctx);
 
-  // Anything in searchable that didn't land in placements is a gap.
-  if (placements.length < searchable.length) {
-    const placedIds = new Set(placements.map((p) => `${p.classId}::${p.sessionIndex.toString()}`));
+  // If the search couldn't find a complete assignment, fall back to the
+  // deepest partial it saw. This is what keeps us at least as good as
+  // greedy on partially-infeasible inputs: the prior version returned
+  // an empty placement list whenever ANY variable was infeasible, which
+  // wiped out perfectly-good placements that just happened to be made
+  // before the doomed variable came up. With `best` we always return
+  // the best partial seen during the search, even when the full
+  // assignment turns out to be impossible.
+  const finalPlacements = found ? placements : ctx.best;
+
+  // Anything in searchable that didn't land in finalPlacements is a gap.
+  if (finalPlacements.length < searchable.length) {
+    const placedIds = new Set(
+      finalPlacements.map((p) => `${p.classId}::${p.sessionIndex.toString()}`),
+    );
     for (const v of searchable) {
       if (!placedIds.has(v.id)) {
         gaps.push({
@@ -756,7 +786,7 @@ export function solve(input: SolverInput, options: SolverOptions = {}): SolverRe
   }
 
   return {
-    placements,
+    placements: finalPlacements,
     gaps,
     durationMs: now() - startedAt,
     timedOut: abortFlag.timedOut,

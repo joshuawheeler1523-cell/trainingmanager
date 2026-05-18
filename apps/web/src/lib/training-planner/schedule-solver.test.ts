@@ -231,6 +231,35 @@ describe("solve - PTO blocking", () => {
   });
 });
 
+describe("solve - partial infeasibility falls back to best-effort", () => {
+  it("keeps placing easy classes when one class is infeasible", () => {
+    // Two classes. Class A is trivially placeable. Class B has every
+    // trainer blocked across the whole window, so it cannot fit.
+    // Greedy would place A and skip B. The first version of the CSP
+    // solver returned ZERO placements in this case because full
+    // backtracking rolled back when B couldn't be placed. The `best`
+    // snapshot in search() fixes that.
+    const input = makeInput({
+      trainers: [makeTrainer({ id: "tA" }), makeTrainer({ id: "tB" })],
+      classes: [
+        makeClass({ id: "cA", name: "Class A", total_people_to_train: 10 }),
+        makeClass({ id: "cB", name: "Class B", total_people_to_train: 10 }),
+      ],
+      classTrainers: [
+        { impl_class_id: "cA", impl_trainer_id: "tA" },
+        { impl_class_id: "cB", impl_trainer_id: "tB" },
+      ],
+      // tB is locked across the whole window — cB can't fit.
+      busyTrainers: trainerBusyAllDays("tB", "2026-06-01", "2026-06-12", "America/New_York"),
+    });
+    const result = solve(input);
+    expect(result.placements.length).toBeGreaterThanOrEqual(1);
+    expect(result.placements.every((p) => p.classId === "cA")).toBe(true);
+    expect(result.gaps).toHaveLength(1);
+    expect(result.gaps[0]?.classId).toBe("cB");
+  });
+});
+
 describe("solve - infeasible reporting", () => {
   it("reports a gap when the class has no trainer slate", () => {
     const input = makeInput({
