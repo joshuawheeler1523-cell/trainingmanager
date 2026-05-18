@@ -323,7 +323,10 @@ describe("training-planner pure helpers", () => {
   });
 });
 
-describe("generateSchedule (RPC wrapper)", async () => {
+describe("generateSchedule (in-process CSP)", async () => {
+  // The action now delegates to lib/training-planner/schedule-runner. The
+  // happy-path math is covered by schedule-solver.test.ts; this suite
+  // just guards the auth context check.
   const { generateSchedule } = await import("./actions");
 
   it("returns NO_ORG when org context missing", async () => {
@@ -331,26 +334,6 @@ describe("generateSchedule (RPC wrapper)", async () => {
     const result = await generateSchedule(IMPL_ID);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("NO_ORG");
-  });
-
-  it("relays the RPC payload", async () => {
-    const mockClient = {
-      from: mockFrom,
-      rpc: vi.fn().mockResolvedValue({
-        data: { sessions: 5, conflicts: 0, capacity_gaps: [] },
-        error: null,
-      }),
-    };
-    const { createClient: cc } = await import("@/lib/supabase/server");
-    (cc as unknown as { mockResolvedValueOnce: (v: unknown) => void }).mockResolvedValueOnce(
-      mockClient,
-    );
-    const result = await generateSchedule(IMPL_ID);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.data.sessions).toBe(5);
-      expect(result.data.conflicts).toBe(0);
-    }
   });
 });
 
