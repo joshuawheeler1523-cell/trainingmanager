@@ -167,20 +167,20 @@ export default async function CalculatePage({ params }: { params: Params }) {
     unavailabilityByTrainer,
   });
 
-  // Authoritative unscheduled count + reasons come from the SQL generator
-  // running in dry-run mode — same planning math the Generate Schedule
+  // Authoritative unscheduled count + reasons come from running the CSP
+  // solver in dry-run mode — same planning math the Generate Schedule
   // button uses, just without writing rows. The in-memory simulator above
-  // drifts from the SQL on some configurations (notably single-trainer
-  // class slates), so we override its unscheduledSessions with the SQL's
-  // gap list. Skipped when the impl can't be scheduled yet (no window
-  // dates, no classes, etc.) since the RPC would just raise.
+  // drifts on some configurations (notably single-trainer class slates),
+  // so we override its unscheduledSessions with the solver's gap list.
+  // Skipped when the impl can't be scheduled yet (no window dates, no
+  // classes, etc.) since the solver would just raise.
   let dryRun: ScheduleGenResult | null = null;
   if (implTyped.window_start_date && implTyped.window_end_date && (classes?.length ?? 0) > 0) {
     // Cached read: bust on impl.updated_at so any edit to the impl row
     // forces a recompute. The Calculate page renders frequently while a
     // planner is iterating; without caching, every tab-switch reruns
-    // the SQL generator (200–800ms).
-    dryRun = await dryRunScheduleCached(id, implTyped.updated_at);
+    // the CSP solver (200ms–5s).
+    dryRun = await dryRunScheduleCached(id, implTyped.updated_at, orgId);
   }
   if (dryRun) {
     feas.unscheduledSessions = dryRun.capacity_gaps.length;
