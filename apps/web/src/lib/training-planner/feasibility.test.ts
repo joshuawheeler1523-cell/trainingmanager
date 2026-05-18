@@ -22,6 +22,7 @@ const baseImpl: Implementation = {
   org_id: "o1",
   name: "test impl",
   description: null,
+  bucket_id: null,
   window_start_date: "2026-06-01", // Monday
   window_end_date: "2026-07-26", // Sunday (8 weeks)
   go_live_date: "2026-08-01",

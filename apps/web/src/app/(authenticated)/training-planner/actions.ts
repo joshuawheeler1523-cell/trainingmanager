@@ -29,6 +29,7 @@ import {
   type ImplClassPrerequisite,
 } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
+import { runSchedule } from "@/lib/training-planner/schedule-runner";
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -1095,6 +1096,13 @@ export type ScheduleGenResult = {
   aborted?: boolean;
 };
 
+// Runs the in-process CSP solver from lib/training-planner/schedule-runner.ts.
+// Replaces the old generate_implementation_schedule pl/pgSQL RPC, which was
+// greedy first-fit and never backtracked — leaving feasible plans on the
+// table whenever an early class grabbed a slot a later one needed.
+//
+// Atomic-abort behavior preserved: if anchor_impls is non-empty and the
+// solver can't place every session, the existing drafts are NOT replaced.
 export async function generateSchedule(
   implementationId: string,
   anchorImpls: string[] = [],
@@ -1102,34 +1110,34 @@ export async function generateSchedule(
   const c = await ctx();
   if (!c.ok) return c;
 
-  const { data, error } = await c.supabase.rpc("generate_implementation_schedule", {
-    p_implementation_id: implementationId,
-    p_dry_run: false,
-    p_anchor_impls: anchorImpls,
-  });
-  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  const result = await runSchedule(
+    c.supabase,
+    c.orgId,
+    c.departmentId,
+    implementationId,
+    anchorImpls,
+    {
+      dryRun: false,
+    },
+  );
+  if (!result.ok) return result;
   revalidateImpl(implementationId);
-  return { ok: true, data: data as ScheduleGenResult };
+  return { ok: true, data: result.data };
 }
 
-// Run the SQL generator in dry-run mode — same planning math, no writes.
-// Used by the Calculate page so its "X can't fit" verdict reflects the
-// actual production scheduler instead of an in-memory simulator that
-// drifted from the SQL over time. Drafts and published sessions are left
-// untouched; the returned JSON shows what WOULD be placed if the planner
-// hit Generate right now.
+// Same solver in read-only mode. Used by the Calculate step for "what
+// WOULD happen if I hit Generate now."
 export async function dryRunSchedule(
   implementationId: string,
 ): Promise<ActionResult<ScheduleGenResult>> {
   const c = await ctx();
   if (!c.ok) return c;
 
-  const { data, error } = await c.supabase.rpc("generate_implementation_schedule", {
-    p_implementation_id: implementationId,
-    p_dry_run: true,
+  const result = await runSchedule(c.supabase, c.orgId, c.departmentId, implementationId, [], {
+    dryRun: true,
   });
-  if (error) return { ok: false, error: { code: error.code, message: error.message } };
-  return { ok: true, data: data as ScheduleGenResult };
+  if (!result.ok) return result;
+  return { ok: true, data: result.data };
 }
 
 // ── session edits (drag, swap trainer/room, cancel) ────────────────────────
