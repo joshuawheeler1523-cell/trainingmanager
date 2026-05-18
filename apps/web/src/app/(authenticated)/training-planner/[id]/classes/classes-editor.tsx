@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -59,11 +59,23 @@ function computeWindowWeeks(start: string | null, end: string | null): number {
   return Math.max(1, Math.ceil(days / 7));
 }
 
+// Fields flushed on Save & continue / Back. Add and delete still
+// round-trip immediately; junctions (class_trainers, prerequisites) are
+// edited via the drawer and stay immediate-save because they don't have
+// a row-level patch shape.
+const PATCH_FIELDS = [
+  "module_id",
+  "hours_per_session",
+  "expected_learners_per_session",
+  "total_people_to_train",
+  "required_equipment_tags",
+] as const satisfies readonly (keyof ImplClass)[];
+
 export default function ClassesEditor({
   implementationId,
   windowStartDate,
   windowEndDate,
-  classes,
+  classes: initialClasses,
   modules,
   trainers,
   classTrainers,
@@ -76,25 +88,21 @@ export default function ClassesEditor({
   const [pending, startTransition] = useTransition();
   const [openClassId, setOpenClassId] = useState<string | null>(null);
 
-  // Optimistic row state — edits apply instantly so clicks feel snappy.
-  // useOptimistic auto-reverts on transition failure (e.g., server action
-  // returns ok:false), so the row snaps back to the server value if the
-  // mutation can't land. router.refresh() is skipped on edits since the
-  // user's typed value already shows; we only refresh on add/delete where
-  // the row count changes.
-  const [optimisticClasses, applyClassPatch] = useOptimistic(
-    classes,
-    (state, action: { kind: "upsert"; row: ImplClass } | { kind: "delete"; id: string }) => {
-      if (action.kind === "delete") return state.filter((c) => c.id !== action.id);
-      const existing = state.findIndex((c) => c.id === action.row.id);
-      if (existing >= 0) {
-        const next = state.slice();
-        next[existing] = action.row;
-        return next;
-      }
-      return [...state, action.row];
-    },
-  );
+  // Local-first state — same pattern as rooms/modules/trainers. Field
+  // edits never round-trip until flushDirty fires from Back or Save &
+  // continue. Add/delete update local state on server success so the
+  // table reflects them without a full refetch.
+  const [rows, setRows] = useState<ImplClass[]>(initialClasses);
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+
+  function patchLocal(id: string, patch: Partial<ImplClass>) {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    setDirtyIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }
 
   const trainersByClass = useMemo(() => {
     const m = new Map<string, string[]>();
@@ -116,10 +124,7 @@ export default function ClassesEditor({
     return m;
   }, [prerequisites]);
 
-  const classMap = useMemo(
-    () => new Map(optimisticClasses.map((c) => [c.id, c])),
-    [optimisticClasses],
-  );
+  const classMap = useMemo(() => new Map(rows.map((c) => [c.id, c])), [rows]);
 
   const feasibilityById = useMemo(
     () => new Map(classFeasibility.map((cf) => [cf.classId, cf])),
@@ -142,29 +147,15 @@ export default function ClassesEditor({
         hours_per_session: Number(newHours),
         expected_learners_per_session: Number(newPerSession),
         total_people_to_train: Number(newTotal),
-        sort_order: classes.length,
+        sort_order: rows.length,
       });
       if (result.ok) {
+        setRows((prev) => [...prev, result.data]);
         setNewName("");
         setNewTotal("0");
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
-    });
-  }
-
-  function handleUpdate(c: ImplClass, patch: Record<string, unknown>) {
-    startTransition(async () => {
-      // Optimistic: render the patched row immediately. Skip router.refresh
-      // on success — the page state is already correct and a refetch would
-      // cost ~300-800ms of re-running server-component queries.
-      applyClassPatch({
-        kind: "upsert",
-        row: { ...c, ...(patch as Partial<ImplClass>), updated_at: new Date().toISOString() },
-      });
-      const result = await updateClass(c.id, implementationId, patch);
-      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -173,30 +164,70 @@ export default function ClassesEditor({
       const result = await deleteClass(id, implementationId);
       if (result.ok) {
         if (openClassId === id) setOpenClassId(null);
-        router.refresh();
+        setRows((prev) => prev.filter((r) => r.id !== id));
+        setDirtyIds((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
       } else {
         toast.error(result.error.message);
       }
     });
   }
 
+  async function flushDirty(): Promise<boolean> {
+    if (dirtyIds.size === 0) return true;
+    const dirty = rows.filter((r) => dirtyIds.has(r.id));
+    const results = await Promise.all(
+      dirty.map((r) => {
+        const patch: Partial<ImplClass> = {};
+        for (const k of PATCH_FIELDS) {
+          (patch as Record<string, unknown>)[k] = r[k];
+        }
+        return updateClass(r.id, implementationId, patch);
+      }),
+    );
+    const failed = results.filter((res): res is Extract<typeof res, { ok: false }> => !res.ok);
+    if (failed.length > 0) {
+      const firstMsg = failed[0]?.error.message ?? "Save failed";
+      toast.error(
+        `${failed.length.toString()} of ${dirty.length.toString()} saves failed: ${firstMsg}`,
+      );
+      return false;
+    }
+    setDirtyIds(new Set());
+    return true;
+  }
+
+  function handleBack() {
+    startTransition(async () => {
+      const ok = await flushDirty();
+      if (!ok) return;
+      router.push(`/training-planner/${implementationId}/modules`);
+    });
+  }
+
   function handleNext() {
-    const hasPeople = classes.some((c) => c.total_people_to_train > 0);
+    const hasPeople = rows.some((c) => c.total_people_to_train > 0);
     if (!hasPeople) {
       toast.error("Add at least one class with people to train before continuing.");
       return;
     }
     startTransition(async () => {
+      const ok = await flushDirty();
+      if (!ok) return;
       await setStep(implementationId, 6);
       router.push(`/training-planner/${implementationId}/calculate`);
     });
   }
 
-  // Alphabetize by name. Only rows whose sort_order changes get a round
-  // trip. updateClass scopes its revalidation to the classes page, so a
-  // batched re-order doesn't refetch the impl layout for each row.
+  // Alphabetize by name. Flushes pending edits first so the server isn't
+  // chasing two batches in parallel, then re-orders locally and persists
+  // the new sort_order values for any row that moved.
   function handleSort() {
-    const sorted = classes
+    const sorted = rows
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
     const changed = sorted
@@ -207,6 +238,8 @@ export default function ClassesEditor({
       return;
     }
     startTransition(async () => {
+      const ok = await flushDirty();
+      if (!ok) return;
       const results = await Promise.all(
         changed.map((x) => updateClass(x.id, implementationId, { sort_order: x.newOrder })),
       );
@@ -215,18 +248,21 @@ export default function ClassesEditor({
         toast.error(`${failed.length.toString()} classes failed to re-order`);
         return;
       }
-      router.refresh();
+      setRows((prev) => {
+        const byId = new Map(prev.map((r) => [r.id, r]));
+        return sorted.map((c, i) => {
+          const live = byId.get(c.id);
+          return live ? { ...live, sort_order: i } : c;
+        });
+      });
     });
   }
 
   const windowWeeks = computeWindowWeeks(windowStartDate, windowEndDate);
   const fteDenominator = windowWeeks * FTE_HOURS_PER_WEEK; // 0 when window unset
 
-  const totalSessions = optimisticClasses.reduce((acc, c) => acc + sessionsNeeded(c), 0);
-  const totalHours = optimisticClasses.reduce(
-    (acc, c) => acc + sessionsNeeded(c) * c.hours_per_session,
-    0,
-  );
+  const totalSessions = rows.reduce((acc, c) => acc + sessionsNeeded(c), 0);
+  const totalHours = rows.reduce((acc, c) => acc + sessionsNeeded(c) * c.hours_per_session, 0);
   // Aggregate FTE / rooms computed from total hours (not summed per-class)
   // so the bottom-line is honest about resource sharing across classes —
   // summing per-class rounding-ups would inflate.
@@ -248,7 +284,7 @@ export default function ClassesEditor({
         </p>
         <button
           type="button"
-          disabled={pending || optimisticClasses.length < 2}
+          disabled={pending || rows.length < 2}
           onClick={handleSort}
           title="Reorder classes alphabetically by name"
           className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.04em] disabled:opacity-50"
@@ -258,7 +294,7 @@ export default function ClassesEditor({
         </button>
       </div>
 
-      {optimisticClasses.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
           <p className="text-foreground text-sm font-medium">No classes yet</p>
           <p className="text-muted-foreground mt-1 text-xs">Most implementations have 5–20.</p>
@@ -284,7 +320,7 @@ export default function ClassesEditor({
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {optimisticClasses.map((c) => {
+              {rows.map((c) => {
                 const sessions = sessionsNeeded(c);
                 const hours = sessions * c.hours_per_session;
                 const trainerFte = fteDenominator > 0 ? hours / fteDenominator : null;
@@ -304,8 +340,12 @@ export default function ClassesEditor({
                 const roomsSource: "sim" | "est" = simRoomsUsed != null ? "sim" : "est";
                 const trainerCount = (trainersByClass.get(c.id) ?? []).length;
                 const prereqCount = (prereqsByClass.get(c.id) ?? []).length;
+                const dirty = dirtyIds.has(c.id);
                 return (
-                  <tr key={c.id} className="hover:bg-surface/50">
+                  <tr
+                    key={c.id}
+                    className={`hover:bg-surface/50 ${dirty ? "bg-[var(--cream,transparent)]" : ""}`}
+                  >
                     <td className="px-3 py-2">
                       <button
                         type="button"
@@ -320,9 +360,8 @@ export default function ClassesEditor({
                     <td className="px-3 py-2">
                       <select
                         value={c.module_id ?? ""}
-                        disabled={pending}
                         onChange={(e) => {
-                          handleUpdate(c, { module_id: e.target.value || null });
+                          patchLocal(c.id, { module_id: e.target.value || null });
                         }}
                         className={fieldClass + " w-full"}
                       >
@@ -336,28 +375,28 @@ export default function ClassesEditor({
                     </td>
                     <td className="px-3 py-2">
                       <input
+                        key={`${c.id}-hps`}
                         type="number"
                         step="0.25"
                         min={0.25}
                         defaultValue={c.hours_per_session}
-                        disabled={pending}
                         onBlur={(e) => {
                           const v = Number(e.target.value);
-                          if (v !== c.hours_per_session) handleUpdate(c, { hours_per_session: v });
+                          if (v !== c.hours_per_session) patchLocal(c.id, { hours_per_session: v });
                         }}
                         className={fieldClass + " w-20 tabular-nums"}
                       />
                     </td>
                     <td className="px-3 py-2">
                       <input
+                        key={`${c.id}-eps`}
                         type="number"
                         min={1}
                         defaultValue={c.expected_learners_per_session}
-                        disabled={pending}
                         onBlur={(e) => {
                           const v = Number(e.target.value);
                           if (v !== c.expected_learners_per_session) {
-                            handleUpdate(c, { expected_learners_per_session: v });
+                            patchLocal(c.id, { expected_learners_per_session: v });
                           }
                         }}
                         className={fieldClass + " w-20 tabular-nums"}
@@ -365,14 +404,14 @@ export default function ClassesEditor({
                     </td>
                     <td className="px-3 py-2">
                       <input
+                        key={`${c.id}-tot`}
                         type="number"
                         min={0}
                         defaultValue={c.total_people_to_train}
-                        disabled={pending}
                         onBlur={(e) => {
                           const v = Number(e.target.value);
                           if (v !== c.total_people_to_train) {
-                            handleUpdate(c, { total_people_to_train: v });
+                            patchLocal(c.id, { total_people_to_train: v });
                           }
                         }}
                         className={fieldClass + " w-20 tabular-nums"}
@@ -380,12 +419,12 @@ export default function ClassesEditor({
                     </td>
                     <td className="px-3 py-2">
                       <input
+                        key={`${c.id}-tags`}
                         defaultValue={c.required_equipment_tags.join(", ")}
-                        disabled={pending}
                         onBlur={(e) => {
                           const next = parseTagList(e.target.value);
                           if (!arraysEqual(next, c.required_equipment_tags)) {
-                            handleUpdate(c, { required_equipment_tags: next });
+                            patchLocal(c.id, { required_equipment_tags: next });
                           }
                         }}
                         placeholder="e.g. iv-pump"
@@ -571,30 +610,36 @@ export default function ClassesEditor({
       <div className="border-border flex items-center justify-between border-t pt-4">
         <button
           type="button"
-          onClick={() => {
-            router.push(`/training-planner/${implementationId}/modules`);
-          }}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
+          disabled={pending}
+          onClick={handleBack}
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm disabled:opacity-50"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Back
         </button>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={handleNext}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-        >
-          Save & continue
-          <ArrowRightIcon className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-3">
+          {dirtyIds.size > 0 && (
+            <span className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
+              {dirtyIds.size.toString()} unsaved
+            </span>
+          )}
+          <button
+            type="button"
+            disabled={pending}
+            onClick={handleNext}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          >
+            {pending ? "Saving…" : "Save & continue"}
+            <ArrowRightIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {open && (
         <ClassDrawer
           implementationId={implementationId}
           klass={open}
-          allClasses={optimisticClasses}
+          allClasses={rows}
           trainers={trainers}
           assignedTrainerIds={trainersByClass.get(open.id) ?? []}
           prerequisites={prereqsByClass.get(open.id) ?? []}

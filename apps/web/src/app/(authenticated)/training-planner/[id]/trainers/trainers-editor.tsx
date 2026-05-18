@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -38,9 +38,19 @@ type Props = {
 const fieldClass =
   "border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
+// Fields flushed when Save & continue / Back fires. Anything that creates
+// or deletes a row (or links a free-text trainer to the external pool)
+// still round-trips immediately because it needs a server-issued id.
+const PATCH_FIELDS = [
+  "name",
+  "email",
+  "availability_hours_per_week",
+  "max_concurrent_sessions",
+] as const satisfies readonly (keyof ImplTrainer)[];
+
 export default function TrainersEditor({
   implementationId,
-  trainers,
+  trainers: initialTrainers,
   instructors,
   unavailability,
   workload,
@@ -48,27 +58,32 @@ export default function TrainersEditor({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  // Optimistic row state — edits apply instantly so clicks feel snappy.
-  // useOptimistic auto-reverts on transition failure. router.refresh()
-  // is skipped on edits since the optimistic state already reflects
-  // the new value; we only refresh on add/delete/link where the row
-  // count changes.
-  const [optimisticTrainers, applyTrainerPatch] = useOptimistic(
-    trainers,
-    (state, action: { kind: "upsert"; row: ImplTrainer } | { kind: "delete"; id: string }) => {
-      if (action.kind === "delete") return state.filter((t) => t.id !== action.id);
-      const existing = state.findIndex((t) => t.id === action.row.id);
-      if (existing >= 0) {
-        const next = state.slice();
-        next[existing] = action.row;
-        return next;
-      }
-      return [...state, action.row];
-    },
-  );
+  // Local-first state — mirrors the rooms / modules editor pattern. Field
+  // edits and number changes never round-trip until flushDirty runs.
+  const [rows, setRows] = useState<ImplTrainer[]>(initialTrainers);
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+
+  function patchLocal(id: string, patch: Partial<ImplTrainer>) {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    setDirtyIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }
+
+  function markCleanAfterRemoteChange(id: string, fresh: ImplTrainer) {
+    setRows((prev) => prev.map((r) => (r.id === id ? fresh : r)));
+    setDirtyIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }
 
   const usedInstructorIds = new Set(
-    optimisticTrainers.map((t) => t.instructor_id).filter((x): x is string => !!x),
+    rows.map((t) => t.instructor_id).filter((x): x is string => !!x),
   );
   const internalInstructors = instructors.filter((i) => !i.is_external);
   const externalPool = instructors.filter((i) => i.is_external);
@@ -105,9 +120,9 @@ export default function TrainersEditor({
         availability_hours_per_week: Number(hours),
       });
       if (result.ok) {
+        setRows((prev) => [...prev, result.data]);
         setPickInstructor("");
         setHours("20");
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -126,9 +141,9 @@ export default function TrainersEditor({
         availability_hours_per_week: Number(hours),
       });
       if (result.ok) {
+        setRows((prev) => [...prev, result.data]);
         setPickExternal("");
         setHours("20");
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -155,10 +170,13 @@ export default function TrainersEditor({
         availability_hours_per_week: Number(hours),
       });
       if (trainerResult.ok) {
+        setRows((prev) => [...prev, trainerResult.data]);
         setNewExtName("");
         setNewExtEmail("");
         setHours("20");
         toast.success(`Added "${name}" to the external pool`);
+        // Pool list lives in the `instructors` prop, which is read from the
+        // server — refresh so the new pool entry shows in subsequent pickers.
         router.refresh();
       } else {
         toast.error(trainerResult.error.message);
@@ -177,10 +195,10 @@ export default function TrainersEditor({
         availability_hours_per_week: Number(hours),
       });
       if (result.ok) {
+        setRows((prev) => [...prev, result.data]);
         setExternalName("");
         setExternalEmail("");
         setHours("20");
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -206,9 +224,6 @@ export default function TrainersEditor({
     });
   }
 
-  // existingInstructorId is either an instructors.id or the literal "NEW"
-  // sentinel meaning "create a new external pool entry from this trainer's
-  // name/email and link to it".
   function promoteToPool(
     trainerId: string,
     existingInstructorId: string,
@@ -231,6 +246,7 @@ export default function TrainersEditor({
       }
       const linked = await linkImplTrainerToInstructor(trainerId, implementationId, instructorId);
       if (linked.ok) {
+        markCleanAfterRemoteChange(trainerId, linked.data);
         setPromotingTrainerId(null);
         toast.success("Linked to external pool");
         router.refresh();
@@ -240,28 +256,59 @@ export default function TrainersEditor({
     });
   }
 
-  function handleUpdate(t: ImplTrainer, patch: Record<string, unknown>) {
-    startTransition(async () => {
-      // Optimistic: patch the row immediately, skip router.refresh on success.
-      applyTrainerPatch({
-        kind: "upsert",
-        row: { ...t, ...(patch as Partial<ImplTrainer>), updated_at: new Date().toISOString() },
-      });
-      const result = await updateTrainer(t.id, implementationId, patch);
-      if (!result.ok) toast.error(result.error.message);
-    });
-  }
-
   function handleDelete(id: string) {
     startTransition(async () => {
       const result = await deleteTrainer(id, implementationId);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (result.ok) {
+        setRows((prev) => prev.filter((r) => r.id !== id));
+        setDirtyIds((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
+  async function flushDirty(): Promise<boolean> {
+    if (dirtyIds.size === 0) return true;
+    const dirty = rows.filter((r) => dirtyIds.has(r.id));
+    const results = await Promise.all(
+      dirty.map((r) => {
+        const patch: Partial<ImplTrainer> = {};
+        for (const k of PATCH_FIELDS) {
+          (patch as Record<string, unknown>)[k] = r[k];
+        }
+        return updateTrainer(r.id, implementationId, patch);
+      }),
+    );
+    const failed = results.filter((res): res is Extract<typeof res, { ok: false }> => !res.ok);
+    if (failed.length > 0) {
+      const firstMsg = failed[0]?.error.message ?? "Save failed";
+      toast.error(
+        `${failed.length.toString()} of ${dirty.length.toString()} saves failed: ${firstMsg}`,
+      );
+      return false;
+    }
+    setDirtyIds(new Set());
+    return true;
+  }
+
+  function handleBack() {
+    startTransition(async () => {
+      const ok = await flushDirty();
+      if (!ok) return;
+      router.push(`/training-planner/${implementationId}/rooms`);
     });
   }
 
   function handleNext() {
     startTransition(async () => {
+      const ok = await flushDirty();
+      if (!ok) return;
       await setStep(implementationId, 4);
       router.push(`/training-planner/${implementationId}/modules`);
     });
@@ -278,7 +325,7 @@ export default function TrainersEditor({
         scheduler plans around it.
       </p>
 
-      {optimisticTrainers.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
           <p className="text-foreground text-sm font-medium">No trainers yet</p>
         </div>
@@ -299,7 +346,7 @@ export default function TrainersEditor({
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {optimisticTrainers.map((t) => {
+              {rows.map((t) => {
                 const trainerPto = ptoByTrainer.get(t.id) ?? [];
                 const isOpen = openPtoFor === t.id;
                 const linkedInstructor = t.instructor_id
@@ -317,12 +364,13 @@ export default function TrainersEditor({
                     pto={trainerPto}
                     workload={workload[t.id] ?? null}
                     isOpen={isOpen}
+                    isDirty={dirtyIds.has(t.id)}
                     onToggle={() => {
                       setOpenPtoFor(isOpen ? null : t.id);
                     }}
                     implementationId={implementationId}
                     pending={pending}
-                    onUpdate={handleUpdate}
+                    onPatch={patchLocal}
                     onDelete={handleDelete}
                     sourceKind={sourceKind}
                     poolCandidates={availableExternal}
@@ -526,23 +574,29 @@ export default function TrainersEditor({
       <div className="border-border flex items-center justify-between border-t pt-4">
         <button
           type="button"
-          onClick={() => {
-            router.push(`/training-planner/${implementationId}/rooms`);
-          }}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
+          disabled={pending}
+          onClick={handleBack}
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm disabled:opacity-50"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Back
         </button>
-        <button
-          type="button"
-          disabled={pending || trainers.length === 0}
-          onClick={handleNext}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-        >
-          Save & continue
-          <ArrowRightIcon className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-3">
+          {dirtyIds.size > 0 && (
+            <span className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
+              {dirtyIds.size.toString()} unsaved
+            </span>
+          )}
+          <button
+            type="button"
+            disabled={pending || rows.length === 0}
+            onClick={handleNext}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          >
+            {pending ? "Saving…" : "Save & continue"}
+            <ArrowRightIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -553,10 +607,11 @@ function TrainerRow({
   pto,
   workload,
   isOpen,
+  isDirty,
   onToggle,
   implementationId,
   pending,
-  onUpdate,
+  onPatch,
   onDelete,
   sourceKind,
   poolCandidates,
@@ -569,10 +624,11 @@ function TrainerRow({
   pto: ImplTrainerUnavailability[];
   workload: TrainerWorkload | null;
   isOpen: boolean;
+  isDirty: boolean;
   onToggle: () => void;
   implementationId: string;
   pending: boolean;
-  onUpdate: (t: ImplTrainer, patch: Record<string, unknown>) => void;
+  onPatch: (id: string, patch: Partial<ImplTrainer>) => void;
   onDelete: (id: string) => void;
   sourceKind: "roster" | "pool" | "freetext";
   poolCandidates: Instructor[];
@@ -633,7 +689,7 @@ function TrainerRow({
 
   return (
     <>
-      <tr>
+      <tr className={isDirty ? "bg-[var(--cream,transparent)]" : ""}>
         <td className="px-2 py-2">
           <button
             type="button"
@@ -650,11 +706,12 @@ function TrainerRow({
         </td>
         <td className="px-3 py-2">
           <input
+            key={`${t.id}-name`}
             defaultValue={t.name}
-            disabled={rowPending || !!t.instructor_id}
+            disabled={!!t.instructor_id}
             onBlur={(e) => {
               if (!t.instructor_id && e.target.value !== t.name) {
-                onUpdate(t, { name: e.target.value });
+                onPatch(t.id, { name: e.target.value });
               }
             }}
             className={fieldClass + " w-full"}
@@ -662,11 +719,11 @@ function TrainerRow({
         </td>
         <td className="px-3 py-2">
           <input
+            key={`${t.id}-email`}
             defaultValue={t.email ?? ""}
-            disabled={rowPending}
             onBlur={(e) => {
               if (e.target.value !== (t.email ?? "")) {
-                onUpdate(t, { email: e.target.value || null });
+                onPatch(t.id, { email: e.target.value || null });
               }
             }}
             className={fieldClass + " w-full"}
@@ -701,15 +758,15 @@ function TrainerRow({
         </td>
         <td className="px-3 py-2">
           <input
+            key={`${t.id}-hrs`}
             type="number"
             step="0.5"
             min={0}
             defaultValue={t.availability_hours_per_week}
-            disabled={rowPending}
             onBlur={(e) => {
               const v = Number(e.target.value);
               if (v !== t.availability_hours_per_week) {
-                onUpdate(t, { availability_hours_per_week: v });
+                onPatch(t.id, { availability_hours_per_week: v });
               }
             }}
             className={fieldClass + " w-20 tabular-nums"}
@@ -731,14 +788,14 @@ function TrainerRow({
         </td>
         <td className="px-3 py-2">
           <input
+            key={`${t.id}-conc`}
             type="number"
             min={1}
             defaultValue={t.max_concurrent_sessions}
-            disabled={rowPending}
             onBlur={(e) => {
               const v = Number(e.target.value);
               if (v !== t.max_concurrent_sessions) {
-                onUpdate(t, { max_concurrent_sessions: v });
+                onPatch(t.id, { max_concurrent_sessions: v });
               }
             }}
             className={fieldClass + " w-16 tabular-nums"}
