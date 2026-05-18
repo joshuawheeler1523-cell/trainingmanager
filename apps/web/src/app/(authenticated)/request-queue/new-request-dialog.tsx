@@ -5,21 +5,35 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import * as Dialog from "@radix-ui/react-dialog";
 import { XMarkIcon } from "@heroicons/react/20/solid";
-import { REQUEST_URGENCY_VALUES, type RequestUrgency } from "@arbor/shared";
+import { REQUEST_URGENCY_VALUES, type AllocationBucket, type RequestUrgency } from "@arbor/shared";
 import { createRequest } from "./actions";
 
 type Props = {
+  buckets: AllocationBucket[];
   onClose: () => void;
 };
+
+// Best-fit pick for the new-request dropdown's initial value. Mirrors the
+// heuristic the bucket_id migration uses for backfill — prefer a bucket
+// matching "Course Development" / "Develop" / "Curric" before falling back
+// to the first non-archived bucket by display order.
+function pickDefaultRequestBucket(buckets: AllocationBucket[]): string {
+  const match = buckets.find((b) => {
+    const n = b.name.toLowerCase();
+    return n.includes("course") || n.includes("develop") || n.includes("curric");
+  });
+  return match?.id ?? buckets[0]?.id ?? "";
+}
 
 const fieldCls =
   "border-input bg-background text-foreground w-full rounded-md border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
-export default function NewRequestDialog({ onClose }: Props) {
+export default function NewRequestDialog({ buckets, onClose }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const [title, setTitle] = useState("");
+  const [bucketId, setBucketId] = useState<string>(() => pickDefaultRequestBucket(buckets));
   const [requesterName, setRequesterName] = useState("");
   const [requesterEmail, setRequesterEmail] = useState("");
   const [requesterDept, setRequesterDept] = useState("");
@@ -33,9 +47,14 @@ export default function NewRequestDialog({ onClose }: Props) {
       toast.error("Title and requester name are required.");
       return;
     }
+    if (!bucketId) {
+      toast.error("Create an allocation bucket before adding a request.");
+      return;
+    }
     startTransition(async () => {
       const result = await createRequest({
         title: title.trim(),
+        bucket_id: bucketId,
         requested_by_name: requesterName.trim(),
         requested_by_email: requesterEmail.trim() || null,
         requested_by_department: requesterDept.trim() || null,
@@ -93,6 +112,28 @@ export default function NewRequestDialog({ onClose }: Props) {
                 className={fieldCls}
                 autoFocus
               />
+            </Field>
+
+            <Field id="nr-bucket" label="Allocation bucket *">
+              <select
+                id="nr-bucket"
+                value={bucketId}
+                onChange={(e) => {
+                  setBucketId(e.target.value);
+                }}
+                disabled={buckets.length === 0}
+                className={fieldCls + " disabled:opacity-50"}
+              >
+                {buckets.length === 0 ? (
+                  <option value="">No buckets yet — create one in Allocations</option>
+                ) : (
+                  buckets.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))
+                )}
+              </select>
             </Field>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

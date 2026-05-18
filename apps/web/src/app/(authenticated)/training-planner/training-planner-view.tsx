@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -8,7 +8,12 @@ import { DocumentDuplicateIcon, PlusIcon, TrashIcon } from "@heroicons/react/20/
 import EmptyState from "@/components/ui/empty-state";
 import { Badge, Eyebrow, type BadgeVariant } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { IMPL_STATUS_VALUES, type Implementation, type ImplStatus } from "@arbor/shared";
+import {
+  IMPL_STATUS_VALUES,
+  type AllocationBucket,
+  type Implementation,
+  type ImplStatus,
+} from "@arbor/shared";
 import { archiveImplementation, createImplementation, duplicateImplementation } from "./actions";
 
 type PlannerRow = Implementation & {
@@ -17,7 +22,19 @@ type PlannerRow = Implementation & {
   completion_pct: number | null;
 };
 
-type Props = { implementations: PlannerRow[] };
+type Props = { implementations: PlannerRow[]; buckets: AllocationBucket[] };
+
+// Best-fit pick for the new-implementation dropdown's initial value. Mirrors
+// the heuristic the bucket_id migration uses for backfill — prefer a bucket
+// named like "Direct Training"/"Instruction"/"Teach", then fall back to the
+// first non-archived bucket by display order.
+function pickDefaultImplBucket(buckets: AllocationBucket[]): string {
+  const match = buckets.find((b) => {
+    const n = b.name.toLowerCase();
+    return n.includes("direct") || n.includes("instruction") || n.includes("teach");
+  });
+  return match?.id ?? buckets[0]?.id ?? "";
+}
 
 const STATUS_VARIANT: Record<ImplStatus, BadgeVariant> = {
   draft: "neutral",
@@ -35,17 +52,29 @@ const STATUS_LABEL: Record<ImplStatus, string> = {
   cancelled: "Cancelled",
 };
 
-export default function TrainingPlannerView({ implementations }: Props) {
+export default function TrainingPlannerView({ implementations, buckets }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [statusFilter, setStatusFilter] = useState<ImplStatus | "all">("all");
   const [name, setName] = useState("");
+  const [bucketId, setBucketId] = useState<string>(() => pickDefaultImplBucket(buckets));
+
+  // Keep default in sync if the bucket list changes after revalidate.
+  useEffect(() => {
+    if (!bucketId && buckets.length > 0) {
+      setBucketId(pickDefaultImplBucket(buckets));
+    }
+  }, [buckets, bucketId]);
 
   function handleCreate() {
     const n = name.trim();
     if (!n) return;
+    if (!bucketId) {
+      toast.error("Create an allocation bucket before adding an implementation.");
+      return;
+    }
     startTransition(async () => {
-      const result = await createImplementation({ name: n });
+      const result = await createImplementation({ name: n, bucket_id: bucketId });
       if (result.ok) {
         toast.success("Implementation created");
         setName("");
@@ -146,9 +175,28 @@ export default function TrainingPlannerView({ implementations }: Props) {
             placeholder="New implementation name"
             className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-sm"
           />
+          <select
+            aria-label="Allocation bucket"
+            value={bucketId}
+            onChange={(e) => {
+              setBucketId(e.target.value);
+            }}
+            disabled={buckets.length === 0}
+            className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-sm disabled:opacity-50"
+          >
+            {buckets.length === 0 ? (
+              <option value="">No buckets yet</option>
+            ) : (
+              buckets.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))
+            )}
+          </select>
           <button
             type="button"
-            disabled={pending || !name.trim()}
+            disabled={pending || !name.trim() || !bucketId}
             onClick={handleCreate}
             className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
           >

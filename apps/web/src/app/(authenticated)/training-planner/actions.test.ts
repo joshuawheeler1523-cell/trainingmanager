@@ -35,6 +35,7 @@ const ORG_ID = "aaaaaaaa-0000-0000-0000-000000000000";
 const IMPL_ID = "bbbbbbbb-0000-0000-0000-000000000000";
 const CLASS_ID = "cccccccc-0000-0000-0000-000000000000";
 const PREREQ_ID = "dddddddd-0000-0000-0000-000000000000";
+const BUCKET_ID = "eeeeeeee-0000-0000-0000-000000000000";
 
 function makeInsertChain(result: { data?: unknown; error?: unknown }) {
   return {
@@ -74,13 +75,16 @@ describe("createImplementation", () => {
         error: null,
       }),
     );
-    const result = await createImplementation({ name: "EMR Cutover" });
+    const result = await createImplementation({
+      name: "EMR Cutover",
+      bucket_id: BUCKET_ID,
+    });
     expect(result.ok).toBe(true);
   });
 
   it("returns NO_ORG when org context missing", async () => {
     mockGetCurrentOrgId.mockResolvedValue(null);
-    const result = await createImplementation({ name: "X" });
+    const result = await createImplementation({ name: "X", bucket_id: BUCKET_ID });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("NO_ORG");
   });
@@ -123,6 +127,7 @@ describe("updateImplementationSetup", () => {
     );
     const result = await updateImplementationSetup(IMPL_ID, {
       name: "EMR Cutover",
+      bucket_id: BUCKET_ID,
       window_start_date: "2026-06-01",
       window_end_date: "2026-07-15",
       go_live_date: "2026-08-01",

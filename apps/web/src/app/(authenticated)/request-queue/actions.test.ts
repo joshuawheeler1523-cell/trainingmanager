@@ -24,6 +24,7 @@ const { createRequest, updateRequestStatus, assignRequestInstructor, createIntak
 const ORG_ID = "aaaaaaaa-0000-0000-0000-000000000000";
 const REQUEST_ID = "bbbbbbbb-0000-0000-0000-000000000000";
 const INSTRUCTOR_ID = "cccccccc-0000-0000-0000-000000000000";
+const BUCKET_ID = "eeeeeeee-0000-0000-0000-000000000000";
 
 function makeInsertChain(result: { data?: unknown; error?: unknown }) {
   return {
@@ -55,7 +56,11 @@ describe("createRequest", () => {
   });
 
   it("rejects when requested_by_name is empty", async () => {
-    const result = await createRequest({ title: "Need ACLS", requested_by_name: "" });
+    const result = await createRequest({
+      title: "Need ACLS",
+      bucket_id: BUCKET_ID,
+      requested_by_name: "",
+    });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.field).toBe("requested_by_name");
   });
@@ -63,6 +68,7 @@ describe("createRequest", () => {
   it("rejects an invalid email", async () => {
     const result = await createRequest({
       title: "X",
+      bucket_id: BUCKET_ID,
       requested_by_name: "Sam",
       requested_by_email: "not-an-email",
     });
@@ -73,11 +79,18 @@ describe("createRequest", () => {
   it("rejects an unknown urgency", async () => {
     const result = await createRequest({
       title: "X",
+      bucket_id: BUCKET_ID,
       requested_by_name: "Sam",
       urgency: "later",
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("VALIDATION");
+  });
+
+  it("rejects when bucket_id is missing", async () => {
+    const result = await createRequest({ title: "X", requested_by_name: "Sam" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.field).toBe("bucket_id");
   });
 
   it("succeeds with a minimal valid record", async () => {
@@ -87,13 +100,21 @@ describe("createRequest", () => {
         error: null,
       }),
     );
-    const result = await createRequest({ title: "X", requested_by_name: "Sam" });
+    const result = await createRequest({
+      title: "X",
+      bucket_id: BUCKET_ID,
+      requested_by_name: "Sam",
+    });
     expect(result.ok).toBe(true);
   });
 
   it("returns NO_ORG when org context missing", async () => {
     mockGetCurrentOrgId.mockResolvedValue(null);
-    const result = await createRequest({ title: "X", requested_by_name: "Sam" });
+    const result = await createRequest({
+      title: "X",
+      bucket_id: BUCKET_ID,
+      requested_by_name: "Sam",
+    });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("NO_ORG");
   });

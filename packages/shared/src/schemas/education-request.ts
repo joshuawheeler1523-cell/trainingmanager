@@ -37,6 +37,7 @@ export type RequestSubmittedVia = (typeof REQUEST_SUBMITTED_VIA_VALUES)[number];
 
 export const requestInsertSchema = z.object({
   title: z.string().min(1, "Title is required").max(200),
+  bucket_id: z.string().uuid("Pick a bucket"),
   requested_by_name: z.string().min(1, "Requester name is required").max(200),
   requested_by_email: z
     .string()
@@ -71,6 +72,7 @@ export type EducationRequest = {
   id: string;
   org_id: string;
   title: string;
+  bucket_id: string | null;
   requested_by_name: string;
   requested_by_email: string | null;
   requested_by_department: string | null;

@@ -75,11 +75,32 @@ export async function submitPublicRequest(
     };
   }
 
+  // Public submitters can't pick a bucket. Resolve the org's default
+  // through a token-gated SECURITY DEFINER RPC so the anon client never
+  // needs SELECT on allocation_buckets directly.
+  const { data: defaultBucketId, error: bucketErr } = await anonClient.rpc(
+    "public_intake_default_bucket",
+    { p_token: token },
+  );
+  if (bucketErr) {
+    return { ok: false, error: { code: bucketErr.code, message: bucketErr.message } };
+  }
+  if (!defaultBucketId) {
+    return {
+      ok: false,
+      error: {
+        code: "NO_BUCKET",
+        message: "This org has no allocation buckets configured. Ask an admin to create one.",
+      },
+    };
+  }
+
   const { data, error } = await anonClient
     .from("education_requests")
     .insert({
       org_id: link.org_id,
       department_id: departmentId,
+      bucket_id: defaultBucketId,
       title: parsed.data.title,
       requested_by_name: parsed.data.requested_by_name,
       requested_by_email: parsed.data.requested_by_email,

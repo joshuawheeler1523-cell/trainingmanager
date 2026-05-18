@@ -1472,6 +1472,7 @@ export type Database = {
       };
       education_requests: {
         Row: {
+          bucket_id: string | null;
           business_justification: string | null;
           created_at: string;
           created_by: string | null;
@@ -1496,6 +1497,7 @@ export type Database = {
           urgency: string;
         };
         Insert: {
+          bucket_id?: string | null;
           business_justification?: string | null;
           created_at?: string;
           created_by?: string | null;
@@ -1520,6 +1522,7 @@ export type Database = {
           urgency?: string;
         };
         Update: {
+          bucket_id?: string | null;
           business_justification?: string | null;
           created_at?: string;
           created_by?: string | null;
@@ -1544,6 +1547,13 @@ export type Database = {
           urgency?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "education_requests_bucket_id_fkey";
+            columns: ["bucket_id"];
+            isOneToOne: false;
+            referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "education_requests_department_id_fkey";
             columns: ["department_id"];
@@ -2443,6 +2453,7 @@ export type Database = {
       };
       implementations: {
         Row: {
+          bucket_id: string | null;
           business_hours_end_local: number;
           business_hours_start_local: number;
           created_at: string;
@@ -2468,6 +2479,7 @@ export type Database = {
           window_start_date: string | null;
         };
         Insert: {
+          bucket_id?: string | null;
           business_hours_end_local?: number;
           business_hours_start_local?: number;
           created_at?: string;
@@ -2493,6 +2505,7 @@ export type Database = {
           window_start_date?: string | null;
         };
         Update: {
+          bucket_id?: string | null;
           business_hours_end_local?: number;
           business_hours_start_local?: number;
           created_at?: string;
@@ -2518,6 +2531,13 @@ export type Database = {
           window_start_date?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "implementations_bucket_id_fkey";
+            columns: ["bucket_id"];
+            isOneToOne: false;
+            referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "implementations_department_id_fkey";
             columns: ["department_id"];
@@ -5807,6 +5827,7 @@ export type Database = {
       };
       current_agency_id: { Args: never; Returns: string };
       current_instructor_id: { Args: { p_org_id: string }; Returns: string };
+      current_user_email: { Args: never; Returns: string };
       current_user_id: { Args: never; Returns: string };
       default_department_for_org: {
         Args: { p_org_id: string };
@@ -5935,6 +5956,10 @@ export type Database = {
       notify_aging_requests: { Args: never; Returns: undefined };
       notify_expiring_certifications: { Args: never; Returns: undefined };
       proficiency_rank: { Args: { p_proficiency: string }; Returns: number };
+      public_intake_default_bucket: {
+        Args: { p_token: string };
+        Returns: string;
+      };
       purge_expired_audit_logs: {
         Args: { p_default_retention_days?: number };
         Returns: {

@@ -24,19 +24,26 @@ export default async function TrainingPlannerPage() {
     );
   }
 
-  const [{ data: implementations }, { data: classes }, { data: sessions }] = await Promise.all([
-    supabase
-      .from("implementations")
-      .select("*")
-      .eq("org_id", orgId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("impl_classes")
-      .select("id, implementation_id, total_people_to_train, expected_learners_per_session")
-      .eq("org_id", orgId),
-    supabase.from("impl_sessions").select("id, impl_class_id, status").eq("org_id", orgId),
-  ]);
+  const [{ data: implementations }, { data: classes }, { data: sessions }, { data: bucketRows }] =
+    await Promise.all([
+      supabase
+        .from("implementations")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("impl_classes")
+        .select("id, implementation_id, total_people_to_train, expected_learners_per_session")
+        .eq("org_id", orgId),
+      supabase.from("impl_sessions").select("id, impl_class_id, status").eq("org_id", orgId),
+      supabase
+        .from("allocation_buckets")
+        .select("*")
+        .eq("org_id", orgId)
+        .eq("is_archived", false)
+        .order("display_order"),
+    ]);
 
   const implList = (implementations ?? []) as Implementation[];
   const classList = (classes ?? []) as Pick<
@@ -74,7 +81,7 @@ export default async function TrainingPlannerPage() {
         title="Training Planner"
         description="Plan large training rollouts with rooms, trainers, modules, and auto-scheduled sessions."
       />
-      <TrainingPlannerView implementations={enriched} />
+      <TrainingPlannerView implementations={enriched} buckets={bucketRows ?? []} />
     </div>
   );
 }
