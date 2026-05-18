@@ -11,7 +11,13 @@ import {
   TrashIcon,
 } from "@heroicons/react/20/solid";
 import type { ImplModule } from "@arbor/shared";
-import { createModule, deleteModule, setStep, updateModule } from "../../actions";
+import {
+  createModule,
+  deleteModule,
+  reorderImplModules,
+  setStep,
+  updateModule,
+} from "../../actions";
 
 type Props = {
   implementationId: string;
@@ -124,33 +130,28 @@ export default function ModulesEditor({ implementationId, modules: initialModule
     });
   }
 
-  // Alphabetize. Persists immediately (not via the deferred flush) so the
-  // order reflects on disk and the next render returns the rows sorted.
+  // Alphabetize via a single bulk server action — one round trip, one
+  // revalidate. Pending field edits flush first so they aren't lost.
   function handleSort() {
     const sorted = rows
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-    const changed = sorted
-      .map((m, i) => ({ id: m.id, newOrder: i, oldOrder: m.sort_order }))
-      .filter((x) => x.newOrder !== x.oldOrder);
-    if (changed.length === 0) {
+    const orderings = sorted
+      .map((m, i) => ({ id: m.id, sort_order: i, oldOrder: m.sort_order }))
+      .filter((x) => x.sort_order !== x.oldOrder)
+      .map(({ id, sort_order }) => ({ id, sort_order }));
+    if (orderings.length === 0) {
       toast.info("Already in alphabetical order");
       return;
     }
     startTransition(async () => {
-      // Flush any pending field edits first so we don't lose them when the
-      // server returns the re-ordered rows and clobbers local state.
       const ok = await flushDirty();
       if (!ok) return;
-      const results = await Promise.all(
-        changed.map((x) => updateModule(x.id, implementationId, { sort_order: x.newOrder })),
-      );
-      const failed = results.filter((res) => !res.ok);
-      if (failed.length > 0) {
-        toast.error(`${failed.length.toString()} modules failed to re-order`);
+      const result = await reorderImplModules(implementationId, orderings);
+      if (!result.ok) {
+        toast.error(result.error.message);
         return;
       }
-      // Local re-order so the user sees the new sequence without a refetch.
       setRows((prev) => {
         const byId = new Map(prev.map((r) => [r.id, r]));
         return sorted.map((m, i) => {

@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
+  ArrowTopRightOnSquareIcon,
   BarsArrowDownIcon,
   PlusIcon,
   TrashIcon,
@@ -24,6 +25,7 @@ import {
   createClass,
   deleteClass,
   removeClassPrerequisite,
+  reorderImplClasses,
   setClassTrainers,
   setStep,
   updateClass,
@@ -64,6 +66,7 @@ function computeWindowWeeks(start: string | null, end: string | null): number {
 // edited via the drawer and stay immediate-save because they don't have
 // a row-level patch shape.
 const PATCH_FIELDS = [
+  "name",
   "module_id",
   "hours_per_session",
   "expected_learners_per_session",
@@ -223,29 +226,26 @@ export default function ClassesEditor({
     });
   }
 
-  // Alphabetize by name. Flushes pending edits first so the server isn't
-  // chasing two batches in parallel, then re-orders locally and persists
-  // the new sort_order values for any row that moved.
+  // Alphabetize via a single bulk server action so the round trip count
+  // doesn't scale with class count. Flushes pending field edits first.
   function handleSort() {
     const sorted = rows
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-    const changed = sorted
-      .map((c, i) => ({ id: c.id, newOrder: i, oldOrder: c.sort_order }))
-      .filter((x) => x.newOrder !== x.oldOrder);
-    if (changed.length === 0) {
+    const orderings = sorted
+      .map((c, i) => ({ id: c.id, sort_order: i, oldOrder: c.sort_order }))
+      .filter((x) => x.sort_order !== x.oldOrder)
+      .map(({ id, sort_order }) => ({ id, sort_order }));
+    if (orderings.length === 0) {
       toast.info("Already in alphabetical order");
       return;
     }
     startTransition(async () => {
       const ok = await flushDirty();
       if (!ok) return;
-      const results = await Promise.all(
-        changed.map((x) => updateClass(x.id, implementationId, { sort_order: x.newOrder })),
-      );
-      const failed = results.filter((res) => !res.ok);
-      if (failed.length > 0) {
-        toast.error(`${failed.length.toString()} classes failed to re-order`);
+      const result = await reorderImplClasses(implementationId, orderings);
+      if (!result.ok) {
+        toast.error(result.error.message);
         return;
       }
       setRows((prev) => {
@@ -347,15 +347,29 @@ export default function ClassesEditor({
                     className={`hover:bg-surface/50 ${dirty ? "bg-[var(--cream,transparent)]" : ""}`}
                   >
                     <td className="px-3 py-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOpenClassId(c.id);
-                        }}
-                        className="text-primary text-left font-medium hover:underline"
-                      >
-                        {c.name}
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <input
+                          key={`${c.id}-name`}
+                          defaultValue={c.name}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v && v !== c.name) patchLocal(c.id, { name: v });
+                          }}
+                          aria-label="Class name"
+                          className={fieldClass + " min-w-0 flex-1 font-medium"}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenClassId(c.id);
+                          }}
+                          aria-label="Open class details"
+                          title="Edit prerequisites + assigned trainers"
+                          className="text-muted-foreground hover:text-foreground shrink-0 rounded p-1"
+                        >
+                          <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                     <td className="px-3 py-2">
                       <select
@@ -687,8 +701,8 @@ function ClassDrawer({
   klass,
   allClasses,
   trainers,
-  assignedTrainerIds,
-  prerequisites,
+  assignedTrainerIds: initialAssignedIds,
+  prerequisites: initialPrereqs,
   classMap,
   onClose,
 }: {
@@ -701,30 +715,47 @@ function ClassDrawer({
   classMap: Map<string, ImplClass>;
   onClose: () => void;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [pickPrereq, setPickPrereq] = useState("");
 
+  // Local-first state for assignments + prereqs. Clicks update state
+  // instantly; server saves run in the background. No router.refresh
+  // needed because the parent's classMap derives from local rows state
+  // and the drawer's own state holds the assignment truth while open.
+  const [assignedIds, setAssignedIds] = useState<Set<string>>(() => new Set(initialAssignedIds));
+  const [prereqs, setPrereqs] = useState<ImplClassPrerequisite[]>(initialPrereqs);
+
+  // Serialize setClassTrainers calls so rapid checkbox clicks can't
+  // arrive at the server out of order. Each click queues behind the
+  // previous save with a snapshot of the post-click assignment set.
+  const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
+
   function toggleTrainer(trainerId: string) {
-    const next = new Set(assignedTrainerIds);
-    if (next.has(trainerId)) next.delete(trainerId);
-    else next.add(trainerId);
-    startTransition(async () => {
-      const result = await setClassTrainers(klass.id, implementationId, Array.from(next));
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+    setAssignedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(trainerId)) next.delete(trainerId);
+      else next.add(trainerId);
+      const snapshot = Array.from(next);
+      saveQueue.current = saveQueue.current
+        .catch(() => {
+          /* never let a previous failure block the next save */
+        })
+        .then(() => setClassTrainers(klass.id, implementationId, snapshot))
+        .then((r) => {
+          if (!r.ok) toast.error(r.error.message);
+        });
+      return next;
     });
   }
 
   function addPrereq() {
     if (!pickPrereq) return;
+    const prereqId = pickPrereq;
+    setPickPrereq("");
     startTransition(async () => {
-      const result = await addClassPrerequisite(klass.id, implementationId, pickPrereq);
+      const result = await addClassPrerequisite(klass.id, implementationId, prereqId);
       if (result.ok) {
-        setPickPrereq("");
-        router.refresh();
-      } else if (result.error.code === "CYCLE") {
-        toast.error(result.error.message);
+        setPrereqs((prev) => [...prev, result.data]);
       } else {
         toast.error(result.error.message);
       }
@@ -732,14 +763,14 @@ function ClassDrawer({
   }
 
   function removePrereq(rowId: string) {
-    startTransition(async () => {
-      const result = await removeClassPrerequisite(rowId, implementationId);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+    setPrereqs((prev) => prev.filter((p) => p.id !== rowId));
+    // Fire and forget — the optimistic removal is already shown.
+    void removeClassPrerequisite(rowId, implementationId).then((r) => {
+      if (!r.ok) toast.error(r.error.message);
     });
   }
 
-  const prereqIds = new Set(prerequisites.map((p) => p.prerequisite_id));
+  const prereqIds = new Set(prereqs.map((p) => p.prerequisite_id));
   const candidatePrereqs = allClasses.filter((c) => c.id !== klass.id && !prereqIds.has(c.id));
 
   return (
@@ -779,7 +810,7 @@ function ClassDrawer({
           {/* Trainers */}
           <section>
             <h3 className="text-foreground mb-2 text-sm font-semibold">
-              Eligible trainers ({assignedTrainerIds.length.toString()})
+              Eligible trainers ({assignedIds.size.toString()})
             </h3>
             <p className="text-muted-foreground mb-2 text-xs">
               Multiple eligible trainers gives the scheduler more flexibility.
@@ -791,13 +822,12 @@ function ClassDrawer({
             ) : (
               <ul className="border-border divide-border divide-y rounded-md border">
                 {trainers.map((t) => {
-                  const checked = assignedTrainerIds.includes(t.id);
+                  const checked = assignedIds.has(t.id);
                   return (
                     <li key={t.id} className="flex items-center gap-3 px-3 py-2 text-sm">
                       <input
                         type="checkbox"
                         checked={checked}
-                        disabled={pending}
                         onChange={() => {
                           toggleTrainer(t.id);
                         }}
@@ -816,27 +846,26 @@ function ClassDrawer({
           {/* Prerequisites */}
           <section>
             <h3 className="text-foreground mb-2 text-sm font-semibold">
-              Prerequisites ({prerequisites.length.toString()})
+              Prerequisites ({prereqs.length.toString()})
             </h3>
-            {prerequisites.length === 0 ? (
+            {prereqs.length === 0 ? (
               <p className="text-muted-foreground text-xs">
                 No prerequisites — this class can run any time.
               </p>
             ) : (
               <ul className="border-border divide-border divide-y rounded-md border">
-                {prerequisites.map((p) => (
+                {prereqs.map((p) => (
                   <li key={p.id} className="flex items-center justify-between px-3 py-2 text-sm">
                     <span className="text-foreground">
                       {classMap.get(p.prerequisite_id)?.name ?? "—"}
                     </span>
                     <button
                       type="button"
-                      disabled={pending}
                       onClick={() => {
                         removePrereq(p.id);
                       }}
                       aria-label="Remove prerequisite"
-                      className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+                      className="text-muted-foreground hover:text-destructive"
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>

@@ -824,6 +824,43 @@ export async function deleteModule(
   return { ok: true, data: { id } };
 }
 
+// Bulk re-order: one server call writes every sort_order in a single
+// round trip, then revalidates the modules page once. The client side
+// fires updates in parallel before this existed, which on a 20-row
+// impl meant 20 round trips + 20 revalidates queueing up behind each
+// other — felt unbearably slow on the Sort A-Z button. Now: 1 round
+// trip, 1 revalidate.
+export async function reorderImplModules(
+  implementationId: string,
+  orderings: { id: string; sort_order: number }[],
+): Promise<ActionResult<{ count: number }>> {
+  if (orderings.length === 0) return { ok: true, data: { count: 0 } };
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  // Postgres doesn't have a single-statement "update many rows with
+  // different values" without VALUES + UPDATE FROM. We could go via a
+  // raw SQL RPC for that, but a Promise.all of N small UPDATEs inside
+  // one server action is already a big win: shared HTTP/2 conn to
+  // Supabase, no per-call client setup, and only one revalidatePath at
+  // the end. Good enough for impls with up to a couple hundred rows.
+  const results = await Promise.all(
+    orderings.map((o) =>
+      c.supabase
+        .from("impl_modules")
+        .update({ sort_order: o.sort_order })
+        .eq("id", o.id)
+        .eq("org_id", c.orgId),
+    ),
+  );
+  const firstError = results.find((r) => r.error)?.error;
+  if (firstError) {
+    return { ok: false, error: { code: firstError.code, message: firstError.message } };
+  }
+  revalidatePath(`/training-planner/${implementationId}/modules`);
+  return { ok: true, data: { count: orderings.length } };
+}
+
 // ── impl_classes ────────────────────────────────────────────────────────────
 
 export async function createClass(
@@ -901,6 +938,34 @@ export async function deleteClass(
   return { ok: true, data: { id } };
 }
 
+// See reorderImplModules — same rationale. Sort A-Z used to fan out N
+// independent updateClass calls and each one's revalidatePath stacked
+// up. Now it's one server call, one revalidate.
+export async function reorderImplClasses(
+  implementationId: string,
+  orderings: { id: string; sort_order: number }[],
+): Promise<ActionResult<{ count: number }>> {
+  if (orderings.length === 0) return { ok: true, data: { count: 0 } };
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const results = await Promise.all(
+    orderings.map((o) =>
+      c.supabase
+        .from("impl_classes")
+        .update({ sort_order: o.sort_order })
+        .eq("id", o.id)
+        .eq("org_id", c.orgId),
+    ),
+  );
+  const firstError = results.find((r) => r.error)?.error;
+  if (firstError) {
+    return { ok: false, error: { code: firstError.code, message: firstError.message } };
+  }
+  revalidatePath(`/training-planner/${implementationId}/classes`);
+  return { ok: true, data: { count: orderings.length } };
+}
+
 // ── junctions: class trainers + class prerequisites ─────────────────────────
 
 export async function setClassTrainers(
@@ -921,7 +986,10 @@ export async function setClassTrainers(
   if (delErr) return { ok: false, error: { code: delErr.code, message: delErr.message } };
 
   if (trainerIds.length === 0) {
-    revalidateImpl(implementationId);
+    // Scoped revalidate so a checkbox toggle doesn't refetch the whole
+    // impl layout. The drawer's optimistic state handles the immediate
+    // visual; this is just for next-mount accuracy.
+    revalidatePath(`/training-planner/${implementationId}/classes`);
     return { ok: true, data: { count: 0 } };
   }
 
@@ -934,7 +1002,7 @@ export async function setClassTrainers(
   const { error: insErr } = await c.supabase.from("impl_class_trainers").insert(rows);
   if (insErr) return { ok: false, error: { code: insErr.code, message: insErr.message } };
 
-  revalidateImpl(implementationId);
+  revalidatePath(`/training-planner/${implementationId}/classes`);
   return { ok: true, data: { count: trainerIds.length } };
 }
 
@@ -972,7 +1040,9 @@ export async function addClassPrerequisite(
     }
     return { ok: false, error: { code: error.code, message: error.message } };
   }
-  revalidateImpl(implementationId);
+  // Prereqs are read by the classes page only; no layout count depends
+  // on them, so the layout-wide revalidate wasn't pulling its weight.
+  revalidatePath(`/training-planner/${implementationId}/classes`);
   return { ok: true, data };
 }
 
@@ -990,7 +1060,7 @@ export async function removeClassPrerequisite(
     .eq("org_id", c.orgId);
 
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
-  revalidateImpl(implementationId);
+  revalidatePath(`/training-planner/${implementationId}/classes`);
   return { ok: true, data: { id: prereqRowId } };
 }
 
