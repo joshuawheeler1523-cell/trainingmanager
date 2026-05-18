@@ -92,23 +92,24 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     const skillByName = new Map(skills.map((s) => [s.name, s.id]));
 
     // ── 4. Instructors ───────────────────────────────────────────────────
-    // Capacity narrative for the demo: a few part-time educators dedicated to
-    // a specific program land in the over-allocated / at-risk bands so the
-    // dashboard shows realistic variety; the rest are full-time but
-    // under-loaded (typical for an internal ed team that has slack).
+    // Every instructor is full-time (2080h annual = 40h/wk × 52wk). Variance
+    // in utilization% comes from how much WORK each is assigned downstream
+    // (classes, projects, requests, tasks), not from capacity. The demo
+    // story: two over-allocated leads, two at-risk, six balanced, four
+    // under-utilized — populated by deliberate work concentration below.
     const instructorSeeds: { full_name: string; department: string; annual_hours: number }[] = [
-      { full_name: "Maya Castellanos", department: "Nursing Education", annual_hours: 600 },
-      { full_name: "Devon Park", department: "Nursing Education", annual_hours: 58 },
-      { full_name: "Aisha Bello", department: "Nursing Education", annual_hours: 500 },
+      { full_name: "Maya Castellanos", department: "Nursing Education", annual_hours: 2080 },
+      { full_name: "Devon Park", department: "Nursing Education", annual_hours: 2080 },
+      { full_name: "Aisha Bello", department: "Nursing Education", annual_hours: 2080 },
       { full_name: "Tomás Rivera", department: "Clinical Informatics", annual_hours: 2080 },
       { full_name: "Sasha Petrov", department: "Clinical Informatics", annual_hours: 2080 },
-      { full_name: "Priya Chandrasekaran", department: "Surgery", annual_hours: 150 },
-      { full_name: "Marcus Webb", department: "Surgery", annual_hours: 1664 },
-      { full_name: "Hannah O'Connor", department: "Emergency", annual_hours: 200 },
-      { full_name: "Reggie Strand", department: "Emergency", annual_hours: 280 },
+      { full_name: "Priya Chandrasekaran", department: "Surgery", annual_hours: 2080 },
+      { full_name: "Marcus Webb", department: "Surgery", annual_hours: 2080 },
+      { full_name: "Hannah O'Connor", department: "Emergency", annual_hours: 2080 },
+      { full_name: "Reggie Strand", department: "Emergency", annual_hours: 2080 },
       { full_name: "Nadia Haddad", department: "Pediatrics", annual_hours: 2080 },
       { full_name: "Quentin Reyes", department: "Compliance & Quality", annual_hours: 2080 },
-      { full_name: "Linnea Forsberg", department: "Compliance & Quality", annual_hours: 1872 },
+      { full_name: "Linnea Forsberg", department: "Compliance & Quality", annual_hours: 2080 },
     ];
     const { data: instructors, error: instErr } = await admin
       .from("instructors")
@@ -125,43 +126,85 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     const instById = new Map(instructors.map((i) => [i.full_name, i]));
 
     // Skill assignments — one to three per instructor, biased to dept.
+    // Certification skills carry expires_at so the skill-gap report's
+    // expiring_certs panel populates. Spread urgencies (15d, 30d, 60d, 80d)
+    // for visual variety; one expiry beyond the 90d window so we can verify
+    // the cutoff works.
     type Prof = "beginner" | "intermediate" | "advanced" | "expert";
-    const skillAssignments: Array<[string, string, Prof]> = [
-      ["Maya Castellanos", "Epic EHR", "expert"],
-      ["Maya Castellanos", "Adult Learning Theory", "advanced"],
-      ["Maya Castellanos", "BLS / CPR", "expert"],
-      ["Devon Park", "Cerner Millennium", "advanced"],
-      ["Devon Park", "Adult Learning Theory", "intermediate"],
-      ["Aisha Bello", "Epic EHR", "advanced"],
-      ["Aisha Bello", "BLS / CPR", "advanced"],
-      ["Tomás Rivera", "Epic EHR", "expert"],
-      ["Tomás Rivera", "Cerner Millennium", "expert"],
-      ["Sasha Petrov", "Epic EHR", "intermediate"],
-      ["Sasha Petrov", "Adult Learning Theory", "advanced"],
-      ["Priya Chandrasekaran", "Surgical Robotics (da Vinci)", "expert"],
-      ["Priya Chandrasekaran", "Adult ACLS", "expert"],
-      ["Marcus Webb", "Surgical Robotics (da Vinci)", "advanced"],
-      ["Hannah O'Connor", "Trauma & Code Response", "expert"],
-      ["Hannah O'Connor", "Adult ACLS", "expert"],
-      ["Reggie Strand", "Trauma & Code Response", "advanced"],
-      ["Reggie Strand", "BLS / CPR", "expert"],
-      ["Nadia Haddad", "Pediatric Critical Care", "expert"],
-      ["Nadia Haddad", "BLS / CPR", "advanced"],
-      ["Quentin Reyes", "Adult Learning Theory", "intermediate"],
-      ["Linnea Forsberg", "Adult Learning Theory", "advanced"],
+    type SkillAssign = {
+      name: string;
+      skill: string;
+      prof: Prof;
+      expiresInDays?: number;
+    };
+    const skillAssignments: SkillAssign[] = [
+      { name: "Maya Castellanos", skill: "Epic EHR", prof: "expert" },
+      { name: "Maya Castellanos", skill: "Adult Learning Theory", prof: "advanced" },
+      { name: "Maya Castellanos", skill: "BLS / CPR", prof: "expert", expiresInDays: 60 },
+      { name: "Devon Park", skill: "Cerner Millennium", prof: "advanced" },
+      { name: "Devon Park", skill: "Adult Learning Theory", prof: "intermediate" },
+      { name: "Aisha Bello", skill: "Epic EHR", prof: "advanced" },
+      { name: "Aisha Bello", skill: "BLS / CPR", prof: "advanced", expiresInDays: 200 },
+      { name: "Tomás Rivera", skill: "Epic EHR", prof: "expert" },
+      { name: "Tomás Rivera", skill: "Cerner Millennium", prof: "expert" },
+      { name: "Tomás Rivera", skill: "Adult ACLS", prof: "advanced", expiresInDays: 30 },
+      { name: "Sasha Petrov", skill: "Epic EHR", prof: "intermediate" },
+      { name: "Sasha Petrov", skill: "Adult Learning Theory", prof: "advanced" },
+      {
+        name: "Priya Chandrasekaran",
+        skill: "Surgical Robotics (da Vinci)",
+        prof: "expert",
+      },
+      {
+        name: "Priya Chandrasekaran",
+        skill: "Adult ACLS",
+        prof: "expert",
+        expiresInDays: 120, // outside the 90d window — won't show in expiring_certs
+      },
+      { name: "Marcus Webb", skill: "Surgical Robotics (da Vinci)", prof: "advanced" },
+      { name: "Hannah O'Connor", skill: "Trauma & Code Response", prof: "expert" },
+      {
+        name: "Hannah O'Connor",
+        skill: "Adult ACLS",
+        prof: "expert",
+        expiresInDays: 15, // urgent
+      },
+      { name: "Reggie Strand", skill: "Trauma & Code Response", prof: "advanced" },
+      { name: "Reggie Strand", skill: "BLS / CPR", prof: "expert", expiresInDays: 80 },
+      { name: "Nadia Haddad", skill: "Pediatric Critical Care", prof: "expert" },
+      { name: "Nadia Haddad", skill: "BLS / CPR", prof: "advanced" },
+      { name: "Quentin Reyes", skill: "Adult Learning Theory", prof: "intermediate" },
+      { name: "Linnea Forsberg", skill: "Adult Learning Theory", prof: "advanced" },
     ];
     const isRows = skillAssignments
-      .map(([name, skillName, prof]) => {
-        const inst = instById.get(name);
-        const skillId = skillByName.get(skillName);
+      .map((a) => {
+        const inst = instById.get(a.name);
+        const skillId = skillByName.get(a.skill);
         if (!inst || !skillId) return null;
-        return {
+        const row: {
+          org_id: string;
+          department_id: string;
+          instructor_id: string;
+          skill_id: string;
+          proficiency: Prof;
+          is_certified?: boolean;
+          certified_at?: string;
+          expires_at?: string;
+        } = {
           org_id: orgId,
           department_id: deptId,
           instructor_id: inst.id,
           skill_id: skillId,
-          proficiency: prof,
+          proficiency: a.prof,
         };
+        if (a.expiresInDays !== undefined) {
+          row.is_certified = true;
+          // Certified roughly 2 years ago (typical cert cycle); expires_at
+          // is the demo-tunable.
+          row.certified_at = addDaysIso(a.expiresInDays - 730);
+          row.expires_at = addDaysIso(a.expiresInDays);
+        }
+        return row;
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
     const { error: isErr } = await admin.from("instructor_skills").insert(isRows);
@@ -418,6 +461,21 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           hours_per_day: 8,
           allocation_bucket_id: bucketByName.get("Direct Training")!,
         },
+        // Pediatric Code Blue Sim — only Nadia is expert-qualified for
+        // Pediatric Critical Care, so this class triggers skill-gap's
+        // insufficient_coverage finding (qualified_count = 1 < threshold 2).
+        {
+          org_id: orgId,
+          department_id: deptId,
+          name: "Pediatric Code Blue Sim",
+          total_days: 1,
+          offerings_per_year: 6,
+          prep_hours_per_offering: 4,
+          logistics_hours_per_offering: 2,
+          status: "active",
+          hours_per_day: 4,
+          allocation_bucket_id: bucketByName.get("Direct Training")!,
+        },
       ])
       .select("id, name");
     if (!classes) throw new Error("Classes returned no rows");
@@ -471,6 +529,14 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         class_id: classByName.get("BLS Provider — Quarterly Cohort")!,
         skill_id: skillByName.get("BLS / CPR")!,
         min_proficiency: "advanced",
+        requirement: "required",
+      },
+      {
+        org_id: orgId,
+        department_id: deptId,
+        class_id: classByName.get("Pediatric Code Blue Sim")!,
+        skill_id: skillByName.get("Pediatric Critical Care")!,
+        min_proficiency: "expert",
         requirement: "required",
       },
     ]);
@@ -547,6 +613,14 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         instructor_id: instById.get("Aisha Bello")!.id,
         role: "eligible",
         assigned_offerings: 4,
+      },
+      {
+        org_id: orgId,
+        department_id: deptId,
+        class_id: classByName.get("Pediatric Code Blue Sim")!,
+        instructor_id: instById.get("Nadia Haddad")!.id,
+        role: "primary",
+        assigned_offerings: 6,
       },
     ]);
 
@@ -1064,7 +1138,713 @@ export async function seedDemoOrg(): Promise<SeedResult> {
       ]);
     }
 
-    // ── 15. Support tickets (sample) — org-scoped (no department_id) ─────
+    // Second implementation — CLEAN feasibility (plenty of headroom).
+    // BLS Annual Refresh in Q3: 60 staff × one 4-hour class = 5 sessions,
+    // 2 rooms × 8h/day for 30 days, 2 trainers with 40 + 24 h/wk. Easy fit.
+    const { data: implBlsRows } = await admin
+      .from("implementations")
+      .insert({
+        org_id: orgId,
+        department_id: deptId,
+        name: "BLS Annual Refresh — Q3 Wave",
+        status: "active",
+        description:
+          "Annual BLS provider re-certification for 60 frontline staff. Two trainers, two rooms — plenty of slack.",
+        window_start_date: addDaysIso(45),
+        window_end_date: addDaysIso(75),
+        go_live_date: addDaysIso(78),
+        current_step: 7,
+      })
+      .select("id, name");
+    if (implBlsRows && implBlsRows.length > 0) {
+      const implBlsId = implBlsRows[0]!.id;
+      const { data: blsModules } = await admin
+        .from("impl_modules")
+        .insert([
+          {
+            org_id: orgId,
+            department_id: deptId,
+            implementation_id: implBlsId,
+            name: "BLS Skills Stations",
+            sort_order: 0,
+          },
+        ])
+        .select("id, name");
+      const blsModByName = new Map((blsModules ?? []).map((m) => [m.name, m.id]));
+      await admin.from("impl_classes").insert([
+        {
+          org_id: orgId,
+          department_id: deptId,
+          implementation_id: implBlsId,
+          module_id: blsModByName.get("BLS Skills Stations") ?? null,
+          name: "BLS Skills + Megacode",
+          expected_learners_per_session: 12,
+          hours_per_session: 4,
+          total_people_to_train: 60,
+          sort_order: 0,
+        },
+      ]);
+      await admin.from("impl_rooms").insert([
+        {
+          org_id: orgId,
+          department_id: deptId,
+          implementation_id: implBlsId,
+          name: "Sim Lab North",
+          seat_capacity: 12,
+          available_hours_per_day: 8,
+          sort_order: 0,
+        },
+        {
+          org_id: orgId,
+          department_id: deptId,
+          implementation_id: implBlsId,
+          name: "Sim Lab South",
+          seat_capacity: 12,
+          available_hours_per_day: 8,
+          sort_order: 1,
+        },
+      ]);
+      await admin.from("impl_trainers").insert([
+        {
+          org_id: orgId,
+          department_id: deptId,
+          implementation_id: implBlsId,
+          name: "Reggie Strand",
+          instructor_id: instById.get("Reggie Strand")!.id,
+          availability_hours_per_week: 40,
+          max_concurrent_sessions: 1,
+          sort_order: 0,
+        },
+        {
+          org_id: orgId,
+          department_id: deptId,
+          implementation_id: implBlsId,
+          name: "Aisha Bello",
+          instructor_id: instById.get("Aisha Bello")!.id,
+          availability_hours_per_week: 24,
+          max_concurrent_sessions: 1,
+          sort_order: 1,
+        },
+      ]);
+    }
+
+    // Third implementation — BOTTLENECK feasibility. Short window, one
+    // small room, one over-allocated trainer. Designed to surface the new
+    // room_capacity diagnosis on Calculate — the "don't hire trainers,
+    // fix the room" guard shipped today in the scheduler rewrite.
+    const { data: implRoboRows } = await admin
+      .from("implementations")
+      .insert({
+        org_id: orgId,
+        department_id: deptId,
+        name: "Robotics Console Recert — System-wide",
+        status: "active",
+        description:
+          "120 surgeons system-wide due for da Vinci console recertification. Tight 30-day window, one console lab, one qualified trainer.",
+        window_start_date: addDaysIso(10),
+        window_end_date: addDaysIso(40),
+        go_live_date: addDaysIso(45),
+        current_step: 3,
+      })
+      .select("id, name");
+    if (implRoboRows && implRoboRows.length > 0) {
+      const implRoboId = implRoboRows[0]!.id;
+      const { data: roboModules } = await admin
+        .from("impl_modules")
+        .insert([
+          {
+            org_id: orgId,
+            department_id: deptId,
+            implementation_id: implRoboId,
+            name: "Console Recert Lab",
+            sort_order: 0,
+          },
+          {
+            org_id: orgId,
+            department_id: deptId,
+            implementation_id: implRoboId,
+            name: "Procedural Drills",
+            sort_order: 1,
+          },
+        ])
+        .select("id, name");
+      const roboModByName = new Map((roboModules ?? []).map((m) => [m.name, m.id]));
+      await admin.from("impl_classes").insert([
+        {
+          org_id: orgId,
+          department_id: deptId,
+          implementation_id: implRoboId,
+          module_id: roboModByName.get("Console Recert Lab") ?? null,
+          name: "Console Recert — 1:1",
+          expected_learners_per_session: 4,
+          hours_per_session: 8,
+          total_people_to_train: 80,
+          sort_order: 0,
+        },
+        {
+          org_id: orgId,
+          department_id: deptId,
+          implementation_id: implRoboId,
+          module_id: roboModByName.get("Procedural Drills") ?? null,
+          name: "Procedural Drill Block",
+          expected_learners_per_session: 4,
+          hours_per_session: 8,
+          total_people_to_train: 40,
+          sort_order: 1,
+        },
+      ]);
+      await admin.from("impl_rooms").insert([
+        {
+          org_id: orgId,
+          department_id: deptId,
+          implementation_id: implRoboId,
+          name: "Robotics Console Lab",
+          seat_capacity: 4,
+          available_hours_per_day: 6,
+          sort_order: 0,
+        },
+      ]);
+      await admin.from("impl_trainers").insert([
+        {
+          org_id: orgId,
+          department_id: deptId,
+          implementation_id: implRoboId,
+          name: "Priya Chandrasekaran",
+          instructor_id: instById.get("Priya Chandrasekaran")!.id,
+          availability_hours_per_week: 16,
+          max_concurrent_sessions: 1,
+          sort_order: 0,
+        },
+      ]);
+    }
+
+    // ── 15. Education requests + assignments ─────────────────────────────
+    // 6 requests spread across the kanban so the Request Queue board has a
+    // card in every column. Three of them carry assignments to Maya / Priya /
+    // Hannah — those assigned hours feed the utilization-band story (Maya
+    // and Priya into over-allocated, Hannah into at-risk).
+    const { data: edRequests } = await admin
+      .from("education_requests")
+      .insert([
+        {
+          org_id: orgId,
+          department_id: deptId,
+          title: "ICU vasopressor titration refresher",
+          requested_by_name: "Dr. Anita Shah",
+          requested_by_email: "ashah@riverside.example",
+          requested_by_department: "ICU",
+          business_justification:
+            "New norepinephrine protocol rolled out last month. Nurses need a hands-on titration refresher before next month's audits.",
+          target_audience: "ICU RNs (~40 staff)",
+          urgency: "high",
+          target_completion_date: addDaysIso(45),
+          status: "new",
+          submitted_via: "form",
+          bucket_id: bucketByName.get("Direct Training")!,
+        },
+        {
+          org_id: orgId,
+          department_id: deptId,
+          title: "New-grad onboarding pathway redesign",
+          requested_by_name: "Karen Liu, RN, MSN",
+          requested_by_email: "kliu@riverside.example",
+          requested_by_department: "Nursing",
+          business_justification:
+            "Current 12-week onboarding underperforms — turnover at month 4 is 22%. Need a re-skinned pathway with embedded simulation checkpoints.",
+          target_audience: "New-grad RNs (~25 hires/yr)",
+          urgency: "standard",
+          status: "under_review",
+          submitted_via: "form",
+          bucket_id: bucketByName.get("Course Development")!,
+        },
+        {
+          org_id: orgId,
+          department_id: deptId,
+          title: "Stroke alert team simulation",
+          requested_by_name: "Dr. James Park",
+          requested_by_email: "jpark@riverside.example",
+          requested_by_department: "Neurology",
+          business_justification:
+            "Door-to-needle metrics slipping. Multidisciplinary sim quarterly to rebuild muscle memory.",
+          target_audience: "ED + Neuro + Pharmacy (15 per cohort)",
+          urgency: "high",
+          target_completion_date: addDaysIso(60),
+          status: "approved",
+          submitted_via: "app",
+          bucket_id: bucketByName.get("Direct Training")!,
+        },
+        {
+          org_id: orgId,
+          department_id: deptId,
+          title: "Epic downtime procedure training",
+          requested_by_name: "IT Operations",
+          requested_by_email: "itops@riverside.example",
+          requested_by_department: "IT",
+          business_justification:
+            "Quarterly downtime drills now mandatory per Joint Commission finding. Every unit needs an annual refresh.",
+          target_audience: "All clinical staff (~1,600)",
+          urgency: "urgent",
+          target_completion_date: addDaysIso(28),
+          status: "assigned",
+          submitted_via: "app",
+          bucket_id: bucketByName.get("Direct Training")!,
+        },
+        {
+          org_id: orgId,
+          department_id: deptId,
+          title: "OR fire safety annual refresher",
+          requested_by_name: "OR Safety Committee",
+          requested_by_email: "or-safety@riverside.example",
+          requested_by_department: "Surgery",
+          business_justification:
+            "Annual regulatory requirement. Last cycle's completion rate was 87% — need a tighter rollout.",
+          target_audience: "OR staff (~120)",
+          urgency: "standard",
+          target_completion_date: addDaysIso(90),
+          status: "in_progress",
+          submitted_via: "app",
+          bucket_id: bucketByName.get("Compliance & Audits")!,
+        },
+        {
+          org_id: orgId,
+          department_id: deptId,
+          title: "Bedside ultrasound credentialing series",
+          requested_by_name: "Dr. Maria Gonzalez",
+          requested_by_email: "mgonzalez@riverside.example",
+          requested_by_department: "Emergency",
+          business_justification:
+            "POCUS volume up 40%. Need a 4-session credentialing track aligned with ACEP guidelines.",
+          target_audience: "EM attendings + senior residents",
+          urgency: "standard",
+          status: "completed",
+          submitted_via: "form",
+          bucket_id: bucketByName.get("Course Development")!,
+        },
+      ])
+      .select("id, title, status");
+
+    if (edRequests) {
+      const edByTitle = new Map(edRequests.map((r) => [r.title, r.id]));
+      const epicDowntimeId = edByTitle.get("Epic downtime procedure training");
+      const orFireSafetyId = edByTitle.get("OR fire safety annual refresher");
+      const ultrasoundId = edByTitle.get("Bedside ultrasound credentialing series");
+      const nowIso = new Date().toISOString();
+      const erAssignments: Array<{
+        request_id: string;
+        instructor_name: string;
+        estimated_hours: number;
+        actual_hours?: number;
+        started_at?: string;
+        completed_at?: string;
+      }> = [];
+      if (epicDowntimeId) {
+        erAssignments.push({
+          request_id: epicDowntimeId,
+          instructor_name: "Maya Castellanos",
+          estimated_hours: 40,
+        });
+      }
+      if (orFireSafetyId) {
+        erAssignments.push({
+          request_id: orFireSafetyId,
+          instructor_name: "Priya Chandrasekaran",
+          estimated_hours: 20,
+          started_at: addDaysIso(-7) + "T14:00:00Z",
+        });
+      }
+      if (ultrasoundId) {
+        erAssignments.push({
+          request_id: ultrasoundId,
+          instructor_name: "Hannah O'Connor",
+          estimated_hours: 40,
+          actual_hours: 38,
+          started_at: addDaysIso(-45) + "T09:00:00Z",
+          completed_at: addDaysIso(-3) + "T16:00:00Z",
+        });
+      }
+      if (erAssignments.length > 0) {
+        await admin.from("education_request_assignments").insert(
+          erAssignments.map((a) => ({
+            org_id: orgId,
+            department_id: deptId,
+            request_id: a.request_id,
+            instructor_id: instById.get(a.instructor_name)!.id,
+            estimated_hours: a.estimated_hours,
+            ...(a.actual_hours !== undefined ? { actual_hours: a.actual_hours } : {}),
+            ...(a.started_at ? { started_at: a.started_at } : {}),
+            ...(a.completed_at ? { completed_at: a.completed_at } : {}),
+          })),
+        );
+      }
+      void nowIso;
+    }
+
+    // ── 16. One-on-ones + action items + workload changes ────────────────
+    // Three records: Maya (completed 2wk ago, over-allocation flagged),
+    // Hannah (completed 1wk ago, at-risk), Priya (upcoming, +3d).
+    const { data: oneOnOnes } = await admin
+      .from("one_on_ones")
+      .insert([
+        {
+          org_id: orgId,
+          department_id: deptId,
+          instructor_id: instById.get("Maya Castellanos")!.id,
+          manager_id: user.id,
+          scheduled_for: addDaysIso(-14) + "T15:00:00Z",
+          completed_at: addDaysIso(-14) + "T15:38:00Z",
+          sentiment: "stretched",
+          topics: ["Cerner-to-Epic deck status", "PTO planning", "Backup primary for Bootcamp"],
+          concerns: ["over-allocation"],
+          snapshot_total_hours: 2280,
+          snapshot_utilization_pct: 109.6,
+          snapshot_at: addDaysIso(-14) + "T15:00:00Z",
+        },
+        {
+          org_id: orgId,
+          department_id: deptId,
+          instructor_id: instById.get("Hannah O'Connor")!.id,
+          manager_id: user.id,
+          scheduled_for: addDaysIso(-7) + "T13:00:00Z",
+          completed_at: addDaysIso(-7) + "T13:28:00Z",
+          sentiment: "engaged",
+          topics: ["Trauma sim curriculum updates", "ACLS cert renewal"],
+          concerns: [],
+          snapshot_total_hours: 1830,
+          snapshot_utilization_pct: 88.0,
+          snapshot_at: addDaysIso(-7) + "T13:00:00Z",
+        },
+        {
+          org_id: orgId,
+          department_id: deptId,
+          instructor_id: instById.get("Priya Chandrasekaran")!.id,
+          manager_id: user.id,
+          scheduled_for: addDaysIso(3) + "T16:00:00Z",
+          sentiment: null,
+          topics: [],
+          concerns: [],
+        },
+      ])
+      .select("id, instructor_id");
+
+    if (oneOnOnes && oneOnOnes.length >= 2) {
+      // Find the rows by their instructor for clarity.
+      const mayaInstId = instById.get("Maya Castellanos")!.id;
+      const hannahInstId = instById.get("Hannah O'Connor")!.id;
+      const mayaOOO = oneOnOnes.find((o) => o.instructor_id === mayaInstId);
+      const hannahOOO = oneOnOnes.find((o) => o.instructor_id === hannahInstId);
+
+      const actionRows: Array<{
+        one_on_one_id: string;
+        description: string;
+        category: string;
+        owner: string;
+        status: string;
+        due_by?: string;
+        resolved_at?: string;
+      }> = [];
+
+      if (mayaOOO) {
+        actionRows.push(
+          {
+            one_on_one_id: mayaOOO.id,
+            description: "Reduce Epic Bootcamp from 18 → 12 offerings this cycle",
+            category: "load_reduction",
+            owner: "manager",
+            status: "done",
+            resolved_at: addDaysIso(-10) + "T11:00:00Z",
+          },
+          {
+            one_on_one_id: mayaOOO.id,
+            description: "Identify backup primary for Inpatient Bootcamp",
+            category: "backup",
+            owner: "manager",
+            status: "open",
+            due_by: addDaysIso(14),
+          },
+          {
+            one_on_one_id: mayaOOO.id,
+            description: "Schedule PTO — week of June 23",
+            category: "wellbeing",
+            owner: "instructor",
+            status: "done",
+            resolved_at: addDaysIso(-12) + "T09:00:00Z",
+          },
+          {
+            one_on_one_id: mayaOOO.id,
+            description: "Submit travel for Epic UGM",
+            category: "development",
+            owner: "instructor",
+            status: "open",
+            due_by: addDaysIso(30),
+          },
+        );
+      }
+      if (hannahOOO) {
+        actionRows.push(
+          {
+            one_on_one_id: hannahOOO.id,
+            description: "Renew Adult ACLS cert (expires in 15d)",
+            category: "certification",
+            owner: "instructor",
+            status: "open",
+            due_by: addDaysIso(14),
+          },
+          {
+            one_on_one_id: hannahOOO.id,
+            description: "Refresh stroke-alert sim deck",
+            category: "course_development",
+            owner: "instructor",
+            status: "done",
+            resolved_at: addDaysIso(-2) + "T17:00:00Z",
+          },
+          {
+            one_on_one_id: hannahOOO.id,
+            description: "Confirm Reggie as backup primary for Trauma sim",
+            category: "backup",
+            owner: "manager",
+            status: "done",
+            resolved_at: addDaysIso(-5) + "T10:00:00Z",
+          },
+        );
+      }
+
+      if (actionRows.length > 0) {
+        await admin.from("one_on_one_action_items").insert(
+          actionRows.map((a) => ({
+            org_id: orgId,
+            department_id: deptId,
+            one_on_one_id: a.one_on_one_id,
+            description: a.description,
+            category: a.category,
+            owner: a.owner,
+            status: a.status,
+            ...(a.due_by ? { due_by: a.due_by } : {}),
+            ...(a.resolved_at ? { resolved_at: a.resolved_at } : {}),
+          })),
+        );
+      }
+
+      // Workload changes audit trail for Maya's over-allocation 1:1.
+      if (mayaOOO) {
+        await admin.from("one_on_one_workload_changes").insert([
+          {
+            org_id: orgId,
+            department_id: deptId,
+            one_on_one_id: mayaOOO.id,
+            source_kind: "class_assignment",
+            source_id: classByName.get("Epic EHR — Inpatient Nursing Bootcamp")!,
+            change_kind: "modified",
+            before_value: { assigned_offerings: 18 },
+            after_value: { assigned_offerings: 12 },
+            rationale_category: "over_allocation",
+            actor_id: user.id,
+          },
+          {
+            org_id: orgId,
+            department_id: deptId,
+            one_on_one_id: mayaOOO.id,
+            source_kind: "ad_hoc_task",
+            source_id: mayaOOO.id, // synthetic — pre-merge migration leaves source_id required
+            change_kind: "removed",
+            before_value: { hours: 6, name: "Update sepsis bundle order set training" },
+            after_value: null,
+            rationale_category: "over_allocation",
+            actor_id: user.id,
+          },
+        ]);
+      }
+    }
+
+    // ── 17. Saved reports — pre-staged templates ─────────────────────────
+    await admin.from("saved_reports").insert([
+      {
+        org_id: orgId,
+        department_id: deptId,
+        slug: "workload",
+        name: "At-risk instructors (weekly)",
+        description: "Anyone above 80% utilization. Run weekly for the staff meeting.",
+        filters: { utilization_band: "at_risk" },
+        org_visibility: true,
+        last_run_at: addDaysIso(-3) + "T08:00:00Z",
+        created_by: user.id,
+      },
+      {
+        org_id: orgId,
+        department_id: deptId,
+        slug: "skill-gap",
+        name: "Cert expirations — 60-day lookahead",
+        description: "Catch ACLS / BLS renewals before they lapse.",
+        filters: { expiry_window_days: 60 },
+        org_visibility: true,
+        last_run_at: addDaysIso(-1) + "T08:00:00Z",
+        created_by: user.id,
+      },
+      {
+        org_id: orgId,
+        department_id: deptId,
+        slug: "allocation",
+        name: "Q3 allocation summary",
+        description: "Bucket-level target vs actual across the whole team.",
+        filters: { bucket_ids: [] },
+        org_visibility: false,
+        created_by: user.id,
+      },
+    ]);
+
+    // ── 18. Sketchpad — Epic Cutover Week 1 mockup ───────────────────────
+    const { data: sketchSchedule } = await admin
+      .from("sketchpad_schedules")
+      .insert({
+        org_id: orgId,
+        department_id: deptId,
+        name: "Epic Cutover — Week 1 mockup",
+        notes: "Draft layout for review with the unit managers next Tuesday.",
+        start_date: addDaysIso(30),
+        day_count: 5,
+        hours_start: 8,
+        hours_end: 17,
+        slot_minutes: 30,
+        created_by: user.id,
+      })
+      .select("id")
+      .single();
+
+    if (sketchSchedule) {
+      const scheduleId = sketchSchedule.id;
+      const { data: skRooms } = await admin
+        .from("sketchpad_rooms")
+        .insert([
+          {
+            org_id: orgId,
+            schedule_id: scheduleId,
+            name: "Education Center A",
+            capacity: 24,
+            position: 0,
+          },
+          {
+            org_id: orgId,
+            schedule_id: scheduleId,
+            name: "Education Center B",
+            capacity: 16,
+            position: 1,
+          },
+          {
+            org_id: orgId,
+            schedule_id: scheduleId,
+            name: "Conference Suite 304",
+            capacity: 30,
+            position: 2,
+          },
+        ])
+        .select("id, name");
+
+      if (skRooms) {
+        const roomByName = new Map(skRooms.map((r) => [r.name, r.id]));
+        const start = addDaysIso(30);
+        const bootcampGroupId = crypto.randomUUID();
+        const sessionStart = (dayOffset: number, hourLocal: number): string => {
+          const d = new Date(start + "T00:00:00Z");
+          d.setUTCDate(d.getUTCDate() + dayOffset);
+          d.setUTCHours(hourLocal + 5, 0, 0, 0); // ~ET morning in UTC
+          return d.toISOString();
+        };
+        await admin.from("sketchpad_sessions").insert([
+          {
+            org_id: orgId,
+            schedule_id: scheduleId,
+            room_id: roomByName.get("Education Center A")!,
+            trainer_name: "Maya Castellanos",
+            class_name: "Inpatient Bootcamp — Day 1",
+            starts_at: sessionStart(0, 8),
+            ends_at: sessionStart(0, 17),
+            learner_count: 18,
+            color: "#1F4D3A",
+            group_id: bootcampGroupId,
+          },
+          {
+            org_id: orgId,
+            schedule_id: scheduleId,
+            room_id: roomByName.get("Education Center A")!,
+            trainer_name: "Maya Castellanos",
+            class_name: "Inpatient Bootcamp — Day 2",
+            starts_at: sessionStart(1, 8),
+            ends_at: sessionStart(1, 17),
+            learner_count: 18,
+            color: "#1F4D3A",
+            group_id: bootcampGroupId,
+          },
+          {
+            org_id: orgId,
+            schedule_id: scheduleId,
+            room_id: roomByName.get("Education Center A")!,
+            trainer_name: "Maya Castellanos",
+            class_name: "Inpatient Bootcamp — Day 3",
+            starts_at: sessionStart(2, 8),
+            ends_at: sessionStart(2, 17),
+            learner_count: 18,
+            color: "#1F4D3A",
+            group_id: bootcampGroupId,
+          },
+          {
+            org_id: orgId,
+            schedule_id: scheduleId,
+            room_id: roomByName.get("Education Center B")!,
+            trainer_name: "Devon Park",
+            class_name: "Med Admin Lab",
+            starts_at: sessionStart(0, 13),
+            ends_at: sessionStart(0, 17),
+            learner_count: 12,
+            color: "#8FA68E",
+          },
+          {
+            org_id: orgId,
+            schedule_id: scheduleId,
+            room_id: roomByName.get("Education Center B")!,
+            trainer_name: "Devon Park",
+            class_name: "Med Admin Lab",
+            starts_at: sessionStart(1, 13),
+            ends_at: sessionStart(1, 17),
+            learner_count: 12,
+            color: "#8FA68E",
+          },
+          {
+            org_id: orgId,
+            schedule_id: scheduleId,
+            room_id: roomByName.get("Education Center B")!,
+            trainer_name: "Aisha Bello",
+            class_name: "Med Admin Lab",
+            starts_at: sessionStart(2, 13),
+            ends_at: sessionStart(2, 17),
+            learner_count: 12,
+            color: "#8FA68E",
+          },
+          {
+            org_id: orgId,
+            schedule_id: scheduleId,
+            room_id: roomByName.get("Conference Suite 304")!,
+            trainer_name: "Aisha Bello",
+            class_name: "Downtime Procedures Briefing",
+            starts_at: sessionStart(3, 9),
+            ends_at: sessionStart(3, 12),
+            learner_count: 30,
+            color: "#D4A574",
+          },
+          {
+            org_id: orgId,
+            schedule_id: scheduleId,
+            room_id: roomByName.get("Conference Suite 304")!,
+            trainer_name: "Maya Castellanos",
+            class_name: "Super-user Briefing",
+            starts_at: sessionStart(4, 14),
+            ends_at: sessionStart(4, 17),
+            learner_count: 25,
+            color: "#1F4D3A",
+          },
+        ]);
+      }
+    }
+
+    // ── 19. Support tickets (sample) — org-scoped (no department_id) ─────
     await admin.from("support_tickets").insert([
       {
         org_id: orgId,
@@ -1100,7 +1880,12 @@ export async function seedDemoOrg(): Promise<SeedResult> {
         buckets: bucketSeeds.length,
         tras: tras?.length ?? 0,
         projects: projects.length,
-        implementations: implRows?.length ?? 0,
+        implementations:
+          (implRows?.length ?? 0) + (implBlsRows?.length ?? 0) + (implRoboRows?.length ?? 0),
+        education_requests: edRequests?.length ?? 0,
+        one_on_ones: oneOnOnes?.length ?? 0,
+        saved_reports: 3,
+        sketchpad_schedules: sketchSchedule ? 1 : 0,
       },
     };
   } catch (e) {
