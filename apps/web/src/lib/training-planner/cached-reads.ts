@@ -20,33 +20,69 @@ import type { ScheduleGenResult } from "@/app/(authenticated)/training-planner/a
 //      nothing the authorized user couldn't derive from classes / rooms /
 //      trainers they already see.
 //
-// Cache is keyed by (impl_id, updated_at, org_id). Bumping updated_at
-// on any edit to the impl row invalidates immediately. The 60s
-// `revalidate` is a safety belt against changes the key doesn't capture
-// (a class hours edit doesn't touch impl.updated_at, but it would
-// invalidate the dry-run plan).
+// Invalidation:
+//   - Cache key includes (impl_id, updated_at, org_id). Edits to the
+//     impl row itself bump updated_at and immediately re-key.
+//   - Per-impl tag `calc:<impl_id>` (set at definition time, since
+//     unstable_cache tags are static) lets any mutation server action
+//     call revalidateTag(calcTag(impl_id)) to invalidate the cache for
+//     just that impl — without needing the impl row's updated_at to
+//     change. To get a per-impl tag we build a fresh unstable_cache
+//     closure per impl, memoized in `byImpl`.
+//   - 60s revalidate is the safety belt for anything we forgot to wire.
 
-export const dryRunScheduleCached = unstable_cache(
-  async (
+/** Tag name for invalidating the dry-run cache for a single impl. Mutation
+ *  server actions call `revalidateTag(calcTag(implementationId))` after
+ *  writing solver-relevant data (rooms, trainers, classes, slate, etc.). */
+export function calcTag(implementationId: string): string {
+  return `calc:${implementationId}`;
+}
+
+// Per-impl cache closures. unstable_cache tags are static at definition,
+// so we generate one closure per implementationId on first use and reuse
+// it forever. The closure's identity (and the tag it carries) is the
+// per-impl scope.
+const byImpl = new Map<
+  string,
+  (
     implementationId: string,
-    // cacheBuster is read indirectly via the unstable_cache key — pass
-    // impl.updated_at here so any edit to the impl row busts the cache.
     cacheBuster: string,
     orgId: string,
-  ): Promise<ScheduleGenResult | null> => {
-    void cacheBuster;
-    const admin = createAdminClient();
-    // department_id is only consulted by runSchedule when writing new
-    // sessions, which a dry-run never does. Pass empty so we don't have
-    // to look it up just to satisfy the type.
-    const result = await runSchedule(admin, orgId, "", implementationId, [], {
-      dryRun: true,
-    });
-    if (!result.ok) return null;
-    return result.data;
-  },
-  // v2: switched from legacy SQL RPC to in-process CSP solver. Old cache
-  // entries don't carry diagnoses / headline_fix and must be invalidated.
-  ["dry-run-schedule-v2"],
-  { revalidate: 60 },
-);
+  ) => Promise<ScheduleGenResult | null>
+>();
+
+function getCachedForImpl(implementationId: string) {
+  const existing = byImpl.get(implementationId);
+  if (existing) return existing;
+  const fn = unstable_cache(
+    async (
+      innerImplementationId: string,
+      cacheBuster: string,
+      orgId: string,
+    ): Promise<ScheduleGenResult | null> => {
+      void cacheBuster;
+      const admin = createAdminClient();
+      const result = await runSchedule(admin, orgId, "", innerImplementationId, [], {
+        dryRun: true,
+      });
+      if (!result.ok) return null;
+      return result.data;
+    },
+    // v2: switched from legacy SQL RPC to in-process CSP solver. Old
+    // cache entries don't carry diagnoses / headline_fix and must be
+    // invalidated.
+    ["dry-run-schedule-v2", implementationId],
+    { revalidate: 60, tags: [calcTag(implementationId)] },
+  );
+  byImpl.set(implementationId, fn);
+  return fn;
+}
+
+export async function dryRunScheduleCached(
+  implementationId: string,
+  cacheBuster: string,
+  orgId: string,
+): Promise<ScheduleGenResult | null> {
+  const fn = getCachedForImpl(implementationId);
+  return fn(implementationId, cacheBuster, orgId);
+}

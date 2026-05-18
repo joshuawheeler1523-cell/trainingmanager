@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { calcTag } from "@/lib/training-planner/cached-reads";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import {
@@ -75,7 +76,22 @@ async function ctx() {
 
 function revalidateImpl(id?: string) {
   revalidatePath("/training-planner");
-  if (id) revalidatePath(`/training-planner/${id}`, "layout");
+  if (id) {
+    revalidatePath(`/training-planner/${id}`, "layout");
+    // Bust the dry-run scheduler cache so the Calculate page reflects
+    // edits to rooms / trainers / classes / slates / PTO / etc.
+    // immediately instead of waiting on the 60s revalidate.
+    updateTag(calcTag(id));
+  }
+}
+
+/** Narrow revalidation that does NOT touch the page output cache (so we
+ *  don't trigger a layout-wide refresh), but DOES bust the dry-run
+ *  scheduler cache for this impl. Use this when a mutation only affects
+ *  the Calculate page's scheduling math, not what's visible on the
+ *  current page. */
+function revalidateCalcOnly(id: string) {
+  updateTag(calcTag(id));
 }
 
 // ── implementations ─────────────────────────────────────────────────────────
@@ -499,6 +515,9 @@ export async function updateRoom(
   // refetches on every day-button toggle. createRoom/deleteRoom still need
   // it because they move the roomCount readiness marker.
   revalidatePath(`/training-planner/${implementationId}/rooms`);
+  // Room edits do change scheduling math — bust the dry-run cache so
+  // the Calculate page picks up new seat counts / day filters / etc.
+  revalidateCalcOnly(implementationId);
   return { ok: true, data };
 }
 
@@ -919,6 +938,8 @@ export async function updateClass(
   // classes page to keep batched re-orders (Sort A-Z) cheap. createClass
   // and deleteClass still revalidate the layout for the class-count marker.
   revalidatePath(`/training-planner/${implementationId}/classes`);
+  // Class hours / learner counts / equipment tags affect scheduling math.
+  revalidateCalcOnly(implementationId);
   return { ok: true, data };
 }
 
@@ -965,6 +986,8 @@ export async function reorderImplClasses(
     return { ok: false, error: { code: firstError.code, message: firstError.message } };
   }
   revalidatePath(`/training-planner/${implementationId}/classes`);
+  // Class sort_order is a topological-tie-break input to the solver.
+  revalidateCalcOnly(implementationId);
   return { ok: true, data: { count: orderings.length } };
 }
 
@@ -992,6 +1015,8 @@ export async function setClassTrainers(
     // impl layout. The drawer's optimistic state handles the immediate
     // visual; this is just for next-mount accuracy.
     revalidatePath(`/training-planner/${implementationId}/classes`);
+    // Slate edits drive scheduling — bust the dry-run cache too.
+    revalidateCalcOnly(implementationId);
     return { ok: true, data: { count: 0 } };
   }
 
@@ -1005,6 +1030,8 @@ export async function setClassTrainers(
   if (insErr) return { ok: false, error: { code: insErr.code, message: insErr.message } };
 
   revalidatePath(`/training-planner/${implementationId}/classes`);
+  // Slate edits drive scheduling — bust the dry-run cache too.
+  revalidateCalcOnly(implementationId);
   return { ok: true, data: { count: trainerIds.length } };
 }
 
@@ -1045,6 +1072,8 @@ export async function addClassPrerequisite(
   // Prereqs are read by the classes page only; no layout count depends
   // on them, so the layout-wide revalidate wasn't pulling its weight.
   revalidatePath(`/training-planner/${implementationId}/classes`);
+  // Prereqs drive the solver's class ordering — bust the dry-run cache.
+  revalidateCalcOnly(implementationId);
   return { ok: true, data };
 }
 
@@ -1063,6 +1092,8 @@ export async function removeClassPrerequisite(
 
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
   revalidatePath(`/training-planner/${implementationId}/classes`);
+  // Prereqs drive the solver's class ordering — bust the dry-run cache.
+  revalidateCalcOnly(implementationId);
   return { ok: true, data: { id: prereqRowId } };
 }
 

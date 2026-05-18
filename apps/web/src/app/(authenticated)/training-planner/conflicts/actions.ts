@@ -1,8 +1,9 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { calcTag } from "@/lib/training-planner/cached-reads";
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -199,6 +200,11 @@ export async function moveSession(
 
   revalidatePath("/training-planner/conflicts");
   revalidatePath(`/training-planner/${cur.implementation_id}`, "layout");
+  // moveSession on a published session shifts cross-impl busy state for
+  // any other impl that shares a trainer via instructor_id. We only know
+  // the moving impl here, so bust its dry-run cache. Cross-impl freshness
+  // falls back to the 60s revalidate.
+  updateTag(calcTag(cur.implementation_id));
   return { ok: true, data: { id: sessionId } };
 }
 
