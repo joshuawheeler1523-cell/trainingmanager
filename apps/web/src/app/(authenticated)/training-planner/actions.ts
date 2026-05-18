@@ -798,7 +798,11 @@ export async function updateModule(
     .single();
 
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
-  revalidateImpl(implementationId);
+  // In-place module edits never move a layout readiness count, so scope
+  // revalidation to just the modules page (same rationale as updateRoom).
+  // createModule/deleteModule still use revalidateImpl because they shift
+  // the module-count readiness marker.
+  revalidatePath(`/training-planner/${implementationId}/modules`);
   return { ok: true, data };
 }
 
@@ -872,7 +876,10 @@ export async function updateClass(
     .single();
 
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
-  revalidateImpl(implementationId);
+  // In-place edits don't move any layout readiness count — scope to the
+  // classes page to keep batched re-orders (Sort A-Z) cheap. createClass
+  // and deleteClass still revalidate the layout for the class-count marker.
+  revalidatePath(`/training-planner/${implementationId}/classes`);
   return { ok: true, data };
 }
 

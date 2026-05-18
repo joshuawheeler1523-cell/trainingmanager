@@ -3,7 +3,13 @@
 import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeftIcon, ArrowRightIcon, PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  BarsArrowDownIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@heroicons/react/20/solid";
 import type { ImplModule } from "@arbor/shared";
 import { createModule, deleteModule, setStep, updateModule } from "../../actions";
 
@@ -81,13 +87,54 @@ export default function ModulesEditor({ implementationId, modules }: Props) {
     });
   }
 
+  // Alphabetize by name (case-insensitive). Computes the new sort_order
+  // values, fires updateModule in parallel for any row whose position
+  // changed, then refreshes so the server-ordered list reflects the new
+  // sequence. Modules that are already in alphabetical order skip the
+  // round trip.
+  function handleSort() {
+    const sorted = modules
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    const changed = sorted
+      .map((m, i) => ({ id: m.id, newOrder: i, oldOrder: m.sort_order }))
+      .filter((x) => x.newOrder !== x.oldOrder);
+    if (changed.length === 0) {
+      toast.info("Already in alphabetical order");
+      return;
+    }
+    startTransition(async () => {
+      const results = await Promise.all(
+        changed.map((x) => updateModule(x.id, implementationId, { sort_order: x.newOrder })),
+      );
+      const failed = results.filter((res) => !res.ok);
+      if (failed.length > 0) {
+        toast.error(`${failed.length.toString()} modules failed to re-order`);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground text-xs">
-        A <strong>module</strong> is a unit of curriculum — a related set of classes that together
-        form a body of training. Examples: &ldquo;Inpatient Nursing EMR Module&rdquo;,
-        &ldquo;Provider EMR Module&rdquo;. Most implementations have 2–6 modules.
-      </p>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-muted-foreground text-xs">
+          A <strong>module</strong> is a unit of curriculum — a related set of classes that together
+          form a body of training. Examples: &ldquo;Inpatient Nursing EMR Module&rdquo;,
+          &ldquo;Provider EMR Module&rdquo;. Most implementations have 2–6 modules.
+        </p>
+        <button
+          type="button"
+          disabled={pending || optimisticModules.length < 2}
+          onClick={handleSort}
+          title="Reorder modules alphabetically by name"
+          className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.04em] disabled:opacity-50"
+        >
+          <BarsArrowDownIcon className="h-3.5 w-3.5" />
+          Sort A–Z
+        </button>
+      </div>
 
       {optimisticModules.length === 0 ? (
         <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
@@ -96,8 +143,8 @@ export default function ModulesEditor({ implementationId, modules }: Props) {
       ) : (
         <ul className="border-border divide-border divide-y rounded-lg border">
           {optimisticModules.map((m, i) => (
-            <li key={m.id} className="grid grid-cols-12 items-center gap-2 px-3 py-2 text-sm">
-              <span className="text-muted-foreground col-span-1 text-xs tabular-nums">
+            <li key={m.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+              <span className="text-muted-foreground w-6 shrink-0 text-right text-xs tabular-nums">
                 {(i + 1).toString()}.
               </span>
               <input
@@ -106,7 +153,7 @@ export default function ModulesEditor({ implementationId, modules }: Props) {
                 onBlur={(e) => {
                   if (e.target.value !== m.name) handleUpdate(m, { name: e.target.value });
                 }}
-                className={fieldClass + " col-span-3"}
+                className={fieldClass + " w-56 shrink-0"}
               />
               <input
                 defaultValue={m.description ?? ""}
@@ -117,7 +164,7 @@ export default function ModulesEditor({ implementationId, modules }: Props) {
                   }
                 }}
                 placeholder="Description"
-                className={fieldClass + " col-span-7"}
+                className={fieldClass + " min-w-0 flex-1"}
               />
               <button
                 type="button"
@@ -126,7 +173,7 @@ export default function ModulesEditor({ implementationId, modules }: Props) {
                   handleDelete(m.id);
                 }}
                 aria-label="Delete module"
-                className="text-muted-foreground hover:text-destructive col-span-1 justify-self-end disabled:opacity-50"
+                className="text-muted-foreground hover:text-destructive shrink-0 disabled:opacity-50"
               >
                 <TrashIcon className="h-4 w-4" />
               </button>

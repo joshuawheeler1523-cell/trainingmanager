@@ -3,7 +3,13 @@
 import { useMemo, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeftIcon, ArrowRightIcon, PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  BarsArrowDownIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@heroicons/react/20/solid";
 import {
   sessionsNeeded,
   type ImplClass,
@@ -186,6 +192,33 @@ export default function ClassesEditor({
     });
   }
 
+  // Alphabetize by name. Only rows whose sort_order changes get a round
+  // trip. updateClass scopes its revalidation to the classes page, so a
+  // batched re-order doesn't refetch the impl layout for each row.
+  function handleSort() {
+    const sorted = classes
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    const changed = sorted
+      .map((c, i) => ({ id: c.id, newOrder: i, oldOrder: c.sort_order }))
+      .filter((x) => x.newOrder !== x.oldOrder);
+    if (changed.length === 0) {
+      toast.info("Already in alphabetical order");
+      return;
+    }
+    startTransition(async () => {
+      const results = await Promise.all(
+        changed.map((x) => updateClass(x.id, implementationId, { sort_order: x.newOrder })),
+      );
+      const failed = results.filter((res) => !res.ok);
+      if (failed.length > 0) {
+        toast.error(`${failed.length.toString()} classes failed to re-order`);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
   const windowWeeks = computeWindowWeeks(windowStartDate, windowEndDate);
   const fteDenominator = windowWeeks * FTE_HOURS_PER_WEEK; // 0 when window unset
 
@@ -207,11 +240,23 @@ export default function ClassesEditor({
 
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground text-xs">
-        Define each class. The wizard auto-calculates{" "}
-        <code>sessions_needed = ceil(total_people / expected_per_session)</code>. Click a row to
-        edit prerequisites and assigned trainers.
-      </p>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-muted-foreground text-xs">
+          Define each class. The wizard auto-calculates{" "}
+          <code>sessions_needed = ceil(total_people / expected_per_session)</code>. Click a row to
+          edit prerequisites and assigned trainers.
+        </p>
+        <button
+          type="button"
+          disabled={pending || optimisticClasses.length < 2}
+          onClick={handleSort}
+          title="Reorder classes alphabetically by name"
+          className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.04em] disabled:opacity-50"
+        >
+          <BarsArrowDownIcon className="h-3.5 w-3.5" />
+          Sort A–Z
+        </button>
+      </div>
 
       {optimisticClasses.length === 0 ? (
         <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
