@@ -11,22 +11,30 @@ export default async function SetupPage({ params }: { params: Params }) {
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) notFound();
 
-  const [{ data: impl }, { data: projects }, { data: tras }] = await Promise.all([
-    supabase
-      .from("implementations")
-      .select("*")
-      .eq("id", id)
-      .eq("org_id", orgId)
-      .is("deleted_at", null)
-      .maybeSingle(),
-    supabase
-      .from("projects")
-      .select("id, name")
-      .eq("org_id", orgId)
-      .is("deleted_at", null)
-      .order("name"),
-    supabase.from("tras").select("id, project_name").eq("org_id", orgId).order("project_name"),
-  ]);
+  const [{ data: impl }, { data: projects }, { data: tras }, { data: buckets }] = await Promise.all(
+    [
+      supabase
+        .from("implementations")
+        .select("*")
+        .eq("id", id)
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .maybeSingle(),
+      supabase
+        .from("projects")
+        .select("id, name")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .order("name"),
+      supabase.from("tras").select("id, project_name").eq("org_id", orgId).order("project_name"),
+      supabase
+        .from("allocation_buckets")
+        .select("*")
+        .eq("org_id", orgId)
+        .eq("is_archived", false)
+        .order("display_order"),
+    ],
+  );
 
   if (!impl) notFound();
 
@@ -35,6 +43,7 @@ export default async function SetupPage({ params }: { params: Params }) {
       implementation={impl as Implementation}
       projects={projects ?? []}
       tras={tras ?? []}
+      buckets={buckets ?? []}
     />
   );
 }

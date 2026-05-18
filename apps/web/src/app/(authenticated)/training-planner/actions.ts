@@ -187,6 +187,7 @@ export async function duplicateImplementation(id: string): Promise<ActionResult<
       department_id: source.department_id,
       name: newName,
       description: source.description,
+      bucket_id: source.bucket_id,
       window_start_date: source.window_start_date,
       window_end_date: source.window_end_date,
       go_live_date: source.go_live_date,

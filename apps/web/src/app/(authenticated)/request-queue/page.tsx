@@ -24,30 +24,41 @@ export default async function RequestQueuePage() {
     headersList.get("origin") ??
     (headersList.get("host") ? `https://${headersList.get("host") ?? ""}` : "");
 
-  const [{ data: requests }, { data: assignments }, { data: instructors }, { data: intakeLinks }] =
-    await Promise.all([
-      supabase
-        .from("education_requests")
-        .select("*")
-        .eq("org_id", orgId)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false }),
-      supabase.from("education_request_assignments").select("*").eq("org_id", orgId),
-      supabase
-        .from("instructors")
-        .select("*")
-        .eq("org_id", orgId)
-        .eq("is_external", false)
-        .is("deleted_at", null)
-        .eq("status", "active")
-        .order("full_name"),
-      supabase
-        .from("public_intake_links")
-        .select("*")
-        .eq("org_id", orgId)
-        .eq("is_active", true)
-        .order("created_at", { ascending: false }),
-    ]);
+  const [
+    { data: requests },
+    { data: assignments },
+    { data: instructors },
+    { data: intakeLinks },
+    { data: buckets },
+  ] = await Promise.all([
+    supabase
+      .from("education_requests")
+      .select("*")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false }),
+    supabase.from("education_request_assignments").select("*").eq("org_id", orgId),
+    supabase
+      .from("instructors")
+      .select("*")
+      .eq("org_id", orgId)
+      .eq("is_external", false)
+      .is("deleted_at", null)
+      .eq("status", "active")
+      .order("full_name"),
+    supabase
+      .from("public_intake_links")
+      .select("*")
+      .eq("org_id", orgId)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("allocation_buckets")
+      .select("*")
+      .eq("org_id", orgId)
+      .eq("is_archived", false)
+      .order("display_order"),
+  ]);
 
   return (
     <div>
@@ -60,6 +71,7 @@ export default async function RequestQueuePage() {
         assignments={assignments ?? []}
         instructors={(instructors ?? []) as Instructor[]}
         intakeLinks={intakeLinks ?? []}
+        buckets={buckets ?? []}
         origin={origin}
       />
     </div>

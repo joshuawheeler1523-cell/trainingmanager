@@ -6,18 +6,24 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { ArrowRightIcon } from "@heroicons/react/20/solid";
-import { implementationSetupSchema, type Implementation } from "@arbor/shared";
+import {
+  implementationSetupSchema,
+  type AllocationBucket,
+  type Implementation,
+} from "@arbor/shared";
 import { setStep, updateImplementationSetup } from "../../actions";
 
 type Props = {
   implementation: Implementation;
   projects: { id: string; name: string }[];
   tras: { id: string; project_name: string }[];
+  buckets: AllocationBucket[];
 };
 
 type FormValues = {
   name: string;
   description: string;
+  bucket_id: string;
   window_start_date: string;
   window_end_date: string;
   go_live_date: string;
@@ -30,10 +36,18 @@ type FormValues = {
   business_hours_end_local: number;
 };
 
+function pickDefaultBucket(buckets: AllocationBucket[]): string {
+  const match = buckets.find((b) => {
+    const n = b.name.toLowerCase();
+    return n.includes("direct") || n.includes("instruction") || n.includes("teach");
+  });
+  return match?.id ?? buckets[0]?.id ?? "";
+}
+
 const fieldClass =
   "border-input bg-background text-foreground w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
-export default function SetupForm({ implementation, projects, tras }: Props) {
+export default function SetupForm({ implementation, projects, tras, buckets }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -46,6 +60,7 @@ export default function SetupForm({ implementation, projects, tras }: Props) {
     defaultValues: {
       name: implementation.name,
       description: implementation.description ?? "",
+      bucket_id: implementation.bucket_id ?? pickDefaultBucket(buckets),
       window_start_date: implementation.window_start_date ?? "",
       window_end_date: implementation.window_end_date ?? "",
       go_live_date: implementation.go_live_date ?? "",
@@ -98,6 +113,35 @@ export default function SetupForm({ implementation, projects, tras }: Props) {
           Description
         </label>
         <textarea id="description" rows={3} {...register("description")} className={fieldClass} />
+      </div>
+
+      <div>
+        <label htmlFor="bucket_id" className="text-foreground mb-1 block text-xs font-medium">
+          Allocation bucket *
+        </label>
+        <select
+          id="bucket_id"
+          {...register("bucket_id")}
+          disabled={buckets.length === 0}
+          className={fieldClass + " disabled:opacity-50"}
+        >
+          {buckets.length === 0 ? (
+            <option value="">No buckets yet — create one in Allocations</option>
+          ) : (
+            buckets.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))
+          )}
+        </select>
+        {errors.bucket_id && (
+          <p className="text-destructive mt-1 text-xs">{errors.bucket_id.message}</p>
+        )}
+        <p className="text-muted-foreground mt-1 text-[11px]">
+          Every published session under this implementation rolls up to this bucket on the
+          Allocations dashboard.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

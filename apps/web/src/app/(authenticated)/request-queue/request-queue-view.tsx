@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import {
   publicIntakeUrl,
   REQUEST_KANBAN_STATUS_VALUES,
+  type AllocationBucket,
   type EducationRequest,
   type EducationRequestAssignment,
   type Instructor,
@@ -40,6 +41,7 @@ type Props = {
   assignments: EducationRequestAssignment[];
   instructors: Instructor[];
   intakeLinks: PublicIntakeLink[];
+  buckets: AllocationBucket[];
   origin: string;
 };
 
@@ -66,6 +68,7 @@ export default function RequestQueueView({
   assignments,
   instructors,
   intakeLinks,
+  buckets,
   origin,
 }: Props) {
   const router = useRouter();
@@ -278,6 +281,7 @@ export default function RequestQueueView({
 
       {showCreate && (
         <NewRequestDialog
+          buckets={buckets}
           onClose={() => {
             setShowCreate(false);
           }}

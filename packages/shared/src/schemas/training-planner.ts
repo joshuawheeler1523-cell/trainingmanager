@@ -35,6 +35,7 @@ export type ImplStep = (typeof IMPL_STEPS)[number];
 export const implementationInsertSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   description: emptyToNull,
+  bucket_id: z.string().uuid("Pick a bucket"),
   window_start_date: emptyToNull,
   window_end_date: emptyToNull,
   go_live_date: emptyToNull,
@@ -52,6 +53,7 @@ export const implementationSetupSchema = z
   .object({
     name: z.string().min(1, "Name is required").max(200),
     description: emptyToNull,
+    bucket_id: z.string().uuid("Pick a bucket"),
     window_start_date: z.string().min(1, "Window start is required"),
     window_end_date: z.string().min(1, "Window end is required"),
     go_live_date: z.string().min(1, "Go-live date is required"),
@@ -82,6 +84,7 @@ export type Implementation = {
   org_id: string;
   name: string;
   description: string | null;
+  bucket_id: string | null;
   window_start_date: string | null;
   window_end_date: string | null;
   go_live_date: string | null;
