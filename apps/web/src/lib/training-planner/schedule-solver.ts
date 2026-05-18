@@ -48,6 +48,17 @@
 import { fromCalendarLocal } from "@/lib/timezone";
 import type { ImplClass, ImplClassPrerequisite, ImplRoom, ImplTrainer } from "@arbor/shared";
 
+// ── Diagnosis types (per-class failure analysis) ────────────────────────────
+
+/** Classification of *why* a class's sessions couldn't be placed. Drives the
+ *  recommended-fix wording. Ordered roughly by how easy each is to identify. */
+export type DiagnosisBottleneck =
+  | "no_trainers_assigned" // class has empty trainer slate
+  | "no_eligible_room" // no room passes seat / equipment filter
+  | "room_capacity" // eligible rooms saturated — forced demand > pool hours, no smaller-room fallback
+  | "trainer_capacity" // slate hours < hours this class needs
+  | "room_busy_or_window"; // resources exist but the search couldn't find clean slots
+
 // ── Public types ────────────────────────────────────────────────────────────
 
 export type BusyInterval = {
@@ -89,12 +100,10 @@ export type SolverInput = {
   classTrainers: ClassTrainerLink[];
   prerequisites: ImplClassPrerequisite[];
 
-  /** Trainer busy intervals: anchor impls, cross-impl publishings, PTO,
-   *  and same-impl already-published sessions. The solver treats these
-   *  as immovable. */
+  /** Trainer busy intervals: PTO and same-impl already-published sessions.
+   *  The solver treats these as immovable. */
   busyTrainers: BusyInterval[];
-  /** Room busy intervals: typically same-impl already-published
-   *  sessions. */
+  /** Room busy intervals: same-impl already-published sessions. */
   busyRooms: BusyInterval[];
   /** Per-trainer hours already burned in each ISO week by published
    *  same-impl sessions. Used to enforce availability_hours_per_week
@@ -123,9 +132,43 @@ export type Gap = {
   reason: string;
 };
 
+/** Per-class diagnosis aggregated from one or more Gaps. One row per class
+ *  that ended up with at least one unplaced session, with a recommended fix
+ *  written for a manager who needs to know what resource to add. */
+export type ClassDiagnosis = {
+  classId: string;
+  className: string;
+  unplacedSessions: number;
+  bottleneck: DiagnosisBottleneck;
+  /** Trainers currently assigned to this class. Empty when slate is empty. */
+  assignedTrainers: { id: string; name: string; hoursPerWeek: number }[];
+  /** Rooms that pass seat + equipment filter for this class. */
+  eligibleRoomCount: number;
+  /** Class's expected_learners_per_session (the seat floor). */
+  requiredSeats: number;
+  /** Equipment tags this class needs in its room. */
+  requiredEquipment: string[];
+  /** Trainer-hours still needed for the unplaced sessions. */
+  hoursNeeded: number;
+  /** One-sentence directive for the manager. */
+  recommendedFix: string;
+};
+
+/** The single fix that would unblock the most sessions. The UI shows this
+ *  as a headline above the per-class breakdown. Null when there are no gaps. */
+export type HeadlineFix = {
+  classId: string;
+  recommendedFix: string;
+  sessionsUnblocked: number;
+};
+
 export type SolverResult = {
   placements: Placement[];
   gaps: Gap[];
+  /** Per-class diagnoses, sorted by unplacedSessions descending. */
+  diagnoses: ClassDiagnosis[];
+  /** Highest-impact single fix, or null when no gaps exist. */
+  headlineFix: HeadlineFix | null;
   /** Total wall-clock ms taken inside solve(). */
   durationMs: number;
   /** True if the search hit the time budget before exhausting options.
@@ -702,6 +745,243 @@ function initialState(input: SolverInput): WorkingState {
   };
 }
 
+// ── Per-class diagnosis ─────────────────────────────────────────────────────
+
+/** Sum of hours each ISO-week-window busyTrainers interval contributes to a
+ *  trainer's used budget, clipped to the impl window. We use the *raw* hour
+ *  count (not weekly cap math) because the goal is to compare against
+ *  slate-wide capacity, not enforce the weekly rule a second time. */
+function busyHoursOnSlate(
+  slateIds: Set<string>,
+  intervals: BusyInterval[],
+  windowStartUtc: number,
+  windowEndUtc: number,
+): number {
+  let total = 0;
+  for (const iv of intervals) {
+    if (!slateIds.has(iv.resourceId)) continue;
+    const s = Math.max(new Date(iv.start).getTime(), windowStartUtc);
+    const e = Math.min(new Date(iv.end).getTime(), windowEndUtc);
+    if (e > s) total += (e - s) / 3_600_000;
+  }
+  return total;
+}
+
+function placedHoursOnSlate(slateIds: Set<string>, placements: Placement[]): number {
+  let total = 0;
+  for (const p of placements) {
+    if (!slateIds.has(p.trainerId)) continue;
+    total += (new Date(p.end).getTime() - new Date(p.start).getTime()) / 3_600_000;
+  }
+  return total;
+}
+
+/** Estimate how many hours a room is bookable across the window. Counts only
+ *  days-of-week the room is open, multiplied by its per-day hours. Doesn't
+ *  intersect with business hours / lunch — that would under-state the pool
+ *  because a single class only needs a slice of it. Good enough for a
+ *  saturation ratio. */
+function roomHoursInWindow(room: ImplRoom, windowStartDate: string, windowEndDate: string): number {
+  const openSet = new Set(room.available_days_of_week);
+  let openDays = 0;
+  const start = parseUtcDate(windowStartDate);
+  const end = parseUtcDate(windowEndDate);
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    if (openSet.has(cursor.getUTCDay())) openDays++;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return openDays * room.available_hours_per_day;
+}
+
+/** Subtract hours of placed sessions in the given rooms (so room pool reflects
+ *  remaining capacity, not theoretical max). */
+function placedHoursInRooms(roomIds: Set<string>, placements: Placement[]): number {
+  let total = 0;
+  for (const p of placements) {
+    if (!roomIds.has(p.roomId)) continue;
+    total += (new Date(p.end).getTime() - new Date(p.start).getTime()) / 3_600_000;
+  }
+  return total;
+}
+
+function buildDiagnoses(
+  gaps: Gap[],
+  input: SolverInput,
+  placements: Placement[],
+): ClassDiagnosis[] {
+  if (gaps.length === 0) return [];
+
+  const classById = new Map(input.classes.map((c) => [c.id, c]));
+  const trainerById = new Map(input.trainers.map((t) => [t.id, t]));
+
+  const slateByClass = new Map<string, string[]>();
+  for (const ct of input.classTrainers) {
+    const list = slateByClass.get(ct.impl_class_id) ?? [];
+    list.push(ct.impl_trainer_id);
+    slateByClass.set(ct.impl_class_id, list);
+  }
+
+  const gapsByClass = new Map<string, Gap[]>();
+  for (const g of gaps) {
+    const list = gapsByClass.get(g.classId) ?? [];
+    list.push(g);
+    gapsByClass.set(g.classId, list);
+  }
+
+  // Window math — used for slate-hours-available estimation.
+  const windowStartUtc = parseUtcDate(input.windowStartDate).getTime();
+  const windowEndUtc = parseUtcDate(input.windowEndDate).getTime() + 86_400_000 - 1;
+  const windowWeeks = Math.max(
+    1,
+    Math.ceil((windowEndUtc - windowStartUtc + 1) / (7 * 86_400_000)),
+  );
+
+  const diagnoses: ClassDiagnosis[] = [];
+
+  for (const [classId, classGaps] of gapsByClass) {
+    const cls = classById.get(classId);
+    if (!cls) continue;
+
+    const slateIds = slateByClass.get(classId) ?? [];
+    const slateTrainers = slateIds
+      .map((id) => trainerById.get(id))
+      .filter((t): t is ImplTrainer => !!t);
+    const assignedTrainers = slateTrainers.map((t) => ({
+      id: t.id,
+      name: t.name,
+      hoursPerWeek: t.availability_hours_per_week,
+    }));
+
+    const eligibleRooms = input.rooms.filter(
+      (r) =>
+        r.seat_capacity >= cls.expected_learners_per_session &&
+        tagSubset(cls.required_equipment_tags, r.equipment_tags),
+    );
+
+    const unplaced = classGaps.length;
+    const hoursNeeded = unplaced * cls.hours_per_session;
+    const requiredSeats = cls.expected_learners_per_session;
+    const requiredEquipment = cls.required_equipment_tags;
+
+    let bottleneck: DiagnosisBottleneck;
+    let recommendedFix: string;
+
+    if (slateIds.length === 0) {
+      bottleneck = "no_trainers_assigned";
+      recommendedFix = `Assign a trainer to "${cls.name}" — no trainers are in its slate.`;
+    } else if (eligibleRooms.length === 0) {
+      bottleneck = "no_eligible_room";
+      const seatsOk = input.rooms.some((r) => r.seat_capacity >= requiredSeats);
+      if (!seatsOk) {
+        recommendedFix = `Add a room with at least ${requiredSeats.toString()} seats — none of your rooms meet "${cls.name}"'s seat requirement.`;
+      } else if (requiredEquipment.length > 0) {
+        recommendedFix = `Add a room with equipment: ${requiredEquipment.join(", ")}. No configured room has the gear "${cls.name}" needs.`;
+      } else {
+        recommendedFix = `No room can host "${cls.name}" — review room day-of-week availability and the implementation window.`;
+      }
+    } else {
+      // ── Slate (trainer) capacity math ──
+      const slateIdSet = new Set(slateIds);
+      const slateCap = slateTrainers.reduce(
+        (acc, t) => acc + t.availability_hours_per_week * windowWeeks,
+        0,
+      );
+      const slateBusy = busyHoursOnSlate(
+        slateIdSet,
+        input.busyTrainers,
+        windowStartUtc,
+        windowEndUtc,
+      );
+      const slateUsed = placedHoursOnSlate(slateIdSet, placements);
+      const slateAvail = Math.max(0, slateCap - slateBusy - slateUsed);
+      const slateRatio = slateAvail > 0 ? hoursNeeded / slateAvail : 999;
+
+      // ── Room capacity math ──
+      // Pool = eligible rooms' bookable hours in window, minus what we've
+      // already placed. Forced demand = hours from EVERY class that can ONLY
+      // use rooms this class can use (i.e., no smaller-seat fallback). This
+      // captures the "TR1 is the only 18-seat room and 7 classes all need it"
+      // pattern.
+      const eligibleRoomIds = new Set(eligibleRooms.map((r) => r.id));
+      const roomPoolRaw = eligibleRooms.reduce(
+        (acc, r) => acc + roomHoursInWindow(r, input.windowStartDate, input.windowEndDate),
+        0,
+      );
+      const roomUsedByPlacements = placedHoursInRooms(eligibleRoomIds, placements);
+      const roomAvail = Math.max(0, roomPoolRaw - roomUsedByPlacements);
+
+      // Largest seat capacity among rooms NOT eligible for this class.
+      // Classes whose required seats exceed this number have no fallback
+      // outside this class's eligible-room set — they "force" demand into
+      // the same pool.
+      const ineligibleSeats = input.rooms
+        .filter((r) => !eligibleRoomIds.has(r.id))
+        .map((r) => r.seat_capacity);
+      const fallbackCapacity = ineligibleSeats.length > 0 ? Math.max(...ineligibleSeats) : -1;
+
+      // Sum hours from forced competitors (including this class).
+      let forcedDemandHours = 0;
+      for (const c2 of input.classes) {
+        if (c2.expected_learners_per_session <= fallbackCapacity) continue;
+        // Equipment match: skip classes whose equipment requirements wouldn't
+        // also need this room subset. Approximation: any class with equipment
+        // tags ⊆ first eligible room's tags. Conservative: include all forced
+        // by seat alone.
+        const sessions = classSessionsNeeded(c2);
+        forcedDemandHours += sessions * c2.hours_per_session;
+      }
+      const roomRatio = roomAvail > 0 ? forcedDemandHours / roomAvail : 999;
+
+      const slateNames = assignedTrainers.map((t) => t.name).join(", ");
+      const eligibleRoomNames = eligibleRooms.map((r) => r.name).join(", ");
+
+      // ── Bottleneck classification ──
+      //
+      // Priority is INTENTIONALLY: room_capacity BEFORE trainer_capacity.
+      // Hiring a trainer when rooms are the constraint is expensive and
+      // unhelpful — we want the message to clearly disambiguate.
+      const roomIsTighter = roomRatio >= slateRatio && roomRatio >= 0.5;
+      const slateIsOverbooked = slateRatio > 1.0;
+
+      if (roomIsTighter) {
+        bottleneck = "room_capacity";
+        const fallbackSuggestion =
+          fallbackCapacity > 0
+            ? ` Or split "${cls.name}" into smaller cohorts (≤${fallbackCapacity.toString()} learners/session) so smaller rooms can host it.`
+            : "";
+        let fix = `"${cls.name}" needs ${requiredSeats.toString()}+ seats — only ${eligibleRooms.length.toString()} room${eligibleRooms.length === 1 ? "" : "s"} fit${eligibleRooms.length === 1 ? "s" : ""} (${eligibleRoomNames}). Across all classes that have no smaller-room fallback, ${forcedDemandHours.toFixed(0)}h of training is competing for ${roomAvail.toFixed(0)}h of room time in the window. Add another ${requiredSeats.toString()}+ seat room.${fallbackSuggestion}`;
+        if (slateRatio < 0.5) {
+          fix += ` Trainers are NOT the bottleneck — assigned trainers (${slateNames}) have ~${slateAvail.toFixed(0)}h free vs ${hoursNeeded.toFixed(0)}h needed for this class. Adding trainers will not help; fix the room.`;
+        }
+        recommendedFix = fix;
+      } else if (slateIsOverbooked) {
+        bottleneck = "trainer_capacity";
+        recommendedFix = `Add another trainer to "${cls.name}". Its slate (${slateNames}) has only ~${slateAvail.toFixed(0)}h free in the window, but the ${unplaced.toString()} remaining session${unplaced === 1 ? "" : "s"} need ${hoursNeeded.toFixed(0)}h.`;
+      } else {
+        bottleneck = "room_busy_or_window";
+        recommendedFix = `Rooms big enough for "${cls.name}" (${requiredSeats.toString()}+ seats) are fully booked across the available days. Add another ${requiredSeats.toString()}+ seat room, or extend the window past ${input.windowEndDate}.`;
+      }
+    }
+
+    diagnoses.push({
+      classId,
+      className: cls.name,
+      unplacedSessions: unplaced,
+      bottleneck,
+      assignedTrainers,
+      eligibleRoomCount: eligibleRooms.length,
+      requiredSeats,
+      requiredEquipment,
+      hoursNeeded,
+      recommendedFix,
+    });
+  }
+
+  diagnoses.sort((a, b) => b.unplacedSessions - a.unplacedSessions);
+  return diagnoses;
+}
+
 function describeFailure(v: Variable, input: SolverInput): string {
   if (v.trainerSlate.length === 0) {
     return "No trainers assigned to this class";
@@ -785,9 +1065,21 @@ export function solve(input: SolverInput, options: SolverOptions = {}): SolverRe
     }
   }
 
+  const diagnoses = buildDiagnoses(gaps, input, finalPlacements);
+  const headlineFix: HeadlineFix | null =
+    diagnoses.length > 0 && diagnoses[0]
+      ? {
+          classId: diagnoses[0].classId,
+          recommendedFix: diagnoses[0].recommendedFix,
+          sessionsUnblocked: diagnoses[0].unplacedSessions,
+        }
+      : null;
+
   return {
     placements: finalPlacements,
     gaps,
+    diagnoses,
+    headlineFix,
     durationMs: now() - startedAt,
     timedOut: abortFlag.timedOut,
   };

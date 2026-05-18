@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { calcTag } from "@/lib/training-planner/cached-reads";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import {
@@ -30,6 +31,7 @@ import {
 } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 import { runSchedule } from "@/lib/training-planner/schedule-runner";
+import type { ClassDiagnosis, HeadlineFix } from "@/lib/training-planner/schedule-solver";
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -74,7 +76,22 @@ async function ctx() {
 
 function revalidateImpl(id?: string) {
   revalidatePath("/training-planner");
-  if (id) revalidatePath(`/training-planner/${id}`, "layout");
+  if (id) {
+    revalidatePath(`/training-planner/${id}`, "layout");
+    // Bust the dry-run scheduler cache so the Calculate page reflects
+    // edits to rooms / trainers / classes / slates / PTO / etc.
+    // immediately instead of waiting on the 60s revalidate.
+    updateTag(calcTag(id));
+  }
+}
+
+/** Narrow revalidation that does NOT touch the page output cache (so we
+ *  don't trigger a layout-wide refresh), but DOES bust the dry-run
+ *  scheduler cache for this impl. Use this when a mutation only affects
+ *  the Calculate page's scheduling math, not what's visible on the
+ *  current page. */
+function revalidateCalcOnly(id: string) {
+  updateTag(calcTag(id));
 }
 
 // ── implementations ─────────────────────────────────────────────────────────
@@ -498,6 +515,9 @@ export async function updateRoom(
   // refetches on every day-button toggle. createRoom/deleteRoom still need
   // it because they move the roomCount readiness marker.
   revalidatePath(`/training-planner/${implementationId}/rooms`);
+  // Room edits do change scheduling math — bust the dry-run cache so
+  // the Calculate page picks up new seat counts / day filters / etc.
+  revalidateCalcOnly(implementationId);
   return { ok: true, data };
 }
 
@@ -918,6 +938,8 @@ export async function updateClass(
   // classes page to keep batched re-orders (Sort A-Z) cheap. createClass
   // and deleteClass still revalidate the layout for the class-count marker.
   revalidatePath(`/training-planner/${implementationId}/classes`);
+  // Class hours / learner counts / equipment tags affect scheduling math.
+  revalidateCalcOnly(implementationId);
   return { ok: true, data };
 }
 
@@ -964,6 +986,8 @@ export async function reorderImplClasses(
     return { ok: false, error: { code: firstError.code, message: firstError.message } };
   }
   revalidatePath(`/training-planner/${implementationId}/classes`);
+  // Class sort_order is a topological-tie-break input to the solver.
+  revalidateCalcOnly(implementationId);
   return { ok: true, data: { count: orderings.length } };
 }
 
@@ -991,6 +1015,8 @@ export async function setClassTrainers(
     // impl layout. The drawer's optimistic state handles the immediate
     // visual; this is just for next-mount accuracy.
     revalidatePath(`/training-planner/${implementationId}/classes`);
+    // Slate edits drive scheduling — bust the dry-run cache too.
+    revalidateCalcOnly(implementationId);
     return { ok: true, data: { count: 0 } };
   }
 
@@ -1004,6 +1030,8 @@ export async function setClassTrainers(
   if (insErr) return { ok: false, error: { code: insErr.code, message: insErr.message } };
 
   revalidatePath(`/training-planner/${implementationId}/classes`);
+  // Slate edits drive scheduling — bust the dry-run cache too.
+  revalidateCalcOnly(implementationId);
   return { ok: true, data: { count: trainerIds.length } };
 }
 
@@ -1044,6 +1072,8 @@ export async function addClassPrerequisite(
   // Prereqs are read by the classes page only; no layout count depends
   // on them, so the layout-wide revalidate wasn't pulling its weight.
   revalidatePath(`/training-planner/${implementationId}/classes`);
+  // Prereqs drive the solver's class ordering — bust the dry-run cache.
+  revalidateCalcOnly(implementationId);
   return { ok: true, data };
 }
 
@@ -1062,6 +1092,8 @@ export async function removeClassPrerequisite(
 
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
   revalidatePath(`/training-planner/${implementationId}/classes`);
+  // Prereqs drive the solver's class ordering — bust the dry-run cache.
+  revalidateCalcOnly(implementationId);
   return { ok: true, data: { id: prereqRowId } };
 }
 
@@ -1079,47 +1111,34 @@ export type ScheduleGenResult = {
   sessions: number;
   conflicts: number;
   capacity_gaps: { class_id: string; class_name: string; session_index: number; reason: string }[];
-  // Populated by the generator when capacity_gaps is non-empty. All fields
-  // are optional because the SQL may emit an empty object {} when the
-  // aggregate deficit isn't positive (e.g., gap is due to weekly distribution
-  // or prereq sequencing, not raw hours).
+  // Per-class bottleneck breakdown with a recommended fix per row, plus a
+  // headline call-out for the single fix that would unblock the most
+  // sessions. Empty / null when nothing failed to place.
+  diagnoses: ClassDiagnosis[];
+  headline_fix: HeadlineFix | null;
+  // Aggregate quick-fix suggestions when there are unplaceable sessions.
+  // Optional because the deficit math may not yield positives (e.g., gap
+  // is due to weekly distribution or prereq sequencing, not raw hours).
   recommendations?: {
     trainer_hours_per_week_to_add?: number;
     trainers_to_add?: number;
     weeks_to_extend?: number;
   };
-  // Names of the impls used as anchors for this run. Empty when not in
-  // anchor mode. Used by the UI to render "anchored against: X, Y" context.
-  anchor_impls?: { id: string; name: string }[];
-  // True when anchor mode produced gaps and the generator wrote nothing
-  // (atomic abort). The planner's existing schedule is preserved.
-  aborted?: boolean;
 };
 
-// Runs the in-process CSP solver from lib/training-planner/schedule-runner.ts.
-// Replaces the old generate_implementation_schedule pl/pgSQL RPC, which was
-// greedy first-fit and never backtracked — leaving feasible plans on the
-// table whenever an early class grabbed a slot a later one needed.
-//
-// Atomic-abort behavior preserved: if anchor_impls is non-empty and the
-// solver can't place every session, the existing drafts are NOT replaced.
+// Runs the in-process CSP solver against a single implementation. The
+// scheduler now operates project-by-project — no anchor mode, no
+// cross-impl coordination. If two impls share a trainer they could
+// double-book; the hospital manages that manually outside the app.
 export async function generateSchedule(
   implementationId: string,
-  anchorImpls: string[] = [],
 ): Promise<ActionResult<ScheduleGenResult>> {
   const c = await ctx();
   if (!c.ok) return c;
 
-  const result = await runSchedule(
-    c.supabase,
-    c.orgId,
-    c.departmentId,
-    implementationId,
-    anchorImpls,
-    {
-      dryRun: false,
-    },
-  );
+  const result = await runSchedule(c.supabase, c.orgId, c.departmentId, implementationId, {
+    dryRun: false,
+  });
   if (!result.ok) return result;
   revalidateImpl(implementationId);
   return { ok: true, data: result.data };
@@ -1133,7 +1152,7 @@ export async function dryRunSchedule(
   const c = await ctx();
   if (!c.ok) return c;
 
-  const result = await runSchedule(c.supabase, c.orgId, c.departmentId, implementationId, [], {
+  const result = await runSchedule(c.supabase, c.orgId, c.departmentId, implementationId, {
     dryRun: true,
   });
   if (!result.ok) return result;

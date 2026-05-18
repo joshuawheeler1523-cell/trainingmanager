@@ -282,6 +282,235 @@ describe("solve - infeasible reporting", () => {
   });
 });
 
+describe("solve - per-class diagnosis", () => {
+  it("flags no_trainers_assigned when the class has an empty slate", () => {
+    const result = solve(makeInput({ classTrainers: [] }));
+    expect(result.diagnoses).toHaveLength(1);
+    const d = result.diagnoses[0];
+    expect(d?.bottleneck).toBe("no_trainers_assigned");
+    expect(d?.assignedTrainers).toHaveLength(0);
+    expect(d?.recommendedFix).toContain("Assign a trainer");
+    expect(d?.recommendedFix).toContain("Class A");
+  });
+
+  it("flags no_eligible_room when seat capacity falls short", () => {
+    const result = solve(
+      makeInput({
+        rooms: [makeRoom({ seat_capacity: 5 })],
+        classes: [makeClass({ expected_learners_per_session: 25, total_people_to_train: 25 })],
+      }),
+    );
+    expect(result.diagnoses).toHaveLength(1);
+    const d = result.diagnoses[0];
+    expect(d?.bottleneck).toBe("no_eligible_room");
+    expect(d?.requiredSeats).toBe(25);
+    expect(d?.eligibleRoomCount).toBe(0);
+    expect(d?.recommendedFix).toContain("25 seats");
+  });
+
+  it("flags no_eligible_room with equipment wording when seats fit but tags don't", () => {
+    const result = solve(
+      makeInput({
+        rooms: [makeRoom({ seat_capacity: 20, equipment_tags: [] })],
+        classes: [
+          makeClass({
+            expected_learners_per_session: 10,
+            total_people_to_train: 10,
+            required_equipment_tags: ["iv-pump", "manikin"],
+          }),
+        ],
+      }),
+    );
+    const d = result.diagnoses[0];
+    expect(d?.bottleneck).toBe("no_eligible_room");
+    expect(d?.recommendedFix).toContain("iv-pump");
+    expect(d?.recommendedFix).toContain("manikin");
+  });
+
+  it("flags trainer_capacity when hours needed exceeds slate's free time (non-anchor)", () => {
+    // 5 sessions × 2h = 10h needed. One trainer with 4h/wk × 1 wk window = 4h cap.
+    const result = solve(
+      makeInput({
+        windowStartDate: "2026-06-01",
+        windowEndDate: "2026-06-05",
+        cutoffDate: "2026-06-05",
+        trainers: [makeTrainer({ name: "Jane Doe", availability_hours_per_week: 4 })],
+        classes: [
+          makeClass({
+            name: "Inpatient Nurse",
+            hours_per_session: 2,
+            total_people_to_train: 50,
+          }),
+        ],
+      }),
+    );
+    const d = result.diagnoses.find((x) => x.className === "Inpatient Nurse");
+    expect(d?.bottleneck).toBe("trainer_capacity");
+    expect(d?.recommendedFix).toContain("Jane Doe");
+    expect(d?.recommendedFix).toContain("Add another trainer");
+  });
+
+  it("returns a headline_fix pointing at the class with the most unplaced sessions", () => {
+    // Two infeasible classes — one with 3 sessions, one with 1. Headline picks
+    // the 3-session one.
+    const input = makeInput({
+      classes: [
+        makeClass({ id: "cBig", name: "Big Class", total_people_to_train: 30 }), // 3 sessions
+        makeClass({ id: "cSmall", name: "Small Class", total_people_to_train: 10 }), // 1 session
+      ],
+      // No trainers assigned to either — both will fail with no_trainers_assigned.
+      classTrainers: [],
+    });
+    const result = solve(input);
+    expect(result.headlineFix).not.toBeNull();
+    expect(result.headlineFix?.classId).toBe("cBig");
+    expect(result.headlineFix?.sessionsUnblocked).toBe(3);
+    // Diagnoses come back sorted, most-unplaced first.
+    expect(result.diagnoses[0]?.classId).toBe("cBig");
+    expect(result.diagnoses[1]?.classId).toBe("cSmall");
+  });
+
+  it("returns no headline_fix or diagnoses on a clean run", () => {
+    const result = solve(makeInput());
+    expect(result.gaps).toHaveLength(0);
+    expect(result.diagnoses).toHaveLength(0);
+    expect(result.headlineFix).toBeNull();
+  });
+
+  it("flags room_capacity when a single large room is contended by multiple big classes", () => {
+    // Mirrors a real user scenario: 1 big room (18 seats) is the only one
+    // that can host multiple large classes. Trainers have plenty of free
+    // time. Without the room-bottleneck detection this would have been
+    // mis-classified as "add another trainer" — which doesn't help.
+    const result = solve(
+      makeInput({
+        // Tight 2-week window: TR1 has only ~80h available (10 weekdays × 8h).
+        // The big classes below need ~85h of forced room time — guaranteed
+        // to overflow.
+        windowStartDate: "2026-08-31",
+        windowEndDate: "2026-09-11",
+        cutoffDate: "2026-09-11",
+        rooms: [
+          makeRoom({ id: "tr1", name: "3rd Floor TR1", seat_capacity: 18 }),
+          makeRoom({ id: "tr2", name: "3rd Floor TR2", seat_capacity: 8 }),
+          makeRoom({ id: "tr3", name: "BoardRoom", seat_capacity: 4 }),
+        ],
+        trainers: [
+          makeTrainer({ id: "pt3", name: "PT3", availability_hours_per_week: 40 }),
+          makeTrainer({ id: "pt11", name: "PT11", availability_hours_per_week: 40 }),
+        ],
+        classes: [
+          // 3 classes that all need >= 9 seats — only TR1 (18 seats) fits.
+          // Combined sessions × hours = ~88h forced demand against ~80h pool.
+          makeClass({
+            id: "nurse",
+            name: "Inpatient Nurse",
+            expected_learners_per_session: 18,
+            hours_per_session: 8,
+            total_people_to_train: 200, // 12 sessions × 8h = 96h (overflows TR1 alone)
+          }),
+          makeClass({
+            id: "ptotslp",
+            name: "PT/OT/SLP",
+            expected_learners_per_session: 12,
+            hours_per_session: 4,
+            total_people_to_train: 31, // 3 sessions × 4h = 12h
+          }),
+          makeClass({
+            id: "pctca",
+            name: "PCT/CA",
+            expected_learners_per_session: 10,
+            hours_per_session: 8,
+            total_people_to_train: 21, // 3 sessions × 8h = 24h
+          }),
+          makeClass({
+            id: "ednurse",
+            name: "ED Nurse",
+            expected_learners_per_session: 12,
+            hours_per_session: 4,
+            total_people_to_train: 12, // 1 session × 4h = 4h
+          }),
+        ],
+        classTrainers: [
+          { impl_class_id: "nurse", impl_trainer_id: "pt3" },
+          { impl_class_id: "nurse", impl_trainer_id: "pt11" },
+          { impl_class_id: "ptotslp", impl_trainer_id: "pt3" },
+          { impl_class_id: "ptotslp", impl_trainer_id: "pt11" },
+          { impl_class_id: "pctca", impl_trainer_id: "pt3" },
+          { impl_class_id: "pctca", impl_trainer_id: "pt11" },
+          { impl_class_id: "ednurse", impl_trainer_id: "pt3" },
+          { impl_class_id: "ednurse", impl_trainer_id: "pt11" },
+        ],
+        // Light PTO so trainers aren't trivially infinite, but well under
+        // capacity — rooms should be the binding constraint.
+        busyTrainers: [
+          { resourceId: "pt3", start: "2026-09-01T13:00:00Z", end: "2026-09-01T17:00:00Z" },
+          { resourceId: "pt11", start: "2026-09-02T13:00:00Z", end: "2026-09-02T17:00:00Z" },
+        ],
+      }),
+      // Short budget — the search will hit it on the doomed-by-room-capacity
+      // variables and bail out fast. The diagnosis still classifies the
+      // gaps as room_capacity using post-hoc math, independent of whether
+      // search timed out.
+      { timeBudgetMs: 300 },
+    );
+
+    // At least one of the big classes should hit the room_capacity bottleneck,
+    // and NONE of the failed classes should recommend "Add another trainer".
+    const failedDiagnoses = result.diagnoses;
+    expect(failedDiagnoses.length).toBeGreaterThan(0);
+
+    const roomCapDiag = failedDiagnoses.find((d) => d.bottleneck === "room_capacity");
+    expect(roomCapDiag).toBeDefined();
+    expect(roomCapDiag?.recommendedFix).toContain("3rd Floor TR1");
+    expect(roomCapDiag?.recommendedFix).toContain("Add another");
+    expect(roomCapDiag?.recommendedFix).toContain("seat room");
+    // The "do NOT hire trainers" guard fires when slate has lots of free hours.
+    expect(roomCapDiag?.recommendedFix).toMatch(/NOT the bottleneck/);
+
+    // Critically: no failed-class fix should suggest adding a trainer in this
+    // scenario, since rooms (not trainers) are the bottleneck.
+    for (const d of failedDiagnoses) {
+      if (d.bottleneck === "room_capacity") continue;
+      // Other bottlenecks are fine, but they shouldn't be trainer_blocked /
+      // trainer_capacity for these big-room classes specifically.
+      expect(["room_capacity", "room_busy_or_window", "no_eligible_room"]).toContain(d.bottleneck);
+    }
+  });
+
+  it("keeps recommending trainer_capacity when slate truly is short (room is fine)", () => {
+    // Lots of rooms, one very limited trainer slate. Should NOT classify as
+    // room_capacity — slate is the actual constraint.
+    const result = solve(
+      makeInput({
+        windowStartDate: "2026-06-01",
+        windowEndDate: "2026-06-05",
+        cutoffDate: "2026-06-05",
+        rooms: [
+          makeRoom({ id: "r1", name: "Big Room A", seat_capacity: 30 }),
+          makeRoom({ id: "r2", name: "Big Room B", seat_capacity: 30 }),
+          makeRoom({ id: "r3", name: "Big Room C", seat_capacity: 30 }),
+        ],
+        trainers: [
+          // 4h/wk × 1 week = 4h of trainer time, but the class needs 20h.
+          makeTrainer({ name: "Solo Trainer", availability_hours_per_week: 4 }),
+        ],
+        classes: [
+          makeClass({
+            name: "Demanding Class",
+            hours_per_session: 4,
+            expected_learners_per_session: 10,
+            total_people_to_train: 50, // 5 sessions × 4h = 20h needed
+          }),
+        ],
+      }),
+    );
+    const d = result.diagnoses[0];
+    expect(d?.bottleneck).toBe("trainer_capacity");
+    expect(d?.recommendedFix).toContain("Solo Trainer");
+  });
+});
+
 describe("solve - room equipment", () => {
   it("only uses rooms whose equipment_tags are a superset of class.required_equipment_tags", () => {
     const input = makeInput({

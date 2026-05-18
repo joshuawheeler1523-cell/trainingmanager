@@ -370,10 +370,9 @@ type TrainerState = {
   maxConcurrent: number;
   weeklyUsed: Map<string, number>;
   nextFree: Date;
-  // Cross-impl busy intervals — published sessions in OTHER implementations
-  // where this person teaches (matched by instructor_id server-side). The
-  // sim treats overlapping placements as if this trainer were booked.
-  crossImplBusy: Array<{ start: Date; end: Date; label?: string }>;
+  // PTO / unavailability busy intervals for this trainer in this impl.
+  // The sim treats overlapping placements as if this trainer were booked.
+  unavailabilityBusy: Array<{ start: Date; end: Date; label?: string }>;
 };
 
 type RoomState = {
@@ -505,25 +504,9 @@ function setHourOfDay(d: Date, hourLocal: number): void {
 // ── Main entry ─────────────────────────────────────────────────────────────
 
 /**
- * Cross-implementation busy interval keyed by this impl's trainer id. The
- * server pre-computes per-trainer busy windows by joining published
- * sessions in OTHER live implementations whose trainer rows link to the
- * same instructor_id, then mapping back to THIS impl's trainer id. The
- * sim treats each interval as if the trainer were already booked, so the
- * Calculate preview matches what the SQL generator will produce on
- * Generate (which has the same pre-seed logic in pg_temp.tmp_busy_trainer).
- */
-export type CrossImplBusy = {
-  start: string; // ISO timestamptz
-  end: string; // ISO timestamptz
-  implName?: string;
-  className?: string;
-};
-
-/**
  * Per-trainer PTO / unavailability windows from impl_trainer_unavailability.
- * Same shape as CrossImplBusy so the simulator can merge them; `reason` is
- * surfaced as the label when the placement loop logs/debugs.
+ * The sim treats each interval as if the trainer were already booked, so
+ * the Calculate preview matches what the actual scheduler will produce.
  */
 export type TrainerUnavailability = {
   start: string;
@@ -538,7 +521,6 @@ export function computeFeasibility(input: {
   classes: ImplClass[];
   classTrainers: ImplClassTrainer[];
   prereqs: ImplClassPrerequisite[];
-  crossImplBusyByTrainer?: Map<string, CrossImplBusy[]>;
   unavailabilityByTrainer?: Map<string, TrainerUnavailability[]>;
 }): FeasibilityResult {
   const {
@@ -548,7 +530,6 @@ export function computeFeasibility(input: {
     classes,
     classTrainers,
     prereqs,
-    crossImplBusyByTrainer,
     unavailabilityByTrainer,
   } = input;
 
@@ -640,7 +621,6 @@ export function computeFeasibility(input: {
     classFeasibility: classFeas,
     trainersByClass,
     prereqsByClass,
-    ...(crossImplBusyByTrainer ? { crossImplBusyByTrainer } : {}),
     ...(unavailabilityByTrainer ? { unavailabilityByTrainer } : {}),
   });
 
@@ -875,7 +855,6 @@ function simulate(args: {
   classFeasibility: ClassFeasibility[];
   trainersByClass: Map<string, string[]>;
   prereqsByClass: Map<string, string[]>;
-  crossImplBusyByTrainer?: Map<string, CrossImplBusy[]>;
   unavailabilityByTrainer?: Map<string, TrainerUnavailability[]>;
 }): SimResult {
   const {
@@ -886,7 +865,6 @@ function simulate(args: {
     classFeasibility,
     trainersByClass,
     prereqsByClass,
-    crossImplBusyByTrainer,
     unavailabilityByTrainer,
   } = args;
 
@@ -961,20 +939,9 @@ function simulate(args: {
       const earliestRoomStart =
         rooms.length > 0 ? Math.min(...rooms.map((r) => r.start_hour_local)) : 9;
       setHourOfDay(start, earliestRoomStart);
-      // Merge cross-impl commitments AND PTO/unavailability windows — both
-      // are immovable wall-clock blocks the trainer can't be scheduled over.
-      // Sort by start so the placement check can scan linearly.
-      const crossLabeled = (crossImplBusyByTrainer?.get(t.id) ?? []).map((b) => {
-        const label =
-          b.implName && b.className
-            ? `${b.className} (${b.implName})`
-            : (b.implName ?? b.className);
-        return {
-          start: new Date(b.start),
-          end: new Date(b.end),
-          ...(label ? { label } : {}),
-        };
-      });
+      // PTO/unavailability windows — immovable wall-clock blocks the
+      // trainer can't be scheduled over. Sort by start so the placement
+      // check can scan linearly.
       const ptoLabeled = (unavailabilityByTrainer?.get(t.id) ?? []).map((u) => {
         const label = u.reason ? `PTO — ${u.reason}` : "PTO";
         return {
@@ -983,9 +950,7 @@ function simulate(args: {
           label,
         };
       });
-      const crossBusy = [...crossLabeled, ...ptoLabeled].sort(
-        (a, b) => a.start.getTime() - b.start.getTime(),
-      );
+      const unavailabilityBusy = ptoLabeled.sort((a, b) => a.start.getTime() - b.start.getTime());
       return [
         t.id,
         {
@@ -997,7 +962,7 @@ function simulate(args: {
           nextFree: start,
           weeklyUsed: new Map(),
           maxConcurrent: t.max_concurrent_sessions,
-          crossImplBusy: crossBusy,
+          unavailabilityBusy,
         },
       ];
     }),
@@ -1084,15 +1049,13 @@ function simulate(args: {
         }
         const wallClockHours = lunchInfo.wallClockHours;
 
-        // Cross-impl busy check: if the candidate window overlaps any
-        // cross-impl busy interval for this trainer, push past the
-        // interval and retry. Treat overlapping cross-impl commitments
-        // as immovable walls — the SQL generator does the same via
-        // pg_temp.tmp_busy_trainer.
+        // PTO / unavailability check: if the candidate window overlaps
+        // any unavailability interval for this trainer, push past the
+        // interval and retry.
         {
           const end = new Date(candidate.getTime() + wallClockHours * 3600 * 1000);
           let pushed = false;
-          for (const busy of trainer.crossImplBusy) {
+          for (const busy of trainer.unavailabilityBusy) {
             if (busy.end <= candidate) continue; // busy ends before we start — fine
             if (busy.start >= end) break; // sorted; no more relevant overlaps
             // Overlaps. Push past it.

@@ -21,7 +21,6 @@ type Props = {
   isArborAdmin?: boolean;
   modules: Record<ToggleableModule, boolean>;
   initialNotifications: NotificationRow[];
-  conflictCount?: number;
 };
 
 export default function AppShell({
@@ -34,7 +33,6 @@ export default function AppShell({
   isArborAdmin = false,
   modules,
   initialNotifications,
-  conflictCount = 0,
 }: Props) {
   const [commandOpen, setCommandOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -63,12 +61,12 @@ export default function AppShell({
         Skip to main content
       </a>
 
-      <DesktopSidebar isAdmin={isAdmin} modules={modules} conflictCount={conflictCount} />
+      <DesktopSidebar isAdmin={isAdmin} modules={modules} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar */}
         <header className="border-border bg-background sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-4">
-          <MobileSidebar isAdmin={isAdmin} modules={modules} conflictCount={conflictCount} />
+          <MobileSidebar isAdmin={isAdmin} modules={modules} />
           <div className="min-w-0 flex-1">{orgSwitcherSlot}</div>
           <div className="flex items-center gap-1">
             {isArborAdmin && (

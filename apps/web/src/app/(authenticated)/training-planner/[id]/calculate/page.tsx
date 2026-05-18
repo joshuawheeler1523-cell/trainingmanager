@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircleIcon, ExclamationTriangleIcon, XCircleIcon } from "@heroicons/react/20/solid";
+import {
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  LightBulbIcon,
+  XCircleIcon,
+} from "@heroicons/react/20/solid";
 import { createClient } from "@/lib/supabase/server";
+import type { ClassDiagnosis } from "@/lib/training-planner/schedule-solver";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import type {
   Implementation,
@@ -12,7 +18,6 @@ import type {
 import {
   computeFeasibility,
   type ClassFeasibility,
-  type CrossImplBusy,
   type FeasibilityResult,
   type FeasibilityVerdict,
   type Recommendation,
@@ -20,7 +25,6 @@ import {
 } from "@/lib/training-planner/feasibility";
 import { type ScheduleGenResult } from "../../actions";
 import { dryRunScheduleCached } from "@/lib/training-planner/cached-reads";
-import { fetchCrossImplConflictsForImpl } from "@/app/(authenticated)/training-planner/conflicts/queries";
 import GenerateButton from "./generate-button";
 
 type Params = Promise<{ id: string }>;
@@ -37,9 +41,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
     { data: classes },
     { data: classTrainers },
     { data: prereqs },
-    { data: orgTrainers },
-    { data: orgImpls },
-    { data: orgPublishedSessions },
     { data: unavailability },
     { count: sessionCount },
   ] = await Promise.all([
@@ -58,22 +59,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
     // org, and computeFeasibility filters down to the supplied class IDs.
     supabase.from("impl_class_trainers").select("*").eq("org_id", orgId),
     supabase.from("impl_class_prerequisites").select("*").eq("org_id", orgId),
-    // For cross-impl trainer conflict: all impl_trainer rows in the org so
-    // we can match instructor_id across implementations.
-    supabase
-      .from("impl_trainers")
-      .select("id, instructor_id, implementation_id")
-      .eq("org_id", orgId),
-    // Implementations metadata so we can filter cross-impl busy to live impls only.
-    supabase.from("implementations").select("id, name, status, deleted_at").eq("org_id", orgId),
-    // Published sessions in OTHER implementations — these are the cross-impl
-    // commitments the simulator must dodge for trainers shared via instructor_id.
-    supabase
-      .from("impl_sessions")
-      .select("impl_trainer_id, scheduled_start, scheduled_end, implementation_id")
-      .eq("org_id", orgId)
-      .eq("status", "published")
-      .neq("implementation_id", id),
     // PTO / unavailability for this impl's trainers.
     supabase
       .from("impl_trainer_unavailability")
@@ -87,47 +72,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
   ]);
 
   if (!impl) notFound();
-
-  // Pairs of draft sessions across impls where one side is this impl.
-  // Shares the layout's React.cache'd fetch, so this is effectively free.
-  const conflictPairsForImpl = await fetchCrossImplConflictsForImpl(orgId, id);
-
-  // Build per-trainer cross-impl busy map: for each of THIS impl's trainers
-  // whose underlying instructor also teaches in OTHER live implementations,
-  // accumulate the other impls' published session intervals.
-  const myTrainerByInstructor = new Map<string, string>(); // instructor_id → my_trainer_id
-  for (const t of trainers ?? []) {
-    if (t.instructor_id) myTrainerByInstructor.set(t.instructor_id, t.id);
-  }
-  const otherTrainerById = new Map<string, { instructor_id: string | null; impl_id: string }>();
-  for (const t of orgTrainers ?? []) {
-    if (t.implementation_id === id) continue; // same-impl trainers are handled normally
-    otherTrainerById.set(t.id, { instructor_id: t.instructor_id, impl_id: t.implementation_id });
-  }
-  const liveImplIds = new Set(
-    (orgImpls ?? [])
-      .filter((i) => !i.deleted_at && i.status !== "archived" && i.status !== "cancelled")
-      .map((i) => i.id),
-  );
-  const implNameById = new Map((orgImpls ?? []).map((i) => [i.id, i.name]));
-
-  const crossImplBusyByTrainer = new Map<string, CrossImplBusy[]>();
-  for (const s of orgPublishedSessions ?? []) {
-    if (!s.impl_trainer_id) continue;
-    if (!liveImplIds.has(s.implementation_id)) continue;
-    const other = otherTrainerById.get(s.impl_trainer_id);
-    if (!other?.instructor_id) continue;
-    const myTrainerId = myTrainerByInstructor.get(other.instructor_id);
-    if (!myTrainerId) continue;
-    const list = crossImplBusyByTrainer.get(myTrainerId) ?? [];
-    const implName = implNameById.get(s.implementation_id);
-    list.push({
-      start: s.scheduled_start,
-      end: s.scheduled_end,
-      ...(implName ? { implName } : {}),
-    });
-    crossImplBusyByTrainer.set(myTrainerId, list);
-  }
 
   // PTO/unavailability windows — only those for this impl's trainers.
   const thisImplTrainerIds = new Set((trainers ?? []).map((t) => t.id));
@@ -157,24 +101,23 @@ export default async function CalculatePage({ params }: { params: Params }) {
     classes: classes ?? [],
     classTrainers: classTrainers ?? [],
     prereqs: prereqs ?? [],
-    crossImplBusyByTrainer,
     unavailabilityByTrainer,
   });
 
-  // Authoritative unscheduled count + reasons come from the SQL generator
-  // running in dry-run mode — same planning math the Generate Schedule
+  // Authoritative unscheduled count + reasons come from running the CSP
+  // solver in dry-run mode — same planning math the Generate Schedule
   // button uses, just without writing rows. The in-memory simulator above
-  // drifts from the SQL on some configurations (notably single-trainer
-  // class slates), so we override its unscheduledSessions with the SQL's
-  // gap list. Skipped when the impl can't be scheduled yet (no window
-  // dates, no classes, etc.) since the RPC would just raise.
+  // drifts on some configurations (notably single-trainer class slates),
+  // so we override its unscheduledSessions with the solver's gap list.
+  // Skipped when the impl can't be scheduled yet (no window dates, no
+  // classes, etc.) since the solver would just raise.
   let dryRun: ScheduleGenResult | null = null;
   if (implTyped.window_start_date && implTyped.window_end_date && (classes?.length ?? 0) > 0) {
     // Cached read: bust on impl.updated_at so any edit to the impl row
     // forces a recompute. The Calculate page renders frequently while a
     // planner is iterating; without caching, every tab-switch reruns
-    // the SQL generator (200–800ms).
-    dryRun = await dryRunScheduleCached(id, implTyped.updated_at);
+    // the CSP solver (200ms–5s).
+    dryRun = await dryRunScheduleCached(id, implTyped.updated_at, orgId);
   }
   if (dryRun) {
     feas.unscheduledSessions = dryRun.capacity_gaps.length;
@@ -214,8 +157,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
         </p>
       </div>
 
-      {conflictPairsForImpl.length > 0 && <ConflictsBanner count={conflictPairsForImpl.length} />}
-
       <YesNoPanel
         canSchedule={canSchedule}
         dryRun={dryRun}
@@ -243,12 +184,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
         implementationId={id}
         ready={feas.ready}
         existingSessions={sessionCount ?? 0}
-        availableAnchors={(orgImpls ?? [])
-          .filter(
-            (i) =>
-              i.id !== id && !i.deleted_at && i.status !== "archived" && i.status !== "cancelled",
-          )
-          .map((i) => ({ id: i.id, name: i.name }))}
       />
 
       <div className="border-border flex items-center justify-between border-t pt-4">
@@ -270,29 +205,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
 }
 
 // ── Components ─────────────────────────────────────────────────────────────
-
-function ConflictsBanner({ count }: { count: number }) {
-  return (
-    <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
-      <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-      <div className="flex-1">
-        <p className="text-foreground text-sm font-semibold">
-          {count.toString()} cross-impl conflict{count === 1 ? "" : "s"} involve this impl
-        </p>
-        <p className="text-muted-foreground mt-0.5 text-xs">
-          Draft sessions in this impl overlap with draft sessions in another impl that share a
-          trainer. Resolve them before publishing so the same person isn&apos;t double-booked.
-        </p>
-      </div>
-      <Link
-        href="/training-planner/conflicts"
-        className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600"
-      >
-        Open resolver →
-      </Link>
-    </div>
-  );
-}
 
 function YesNoPanel({
   canSchedule,
@@ -354,28 +266,34 @@ function YesNoPanel({
 }
 
 function UnscheduledReasonsPanel({ dryRun }: { dryRun: ScheduleGenResult }) {
-  // Group gaps by class so a class with N unscheduled sessions shows up as
-  // one row with a count, not N rows. Reason is the same across sibling
-  // sessions in practice (the SQL emits identical text per class).
-  type Group = { className: string; count: number; reason: string; sessionIndices: number[] };
-  const byClass = new Map<string, Group>();
-  for (const gap of dryRun.capacity_gaps) {
-    const g = byClass.get(gap.class_id) ?? {
-      className: gap.class_name,
-      count: 0,
-      reason: gap.reason,
-      sessionIndices: [],
-    };
-    g.count += 1;
-    g.sessionIndices.push(gap.session_index);
-    byClass.set(gap.class_id, g);
-  }
-  const groups = [...byClass.values()].sort((a, b) => b.count - a.count);
+  // The in-process CSP solver emits a per-class diagnosis with a recommended
+  // fix; prefer that when present. The legacy SQL RPC (still used by the
+  // dry-run cache path) doesn't, so we fall back to grouping the per-session
+  // gap rows by class.
   const total = dryRun.capacity_gaps.length;
+  const diagnoses = dryRun.diagnoses;
+  const headline = dryRun.headline_fix;
+  const hasRichDiagnosis = diagnoses.length > 0;
+
+  type Group = { className: string; count: number; reason: string };
+  const fallbackGroups: Group[] = (() => {
+    if (hasRichDiagnosis) return [];
+    const byClass = new Map<string, Group>();
+    for (const gap of dryRun.capacity_gaps) {
+      const g = byClass.get(gap.class_id) ?? {
+        className: gap.class_name,
+        count: 0,
+        reason: gap.reason,
+      };
+      g.count += 1;
+      byClass.set(gap.class_id, g);
+    }
+    return [...byClass.values()].sort((a, b) => b.count - a.count);
+  })();
 
   return (
-    <div className="border-border rounded-md border bg-rose-50/40 p-3 dark:bg-rose-950/20">
-      <div className="mb-2 flex items-baseline justify-between">
+    <div className="border-border space-y-3 rounded-md border bg-rose-50/40 p-3 dark:bg-rose-950/20">
+      <div className="flex items-baseline justify-between">
         <p className="text-foreground text-sm font-semibold">
           {total.toString()} session{total === 1 ? "" : "s"} can&apos;t fit
         </p>
@@ -383,29 +301,54 @@ function UnscheduledReasonsPanel({ dryRun }: { dryRun: ScheduleGenResult }) {
           From a dry-run of the actual scheduler. No rows were written.
         </p>
       </div>
-      <table className="w-full text-xs">
-        <thead className="text-muted-foreground">
-          <tr>
-            <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Class</th>
-            <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Unplaced</th>
-            <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Reason</th>
-          </tr>
-        </thead>
-        <tbody className="divide-border divide-y">
-          {groups.map((g) => (
-            <tr key={g.className}>
-              <td className="text-foreground px-2 py-1.5 font-medium">{g.className}</td>
-              <td className="text-foreground px-2 py-1.5 text-right tabular-nums">
-                {g.count.toString()}
-              </td>
-              <td className="text-muted-foreground px-2 py-1.5">{g.reason}</td>
-            </tr>
+
+      {hasRichDiagnosis && headline && (
+        <div className="flex items-start gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-2.5 dark:border-emerald-700 dark:bg-emerald-950/30">
+          <LightBulbIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div className="text-xs text-emerald-900 dark:text-emerald-100">
+            <p className="font-semibold">Biggest unlock</p>
+            <p className="mt-0.5 leading-snug">
+              {headline.recommendedFix}{" "}
+              <span className="text-emerald-700/80 dark:text-emerald-200/80">
+                Would place {headline.sessionsUnblocked.toString()} of {total.toString()} sessions.
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {hasRichDiagnosis ? (
+        <ul className="space-y-2">
+          {diagnoses.map((d) => (
+            <DiagnosisCard key={d.classId} d={d} />
           ))}
-        </tbody>
-      </table>
+        </ul>
+      ) : (
+        <table className="w-full text-xs">
+          <thead className="text-muted-foreground">
+            <tr>
+              <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Class</th>
+              <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Unplaced</th>
+              <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Reason</th>
+            </tr>
+          </thead>
+          <tbody className="divide-border divide-y">
+            {fallbackGroups.map((g) => (
+              <tr key={g.className}>
+                <td className="text-foreground px-2 py-1.5 font-medium">{g.className}</td>
+                <td className="text-foreground px-2 py-1.5 text-right tabular-nums">
+                  {g.count.toString()}
+                </td>
+                <td className="text-muted-foreground px-2 py-1.5">{g.reason}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
       {dryRun.recommendations && Object.keys(dryRun.recommendations).length > 0 && (
-        <div className="border-border mt-2 border-t pt-2 text-[11px]">
-          <p className="text-foreground mb-1 font-semibold">Quick fixes:</p>
+        <div className="border-border border-t pt-2 text-[11px]">
+          <p className="text-foreground mb-1 font-semibold">Aggregate quick fixes:</p>
           <ul className="text-muted-foreground list-disc space-y-0.5 pl-4">
             {dryRun.recommendations.trainers_to_add != null &&
               dryRun.recommendations.trainers_to_add > 0 && (
@@ -444,6 +387,44 @@ function UnscheduledReasonsPanel({ dryRun }: { dryRun: ScheduleGenResult }) {
       )}
     </div>
   );
+}
+
+function DiagnosisCard({ d }: { d: ClassDiagnosis }) {
+  return (
+    <li className="border-border bg-background rounded-md border p-2.5">
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <span className="text-foreground text-sm font-semibold">{d.className}</span>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {d.unplacedSessions.toString()} session{d.unplacedSessions === 1 ? "" : "s"} short
+        </span>
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+          {bottleneckLabel(d.bottleneck)}
+        </span>
+      </div>
+      <p className="text-foreground mt-1 text-xs leading-snug">{d.recommendedFix}</p>
+      {d.assignedTrainers.length > 0 && (
+        <p className="text-muted-foreground mt-1 text-[11px]">
+          Assigned trainers:{" "}
+          {d.assignedTrainers.map((t) => `${t.name} (${t.hoursPerWeek.toString()}h/wk)`).join(", ")}
+        </p>
+      )}
+    </li>
+  );
+}
+
+function bottleneckLabel(b: ClassDiagnosis["bottleneck"]): string {
+  switch (b) {
+    case "no_trainers_assigned":
+      return "no trainer";
+    case "no_eligible_room":
+      return "no room";
+    case "room_capacity":
+      return "room capacity";
+    case "trainer_capacity":
+      return "trainer hours";
+    case "room_busy_or_window":
+      return "room / window";
+  }
 }
 
 function VerdictBanner({ result }: { result: FeasibilityResult }) {
