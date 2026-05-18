@@ -393,11 +393,22 @@ function precomputeSlotsForClass(
 ): PrecomputedSlot[] {
   const slots: PrecomputedSlot[] = [];
 
-  const eligibleRooms = rooms.filter(
-    (r) =>
-      r.seat_capacity >= c.expected_learners_per_session &&
-      tagSubset(c.required_equipment_tags, r.equipment_tags),
-  );
+  const eligibleRooms = rooms
+    .filter(
+      (r) =>
+        r.seat_capacity >= c.expected_learners_per_session &&
+        tagSubset(c.required_equipment_tags, r.equipment_tags),
+    )
+    // Least-constraining-value heuristic: try SMALLER eligible rooms first.
+    // A class that needs 3 seats and has 5 eligible rooms (TR3, TR4, BoardRoom,
+    // TR2, TR1) should book TR3/TR4 before consuming TR1's capacity, leaving
+    // TR1 available for the 18-seat class that has no smaller-room option.
+    // Without this, the solver's chronological room iteration causes small
+    // classes to hog big rooms and the bigger classes can't fit.
+    // Ties on seat_capacity break by sort_order (preserves the user's
+    // intentional room ordering).
+    .slice()
+    .sort((a, b) => a.seat_capacity - b.seat_capacity || a.sort_order - b.sort_order);
   if (eligibleRooms.length === 0 || trainerSlate.length === 0) return slots;
 
   const lunchActive = input.lunchBreakLengthMinutes > 0;
