@@ -43,10 +43,13 @@ export default function SeedDemoClient() {
             Riverside Memorial Hospital
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            One click creates (or recreates) a full-data demo organization with ~12 instructors, 8
-            skills, 5 classes, the entire allocation tree, 4 work-intake items, 3 projects with
-            tasks &amp; milestones, an active training implementation, and a couple of support
-            tickets. After it runs, switch to the new org from the org switcher in the top bar.
+            One click creates (or recreates) a hero-quality demo org: 12 instructors (all full-time
+            at 2080h) with realistic utilization variance, 8 skills with expiring certifications, 6
+            classes, the entire allocation tree, 4 work-intake items, 3 projects with tasks &amp;
+            milestones, 3 training-planner implementations (clean / tight / bottleneck), 6 education
+            requests, 3 1:1 meetings with action items, a sketchpad draft, 3 saved reports, and a
+            couple of support tickets. After it runs, switch to the new org from the org switcher in
+            the top bar.
           </p>
           <ul className="text-muted-foreground mt-3 list-disc pl-5 text-xs">
             <li>Idempotent: running again drops and re-seeds the demo org.</li>
