@@ -40,7 +40,15 @@ export const dryRunScheduleCached = unstable_cache(
       p_dry_run: true,
     });
     if (error) return null;
-    return data as ScheduleGenResult;
+    // The SQL RPC predates the in-process CSP solver and doesn't emit the
+    // per-class diagnoses / headline-fix fields. Defensively normalize so
+    // callers can treat these as always-present.
+    const raw = data as Partial<ScheduleGenResult>;
+    return {
+      ...(raw as ScheduleGenResult),
+      diagnoses: raw.diagnoses ?? [],
+      headline_fix: raw.headline_fix ?? null,
+    };
   },
   ["dry-run-schedule-v1"],
   { revalidate: 60 },

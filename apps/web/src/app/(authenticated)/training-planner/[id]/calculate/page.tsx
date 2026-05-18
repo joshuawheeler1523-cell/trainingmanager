@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircleIcon, ExclamationTriangleIcon, XCircleIcon } from "@heroicons/react/20/solid";
+import {
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  LightBulbIcon,
+  XCircleIcon,
+} from "@heroicons/react/20/solid";
 import { createClient } from "@/lib/supabase/server";
+import type { ClassDiagnosis } from "@/lib/training-planner/schedule-solver";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import type {
   Implementation,
@@ -354,28 +360,34 @@ function YesNoPanel({
 }
 
 function UnscheduledReasonsPanel({ dryRun }: { dryRun: ScheduleGenResult }) {
-  // Group gaps by class so a class with N unscheduled sessions shows up as
-  // one row with a count, not N rows. Reason is the same across sibling
-  // sessions in practice (the SQL emits identical text per class).
-  type Group = { className: string; count: number; reason: string; sessionIndices: number[] };
-  const byClass = new Map<string, Group>();
-  for (const gap of dryRun.capacity_gaps) {
-    const g = byClass.get(gap.class_id) ?? {
-      className: gap.class_name,
-      count: 0,
-      reason: gap.reason,
-      sessionIndices: [],
-    };
-    g.count += 1;
-    g.sessionIndices.push(gap.session_index);
-    byClass.set(gap.class_id, g);
-  }
-  const groups = [...byClass.values()].sort((a, b) => b.count - a.count);
+  // The in-process CSP solver emits a per-class diagnosis with a recommended
+  // fix; prefer that when present. The legacy SQL RPC (still used by the
+  // dry-run cache path) doesn't, so we fall back to grouping the per-session
+  // gap rows by class.
   const total = dryRun.capacity_gaps.length;
+  const diagnoses = dryRun.diagnoses;
+  const headline = dryRun.headline_fix;
+  const hasRichDiagnosis = diagnoses.length > 0;
+
+  type Group = { className: string; count: number; reason: string };
+  const fallbackGroups: Group[] = (() => {
+    if (hasRichDiagnosis) return [];
+    const byClass = new Map<string, Group>();
+    for (const gap of dryRun.capacity_gaps) {
+      const g = byClass.get(gap.class_id) ?? {
+        className: gap.class_name,
+        count: 0,
+        reason: gap.reason,
+      };
+      g.count += 1;
+      byClass.set(gap.class_id, g);
+    }
+    return [...byClass.values()].sort((a, b) => b.count - a.count);
+  })();
 
   return (
-    <div className="border-border rounded-md border bg-rose-50/40 p-3 dark:bg-rose-950/20">
-      <div className="mb-2 flex items-baseline justify-between">
+    <div className="border-border space-y-3 rounded-md border bg-rose-50/40 p-3 dark:bg-rose-950/20">
+      <div className="flex items-baseline justify-between">
         <p className="text-foreground text-sm font-semibold">
           {total.toString()} session{total === 1 ? "" : "s"} can&apos;t fit
         </p>
@@ -383,29 +395,54 @@ function UnscheduledReasonsPanel({ dryRun }: { dryRun: ScheduleGenResult }) {
           From a dry-run of the actual scheduler. No rows were written.
         </p>
       </div>
-      <table className="w-full text-xs">
-        <thead className="text-muted-foreground">
-          <tr>
-            <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Class</th>
-            <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Unplaced</th>
-            <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Reason</th>
-          </tr>
-        </thead>
-        <tbody className="divide-border divide-y">
-          {groups.map((g) => (
-            <tr key={g.className}>
-              <td className="text-foreground px-2 py-1.5 font-medium">{g.className}</td>
-              <td className="text-foreground px-2 py-1.5 text-right tabular-nums">
-                {g.count.toString()}
-              </td>
-              <td className="text-muted-foreground px-2 py-1.5">{g.reason}</td>
-            </tr>
+
+      {hasRichDiagnosis && headline && (
+        <div className="flex items-start gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-2.5 dark:border-emerald-700 dark:bg-emerald-950/30">
+          <LightBulbIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div className="text-xs text-emerald-900 dark:text-emerald-100">
+            <p className="font-semibold">Biggest unlock</p>
+            <p className="mt-0.5 leading-snug">
+              {headline.recommendedFix}{" "}
+              <span className="text-emerald-700/80 dark:text-emerald-200/80">
+                Would place {headline.sessionsUnblocked.toString()} of {total.toString()} sessions.
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {hasRichDiagnosis ? (
+        <ul className="space-y-2">
+          {diagnoses.map((d) => (
+            <DiagnosisCard key={d.classId} d={d} />
           ))}
-        </tbody>
-      </table>
+        </ul>
+      ) : (
+        <table className="w-full text-xs">
+          <thead className="text-muted-foreground">
+            <tr>
+              <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Class</th>
+              <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Unplaced</th>
+              <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Reason</th>
+            </tr>
+          </thead>
+          <tbody className="divide-border divide-y">
+            {fallbackGroups.map((g) => (
+              <tr key={g.className}>
+                <td className="text-foreground px-2 py-1.5 font-medium">{g.className}</td>
+                <td className="text-foreground px-2 py-1.5 text-right tabular-nums">
+                  {g.count.toString()}
+                </td>
+                <td className="text-muted-foreground px-2 py-1.5">{g.reason}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
       {dryRun.recommendations && Object.keys(dryRun.recommendations).length > 0 && (
-        <div className="border-border mt-2 border-t pt-2 text-[11px]">
-          <p className="text-foreground mb-1 font-semibold">Quick fixes:</p>
+        <div className="border-border border-t pt-2 text-[11px]">
+          <p className="text-foreground mb-1 font-semibold">Aggregate quick fixes:</p>
           <ul className="text-muted-foreground list-disc space-y-0.5 pl-4">
             {dryRun.recommendations.trainers_to_add != null &&
               dryRun.recommendations.trainers_to_add > 0 && (
@@ -444,6 +481,44 @@ function UnscheduledReasonsPanel({ dryRun }: { dryRun: ScheduleGenResult }) {
       )}
     </div>
   );
+}
+
+function DiagnosisCard({ d }: { d: ClassDiagnosis }) {
+  return (
+    <li className="border-border bg-background rounded-md border p-2.5">
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <span className="text-foreground text-sm font-semibold">{d.className}</span>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {d.unplacedSessions.toString()} session{d.unplacedSessions === 1 ? "" : "s"} short
+        </span>
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+          {bottleneckLabel(d.bottleneck)}
+        </span>
+      </div>
+      <p className="text-foreground mt-1 text-xs leading-snug">{d.recommendedFix}</p>
+      {d.assignedTrainers.length > 0 && (
+        <p className="text-muted-foreground mt-1 text-[11px]">
+          Assigned trainers:{" "}
+          {d.assignedTrainers.map((t) => `${t.name} (${t.hoursPerWeek.toString()}h/wk)`).join(", ")}
+        </p>
+      )}
+    </li>
+  );
+}
+
+function bottleneckLabel(b: ClassDiagnosis["bottleneck"]): string {
+  switch (b) {
+    case "no_trainers_assigned":
+      return "no trainer";
+    case "no_eligible_room":
+      return "no room";
+    case "trainer_capacity":
+      return "trainer hours";
+    case "trainer_blocked":
+      return "anchor conflict";
+    case "room_busy_or_window":
+      return "room / window";
+  }
 }
 
 function VerdictBanner({ result }: { result: FeasibilityResult }) {

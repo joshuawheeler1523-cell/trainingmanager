@@ -282,6 +282,124 @@ describe("solve - infeasible reporting", () => {
   });
 });
 
+describe("solve - per-class diagnosis", () => {
+  it("flags no_trainers_assigned when the class has an empty slate", () => {
+    const result = solve(makeInput({ classTrainers: [] }));
+    expect(result.diagnoses).toHaveLength(1);
+    const d = result.diagnoses[0];
+    expect(d?.bottleneck).toBe("no_trainers_assigned");
+    expect(d?.assignedTrainers).toHaveLength(0);
+    expect(d?.recommendedFix).toContain("Assign a trainer");
+    expect(d?.recommendedFix).toContain("Class A");
+  });
+
+  it("flags no_eligible_room when seat capacity falls short", () => {
+    const result = solve(
+      makeInput({
+        rooms: [makeRoom({ seat_capacity: 5 })],
+        classes: [makeClass({ expected_learners_per_session: 25, total_people_to_train: 25 })],
+      }),
+    );
+    expect(result.diagnoses).toHaveLength(1);
+    const d = result.diagnoses[0];
+    expect(d?.bottleneck).toBe("no_eligible_room");
+    expect(d?.requiredSeats).toBe(25);
+    expect(d?.eligibleRoomCount).toBe(0);
+    expect(d?.recommendedFix).toContain("25 seats");
+  });
+
+  it("flags no_eligible_room with equipment wording when seats fit but tags don't", () => {
+    const result = solve(
+      makeInput({
+        rooms: [makeRoom({ seat_capacity: 20, equipment_tags: [] })],
+        classes: [
+          makeClass({
+            expected_learners_per_session: 10,
+            total_people_to_train: 10,
+            required_equipment_tags: ["iv-pump", "manikin"],
+          }),
+        ],
+      }),
+    );
+    const d = result.diagnoses[0];
+    expect(d?.bottleneck).toBe("no_eligible_room");
+    expect(d?.recommendedFix).toContain("iv-pump");
+    expect(d?.recommendedFix).toContain("manikin");
+  });
+
+  it("flags trainer_capacity when hours needed exceeds slate's free time (non-anchor)", () => {
+    // 5 sessions × 2h = 10h needed. One trainer with 4h/wk × 1 wk window = 4h cap.
+    const result = solve(
+      makeInput({
+        windowStartDate: "2026-06-01",
+        windowEndDate: "2026-06-05",
+        cutoffDate: "2026-06-05",
+        trainers: [makeTrainer({ name: "Jane Doe", availability_hours_per_week: 4 })],
+        classes: [
+          makeClass({
+            name: "Inpatient Nurse",
+            hours_per_session: 2,
+            total_people_to_train: 50,
+          }),
+        ],
+      }),
+    );
+    const d = result.diagnoses.find((x) => x.className === "Inpatient Nurse");
+    expect(d?.bottleneck).toBe("trainer_capacity");
+    expect(d?.recommendedFix).toContain("Jane Doe");
+    expect(d?.recommendedFix).toContain("Add another trainer");
+  });
+
+  it("flags trainer_blocked when running in anchor mode", () => {
+    // Two trainers, both fully booked across the entire window (mimics anchor lock).
+    const result = solve(
+      makeInput({
+        trainers: [makeTrainer({ id: "t1" }), makeTrainer({ id: "t2" })],
+        classTrainers: [
+          { impl_class_id: "c1", impl_trainer_id: "t1" },
+          { impl_class_id: "c1", impl_trainer_id: "t2" },
+        ],
+        busyTrainers: [
+          ...trainerBusyAllDays("t1", "2026-06-01", "2026-06-12", "America/New_York"),
+          ...trainerBusyAllDays("t2", "2026-06-01", "2026-06-12", "America/New_York"),
+        ],
+        anchoredImplNames: ["LCMH Care Connect"],
+      }),
+    );
+    const d = result.diagnoses[0];
+    expect(d?.bottleneck).toBe("trainer_blocked");
+    expect(d?.recommendedFix).toContain("LCMH Care Connect");
+    expect(d?.recommendedFix).toContain("Add another trainer");
+  });
+
+  it("returns a headline_fix pointing at the class with the most unplaced sessions", () => {
+    // Two infeasible classes — one with 3 sessions, one with 1. Headline picks
+    // the 3-session one.
+    const input = makeInput({
+      classes: [
+        makeClass({ id: "cBig", name: "Big Class", total_people_to_train: 30 }), // 3 sessions
+        makeClass({ id: "cSmall", name: "Small Class", total_people_to_train: 10 }), // 1 session
+      ],
+      // No trainers assigned to either — both will fail with no_trainers_assigned.
+      classTrainers: [],
+    });
+    const result = solve(input);
+    expect(result.headlineFix).not.toBeNull();
+    expect(result.headlineFix?.classId).toBe("cBig");
+    expect(result.headlineFix?.sessionsUnblocked).toBe(3);
+    // Diagnoses come back sorted, most-unplaced first.
+    expect(result.diagnoses[0]?.classId).toBe("cBig");
+    expect(result.diagnoses[1]?.classId).toBe("cSmall");
+  });
+
+  it("returns no headline_fix or diagnoses on a clean run", () => {
+    const result = solve(makeInput());
+    expect(result.gaps).toHaveLength(0);
+    expect(result.diagnoses).toHaveLength(0);
+    expect(result.headlineFix).toBeNull();
+  });
+});
+
 describe("solve - room equipment", () => {
   it("only uses rooms whose equipment_tags are a superset of class.required_equipment_tags", () => {
     const input = makeInput({

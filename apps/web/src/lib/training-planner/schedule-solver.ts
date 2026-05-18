@@ -48,6 +48,17 @@
 import { fromCalendarLocal } from "@/lib/timezone";
 import type { ImplClass, ImplClassPrerequisite, ImplRoom, ImplTrainer } from "@arbor/shared";
 
+// ── Diagnosis types (per-class failure analysis) ────────────────────────────
+
+/** Classification of *why* a class's sessions couldn't be placed. Drives the
+ *  recommended-fix wording. Ordered roughly by how easy each is to identify. */
+export type DiagnosisBottleneck =
+  | "no_trainers_assigned" // class has empty trainer slate
+  | "no_eligible_room" // no room passes seat / equipment filter
+  | "trainer_capacity" // slate hours < hours this class needs
+  | "trainer_blocked" // slate has hours, but anchor / PTO / cross-impl eats them
+  | "room_busy_or_window"; // resources exist but the search couldn't find clean slots
+
 // ── Public types ────────────────────────────────────────────────────────────
 
 export type BusyInterval = {
@@ -101,6 +112,11 @@ export type SolverInput = {
    *  on top of new placements. Keyed `${trainerId}::${weekKey}` where
    *  weekKey is YYYY-W## (ISO week, Monday-anchored). */
   initialTrainerWeekHours: Record<string, number>;
+
+  /** Anchored impl display names. Empty / omitted = non-anchor run. Used
+   *  only to phrase diagnosis recommendations; the solver itself treats
+   *  anchor busy state via `busyTrainers` like any other commitment. */
+  anchoredImplNames?: string[];
 };
 
 export type Placement = {
@@ -123,9 +139,43 @@ export type Gap = {
   reason: string;
 };
 
+/** Per-class diagnosis aggregated from one or more Gaps. One row per class
+ *  that ended up with at least one unplaced session, with a recommended fix
+ *  written for a manager who needs to know what resource to add. */
+export type ClassDiagnosis = {
+  classId: string;
+  className: string;
+  unplacedSessions: number;
+  bottleneck: DiagnosisBottleneck;
+  /** Trainers currently assigned to this class. Empty when slate is empty. */
+  assignedTrainers: { id: string; name: string; hoursPerWeek: number }[];
+  /** Rooms that pass seat + equipment filter for this class. */
+  eligibleRoomCount: number;
+  /** Class's expected_learners_per_session (the seat floor). */
+  requiredSeats: number;
+  /** Equipment tags this class needs in its room. */
+  requiredEquipment: string[];
+  /** Trainer-hours still needed for the unplaced sessions. */
+  hoursNeeded: number;
+  /** One-sentence directive for the manager. */
+  recommendedFix: string;
+};
+
+/** The single fix that would unblock the most sessions. The UI shows this
+ *  as a headline above the per-class breakdown. Null when there are no gaps. */
+export type HeadlineFix = {
+  classId: string;
+  recommendedFix: string;
+  sessionsUnblocked: number;
+};
+
 export type SolverResult = {
   placements: Placement[];
   gaps: Gap[];
+  /** Per-class diagnoses, sorted by unplacedSessions descending. */
+  diagnoses: ClassDiagnosis[];
+  /** Highest-impact single fix, or null when no gaps exist. */
+  headlineFix: HeadlineFix | null;
   /** Total wall-clock ms taken inside solve(). */
   durationMs: number;
   /** True if the search hit the time budget before exhausting options.
@@ -702,6 +752,165 @@ function initialState(input: SolverInput): WorkingState {
   };
 }
 
+// ── Per-class diagnosis ─────────────────────────────────────────────────────
+
+/** Sum of hours each ISO-week-window busyTrainers interval contributes to a
+ *  trainer's used budget, clipped to the impl window. We use the *raw* hour
+ *  count (not weekly cap math) because the goal is to compare against
+ *  slate-wide capacity, not enforce the weekly rule a second time. */
+function busyHoursOnSlate(
+  slateIds: Set<string>,
+  intervals: BusyInterval[],
+  windowStartUtc: number,
+  windowEndUtc: number,
+): number {
+  let total = 0;
+  for (const iv of intervals) {
+    if (!slateIds.has(iv.resourceId)) continue;
+    const s = Math.max(new Date(iv.start).getTime(), windowStartUtc);
+    const e = Math.min(new Date(iv.end).getTime(), windowEndUtc);
+    if (e > s) total += (e - s) / 3_600_000;
+  }
+  return total;
+}
+
+function placedHoursOnSlate(slateIds: Set<string>, placements: Placement[]): number {
+  let total = 0;
+  for (const p of placements) {
+    if (!slateIds.has(p.trainerId)) continue;
+    total += (new Date(p.end).getTime() - new Date(p.start).getTime()) / 3_600_000;
+  }
+  return total;
+}
+
+function buildDiagnoses(
+  gaps: Gap[],
+  input: SolverInput,
+  placements: Placement[],
+): ClassDiagnosis[] {
+  if (gaps.length === 0) return [];
+
+  const classById = new Map(input.classes.map((c) => [c.id, c]));
+  const trainerById = new Map(input.trainers.map((t) => [t.id, t]));
+
+  const slateByClass = new Map<string, string[]>();
+  for (const ct of input.classTrainers) {
+    const list = slateByClass.get(ct.impl_class_id) ?? [];
+    list.push(ct.impl_trainer_id);
+    slateByClass.set(ct.impl_class_id, list);
+  }
+
+  const gapsByClass = new Map<string, Gap[]>();
+  for (const g of gaps) {
+    const list = gapsByClass.get(g.classId) ?? [];
+    list.push(g);
+    gapsByClass.set(g.classId, list);
+  }
+
+  // Window math — used for slate-hours-available estimation.
+  const windowStartUtc = parseUtcDate(input.windowStartDate).getTime();
+  const windowEndUtc = parseUtcDate(input.windowEndDate).getTime() + 86_400_000 - 1;
+  const windowWeeks = Math.max(
+    1,
+    Math.ceil((windowEndUtc - windowStartUtc + 1) / (7 * 86_400_000)),
+  );
+  const anchored = (input.anchoredImplNames?.length ?? 0) > 0;
+  const anchorNames = input.anchoredImplNames ?? [];
+
+  const diagnoses: ClassDiagnosis[] = [];
+
+  for (const [classId, classGaps] of gapsByClass) {
+    const cls = classById.get(classId);
+    if (!cls) continue;
+
+    const slateIds = slateByClass.get(classId) ?? [];
+    const slateTrainers = slateIds
+      .map((id) => trainerById.get(id))
+      .filter((t): t is ImplTrainer => !!t);
+    const assignedTrainers = slateTrainers.map((t) => ({
+      id: t.id,
+      name: t.name,
+      hoursPerWeek: t.availability_hours_per_week,
+    }));
+
+    const eligibleRooms = input.rooms.filter(
+      (r) =>
+        r.seat_capacity >= cls.expected_learners_per_session &&
+        tagSubset(cls.required_equipment_tags, r.equipment_tags),
+    );
+
+    const unplaced = classGaps.length;
+    const hoursNeeded = unplaced * cls.hours_per_session;
+    const requiredSeats = cls.expected_learners_per_session;
+    const requiredEquipment = cls.required_equipment_tags;
+
+    let bottleneck: DiagnosisBottleneck;
+    let recommendedFix: string;
+
+    if (slateIds.length === 0) {
+      bottleneck = "no_trainers_assigned";
+      recommendedFix = `Assign a trainer to "${cls.name}" — no trainers are in its slate.`;
+    } else if (eligibleRooms.length === 0) {
+      bottleneck = "no_eligible_room";
+      const seatsOk = input.rooms.some((r) => r.seat_capacity >= requiredSeats);
+      if (!seatsOk) {
+        recommendedFix = `Add a room with at least ${requiredSeats.toString()} seats — none of your rooms meet "${cls.name}"'s seat requirement.`;
+      } else if (requiredEquipment.length > 0) {
+        recommendedFix = `Add a room with equipment: ${requiredEquipment.join(", ")}. No configured room has the gear "${cls.name}" needs.`;
+      } else {
+        recommendedFix = `No room can host "${cls.name}" — review room day-of-week availability and the implementation window.`;
+      }
+    } else {
+      const slateIdSet = new Set(slateIds);
+      const slateCap = slateTrainers.reduce(
+        (acc, t) => acc + t.availability_hours_per_week * windowWeeks,
+        0,
+      );
+      const slateBusy = busyHoursOnSlate(
+        slateIdSet,
+        input.busyTrainers,
+        windowStartUtc,
+        windowEndUtc,
+      );
+      const slateUsed = placedHoursOnSlate(slateIdSet, placements);
+      const slateAvail = Math.max(0, slateCap - slateBusy - slateUsed);
+
+      const slateNames = assignedTrainers.map((t) => t.name).join(", ");
+
+      if (hoursNeeded > slateAvail && !anchored) {
+        bottleneck = "trainer_capacity";
+        recommendedFix = `Add another trainer to "${cls.name}". Its slate (${slateNames}) has only ~${slateAvail.toFixed(0)}h free in the window, but the ${unplaced.toString()} remaining session${unplaced === 1 ? "" : "s"} need ${hoursNeeded.toFixed(0)}h.`;
+      } else if (anchored) {
+        bottleneck = "trainer_blocked";
+        const anchorLabel =
+          anchorNames.length === 1
+            ? `the anchored impl (${anchorNames[0] ?? ""})`
+            : `the ${anchorNames.length.toString()} anchored impls`;
+        recommendedFix = `Trainers on "${cls.name}" (${slateNames}) are committed by ${anchorLabel} during the available slots. Add another trainer to this class, or un-anchor and broaden the window.`;
+      } else {
+        bottleneck = "room_busy_or_window";
+        recommendedFix = `Rooms big enough for "${cls.name}" (${requiredSeats.toString()}+ seats) are fully booked across the available days. Add another ${requiredSeats.toString()}+ seat room, or extend the window past ${input.windowEndDate}.`;
+      }
+    }
+
+    diagnoses.push({
+      classId,
+      className: cls.name,
+      unplacedSessions: unplaced,
+      bottleneck,
+      assignedTrainers,
+      eligibleRoomCount: eligibleRooms.length,
+      requiredSeats,
+      requiredEquipment,
+      hoursNeeded,
+      recommendedFix,
+    });
+  }
+
+  diagnoses.sort((a, b) => b.unplacedSessions - a.unplacedSessions);
+  return diagnoses;
+}
+
 function describeFailure(v: Variable, input: SolverInput): string {
   if (v.trainerSlate.length === 0) {
     return "No trainers assigned to this class";
@@ -785,9 +994,21 @@ export function solve(input: SolverInput, options: SolverOptions = {}): SolverRe
     }
   }
 
+  const diagnoses = buildDiagnoses(gaps, input, finalPlacements);
+  const headlineFix: HeadlineFix | null =
+    diagnoses.length > 0 && diagnoses[0]
+      ? {
+          classId: diagnoses[0].classId,
+          recommendedFix: diagnoses[0].recommendedFix,
+          sessionsUnblocked: diagnoses[0].unplacedSessions,
+        }
+      : null;
+
   return {
     placements: finalPlacements,
     gaps,
+    diagnoses,
+    headlineFix,
     durationMs: now() - startedAt,
     timedOut: abortFlag.timedOut,
   };

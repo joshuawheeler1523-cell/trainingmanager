@@ -14,7 +14,9 @@ import type { Database } from "@/lib/supabase/database.types";
 import {
   solve,
   type BusyInterval,
+  type ClassDiagnosis,
   type ClassTrainerLink,
+  type HeadlineFix,
   type Placement,
   type SolverInput,
 } from "./schedule-solver";
@@ -30,6 +32,11 @@ export type ScheduleRunResult = {
     session_index: number;
     reason: string;
   }[];
+  /** Per-class failure breakdown for the unplaced sessions. Empty when
+   *  capacity_gaps is empty. Sorted by sessions-unplaced descending. */
+  diagnoses: ClassDiagnosis[];
+  /** Single highest-impact fix to surface as a headline. Null when no gaps. */
+  headline_fix: HeadlineFix | null;
   recommendations?: {
     trainer_hours_per_week_to_add?: number;
     trainers_to_add?: number;
@@ -294,6 +301,7 @@ export async function runSchedule(
     busyTrainers,
     busyRooms,
     initialTrainerWeekHours,
+    anchoredImplNames: anchorImplNames.map((a) => a.name),
   };
 
   const solverResult = solve(solverInput);
@@ -359,6 +367,8 @@ export async function runSchedule(
       session_index: g.sessionIndex,
       reason: g.reason,
     })),
+    diagnoses: solverResult.diagnoses,
+    headline_fix: solverResult.headlineFix,
     anchor_impls: anchorImplNames,
     aborted,
   };

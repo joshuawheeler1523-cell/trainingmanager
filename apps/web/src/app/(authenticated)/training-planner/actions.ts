@@ -30,6 +30,7 @@ import {
 } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 import { runSchedule } from "@/lib/training-planner/schedule-runner";
+import type { ClassDiagnosis, HeadlineFix } from "@/lib/training-planner/schedule-solver";
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -1079,6 +1080,11 @@ export type ScheduleGenResult = {
   sessions: number;
   conflicts: number;
   capacity_gaps: { class_id: string; class_name: string; session_index: number; reason: string }[];
+  // Per-class bottleneck breakdown with a recommended fix per row, plus a
+  // headline call-out for the single fix that would unblock the most
+  // sessions. Empty / null when nothing failed to place.
+  diagnoses: ClassDiagnosis[];
+  headline_fix: HeadlineFix | null;
   // Populated by the generator when capacity_gaps is non-empty. All fields
   // are optional because the SQL may emit an empty object {} when the
   // aggregate deficit isn't positive (e.g., gap is due to weekly distribution

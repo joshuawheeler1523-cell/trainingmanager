@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ExclamationTriangleIcon,
+  LightBulbIcon,
   LockClosedIcon,
   SparklesIcon,
   XCircleIcon,
 } from "@heroicons/react/20/solid";
 import { generateSchedule, type ScheduleGenResult } from "../../actions";
+import type { ClassDiagnosis } from "@/lib/training-planner/schedule-solver";
 
 // Other live impls in the same org that the planner can anchor against.
 // Passed from the Calculate page server loader. Anchoring an impl tells
@@ -189,73 +191,110 @@ export default function GenerateButton({
             </p>
           )}
 
-          {result.capacity_gaps.length > 0 && (
-            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950/30">
-              <div className="flex items-start gap-2">
-                <ExclamationTriangleIcon className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                <div className="text-xs text-amber-900 dark:text-amber-200">
-                  <p className="font-semibold">
-                    {aborted ? "Why it couldn't fit" : "Capacity gaps"}
-                  </p>
-                  <ul className="mt-1 space-y-0.5">
-                    {result.capacity_gaps.slice(0, 10).map((g, i) => (
-                      <li key={i}>
-                        <span className="font-medium">{g.class_name}</span> · session{" "}
-                        {g.session_index.toString()} — {g.reason}
-                      </li>
-                    ))}
-                    {result.capacity_gaps.length > 10 && (
-                      <li className="italic">
-                        …{(result.capacity_gaps.length - 10).toString()} more
-                      </li>
-                    )}
-                  </ul>
-                  {result.recommendations && Object.keys(result.recommendations).length > 0 && (
-                    <div className="mt-2">
-                      <p className="font-semibold">To close the gap, pick one:</p>
-                      <ul className="mt-1 space-y-0.5">
-                        {result.recommendations.trainers_to_add != null &&
-                          result.recommendations.trainers_to_add > 0 && (
-                            <li>
-                              • Add{" "}
-                              <span className="font-medium tabular-nums">
-                                {result.recommendations.trainers_to_add.toString()}
-                              </span>{" "}
-                              more trainer
-                              {result.recommendations.trainers_to_add === 1 ? "" : "s"}.
-                            </li>
-                          )}
-                        {result.recommendations.trainer_hours_per_week_to_add != null &&
-                          result.recommendations.trainer_hours_per_week_to_add > 0 && (
-                            <li>
-                              • Add{" "}
-                              <span className="font-medium tabular-nums">
-                                {result.recommendations.trainer_hours_per_week_to_add.toString()}{" "}
-                                h/wk
-                              </span>{" "}
-                              of trainer capacity across the team.
-                            </li>
-                          )}
-                        {result.recommendations.weeks_to_extend != null &&
-                          result.recommendations.weeks_to_extend > 0 && (
-                            <li>
-                              • Extend the window by{" "}
-                              <span className="font-medium tabular-nums">
-                                {result.recommendations.weeks_to_extend.toString()} week
-                                {result.recommendations.weeks_to_extend === 1 ? "" : "s"}
-                              </span>
-                              .
-                            </li>
-                          )}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+          {result.capacity_gaps.length > 0 && <DiagnosisPanel result={result} aborted={aborted} />}
         </div>
       )}
     </div>
   );
+}
+
+function DiagnosisPanel({ result, aborted }: { result: ScheduleGenResult; aborted: boolean }) {
+  // Prefer the rich per-class diagnoses when the in-process solver populated
+  // them. Fall back to the old per-session list when the dry-run came back
+  // from the legacy SQL RPC, which doesn't emit diagnoses.
+  const diagnoses = result.diagnoses;
+  const headline = result.headline_fix;
+  const hasRichDiagnosis = diagnoses.length > 0;
+
+  return (
+    <div className="space-y-2">
+      {hasRichDiagnosis && headline && (
+        <div className="rounded-md border border-emerald-300 bg-emerald-50 p-3 dark:border-emerald-700 dark:bg-emerald-950/30">
+          <div className="flex items-start gap-2">
+            <LightBulbIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <div className="text-xs text-emerald-900 dark:text-emerald-100">
+              <p className="font-semibold">Biggest unlock</p>
+              <p className="mt-0.5">
+                {headline.recommendedFix}{" "}
+                <span className="text-emerald-700/80 dark:text-emerald-200/80">
+                  Would place {headline.sessionsUnblocked.toString()} of{" "}
+                  {result.capacity_gaps.length.toString()} unscheduled sessions.
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-md border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950/30">
+        <div className="flex items-start gap-2">
+          <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="w-full text-xs text-amber-900 dark:text-amber-200">
+            <p className="font-semibold">{aborted ? "Why it couldn't fit" : "Capacity gaps"}</p>
+            {hasRichDiagnosis ? (
+              <ul className="mt-1.5 space-y-2">
+                {diagnoses.map((d) => (
+                  <DiagnosisRow key={d.classId} d={d} />
+                ))}
+              </ul>
+            ) : (
+              <>
+                <ul className="mt-1 space-y-0.5">
+                  {result.capacity_gaps.slice(0, 10).map((g, i) => (
+                    <li key={i}>
+                      <span className="font-medium">{g.class_name}</span> · session{" "}
+                      {g.session_index.toString()} — {g.reason}
+                    </li>
+                  ))}
+                  {result.capacity_gaps.length > 10 && (
+                    <li className="italic">
+                      …{(result.capacity_gaps.length - 10).toString()} more
+                    </li>
+                  )}
+                </ul>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DiagnosisRow({ d }: { d: ClassDiagnosis }) {
+  return (
+    <li>
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <span className="font-semibold">{d.className}</span>
+        <span className="tabular-nums text-amber-700/80 dark:text-amber-200/80">
+          {d.unplacedSessions.toString()} session{d.unplacedSessions === 1 ? "" : "s"} short
+        </span>
+        <span className="text-[10px] uppercase tracking-wide text-amber-700/70 dark:text-amber-200/70">
+          {bottleneckLabel(d.bottleneck)}
+        </span>
+      </div>
+      <p className="mt-0.5 leading-snug">{d.recommendedFix}</p>
+      {d.assignedTrainers.length > 0 && (
+        <p className="mt-0.5 text-[11px] text-amber-700/70 dark:text-amber-200/70">
+          Assigned:{" "}
+          {d.assignedTrainers.map((t) => `${t.name} (${t.hoursPerWeek.toString()}h/wk)`).join(", ")}
+        </p>
+      )}
+    </li>
+  );
+}
+
+function bottleneckLabel(b: ClassDiagnosis["bottleneck"]): string {
+  switch (b) {
+    case "no_trainers_assigned":
+      return "no trainer";
+    case "no_eligible_room":
+      return "no room";
+    case "trainer_capacity":
+      return "trainer hours";
+    case "trainer_blocked":
+      return "anchor conflict";
+    case "room_busy_or_window":
+      return "room / window";
+  }
 }
