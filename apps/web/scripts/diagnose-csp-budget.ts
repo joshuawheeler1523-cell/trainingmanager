@@ -25,7 +25,6 @@ import { runSchedule } from "../src/lib/training-planner/schedule-runner";
 import type { Database } from "../src/lib/supabase/database.types";
 
 const DCH_IMPL_ID = "6d8c55e6-ab18-44d5-aa87-bb3f44281518";
-const LCMH_IMPL_ID = "7d3fb2a5-2c83-4990-adce-d023093df0da";
 const ORG_ID = "d6aa953c-e76d-4ef4-892d-3fa2869dde13";
 const DEPT_ID = "40f2a06b-07dd-470a-9819-f8e890f1a26c";
 
@@ -62,20 +61,10 @@ async function main() {
   console.log("CSP SOLVER DIAGNOSTIC — DCH Care Connect");
   console.log("=".repeat(70));
 
-  type Run = { label: string; anchors: string[]; budgetMs: number };
+  type Run = { label: string; budgetMs: number };
   const runs: Run[] = [
-    { label: "NO ANCHOR · 5s budget (production default)", anchors: [], budgetMs: 5_000 },
-    { label: "NO ANCHOR · 3min budget", anchors: [], budgetMs: LONG_BUDGET_MS },
-    {
-      label: "ANCHORED to LCMH · 5s budget (production default)",
-      anchors: [LCMH_IMPL_ID],
-      budgetMs: 5_000,
-    },
-    {
-      label: "ANCHORED to LCMH · 3min budget",
-      anchors: [LCMH_IMPL_ID],
-      budgetMs: LONG_BUDGET_MS,
-    },
+    { label: "5s budget (production default)", budgetMs: 5_000 },
+    { label: "3min budget", budgetMs: LONG_BUDGET_MS },
   ];
 
   for (const r of runs) {
@@ -84,7 +73,7 @@ async function main() {
     console.log("-".repeat(70));
 
     const started = Date.now();
-    const result = await runSchedule(supabase, ORG_ID, DEPT_ID, DCH_IMPL_ID, r.anchors, {
+    const result = await runSchedule(supabase, ORG_ID, DEPT_ID, DCH_IMPL_ID, {
       dryRun: true,
       solverOptions: { timeBudgetMs: r.budgetMs },
     });
@@ -99,7 +88,6 @@ async function main() {
     console.log(
       `  Placed:     ${d.sessions.toString()} sessions  ·  Gaps: ${d.conflicts.toString()}`,
     );
-    if (d.aborted) console.log(`  ABORTED (anchor mode atomic abort — drafts preserved)`);
 
     if (d.diagnoses.length > 0) {
       console.log(`  Per-class bottlenecks:`);
@@ -118,23 +106,10 @@ async function main() {
   console.log("INTERPRETATION");
   console.log("=".repeat(70));
   console.log(`
-  • If the 3min runs place SIGNIFICANTLY MORE than the 5s runs:
-    ALGORITHM WEAKNESS — the solver was timing out. CP-SAT / OR-Tools
-    or a JS hardening pass (MRV + forward checking) would fix this.
-
-  • If the 3min runs place the SAME or just a tiny bit more:
-    MODEL BUG — a constraint is wrongly blocking slots. The engine
-    has explored exhaustively and concluded infeasibility. Audit:
-    anchor busy intervals, cross-impl shared-instructor matching,
-    PTO clipping, business-hours/lunch math, prereq earliest-start.
-
-  • If anchored 3min ≈ non-anchored 3min: anchor mode is fine and
-    the bottleneck is something this impl shares regardless of
-    anchor — likely a room or constraint issue.
-
-  • If anchored 3min has WAY more gaps than non-anchored 3min: the
-    anchor is the load-bearing constraint. The cross-impl trainer
-    matching may be over-blocking.
+  Single-project mode (post anchor-mode removal). If 5s places everything,
+  the solver is healthy. If gaps appear, check the per-class bottleneck —
+  room_capacity means add a room, trainer_capacity means add a trainer,
+  no_eligible_room / no_trainers means a class is missing setup.
   `);
 }
 

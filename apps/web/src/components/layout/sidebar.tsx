@@ -17,7 +17,6 @@ import {
   CalendarDaysIcon,
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
-  ExclamationTriangleIcon,
   Cog6ToothIcon,
   WrenchScrewdriverIcon,
   Bars3Icon,
@@ -58,7 +57,7 @@ function teamGroup(modules: ModuleFlags): NavGroup {
   return { title: "Team", items };
 }
 
-function workGroup(modules: ModuleFlags, conflictCount: number): NavGroup {
+function workGroup(modules: ModuleFlags): NavGroup {
   const items: NavItem[] = [
     { href: "/allocations", label: "Allocations", icon: AdjustmentsHorizontalIcon },
     { href: "/tras", label: "Work Intake", icon: ClipboardDocumentListIcon },
@@ -69,14 +68,6 @@ function workGroup(modules: ModuleFlags, conflictCount: number): NavGroup {
   items.push({ href: "/projects", label: "Special Projects", icon: BriefcaseIcon });
   if (modules["module.training_planner"]) {
     items.push({ href: "/training-planner", label: "Training Planner", icon: CalendarDaysIcon });
-    if (conflictCount > 0) {
-      items.push({
-        href: "/training-planner/conflicts",
-        label: "Conflicts",
-        icon: ExclamationTriangleIcon,
-        badge: conflictCount,
-      });
-    }
   }
   items.push({ href: "/one-on-ones", label: "1:1s", icon: ChatBubbleLeftRightIcon });
   return { title: "Work", items };
@@ -166,17 +157,15 @@ function NavGroupBlock({
 function SidebarContent({
   isAdmin,
   modules,
-  conflictCount,
   onNavigate,
 }: {
   isAdmin: boolean;
   modules: ModuleFlags;
-  conflictCount: number;
   onNavigate?: (() => void) | undefined;
 }) {
   const pathname = usePathname();
   const team = teamGroup(modules);
-  const work = workGroup(modules, conflictCount);
+  const work = workGroup(modules);
   return (
     <>
       <div className="border-border flex h-16 shrink-0 items-center border-b px-4">
@@ -231,32 +220,16 @@ function SidebarContent({
 }
 
 /** Desktop sidebar — visible on md+, sticky full-height. */
-export function DesktopSidebar({
-  isAdmin,
-  modules,
-  conflictCount = 0,
-}: {
-  isAdmin: boolean;
-  modules: ModuleFlags;
-  conflictCount?: number;
-}) {
+export function DesktopSidebar({ isAdmin, modules }: { isAdmin: boolean; modules: ModuleFlags }) {
   return (
     <aside className="border-border bg-background sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r md:flex">
-      <SidebarContent isAdmin={isAdmin} modules={modules} conflictCount={conflictCount} />
+      <SidebarContent isAdmin={isAdmin} modules={modules} />
     </aside>
   );
 }
 
 /** Mobile drawer — hamburger trigger + slide-in panel. */
-export function MobileSidebar({
-  isAdmin,
-  modules,
-  conflictCount = 0,
-}: {
-  isAdmin: boolean;
-  modules: ModuleFlags;
-  conflictCount?: number;
-}) {
+export function MobileSidebar({ isAdmin, modules }: { isAdmin: boolean; modules: ModuleFlags }) {
   const [open, setOpen] = useState(false);
   const close = () => {
     setOpen(false);
@@ -286,12 +259,7 @@ export function MobileSidebar({
               <XMarkIcon className="h-5 w-5" />
             </button>
           </Dialog.Close>
-          <SidebarContent
-            isAdmin={isAdmin}
-            modules={modules}
-            conflictCount={conflictCount}
-            onNavigate={close}
-          />
+          <SidebarContent isAdmin={isAdmin} modules={modules} onNavigate={close} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

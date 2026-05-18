@@ -1,10 +1,12 @@
-// Orchestrator that runs the CSP solver against the live database.
+// Orchestrator that runs the CSP solver against the live database for a
+// single implementation.
 //
 // Pulls everything the solver needs in one batch of queries, builds the
-// SolverInput, runs solve(), and (when not a dry-run, and when not an
-// anchor-with-gaps abort) replaces the impl's draft sessions with the
-// solver's placements. Returns the same ScheduleGenResult shape the old
-// pl/pgSQL RPC produced so the UI doesn't have to change.
+// SolverInput, runs solve(), and (when not a dry-run) replaces the impl's
+// draft sessions with the solver's placements. Multi-project / anchor /
+// cross-impl coordination was removed in favour of single-project mode —
+// each implementation is sovereign. If two impls share trainers, the
+// hospital coordinates manually outside the app.
 
 import "server-only";
 
@@ -43,8 +45,6 @@ export type ScheduleRunResult = {
     trainers_to_add?: number;
     weeks_to_extend?: number;
   };
-  anchor_impls?: { id: string; name: string }[];
-  aborted?: boolean;
 };
 
 export async function runSchedule(
@@ -52,7 +52,6 @@ export async function runSchedule(
   orgId: string,
   departmentId: string,
   implementationId: string,
-  anchorImpls: string[],
   options: { dryRun: boolean; solverOptions?: SolverOptions },
 ): Promise<
   { ok: true; data: ScheduleRunResult } | { ok: false; error: { code: string; message: string } }
@@ -79,8 +78,7 @@ export async function runSchedule(
     "America/New_York";
 
   // Cutoff: min(window_end, go_live - buffer_days). If that runs before
-  // window_start, push it back by a day so the date range is just empty
-  // (mirrors the SQL).
+  // window_start, push it back by a day so the date range is just empty.
   const cutoffDate = computeCutoff(
     impl.window_start_date,
     impl.window_end_date,
@@ -88,7 +86,8 @@ export async function runSchedule(
     impl.go_live_buffer_days,
   );
 
-  // 2. Load resources in parallel.
+  // 2. Load resources in parallel. Only this impl's data — no cross-impl
+  // joins.
   const [
     { data: rooms, error: roomsErr },
     { data: trainers, error: trainersErr },
@@ -148,13 +147,13 @@ export async function runSchedule(
   const ptoList = pto ?? [];
   const publishedSelfList = publishedSelf ?? [];
 
-  // 3. Build busy intervals + initial weekly hours.
+  // 3. Build busy intervals + initial weekly hours from same-impl
+  // published sessions and our trainers' PTO. That's it — nothing
+  // cross-impl.
   const busyTrainers: BusyInterval[] = [];
   const busyRooms: BusyInterval[] = [];
   const initialTrainerWeekHours: Record<string, number> = {};
 
-  // Same-impl published sessions: take seats on both trainer and room
-  // and burn weekly hours for the trainer.
   const ourTrainerIds = new Set(trainerList.map((t) => t.id));
   for (const s of publishedSelfList) {
     if (s.impl_trainer_id) {
@@ -180,7 +179,6 @@ export async function runSchedule(
     }
   }
 
-  // PTO: only our trainers'.
   for (const u of ptoList) {
     if (!ourTrainerIds.has(u.impl_trainer_id)) continue;
     busyTrainers.push({
@@ -188,96 +186,6 @@ export async function runSchedule(
       start: u.starts_at,
       end: u.ends_at,
     });
-  }
-
-  // Cross-impl busy: for each of our trainers with an instructor_id,
-  // pull every published session in other live impls where the OTHER
-  // impl's trainer shares that instructor_id. Plus anchor-mode draft
-  // sessions in the explicitly anchored impls.
-  const ourInstructorIds = new Set<string>();
-  const trainerByInstructorId = new Map<string, string>();
-  for (const t of trainerList) {
-    if (t.instructor_id) {
-      ourInstructorIds.add(t.instructor_id);
-      trainerByInstructorId.set(t.instructor_id, t.id);
-    }
-  }
-
-  let anchorImplNames: { id: string; name: string }[] = [];
-  if (ourInstructorIds.size > 0) {
-    // Cross-impl always-on: PUBLISHED sessions in other live impls.
-    const { data: crossPub, error: crossErr } = await supabase
-      .from("impl_sessions")
-      .select(
-        "scheduled_start, scheduled_end, implementation_id, impl_trainers!inner(instructor_id), implementations!inner(org_id, deleted_at, status)",
-      )
-      .neq("implementation_id", implementationId)
-      .eq("status", "published")
-      .in("impl_trainers.instructor_id", Array.from(ourInstructorIds));
-    if (crossErr) return { ok: false, error: { code: crossErr.code, message: crossErr.message } };
-
-    for (const s of crossPub as unknown as {
-      scheduled_start: string;
-      scheduled_end: string;
-      impl_trainers: { instructor_id: string | null };
-      implementations: { org_id: string; deleted_at: string | null; status: string };
-    }[]) {
-      if (s.implementations.org_id !== orgId) continue;
-      if (s.implementations.deleted_at) continue;
-      if (["cancelled", "archived"].includes(s.implementations.status)) continue;
-      const instructorId = s.impl_trainers.instructor_id;
-      if (!instructorId) continue;
-      const myTrainerId = trainerByInstructorId.get(instructorId);
-      if (!myTrainerId) continue;
-      busyTrainers.push({
-        resourceId: myTrainerId,
-        start: s.scheduled_start,
-        end: s.scheduled_end,
-      });
-    }
-
-    // Anchor pre-seed: DRAFT + PUBLISHED sessions in explicitly anchored impls.
-    if (anchorImpls.length > 0) {
-      const { data: anchorSessions, error: anchorErr } = await supabase
-        .from("impl_sessions")
-        .select(
-          "scheduled_start, scheduled_end, implementation_id, impl_trainers!inner(instructor_id), implementations!inner(org_id, deleted_at, name)",
-        )
-        .in("implementation_id", anchorImpls)
-        .neq("implementation_id", implementationId)
-        .in("status", ["draft", "published"])
-        .in("impl_trainers.instructor_id", Array.from(ourInstructorIds));
-      if (anchorErr)
-        return { ok: false, error: { code: anchorErr.code, message: anchorErr.message } };
-      for (const s of anchorSessions as unknown as {
-        scheduled_start: string;
-        scheduled_end: string;
-        impl_trainers: { instructor_id: string | null };
-        implementations: { org_id: string; deleted_at: string | null; name: string };
-      }[]) {
-        if (s.implementations.org_id !== orgId) continue;
-        if (s.implementations.deleted_at) continue;
-        const instructorId = s.impl_trainers.instructor_id;
-        if (!instructorId) continue;
-        const myTrainerId = trainerByInstructorId.get(instructorId);
-        if (!myTrainerId) continue;
-        busyTrainers.push({
-          resourceId: myTrainerId,
-          start: s.scheduled_start,
-          end: s.scheduled_end,
-        });
-      }
-
-      // Collect anchor impl names for the result, sorted.
-      const { data: anchorNameRows } = await supabase
-        .from("implementations")
-        .select("id, name")
-        .in("id", anchorImpls)
-        .eq("org_id", orgId);
-      anchorImplNames = ((anchorNameRows ?? []) as { id: string; name: string }[])
-        .filter((a) => a.id !== implementationId)
-        .sort((a, b) => a.name.localeCompare(b.name));
-    }
   }
 
   // 4. Run the solver.
@@ -302,12 +210,11 @@ export async function runSchedule(
     busyTrainers,
     busyRooms,
     initialTrainerWeekHours,
-    anchoredImplNames: anchorImplNames.map((a) => a.name),
   };
 
   const solverResult = solve(solverInput, options.solverOptions ?? {});
 
-  // 5. Recommendations math (matches the old SQL deficit formula).
+  // 5. Aggregate recommendations (same math as before).
   const windowWeeks = Math.max(
     1,
     Math.ceil(
@@ -343,12 +250,9 @@ export async function runSchedule(
     };
   }
 
-  // 6. Decide whether to commit.
-  const anchorMode = anchorImpls.length > 0;
-  const aborted = anchorMode && solverResult.gaps.length > 0;
-  const shouldCommit = !options.dryRun && !aborted;
-
-  if (shouldCommit) {
+  // 6. Commit unless this is a dry-run. No atomic-abort gymnastics —
+  // we always replace this impl's drafts with the solver's best plan.
+  if (!options.dryRun) {
     const writeResult = await writePlacements(
       supabase,
       orgId,
@@ -360,7 +264,7 @@ export async function runSchedule(
   }
 
   const data: ScheduleRunResult = {
-    sessions: aborted ? 0 : solverResult.placements.length,
+    sessions: solverResult.placements.length,
     conflicts: solverResult.gaps.length,
     capacity_gaps: solverResult.gaps.map((g) => ({
       class_id: g.classId,
@@ -370,8 +274,6 @@ export async function runSchedule(
     })),
     diagnoses: solverResult.diagnoses,
     headline_fix: solverResult.headlineFix,
-    anchor_impls: anchorImplNames,
-    aborted,
   };
   if (recommendations) data.recommendations = recommendations;
   return { ok: true, data };

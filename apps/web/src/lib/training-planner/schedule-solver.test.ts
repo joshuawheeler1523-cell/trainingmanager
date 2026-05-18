@@ -350,28 +350,6 @@ describe("solve - per-class diagnosis", () => {
     expect(d?.recommendedFix).toContain("Add another trainer");
   });
 
-  it("flags trainer_blocked when running in anchor mode", () => {
-    // Two trainers, both fully booked across the entire window (mimics anchor lock).
-    const result = solve(
-      makeInput({
-        trainers: [makeTrainer({ id: "t1" }), makeTrainer({ id: "t2" })],
-        classTrainers: [
-          { impl_class_id: "c1", impl_trainer_id: "t1" },
-          { impl_class_id: "c1", impl_trainer_id: "t2" },
-        ],
-        busyTrainers: [
-          ...trainerBusyAllDays("t1", "2026-06-01", "2026-06-12", "America/New_York"),
-          ...trainerBusyAllDays("t2", "2026-06-01", "2026-06-12", "America/New_York"),
-        ],
-        anchoredImplNames: ["LCMH Care Connect"],
-      }),
-    );
-    const d = result.diagnoses[0];
-    expect(d?.bottleneck).toBe("trainer_blocked");
-    expect(d?.recommendedFix).toContain("LCMH Care Connect");
-    expect(d?.recommendedFix).toContain("Add another trainer");
-  });
-
   it("returns a headline_fix pointing at the class with the most unplaced sessions", () => {
     // Two infeasible classes — one with 3 sessions, one with 1. Headline picks
     // the 3-session one.
@@ -399,7 +377,7 @@ describe("solve - per-class diagnosis", () => {
     expect(result.headlineFix).toBeNull();
   });
 
-  it("flags room_capacity (NOT trainer_blocked) when a single large room is contended in anchor mode", () => {
+  it("flags room_capacity when a single large room is contended by multiple big classes", () => {
     // Mirrors a real user scenario: 1 big room (18 seats) is the only one
     // that can host multiple large classes. Trainers have plenty of free
     // time. Without the room-bottleneck detection this would have been
@@ -463,10 +441,8 @@ describe("solve - per-class diagnosis", () => {
           { impl_class_id: "ednurse", impl_trainer_id: "pt3" },
           { impl_class_id: "ednurse", impl_trainer_id: "pt11" },
         ],
-        anchoredImplNames: ["LCMH Care Connect"],
-        // Light anchor commitments on trainers so they're not the bottleneck
-        // — just enough busy time to push utilization off zero but well
-        // below capacity.
+        // Light PTO so trainers aren't trivially infinite, but well under
+        // capacity — rooms should be the binding constraint.
         busyTrainers: [
           { resourceId: "pt3", start: "2026-09-01T13:00:00Z", end: "2026-09-01T17:00:00Z" },
           { resourceId: "pt11", start: "2026-09-02T13:00:00Z", end: "2026-09-02T17:00:00Z" },

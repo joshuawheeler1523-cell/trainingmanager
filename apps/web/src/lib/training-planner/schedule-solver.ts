@@ -57,7 +57,6 @@ export type DiagnosisBottleneck =
   | "no_eligible_room" // no room passes seat / equipment filter
   | "room_capacity" // eligible rooms saturated — forced demand > pool hours, no smaller-room fallback
   | "trainer_capacity" // slate hours < hours this class needs
-  | "trainer_blocked" // slate has hours, but anchor / PTO / cross-impl eats them
   | "room_busy_or_window"; // resources exist but the search couldn't find clean slots
 
 // ── Public types ────────────────────────────────────────────────────────────
@@ -101,23 +100,16 @@ export type SolverInput = {
   classTrainers: ClassTrainerLink[];
   prerequisites: ImplClassPrerequisite[];
 
-  /** Trainer busy intervals: anchor impls, cross-impl publishings, PTO,
-   *  and same-impl already-published sessions. The solver treats these
-   *  as immovable. */
+  /** Trainer busy intervals: PTO and same-impl already-published sessions.
+   *  The solver treats these as immovable. */
   busyTrainers: BusyInterval[];
-  /** Room busy intervals: typically same-impl already-published
-   *  sessions. */
+  /** Room busy intervals: same-impl already-published sessions. */
   busyRooms: BusyInterval[];
   /** Per-trainer hours already burned in each ISO week by published
    *  same-impl sessions. Used to enforce availability_hours_per_week
    *  on top of new placements. Keyed `${trainerId}::${weekKey}` where
    *  weekKey is YYYY-W## (ISO week, Monday-anchored). */
   initialTrainerWeekHours: Record<string, number>;
-
-  /** Anchored impl display names. Empty / omitted = non-anchor run. Used
-   *  only to phrase diagnosis recommendations; the solver itself treats
-   *  anchor busy state via `busyTrainers` like any other commitment. */
-  anchoredImplNames?: string[];
 };
 
 export type Placement = {
@@ -844,8 +836,6 @@ function buildDiagnoses(
     1,
     Math.ceil((windowEndUtc - windowStartUtc + 1) / (7 * 86_400_000)),
   );
-  const anchored = (input.anchoredImplNames?.length ?? 0) > 0;
-  const anchorNames = input.anchoredImplNames ?? [];
 
   const diagnoses: ClassDiagnosis[] = [];
 
@@ -945,26 +935,14 @@ function buildDiagnoses(
 
       const slateNames = assignedTrainers.map((t) => t.name).join(", ");
       const eligibleRoomNames = eligibleRooms.map((r) => r.name).join(", ");
-      const anchorLabel =
-        anchorNames.length === 1
-          ? `the anchored impl (${anchorNames[0] ?? ""})`
-          : `the ${anchorNames.length.toString()} anchored impls`;
 
       // ── Bottleneck classification ──
       //
-      // Priority is INTENTIONALLY: room_capacity BEFORE trainer_*. Hiring a
-      // trainer when rooms are the constraint is expensive and unhelpful —
-      // we want the message to clearly disambiguate.
-      //
-      // Decision rules:
-      //   1. If room saturation >= 50% AND room ratio >= slate ratio → rooms
-      //   2. If slate is over capacity (>100%) and not in anchor mode → trainers
-      //   3. If anchor mode AND slate is at all stretched (>70%) → anchor
-      //   4. Anchor mode catch-all → anchor
-      //   5. Non-anchor catch-all → room_busy_or_window
+      // Priority is INTENTIONALLY: room_capacity BEFORE trainer_capacity.
+      // Hiring a trainer when rooms are the constraint is expensive and
+      // unhelpful — we want the message to clearly disambiguate.
       const roomIsTighter = roomRatio >= slateRatio && roomRatio >= 0.5;
       const slateIsOverbooked = slateRatio > 1.0;
-      const slateIsStretched = slateRatio > 0.7;
 
       if (roomIsTighter) {
         bottleneck = "room_capacity";
@@ -977,18 +955,9 @@ function buildDiagnoses(
           fix += ` Trainers are NOT the bottleneck — assigned trainers (${slateNames}) have ~${slateAvail.toFixed(0)}h free vs ${hoursNeeded.toFixed(0)}h needed for this class. Adding trainers will not help; fix the room.`;
         }
         recommendedFix = fix;
-      } else if (slateIsOverbooked && !anchored) {
+      } else if (slateIsOverbooked) {
         bottleneck = "trainer_capacity";
         recommendedFix = `Add another trainer to "${cls.name}". Its slate (${slateNames}) has only ~${slateAvail.toFixed(0)}h free in the window, but the ${unplaced.toString()} remaining session${unplaced === 1 ? "" : "s"} need ${hoursNeeded.toFixed(0)}h.`;
-      } else if (anchored && slateIsStretched) {
-        bottleneck = "trainer_blocked";
-        recommendedFix = `Trainers on "${cls.name}" (${slateNames}) are committed by ${anchorLabel} during the available slots — only ~${slateAvail.toFixed(0)}h free vs ${hoursNeeded.toFixed(0)}h needed. Add another trainer to this class, or un-anchor and broaden the window.`;
-      } else if (anchored) {
-        // Anchor mode catch-all: scheduling failed but no single resource is
-        // obviously tight. Likely the anchor's session timing collides with
-        // when this class's resources would otherwise be free.
-        bottleneck = "trainer_blocked";
-        recommendedFix = `"${cls.name}" couldn't be placed alongside ${anchorLabel}. Trainers (${slateNames}) and rooms (${eligibleRoomNames}) have hours, but their free time doesn't line up. Try un-anchoring or extending the window past ${input.windowEndDate}.`;
       } else {
         bottleneck = "room_busy_or_window";
         recommendedFix = `Rooms big enough for "${cls.name}" (${requiredSeats.toString()}+ seats) are fully booked across the available days. Add another ${requiredSeats.toString()}+ seat room, or extend the window past ${input.windowEndDate}.`;

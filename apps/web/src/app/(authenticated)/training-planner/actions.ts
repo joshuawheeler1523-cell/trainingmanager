@@ -1116,47 +1116,29 @@ export type ScheduleGenResult = {
   // sessions. Empty / null when nothing failed to place.
   diagnoses: ClassDiagnosis[];
   headline_fix: HeadlineFix | null;
-  // Populated by the generator when capacity_gaps is non-empty. All fields
-  // are optional because the SQL may emit an empty object {} when the
-  // aggregate deficit isn't positive (e.g., gap is due to weekly distribution
-  // or prereq sequencing, not raw hours).
+  // Aggregate quick-fix suggestions when there are unplaceable sessions.
+  // Optional because the deficit math may not yield positives (e.g., gap
+  // is due to weekly distribution or prereq sequencing, not raw hours).
   recommendations?: {
     trainer_hours_per_week_to_add?: number;
     trainers_to_add?: number;
     weeks_to_extend?: number;
   };
-  // Names of the impls used as anchors for this run. Empty when not in
-  // anchor mode. Used by the UI to render "anchored against: X, Y" context.
-  anchor_impls?: { id: string; name: string }[];
-  // True when anchor mode produced gaps and the generator wrote nothing
-  // (atomic abort). The planner's existing schedule is preserved.
-  aborted?: boolean;
 };
 
-// Runs the in-process CSP solver from lib/training-planner/schedule-runner.ts.
-// Replaces the old generate_implementation_schedule pl/pgSQL RPC, which was
-// greedy first-fit and never backtracked — leaving feasible plans on the
-// table whenever an early class grabbed a slot a later one needed.
-//
-// Atomic-abort behavior preserved: if anchor_impls is non-empty and the
-// solver can't place every session, the existing drafts are NOT replaced.
+// Runs the in-process CSP solver against a single implementation. The
+// scheduler now operates project-by-project — no anchor mode, no
+// cross-impl coordination. If two impls share a trainer they could
+// double-book; the hospital manages that manually outside the app.
 export async function generateSchedule(
   implementationId: string,
-  anchorImpls: string[] = [],
 ): Promise<ActionResult<ScheduleGenResult>> {
   const c = await ctx();
   if (!c.ok) return c;
 
-  const result = await runSchedule(
-    c.supabase,
-    c.orgId,
-    c.departmentId,
-    implementationId,
-    anchorImpls,
-    {
-      dryRun: false,
-    },
-  );
+  const result = await runSchedule(c.supabase, c.orgId, c.departmentId, implementationId, {
+    dryRun: false,
+  });
   if (!result.ok) return result;
   revalidateImpl(implementationId);
   return { ok: true, data: result.data };
@@ -1170,7 +1152,7 @@ export async function dryRunSchedule(
   const c = await ctx();
   if (!c.ok) return c;
 
-  const result = await runSchedule(c.supabase, c.orgId, c.departmentId, implementationId, [], {
+  const result = await runSchedule(c.supabase, c.orgId, c.departmentId, implementationId, {
     dryRun: true,
   });
   if (!result.ok) return result;

@@ -62,7 +62,7 @@ function getCachedForImpl(implementationId: string) {
     ): Promise<ScheduleGenResult | null> => {
       void cacheBuster;
       const admin = createAdminClient();
-      const result = await runSchedule(admin, orgId, "", innerImplementationId, [], {
+      const result = await runSchedule(admin, orgId, "", innerImplementationId, {
         dryRun: true,
       });
       if (!result.ok) return null;

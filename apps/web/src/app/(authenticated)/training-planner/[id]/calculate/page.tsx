@@ -18,7 +18,6 @@ import type {
 import {
   computeFeasibility,
   type ClassFeasibility,
-  type CrossImplBusy,
   type FeasibilityResult,
   type FeasibilityVerdict,
   type Recommendation,
@@ -26,7 +25,6 @@ import {
 } from "@/lib/training-planner/feasibility";
 import { type ScheduleGenResult } from "../../actions";
 import { dryRunScheduleCached } from "@/lib/training-planner/cached-reads";
-import { fetchCrossImplConflictsForImpl } from "@/app/(authenticated)/training-planner/conflicts/queries";
 import GenerateButton from "./generate-button";
 
 type Params = Promise<{ id: string }>;
@@ -43,9 +41,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
     { data: classes },
     { data: classTrainers },
     { data: prereqs },
-    { data: orgTrainers },
-    { data: orgImpls },
-    { data: orgPublishedSessions },
     { data: unavailability },
     { count: sessionCount },
   ] = await Promise.all([
@@ -64,22 +59,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
     // org, and computeFeasibility filters down to the supplied class IDs.
     supabase.from("impl_class_trainers").select("*").eq("org_id", orgId),
     supabase.from("impl_class_prerequisites").select("*").eq("org_id", orgId),
-    // For cross-impl trainer conflict: all impl_trainer rows in the org so
-    // we can match instructor_id across implementations.
-    supabase
-      .from("impl_trainers")
-      .select("id, instructor_id, implementation_id")
-      .eq("org_id", orgId),
-    // Implementations metadata so we can filter cross-impl busy to live impls only.
-    supabase.from("implementations").select("id, name, status, deleted_at").eq("org_id", orgId),
-    // Published sessions in OTHER implementations — these are the cross-impl
-    // commitments the simulator must dodge for trainers shared via instructor_id.
-    supabase
-      .from("impl_sessions")
-      .select("impl_trainer_id, scheduled_start, scheduled_end, implementation_id")
-      .eq("org_id", orgId)
-      .eq("status", "published")
-      .neq("implementation_id", id),
     // PTO / unavailability for this impl's trainers.
     supabase
       .from("impl_trainer_unavailability")
@@ -93,47 +72,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
   ]);
 
   if (!impl) notFound();
-
-  // Pairs of draft sessions across impls where one side is this impl.
-  // Shares the layout's React.cache'd fetch, so this is effectively free.
-  const conflictPairsForImpl = await fetchCrossImplConflictsForImpl(orgId, id);
-
-  // Build per-trainer cross-impl busy map: for each of THIS impl's trainers
-  // whose underlying instructor also teaches in OTHER live implementations,
-  // accumulate the other impls' published session intervals.
-  const myTrainerByInstructor = new Map<string, string>(); // instructor_id → my_trainer_id
-  for (const t of trainers ?? []) {
-    if (t.instructor_id) myTrainerByInstructor.set(t.instructor_id, t.id);
-  }
-  const otherTrainerById = new Map<string, { instructor_id: string | null; impl_id: string }>();
-  for (const t of orgTrainers ?? []) {
-    if (t.implementation_id === id) continue; // same-impl trainers are handled normally
-    otherTrainerById.set(t.id, { instructor_id: t.instructor_id, impl_id: t.implementation_id });
-  }
-  const liveImplIds = new Set(
-    (orgImpls ?? [])
-      .filter((i) => !i.deleted_at && i.status !== "archived" && i.status !== "cancelled")
-      .map((i) => i.id),
-  );
-  const implNameById = new Map((orgImpls ?? []).map((i) => [i.id, i.name]));
-
-  const crossImplBusyByTrainer = new Map<string, CrossImplBusy[]>();
-  for (const s of orgPublishedSessions ?? []) {
-    if (!s.impl_trainer_id) continue;
-    if (!liveImplIds.has(s.implementation_id)) continue;
-    const other = otherTrainerById.get(s.impl_trainer_id);
-    if (!other?.instructor_id) continue;
-    const myTrainerId = myTrainerByInstructor.get(other.instructor_id);
-    if (!myTrainerId) continue;
-    const list = crossImplBusyByTrainer.get(myTrainerId) ?? [];
-    const implName = implNameById.get(s.implementation_id);
-    list.push({
-      start: s.scheduled_start,
-      end: s.scheduled_end,
-      ...(implName ? { implName } : {}),
-    });
-    crossImplBusyByTrainer.set(myTrainerId, list);
-  }
 
   // PTO/unavailability windows — only those for this impl's trainers.
   const thisImplTrainerIds = new Set((trainers ?? []).map((t) => t.id));
@@ -163,7 +101,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
     classes: classes ?? [],
     classTrainers: classTrainers ?? [],
     prereqs: prereqs ?? [],
-    crossImplBusyByTrainer,
     unavailabilityByTrainer,
   });
 
@@ -220,8 +157,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
         </p>
       </div>
 
-      {conflictPairsForImpl.length > 0 && <ConflictsBanner count={conflictPairsForImpl.length} />}
-
       <YesNoPanel
         canSchedule={canSchedule}
         dryRun={dryRun}
@@ -249,12 +184,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
         implementationId={id}
         ready={feas.ready}
         existingSessions={sessionCount ?? 0}
-        availableAnchors={(orgImpls ?? [])
-          .filter(
-            (i) =>
-              i.id !== id && !i.deleted_at && i.status !== "archived" && i.status !== "cancelled",
-          )
-          .map((i) => ({ id: i.id, name: i.name }))}
       />
 
       <div className="border-border flex items-center justify-between border-t pt-4">
@@ -276,29 +205,6 @@ export default async function CalculatePage({ params }: { params: Params }) {
 }
 
 // ── Components ─────────────────────────────────────────────────────────────
-
-function ConflictsBanner({ count }: { count: number }) {
-  return (
-    <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
-      <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-      <div className="flex-1">
-        <p className="text-foreground text-sm font-semibold">
-          {count.toString()} cross-impl conflict{count === 1 ? "" : "s"} involve this impl
-        </p>
-        <p className="text-muted-foreground mt-0.5 text-xs">
-          Draft sessions in this impl overlap with draft sessions in another impl that share a
-          trainer. Resolve them before publishing so the same person isn&apos;t double-booked.
-        </p>
-      </div>
-      <Link
-        href="/training-planner/conflicts"
-        className="inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600"
-      >
-        Open resolver →
-      </Link>
-    </div>
-  );
-}
 
 function YesNoPanel({
   canSchedule,
@@ -516,8 +422,6 @@ function bottleneckLabel(b: ClassDiagnosis["bottleneck"]): string {
       return "room capacity";
     case "trainer_capacity":
       return "trainer hours";
-    case "trainer_blocked":
-      return "anchor conflict";
     case "room_busy_or_window":
       return "room / window";
   }
