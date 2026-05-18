@@ -10,8 +10,8 @@
     "test": "echo 'no db tests yet' && exit 0"
   },
   "devDependencies": {
-    "@supabase/supabase-js": "^2.49.4",
-    "supabase": "2.22.6",
-    "tsx": "^4.19.0"
+    "@supabase/supabase-js": "^2.105.4",
+    "supabase": "2.98.2",
+    "tsx": "^4.22.1"
   }
 }
