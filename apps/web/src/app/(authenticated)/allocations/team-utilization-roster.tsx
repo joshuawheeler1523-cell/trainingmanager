@@ -15,6 +15,13 @@ type InstructorRow = {
   hoursPerBucket: Map<string, number>;
 };
 
+// Neutral fill for workload that has no allocation bucket (training-planner
+// sessions, education requests, or any class/recurring task left unbucketed).
+// Without this segment the bar would read empty even though utilization_pct
+// is non-zero — assigned_hours counts unbucketed work but per-bucket segments
+// don't.
+const UNBUCKETED_COLOR = "var(--ink-mute)";
+
 type Props = {
   buckets: Bucket[];
   rows: InstructorRow[];
@@ -80,6 +87,17 @@ export default function TeamUtilizationRoster({ buckets, rows }: Props) {
                 return percent > 0 ? { percent, color: colorFor(b.name), label: b.name } : null;
               })
               .filter((s): s is NonNullable<typeof s> => s !== null);
+            // Any utilization not attributed to a bucket renders as a neutral
+            // tail segment so the bar always matches the displayed percentage.
+            const bucketedPct = segments.reduce((acc, s) => acc + s.percent, 0);
+            const unbucketedPct = Math.max(0, pct - bucketedPct);
+            if (unbucketedPct > 0) {
+              segments.push({
+                percent: unbucketedPct,
+                color: UNBUCKETED_COLOR,
+                label: "Unbucketed",
+              });
+            }
             const overage = pct > 100 ? pct - 100 : 0;
 
             return (
