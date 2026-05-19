@@ -15,6 +15,7 @@ import {
   CheckCircleIcon,
   DocumentArrowDownIcon,
   TableCellsIcon,
+  TrashIcon,
 } from "@heroicons/react/20/solid";
 import GridScheduleView from "./grid-schedule-view";
 import SessionPool from "./session-pool";
@@ -26,6 +27,7 @@ import type { ImplClass, ImplRoom, ImplSession, ImplTrainer, Implementation } fr
 import { Badge, Eyebrow } from "@/components/ui";
 import { toCalendarLocal, fromCalendarLocal } from "@/lib/timezone";
 import {
+  clearDraftSessions,
   placeManualSession,
   publishImplementation,
   setSessionStatus,
@@ -311,6 +313,24 @@ export default function ScheduleView({
     });
   }
 
+  function handleClearDrafts() {
+    if (
+      !confirm(
+        `Delete all ${draftCount.toString()} draft sessions? Published sessions stay. This can't be undone — you'll need to regenerate or place them again manually.`,
+      )
+    )
+      return;
+    startTransition(async () => {
+      const result = await clearDraftSessions(implementation.id);
+      if (result.ok) {
+        toast.success(`Cleared ${result.data.count.toString()} draft sessions`);
+        router.refresh();
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
   const openSession = openSessionId ? (sessions.find((s) => s.id === openSessionId) ?? null) : null;
 
   return (
@@ -418,6 +438,16 @@ export default function ScheduleView({
             <CalendarDaysIcon className="h-3.5 w-3.5" />
             iCal
           </a>
+          <button
+            type="button"
+            disabled={pending || draftCount === 0}
+            onClick={handleClearDrafts}
+            className="border-border bg-background text-foreground inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50 dark:hover:bg-rose-950/30 dark:hover:text-rose-200"
+            title="Delete every draft session. Published sessions stay."
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+            Clear drafts
+          </button>
           <button
             type="button"
             disabled={pending || draftCount === 0}
