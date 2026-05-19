@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useOptimistic, useState, useTransition } from "react";
+import { useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Calendar, dateFnsLocalizer, type Event } from "react-big-calendar";
@@ -106,6 +106,56 @@ export default function ScheduleView({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
+
+  // Edge-scroll the page during any drag so the user can reach rooms above
+  // or below the viewport. Triggered by native dragover events at the window
+  // level — fires for both pool drags and placed-session moves. A rAF loop
+  // keeps scrolling smoothly even when the cursor is stationary near an edge.
+  useEffect(() => {
+    const threshold = 96; // px from viewport edge where auto-scroll engages
+    const maxSpeed = 22; // px per frame at the very edge
+    let rafId: number | null = null;
+    let currentDelta = 0;
+    function tick() {
+      if (currentDelta !== 0) {
+        window.scrollBy(0, currentDelta);
+        rafId = requestAnimationFrame(tick);
+      } else {
+        rafId = null;
+      }
+    }
+    function onDragOver(e: DragEvent) {
+      const vh = window.innerHeight;
+      const y = e.clientY;
+      let delta = 0;
+      if (y < threshold) {
+        delta = -Math.round(maxSpeed * (1 - y / threshold));
+      } else if (y > vh - threshold) {
+        delta = Math.round(maxSpeed * (1 - (vh - y) / threshold));
+      }
+      currentDelta = delta;
+      if (delta !== 0 && rafId === null) {
+        rafId = requestAnimationFrame(tick);
+      }
+    }
+    function stop() {
+      currentDelta = 0;
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    }
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("dragend", stop);
+    window.addEventListener("drop", stop);
+    return () => {
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("dragend", stop);
+      window.removeEventListener("drop", stop);
+      stop();
+    };
+  }, []);
+
   // Manual mode defaults to the grid because that's where the pool sits;
   // auto mode keeps the calendar default behavior.
   const [viewMode, setViewMode] = useState<"calendar" | "grid">(
