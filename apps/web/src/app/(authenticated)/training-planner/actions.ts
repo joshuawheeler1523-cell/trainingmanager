@@ -1417,6 +1417,28 @@ export async function placeManualSession(
   return { ok: true, data: { id: inserted.id } };
 }
 
+// Bulk-delete every draft session in an impl. Used by the "Clear drafts"
+// button on the schedule view — gives the user a one-click blank slate when
+// switching to manual mode after the solver has already placed sessions.
+// Published sessions are untouched so a partial-publish state is safe.
+export async function clearDraftSessions(
+  implementationId: string,
+): Promise<ActionResult<{ count: number }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { error, count } = await c.supabase
+    .from("impl_sessions")
+    .delete({ count: "exact" })
+    .eq("implementation_id", implementationId)
+    .eq("org_id", c.orgId)
+    .eq("status", "draft");
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+
+  revalidateImpl(implementationId);
+  return { ok: true, data: { count: count ?? 0 } };
+}
+
 // Drop-to-pool: delete a draft session so it goes back to the pool. Refuses
 // to delete published sessions — the user has to cancel those through the
 // session drawer to leave an audit trail. Cancelled sessions are already
