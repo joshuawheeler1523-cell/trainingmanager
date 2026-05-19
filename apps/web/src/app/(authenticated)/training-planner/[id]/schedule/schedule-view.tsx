@@ -29,6 +29,7 @@ import {
   placeManualSession,
   publishImplementation,
   setSessionStatus,
+  unplaceManualSession,
   updateSessionAssignments,
   updateSessionTime,
 } from "../../actions";
@@ -176,6 +177,18 @@ export default function ScheduleView({
       };
     });
   }, [filtered, classMap, trainerMap, roomMap, orgTimeZone]);
+
+  function handleUnplaceFromPool(sessionId: string) {
+    startTransition(async () => {
+      const r = await unplaceManualSession(sessionId, implementation.id);
+      if (r.ok) {
+        toast.success("Session returned to pool");
+        router.refresh();
+      } else {
+        toast.error(r.error.message);
+      }
+    });
+  }
 
   function handlePlaceFromPool(args: {
     classId: string;
@@ -420,7 +433,11 @@ export default function ScheduleView({
       {viewMode === "grid" ? (
         showPool ? (
           <div className="flex items-start gap-3">
-            <SessionPool classes={classes} sessions={optimisticSessions} />
+            <SessionPool
+              classes={classes}
+              sessions={optimisticSessions}
+              onUnplaceSession={handleUnplaceFromPool}
+            />
             <div className="min-w-0 flex-1">
               <GridScheduleView
                 implementation={implementation}

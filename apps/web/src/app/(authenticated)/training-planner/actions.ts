@@ -1416,3 +1416,43 @@ export async function placeManualSession(
   revalidateImpl(input.implementationId);
   return { ok: true, data: { id: inserted.id } };
 }
+
+// Drop-to-pool: delete a draft session so it goes back to the pool. Refuses
+// to delete published sessions — the user has to cancel those through the
+// session drawer to leave an audit trail. Cancelled sessions are already
+// invisible in the pool's "placed" count and treated as no-ops here.
+export async function unplaceManualSession(
+  sessionId: string,
+  implementationId: string,
+): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data: row, error: readErr } = await c.supabase
+    .from("impl_sessions")
+    .select("status")
+    .eq("id", sessionId)
+    .eq("org_id", c.orgId)
+    .maybeSingle();
+  if (readErr) return { ok: false, error: { code: readErr.code, message: readErr.message } };
+  if (!row) return { ok: false, error: { code: "NOT_FOUND", message: "Session not found." } };
+  if (row.status === "published") {
+    return {
+      ok: false,
+      error: {
+        code: "PUBLISHED",
+        message: "Cancel published sessions from their detail panel — they need an audit trail.",
+      },
+    };
+  }
+
+  const { error: delErr } = await c.supabase
+    .from("impl_sessions")
+    .delete()
+    .eq("id", sessionId)
+    .eq("org_id", c.orgId);
+  if (delErr) return { ok: false, error: { code: delErr.code, message: delErr.message } };
+
+  revalidateImpl(implementationId);
+  return { ok: true, data: { id: sessionId } };
+}

@@ -1,7 +1,11 @@
 "use client";
 
 import { useMemo, useState, type DragEvent } from "react";
-import { CheckCircleIcon, MagnifyingGlassIcon } from "@heroicons/react/20/solid";
+import {
+  ArrowUturnLeftIcon,
+  CheckCircleIcon,
+  MagnifyingGlassIcon,
+} from "@heroicons/react/20/solid";
 import type { ImplClass, ImplSession } from "@arbor/shared";
 import { resolveClassColor } from "./class-palette";
 import { setActivePoolDrag } from "./active-pool-drag";
@@ -10,6 +14,9 @@ type Props = {
   classes: ImplClass[];
   /** All sessions for this impl (any status except cancelled count toward placed). */
   sessions: ImplSession[];
+  /** Called when the user drags a placed session back onto the pool. The
+   *  caller is responsible for invoking unplaceManualSession + toast. */
+  onUnplaceSession?: (sessionId: string) => void;
 };
 
 type PoolItem = {
@@ -70,9 +77,44 @@ function buildPoolItems(classes: ImplClass[], sessions: ImplSession[]): PoolItem
   return items;
 }
 
-export default function SessionPool({ classes, sessions }: Props) {
+export default function SessionPool({ classes, sessions, onUnplaceSession }: Props) {
   const items = useMemo(() => buildPoolItems(classes, sessions), [classes, sessions]);
   const [search, setSearch] = useState("");
+  const [dropHover, setDropHover] = useState(false);
+
+  function onZoneDragOver(e: DragEvent<HTMLDivElement>) {
+    // Only react to JSON drags coming from a placed session (move-drag). Pool
+    // chips publish `kind: 'pool'` via active-pool-drag; if that's set we're
+    // looking at a pool-to-grid drag and should ignore the zone.
+    const isJson = Array.from(e.dataTransfer.types).includes("application/json");
+    if (!isJson) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (!dropHover) setDropHover(true);
+  }
+
+  function onZoneDragLeave() {
+    if (dropHover) setDropHover(false);
+  }
+
+  function onZoneDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDropHover(false);
+    if (!onUnplaceSession) return;
+    const payload = e.dataTransfer.getData("application/json");
+    if (!payload) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(payload);
+    } catch {
+      return;
+    }
+    if (!parsed || typeof parsed !== "object") return;
+    const obj = parsed as { kind?: string; sessionId?: string };
+    if (obj.kind === "pool") return; // own chip dragged back, ignore
+    if (typeof obj.sessionId !== "string") return;
+    onUnplaceSession(obj.sessionId);
+  }
 
   const totalRequired = items.reduce((a, b) => a + b.required, 0);
   const totalPlaced = items.reduce((a, b) => a + b.placed, 0);
@@ -142,6 +184,23 @@ export default function SessionPool({ classes, sessions }: Props) {
             Drag any chip onto an empty grid cell to schedule it. Conflicts are blocked at the drop.
           </p>
         </>
+      )}
+
+      {onUnplaceSession && (
+        <div
+          onDragOver={onZoneDragOver}
+          onDragLeave={onZoneDragLeave}
+          onDrop={onZoneDrop}
+          className={`border-border flex items-center justify-center gap-1.5 border-t border-dashed px-3 py-2 text-[10.5px] font-medium transition-colors ${
+            dropHover
+              ? "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
+              : "text-muted-foreground"
+          }`}
+          aria-label="Drop a placed session here to remove it"
+        >
+          <ArrowUturnLeftIcon className="h-3 w-3" />
+          {dropHover ? "Release to remove from schedule" : "Drop a placed session here to remove"}
+        </div>
       )}
     </aside>
   );
