@@ -17,6 +17,8 @@ import {
   TableCellsIcon,
 } from "@heroicons/react/20/solid";
 import GridScheduleView from "./grid-schedule-view";
+import { resolveClassColor } from "./class-palette";
+import ClassColorLegend from "./class-color-legend";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import type { ImplClass, ImplRoom, ImplSession, ImplTrainer, Implementation } from "@arbor/shared";
@@ -70,39 +72,6 @@ const CONFLICT_BORDER: Record<ImplSession["conflict_status"], string> = {
   partial: "#c98a3a", // var(--persimmon-deep)
   full: "#b73d3d", // var(--red)
 };
-
-// Muted editorial palette — soft, low-saturation tones that fit Arbor's
-// cream/forest/sage/persimmon system. Distinct against dark text and
-// kept away from the conflict colors (red / amber / forest green). Same
-// array is used by the grid view (grid-schedule-view.tsx) so class
-// colors stay consistent across modes.
-const CLASS_PALETTE = [
-  "#c8d1c1", // sage-soft (lives inside the brand)
-  "#c7d4dc", // dusty blue
-  "#d4c7d8", // dusty lavender
-  "#e8d2bc", // light clay (persimmon-adjacent)
-  "#e0d6b4", // soft gold
-  "#bdd1cb", // muted teal
-  "#dbc4c4", // dusty rose
-  "#b9c3a3", // soft moss
-  "#c7b9c7", // muted plum
-  "#d6c89e", // muted ochre
-  "#c5cbcd", // warm slate
-  "#d8cdc0", // light taupe
-] as const;
-
-function hashString(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-}
-
-function colorForClass(classId: string): string {
-  const idx = hashString(classId) % CLASS_PALETTE.length;
-  return CLASS_PALETTE[idx] ?? "#c8d1c1";
-}
 
 function formatLocal(date: Date, tz: string): string {
   return date.toLocaleString("en-US", {
@@ -300,6 +269,9 @@ export default function ScheduleView({
 
   return (
     <div className="space-y-3">
+      {/* Class color legend — collapsible; lets the user re-skin any class */}
+      <ClassColorLegend implementationId={implementation.id} classes={classes} />
+
       {/* Filters + actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-end gap-2">
@@ -451,7 +423,8 @@ export default function ScheduleView({
               onEventDrop={handleEventDrop}
               onEventResize={handleEventDrop}
               eventPropGetter={(event: CalEvent) => {
-                const fill = colorForClass(event.resource.classId);
+                const klass = classMap.get(event.resource.classId);
+                const fill = resolveClassColor(event.resource.classId, klass?.color ?? null);
                 const borderColor = CONFLICT_BORDER[event.resource.conflictStatus];
                 const hasBorder = event.resource.conflictStatus !== "none";
                 return {

@@ -4,6 +4,7 @@ import { useMemo, useState, type DragEvent } from "react";
 import { MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon } from "@heroicons/react/20/solid";
 import type { ImplClass, ImplRoom, ImplSession, ImplTrainer, Implementation } from "@arbor/shared";
 import { toCalendarLocal, fromCalendarLocal } from "@/lib/timezone";
+import { resolveClassColor } from "./class-palette";
 
 type Props = {
   implementation: Implementation;
@@ -20,35 +21,6 @@ type Props = {
     newEndIso: string;
   }) => void;
 };
-
-// Muted editorial palette — soft, low-saturation tones that fit Arbor's
-// cream/forest/sage/persimmon system. Each is ~80% lightness, ~10-15%
-// saturation so classes feel cohesive instead of candy-bright. Same
-// array is used by the calendar view (schedule-view.tsx) so class colors
-// stay consistent across both modes.
-const CLASS_PALETTE = [
-  "#c8d1c1", // sage-soft (lives inside the brand)
-  "#c7d4dc", // dusty blue
-  "#d4c7d8", // dusty lavender
-  "#e8d2bc", // light clay (persimmon-adjacent)
-  "#e0d6b4", // soft gold
-  "#bdd1cb", // muted teal
-  "#dbc4c4", // dusty rose
-  "#b9c3a3", // soft moss
-  "#c7b9c7", // muted plum
-  "#d6c89e", // muted ochre
-  "#c5cbcd", // warm slate
-  "#d8cdc0", // light taupe
-] as const;
-
-function hashString(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-function colorForClass(classId: string): string {
-  return CLASS_PALETTE[hashString(classId) % CLASS_PALETTE.length] ?? "#c8d1c1";
-}
 
 // Time grid: 7:00 AM → 7:00 PM in 30-min increments.
 const SLOT_START_HOUR = 7;
@@ -464,7 +436,7 @@ function SessionCell({
   const trainer = placed.session.impl_trainer_id
     ? trainerMap.get(placed.session.impl_trainer_id)
     : null;
-  const bg = colorForClass(placed.session.impl_class_id);
+  const bg = resolveClassColor(placed.session.impl_class_id, cls?.color ?? null);
   const conflictBorder =
     placed.session.conflict_status === "full"
       ? "ring-2 ring-rose-500 ring-inset"

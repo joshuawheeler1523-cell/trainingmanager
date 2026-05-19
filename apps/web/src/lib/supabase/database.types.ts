@@ -1875,6 +1875,7 @@ export type Database = {
       };
       impl_classes: {
         Row: {
+          color: string | null;
           created_at: string;
           created_by: string | null;
           department_id: string;
@@ -1894,6 +1895,7 @@ export type Database = {
           updated_by: string | null;
         };
         Insert: {
+          color?: string | null;
           created_at?: string;
           created_by?: string | null;
           department_id: string;
@@ -1913,6 +1915,7 @@ export type Database = {
           updated_by?: string | null;
         };
         Update: {
+          color?: string | null;
           created_at?: string;
           created_by?: string | null;
           department_id?: string;
