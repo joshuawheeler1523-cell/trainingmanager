@@ -13,7 +13,7 @@ export type SeedResult =
   | { ok: false; error: string };
 
 export async function seedDemoOrg(): Promise<SeedResult> {
-  // Caller must be authed — they'll be granted org_admin on the new org.
+  // Caller must be authed — they'll be granted manager on the new org.
   const supabase = await createClient();
   const {
     data: { user },
@@ -60,7 +60,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
     const { error: memErr } = await admin.from("org_memberships").insert({
       org_id: orgId,
       user_id: user.id,
-      role: "org_admin",
+      role: "manager",
       accepted_at: new Date().toISOString(),
     });
     if (memErr) throw new Error(`Create membership: ${memErr.message}`);
