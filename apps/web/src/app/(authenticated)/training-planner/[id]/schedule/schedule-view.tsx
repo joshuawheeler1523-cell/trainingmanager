@@ -192,6 +192,50 @@ export default function ScheduleView({
     });
   }, [filtered, classMap, trainerMap, roomMap, orgTimeZone]);
 
+  function handleGridMove(args: {
+    sessionId: string;
+    newRoomId: string;
+    newStartIso: string;
+    newEndIso: string;
+  }) {
+    const target = optimisticSessions.find((s) => s.id === args.sessionId);
+    if (!target) return;
+    const roomChanged = target.impl_room_id !== args.newRoomId;
+    const timeChanged =
+      target.scheduled_start !== args.newStartIso || target.scheduled_end !== args.newEndIso;
+    if (!roomChanged && !timeChanged) return;
+    startTransition(async () => {
+      applyOptimisticMove({
+        id: args.sessionId,
+        start: args.newStartIso,
+        end: args.newEndIso,
+      });
+      const timeOk = !timeChanged
+        ? { ok: true as const }
+        : await updateSessionTime(
+            args.sessionId,
+            implementation.id,
+            args.newStartIso,
+            args.newEndIso,
+          );
+      if (!timeOk.ok) {
+        toast.error(timeOk.error.message);
+        return;
+      }
+      const roomOk = !roomChanged
+        ? { ok: true as const }
+        : await updateSessionAssignments(args.sessionId, implementation.id, {
+            impl_room_id: args.newRoomId,
+          });
+      if (!roomOk.ok) {
+        toast.error(roomOk.error.message);
+        return;
+      }
+      toast.success(roomChanged ? "Session moved to new room" : "Session moved");
+      router.refresh();
+    });
+  }
+
   function handleEventDrop(args: EventInteractionArgs<CalEvent>) {
     const { event, start, end } = args;
     const startLocal = start instanceof Date ? start : new Date(start);
@@ -374,6 +418,7 @@ export default function ScheduleView({
           rooms={rooms}
           orgTimeZone={orgTimeZone}
           onOpenSession={setOpenSessionId}
+          onMoveSession={handleGridMove}
         />
       ) : (
         <>
