@@ -21,21 +21,24 @@ type Props = {
   }) => void;
 };
 
-// Same palette as the calendar view so users see consistent class colors
-// when switching modes.
+// Muted editorial palette — soft, low-saturation tones that fit Arbor's
+// cream/forest/sage/persimmon system. Each is ~80% lightness, ~10-15%
+// saturation so classes feel cohesive instead of candy-bright. Same
+// array is used by the calendar view (schedule-view.tsx) so class colors
+// stay consistent across both modes.
 const CLASS_PALETTE = [
-  "#bfdbfe",
-  "#c7d2fe",
-  "#ddd6fe",
-  "#e9d5ff",
-  "#f5d0fe",
-  "#fbcfe8",
-  "#a5f3fc",
-  "#99f6e4",
-  "#bae6fd",
-  "#fed7aa",
-  "#d9f99d",
-  "#e2e8f0",
+  "#c8d1c1", // sage-soft (lives inside the brand)
+  "#c7d4dc", // dusty blue
+  "#d4c7d8", // dusty lavender
+  "#e8d2bc", // light clay (persimmon-adjacent)
+  "#e0d6b4", // soft gold
+  "#bdd1cb", // muted teal
+  "#dbc4c4", // dusty rose
+  "#b9c3a3", // soft moss
+  "#c7b9c7", // muted plum
+  "#d6c89e", // muted ochre
+  "#c5cbcd", // warm slate
+  "#d8cdc0", // light taupe
 ] as const;
 
 function hashString(s: string): number {
@@ -44,7 +47,7 @@ function hashString(s: string): number {
   return Math.abs(h);
 }
 function colorForClass(classId: string): string {
-  return CLASS_PALETTE[hashString(classId) % CLASS_PALETTE.length] ?? "#bfdbfe";
+  return CLASS_PALETTE[hashString(classId) % CLASS_PALETTE.length] ?? "#c8d1c1";
 }
 
 // Time grid: 7:00 AM → 7:00 PM in 30-min increments.

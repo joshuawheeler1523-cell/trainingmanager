@@ -71,21 +71,24 @@ const CONFLICT_BORDER: Record<ImplSession["conflict_status"], string> = {
   full: "#b73d3d", // var(--red)
 };
 
-// Per-class fill palette. Chosen to be visually distinct, accessible against
-// dark text, and to avoid the conflict colors (red / amber / pure green).
+// Muted editorial palette — soft, low-saturation tones that fit Arbor's
+// cream/forest/sage/persimmon system. Distinct against dark text and
+// kept away from the conflict colors (red / amber / forest green). Same
+// array is used by the grid view (grid-schedule-view.tsx) so class
+// colors stay consistent across modes.
 const CLASS_PALETTE = [
-  "#bfdbfe", // blue-200
-  "#c7d2fe", // indigo-200
-  "#ddd6fe", // violet-200
-  "#e9d5ff", // purple-200
-  "#f5d0fe", // fuchsia-200
-  "#fbcfe8", // pink-200
-  "#a5f3fc", // cyan-200
-  "#99f6e4", // teal-200
-  "#bae6fd", // sky-200
-  "#fed7aa", // orange-200 (light, distinguishable from amber border)
-  "#d9f99d", // lime-200
-  "#e2e8f0", // slate-200
+  "#c8d1c1", // sage-soft (lives inside the brand)
+  "#c7d4dc", // dusty blue
+  "#d4c7d8", // dusty lavender
+  "#e8d2bc", // light clay (persimmon-adjacent)
+  "#e0d6b4", // soft gold
+  "#bdd1cb", // muted teal
+  "#dbc4c4", // dusty rose
+  "#b9c3a3", // soft moss
+  "#c7b9c7", // muted plum
+  "#d6c89e", // muted ochre
+  "#c5cbcd", // warm slate
+  "#d8cdc0", // light taupe
 ] as const;
 
 function hashString(s: string): number {
@@ -98,7 +101,7 @@ function hashString(s: string): number {
 
 function colorForClass(classId: string): string {
   const idx = hashString(classId) % CLASS_PALETTE.length;
-  return CLASS_PALETTE[idx] ?? "#bfdbfe";
+  return CLASS_PALETTE[idx] ?? "#c8d1c1";
 }
 
 function formatLocal(date: Date, tz: string): string {
