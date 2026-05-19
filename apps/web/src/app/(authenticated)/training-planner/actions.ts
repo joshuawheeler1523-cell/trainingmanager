@@ -32,6 +32,11 @@ import {
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 import { runSchedule } from "@/lib/training-planner/schedule-runner";
 import type { ClassDiagnosis, HeadlineFix } from "@/lib/training-planner/schedule-solver";
+import {
+  validateManualPlacement,
+  type PlacementCandidate,
+  type ValidationContext,
+} from "@/lib/training-planner/manual-placement";
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -1137,6 +1142,16 @@ export async function setStep(id: string, step: number): Promise<ActionResult<Im
   return updateImpl(id, { current_step: step });
 }
 
+// Toggle between the CSP solver ('auto') and hand-built scheduling
+// ('manual'). The Calculate page reads this to pick its CTA; the Schedule
+// page reads it to decide whether to mount the session pool sidebar.
+export async function setScheduleMode(
+  id: string,
+  mode: "auto" | "manual",
+): Promise<ActionResult<Implementation>> {
+  return updateImpl(id, { schedule_mode: mode });
+}
+
 // ── schedule generator ─────────────────────────────────────────────────────
 
 export type ScheduleGenResult = {
@@ -1277,4 +1292,167 @@ export async function publishImplementation(
 
   revalidateImpl(implementationId);
   return { ok: true, data: { count: count ?? 0 } };
+}
+
+// ── manual placement ──────────────────────────────────────────────────────
+// Insert a single hand-built session. Runs the same hard-constraint
+// validator the client used to gate the drop, then INSERTs impl_sessions
+// with status='draft'. The trigger handles conflict_status/learners math.
+
+export type ManualPlacementInput = {
+  implementationId: string;
+  classId: string;
+  roomId: string;
+  /** YYYY-MM-DD in the room's local calendar. */
+  startLocalDate: string;
+  /** Wall-clock start hour in the room's local calendar (0..24, fractional). */
+  startLocalHour: number;
+};
+
+export async function placeManualSession(
+  input: ManualPlacementInput,
+): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  // Load every input the validator needs in parallel.
+  const [
+    { data: implRow },
+    { data: classes },
+    { data: rooms },
+    { data: trainers },
+    { data: classTrainers },
+    { data: sessions },
+    { data: pto },
+    { data: org },
+  ] = await Promise.all([
+    c.supabase
+      .from("implementations")
+      .select("*")
+      .eq("id", input.implementationId)
+      .eq("org_id", c.orgId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    c.supabase
+      .from("impl_classes")
+      .select("*")
+      .eq("implementation_id", input.implementationId)
+      .eq("org_id", c.orgId),
+    c.supabase
+      .from("impl_rooms")
+      .select("*")
+      .eq("implementation_id", input.implementationId)
+      .eq("org_id", c.orgId),
+    c.supabase
+      .from("impl_trainers")
+      .select("*")
+      .eq("implementation_id", input.implementationId)
+      .eq("org_id", c.orgId),
+    c.supabase
+      .from("impl_class_trainers")
+      .select("impl_class_id, impl_trainer_id")
+      .eq("org_id", c.orgId),
+    c.supabase
+      .from("impl_sessions")
+      .select("*")
+      .eq("implementation_id", input.implementationId)
+      .eq("org_id", c.orgId),
+    c.supabase
+      .from("impl_trainer_unavailability")
+      .select("impl_trainer_id, starts_at, ends_at")
+      .eq("org_id", c.orgId),
+    c.supabase.from("organizations").select("time_zone").eq("id", c.orgId).maybeSingle(),
+  ]);
+
+  if (!implRow) {
+    return { ok: false, error: { code: "NOT_FOUND", message: "Implementation not found." } };
+  }
+
+  const validationCtx: ValidationContext = {
+    impl: implRow as unknown as ValidationContext["impl"],
+    classes: classes ?? [],
+    rooms: rooms ?? [],
+    trainers: trainers ?? [],
+    classTrainers: classTrainers ?? [],
+    sessions: (sessions ?? []) as unknown as ValidationContext["sessions"],
+    pto: pto ?? [],
+    orgTimeZone: org?.time_zone ?? "America/New_York",
+  };
+
+  const candidate: PlacementCandidate = {
+    classId: input.classId,
+    roomId: input.roomId,
+    startLocalDate: input.startLocalDate,
+    startLocalHour: input.startLocalHour,
+  };
+
+  const result = validateManualPlacement(candidate, validationCtx);
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: { code: "CONSTRAINT", message: result.reasons.join(" ") },
+    };
+  }
+
+  const { data: inserted, error: insErr } = await c.supabase
+    .from("impl_sessions")
+    .insert({
+      org_id: c.orgId,
+      department_id: c.departmentId,
+      implementation_id: input.implementationId,
+      impl_class_id: input.classId,
+      impl_trainer_id: result.trainerId,
+      impl_room_id: input.roomId,
+      scheduled_start: result.startIso,
+      scheduled_end: result.endIso,
+      learners_count: result.learnersCount,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+
+  if (insErr) return { ok: false, error: { code: insErr.code, message: insErr.message } };
+
+  revalidateImpl(input.implementationId);
+  return { ok: true, data: { id: inserted.id } };
+}
+
+// Drop-to-pool: delete a draft session so it goes back to the pool. Refuses
+// to delete published sessions — the user has to cancel those through the
+// session drawer to leave an audit trail. Cancelled sessions are already
+// invisible in the pool's "placed" count and treated as no-ops here.
+export async function unplaceManualSession(
+  sessionId: string,
+  implementationId: string,
+): Promise<ActionResult<{ id: string }>> {
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data: row, error: readErr } = await c.supabase
+    .from("impl_sessions")
+    .select("status")
+    .eq("id", sessionId)
+    .eq("org_id", c.orgId)
+    .maybeSingle();
+  if (readErr) return { ok: false, error: { code: readErr.code, message: readErr.message } };
+  if (!row) return { ok: false, error: { code: "NOT_FOUND", message: "Session not found." } };
+  if (row.status === "published") {
+    return {
+      ok: false,
+      error: {
+        code: "PUBLISHED",
+        message: "Cancel published sessions from their detail panel — they need an audit trail.",
+      },
+    };
+  }
+
+  const { error: delErr } = await c.supabase
+    .from("impl_sessions")
+    .delete()
+    .eq("id", sessionId)
+    .eq("org_id", c.orgId);
+  if (delErr) return { ok: false, error: { code: delErr.code, message: delErr.message } };
+
+  revalidateImpl(implementationId);
+  return { ok: true, data: { id: sessionId } };
 }

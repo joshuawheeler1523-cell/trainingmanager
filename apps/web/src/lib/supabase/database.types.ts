@@ -2474,6 +2474,7 @@ export type Database = {
           lunch_break_start_minutes: number;
           name: string;
           org_id: string;
+          schedule_mode: string;
           status: string;
           updated_at: string;
           updated_by: string | null;
@@ -2500,6 +2501,7 @@ export type Database = {
           lunch_break_start_minutes?: number;
           name: string;
           org_id: string;
+          schedule_mode?: string;
           status?: string;
           updated_at?: string;
           updated_by?: string | null;
@@ -2526,6 +2528,7 @@ export type Database = {
           lunch_break_start_minutes?: number;
           name?: string;
           org_id?: string;
+          schedule_mode?: string;
           status?: string;
           updated_at?: string;
           updated_by?: string | null;

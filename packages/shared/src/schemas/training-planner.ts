@@ -97,6 +97,7 @@ export type Implementation = {
   go_live_buffer_days: number;
   business_hours_start_local: number;
   business_hours_end_local: number;
+  schedule_mode: "auto" | "manual";
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
