@@ -17,6 +17,7 @@ import {
   TableCellsIcon,
 } from "@heroicons/react/20/solid";
 import GridScheduleView from "./grid-schedule-view";
+import SessionPool from "./session-pool";
 import { resolveClassColor } from "./class-palette";
 import ClassColorLegend from "./class-color-legend";
 import "react-big-calendar/lib/css/react-big-calendar.css";
@@ -95,7 +96,12 @@ export default function ScheduleView({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"calendar" | "grid">("calendar");
+  // Manual mode defaults to the grid because that's where the pool sits;
+  // auto mode keeps the calendar default behavior.
+  const [viewMode, setViewMode] = useState<"calendar" | "grid">(
+    implementation.schedule_mode === "manual" ? "grid" : "calendar",
+  );
+  const showPool = implementation.schedule_mode === "manual" && viewMode === "grid";
 
   // Optimistic layer over the server's sessions array. Drag-drop applies a
   // move synchronously here so the event renders at its drop point in the
@@ -385,16 +391,34 @@ export default function ScheduleView({
       </div>
 
       {viewMode === "grid" ? (
-        <GridScheduleView
-          implementation={implementation}
-          sessions={filtered}
-          classes={classes}
-          trainers={trainers}
-          rooms={rooms}
-          orgTimeZone={orgTimeZone}
-          onOpenSession={setOpenSessionId}
-          onMoveSession={handleGridMove}
-        />
+        showPool ? (
+          <div className="flex items-start gap-3">
+            <SessionPool classes={classes} sessions={optimisticSessions} />
+            <div className="min-w-0 flex-1">
+              <GridScheduleView
+                implementation={implementation}
+                sessions={filtered}
+                classes={classes}
+                trainers={trainers}
+                rooms={rooms}
+                orgTimeZone={orgTimeZone}
+                onOpenSession={setOpenSessionId}
+                onMoveSession={handleGridMove}
+              />
+            </div>
+          </div>
+        ) : (
+          <GridScheduleView
+            implementation={implementation}
+            sessions={filtered}
+            classes={classes}
+            trainers={trainers}
+            rooms={rooms}
+            orgTimeZone={orgTimeZone}
+            onOpenSession={setOpenSessionId}
+            onMoveSession={handleGridMove}
+          />
+        )
       ) : (
         <>
           {/* Calendar */}
