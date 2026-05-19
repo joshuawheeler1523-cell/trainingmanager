@@ -483,6 +483,11 @@ function SessionCell({
           "application/json",
           JSON.stringify({ sessionId: placed.session.id, durationMin }),
         );
+        // Pin the drag image so the cursor lines up with the TOP of the
+        // block (not wherever the user happened to click inside it). On
+        // drop, the cell the cursor is over IS the new top — making the
+        // pre-drop preview match the post-drop placement exactly.
+        e.dataTransfer.setDragImage(e.currentTarget, 4, 4);
       }}
       onClick={onClick}
       className={`border-border cursor-grab border-b border-r align-top transition-opacity hover:opacity-80 active:cursor-grabbing ${conflictBorder} ${preset.pad}`}
