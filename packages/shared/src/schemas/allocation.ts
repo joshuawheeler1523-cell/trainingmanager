@@ -5,20 +5,22 @@ const emptyToNull = z
   .nullish()
   .transform((v) => (v === "" || v == null ? null : v));
 
-// 12 predefined bucket colors. Picker shows these as swatches.
+// Arbor palette swatches for the bucket color picker — same tokens used
+// by allocation templates so user-created buckets match the editorial
+// theme. Existing buckets with off-palette hex values stay valid
+// (column validation accepts any #RRGGBB).
 export const BUCKET_COLORS = [
-  "#6366f1", // indigo
-  "#3b82f6", // blue
-  "#06b6d4", // cyan
-  "#10b981", // emerald
-  "#84cc16", // lime
-  "#eab308", // yellow
-  "#f59e0b", // amber
-  "#f97316", // orange
-  "#ef4444", // red
-  "#ec4899", // pink
-  "#a855f7", // purple
-  "#64748b", // slate
+  "#1F4D3A", // forest — direct training / delivery
+  "#8FA68E", // sage — course development / content
+  "#4A8A6B", // sage-teal — analytics / data / QA
+  "#4D7C8E", // teal-blue — support / rounding
+  "#4A6B8A", // blue — projects / implementation
+  "#6B5B95", // muted purple — governance / committees
+  "#C97B63", // warm clay — people / coaching
+  "#B5651D", // terracotta — build / configuration
+  "#D4A574", // amber — compliance / audit
+  "#6B6B68", // gray — administrative / meetings
+  "#9CA3AF", // light gray — PTO / non-productive
 ] as const;
 
 export const ALLOCATION_SOURCE_VALUES = ["individual", "group", "global", "none"] as const;
@@ -32,7 +34,7 @@ export const bucketInsertSchema = z.object({
   color: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, "Color must be a #RRGGBB hex value")
-    .default("#6366f1"),
+    .default("#1F4D3A"),
   display_order: z.coerce.number().int().min(0).default(0),
   is_archived: z.boolean().default(false),
 });
