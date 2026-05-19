@@ -187,7 +187,7 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           instructor_id: string;
           skill_id: string;
           proficiency: Prof;
-          is_certified?: boolean;
+          is_certified: boolean;
           certified_at?: string;
           expires_at?: string;
         } = {
@@ -196,9 +196,11 @@ export async function seedDemoOrg(): Promise<SeedResult> {
           instructor_id: inst.id,
           skill_id: skillId,
           proficiency: a.prof,
+          // Always set explicitly — PostgREST bulk-insert fills NULL for any
+          // key missing from an object even if the column has a default.
+          is_certified: a.expiresInDays !== undefined,
         };
         if (a.expiresInDays !== undefined) {
-          row.is_certified = true;
           // Certified roughly 2 years ago (typical cert cycle); expires_at
           // is the demo-tunable.
           row.certified_at = addDaysIso(a.expiresInDays - 730);
