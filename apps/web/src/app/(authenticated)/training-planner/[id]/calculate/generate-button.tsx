@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ExclamationTriangleIcon, LightBulbIcon, SparklesIcon } from "@heroicons/react/20/solid";
 import { generateSchedule, type ScheduleGenResult } from "../../actions";
-import type { ClassDiagnosis } from "@/lib/training-planner/schedule-solver";
+import type { ClassDiagnosis, SolverStrategy } from "@/lib/training-planner/schedule-solver";
 
 type Props = {
   implementationId: string;
@@ -13,10 +13,39 @@ type Props = {
   existingSessions: number;
 };
 
+const STRATEGIES: { value: SolverStrategy; label: string; description: string }[] = [
+  {
+    value: "balanced",
+    label: "Balanced",
+    description: "Spread each class evenly across the window (recommended)",
+  },
+  {
+    value: "fastest",
+    label: "Fastest finish",
+    description: "Pack sessions into the earliest open slots — shortest end date",
+  },
+  {
+    value: "morning",
+    label: "Morning priority",
+    description: "Prefer earlier wall-clock times each day",
+  },
+  {
+    value: "evening",
+    label: "Evening priority",
+    description: "Prefer later wall-clock times each day",
+  },
+  {
+    value: "spread",
+    label: "Spread out",
+    description: "Maximize gaps between every session across all classes",
+  },
+];
+
 export default function GenerateButton({ implementationId, ready, existingSessions }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<ScheduleGenResult | null>(null);
+  const [strategy, setStrategy] = useState<SolverStrategy>("balanced");
 
   function handleGenerate() {
     if (!ready) return;
@@ -30,7 +59,7 @@ export default function GenerateButton({ implementationId, ready, existingSessio
       }
     }
     startTransition(async () => {
-      const r = await generateSchedule(implementationId);
+      const r = await generateSchedule(implementationId, strategy);
       if (r.ok) {
         setResult(r.data);
         if (r.data.conflicts > 0) {
@@ -47,10 +76,12 @@ export default function GenerateButton({ implementationId, ready, existingSessio
     });
   }
 
+  const selected = STRATEGIES.find((s) => s.value === strategy) ?? STRATEGIES[0];
+
   return (
     <div className="border-border bg-background space-y-3 rounded-lg border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="text-foreground text-sm font-semibold">Generate schedule</p>
           <p className="text-muted-foreground text-xs">
             {existingSessions > 0
@@ -58,16 +89,43 @@ export default function GenerateButton({ implementationId, ready, existingSessio
               : "Run the scheduler to place sessions on the calendar."}
           </p>
         </div>
-        <button
-          type="button"
-          disabled={pending || !ready}
-          onClick={handleGenerate}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-        >
-          <SparklesIcon className="h-4 w-4" />
-          {pending ? "Generating…" : "Generate schedule"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-1.5">
+            <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">
+              Strategy
+            </span>
+            <select
+              value={strategy}
+              onChange={(e) => {
+                setStrategy(e.target.value as SolverStrategy);
+              }}
+              disabled={pending}
+              className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-xs"
+            >
+              {STRATEGIES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={pending || !ready}
+            onClick={handleGenerate}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          >
+            <SparklesIcon className="h-4 w-4" />
+            {pending ? "Generating…" : "Generate schedule"}
+          </button>
+        </div>
       </div>
+      {selected && (
+        <p className="text-muted-foreground text-[11px] leading-snug">
+          <span className="text-foreground font-medium">{selected.label}:</span>{" "}
+          {selected.description}
+        </p>
+      )}
 
       {result && (
         <div className="border-border space-y-2 rounded-md border-t pt-3">

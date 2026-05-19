@@ -31,7 +31,11 @@ import {
 } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 import { runSchedule } from "@/lib/training-planner/schedule-runner";
-import type { ClassDiagnosis, HeadlineFix } from "@/lib/training-planner/schedule-solver";
+import type {
+  ClassDiagnosis,
+  HeadlineFix,
+  SolverStrategy,
+} from "@/lib/training-planner/schedule-solver";
 import {
   validateManualPlacement,
   type PlacementCandidate,
@@ -1179,12 +1183,14 @@ export type ScheduleGenResult = {
 // double-book; the hospital manages that manually outside the app.
 export async function generateSchedule(
   implementationId: string,
+  strategy: SolverStrategy = "balanced",
 ): Promise<ActionResult<ScheduleGenResult>> {
   const c = await ctx();
   if (!c.ok) return c;
 
   const result = await runSchedule(c.supabase, c.orgId, c.departmentId, implementationId, {
     dryRun: false,
+    solverOptions: { strategy },
   });
   if (!result.ok) return result;
   revalidateImpl(implementationId);

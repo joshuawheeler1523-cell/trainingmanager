@@ -177,12 +177,25 @@ export type SolverResult = {
   timedOut: boolean;
 };
 
+/** How the solver orders candidate slots within each variable's domain.
+ *  Constraints are identical across strategies — only the iteration order
+ *  changes, which controls what the result LOOKS LIKE when multiple valid
+ *  packings exist. */
+export type SolverStrategy =
+  | "fastest" // chronological — pack into the earliest open window (default)
+  | "balanced" // maximize gap to the same class's already-placed sessions
+  | "morning" // prefer earlier wall-clock hours
+  | "evening" // prefer later wall-clock hours
+  | "spread"; // maximize gap to ANY already-placed session
+
 export type SolverOptions = {
   /** Wall-clock budget in ms. The search aborts at this point and
    *  returns the best partial result. Default 5000. */
   timeBudgetMs?: number;
   /** Optional clock for deterministic tests. */
   now?: () => number;
+  /** Slot-ordering strategy. Default 'fastest' preserves prior behavior. */
+  strategy?: SolverStrategy;
 };
 
 // ── Internal types ──────────────────────────────────────────────────────────
@@ -612,7 +625,71 @@ type SearchContext = {
    *  produced on a partially-infeasible input, instead of "everything
    *  is a gap." Snapshotted via slice() each time the depth advances. */
   best: Placement[];
+  strategy: SolverStrategy;
 };
+
+// Reorder a variable's slot domain according to the chosen strategy.
+// 'fastest', 'morning', and 'evening' are static (don't depend on what's
+// already placed); 'balanced' and 'spread' look at the current placements
+// to push the next candidate AWAY from already-booked times.
+//
+// O(N * M) for dynamic strategies where N = slots, M = relevant placements.
+// Precompute scores once, then sort by them — avoids re-scanning during
+// the sort's pairwise comparisons.
+function orderSlots(
+  slots: PrecomputedSlot[],
+  strategy: SolverStrategy,
+  classId: string,
+  placements: Placement[],
+): PrecomputedSlot[] {
+  const copy = slots.slice();
+  switch (strategy) {
+    case "fastest":
+      return copy; // already chronological per precompute
+    case "morning":
+      return copy.sort(
+        (a, b) =>
+          a.startHourLocal - b.startHourLocal ||
+          (a.startIso < b.startIso ? -1 : a.startIso > b.startIso ? 1 : 0),
+      );
+    case "evening":
+      return copy.sort(
+        (a, b) =>
+          b.startHourLocal - a.startHourLocal ||
+          (a.startIso < b.startIso ? -1 : a.startIso > b.startIso ? 1 : 0),
+      );
+    case "balanced": {
+      const anchors: number[] = [];
+      for (const p of placements) {
+        if (p.classId === classId) anchors.push(new Date(p.start).getTime());
+      }
+      if (anchors.length === 0) return copy;
+      return scoreAndSortByMaxGap(copy, anchors);
+    }
+    case "spread": {
+      const anchors = placements.map((p) => new Date(p.start).getTime());
+      if (anchors.length === 0) return copy;
+      return scoreAndSortByMaxGap(copy, anchors);
+    }
+  }
+}
+
+function scoreAndSortByMaxGap(slots: PrecomputedSlot[], anchors: number[]): PrecomputedSlot[] {
+  const scored = slots.map((slot) => {
+    const t = new Date(slot.startIso).getTime();
+    let min = Number.POSITIVE_INFINITY;
+    for (const a of anchors) {
+      const d = Math.abs(t - a);
+      if (d < min) min = d;
+    }
+    return { slot, score: min };
+  });
+  // Larger min-distance to nearest anchor goes first → push away from busy.
+  // Tiebreak by original chronological order (preserves stability so the
+  // same input yields the same output across runs).
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((x) => x.slot);
+}
 
 function search(
   variables: Variable[],
@@ -635,10 +712,16 @@ function search(
 
   const prereqMin = prereqEarliestStart(v.prereqClassIds, state.classEarliestStart);
 
+  // Re-order this variable's slot domain per the user's chosen strategy.
+  // Constraints don't change — only WHERE the search looks first. The
+  // backtracking semantics stay correct because we still enumerate the
+  // full domain on each branch.
+  const orderedSlots = orderSlots(v.slots, options.strategy, v.classId, placements);
+
   // Build candidate list: every (slot, trainer) pair on this variable
   // that survives static filters. Within search we then check current
   // busy state.
-  for (const slot of v.slots) {
+  for (const slot of orderedSlots) {
     if (prereqMin !== undefined && slot.startIso < prereqMin) continue;
     if (isRoomBusyAt(state, slot.roomId, slot.startIso, slot.endIso)) continue;
 
@@ -1097,6 +1180,7 @@ export function solve(input: SolverInput, options: SolverOptions = {}): SolverRe
     gaps,
     abortFlag,
     best: [],
+    strategy: options.strategy ?? "fastest",
   };
   const found = search(searchable, trainersById, state, placements, ctx);
 
