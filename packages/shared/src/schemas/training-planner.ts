@@ -285,6 +285,9 @@ export type ImplClass = {
   total_people_to_train: number;
   required_equipment_tags: string[];
   required_equipment_notes: string | null;
+  /** Optional hex override that wins over the deterministic palette color
+   *  in the Schedule view. Set via the class color picker. */
+  color: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

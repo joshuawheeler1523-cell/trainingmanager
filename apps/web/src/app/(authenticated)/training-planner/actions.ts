@@ -943,6 +943,38 @@ export async function updateClass(
   return { ok: true, data };
 }
 
+// Lightweight color override for a single class. Bypasses
+// implClassUpdateSchema so we don't have to plumb `color` through the
+// full Zod schema for a one-off cosmetic edit. Color is validated as
+// a hex string (#rrggbb or #rgb) or null (= reset to default palette).
+export async function updateClassColor(
+  id: string,
+  implementationId: string,
+  color: string | null,
+): Promise<ActionResult<{ id: string; color: string | null }>> {
+  if (color !== null) {
+    const hexOk = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color);
+    if (!hexOk) {
+      return { ok: false, error: { code: "VALIDATION", message: "Color must be a hex string" } };
+    }
+  }
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { error } = await c.supabase
+    .from("impl_classes")
+    .update({ color })
+    .eq("id", id)
+    .eq("org_id", c.orgId);
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+
+  // Color affects the Schedule and Classes pages but not scheduling math,
+  // so no need to bust the dry-run cache.
+  revalidatePath(`/training-planner/${implementationId}/schedule`);
+  revalidatePath(`/training-planner/${implementationId}/classes`);
+  return { ok: true, data: { id, color } };
+}
+
 export async function deleteClass(
   id: string,
   implementationId: string,
