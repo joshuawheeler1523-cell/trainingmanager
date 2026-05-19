@@ -14,7 +14,9 @@ import {
   CalendarDaysIcon,
   CheckCircleIcon,
   DocumentArrowDownIcon,
+  TableCellsIcon,
 } from "@heroicons/react/20/solid";
+import GridScheduleView from "./grid-schedule-view";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import type { ImplClass, ImplRoom, ImplSession, ImplTrainer, Implementation } from "@arbor/shared";
@@ -121,6 +123,7 @@ export default function ScheduleView({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"calendar" | "grid">("calendar");
 
   // Optimistic layer over the server's sessions array. Drag-drop applies a
   // move synchronously here so the event renders at its drop point in the
@@ -283,6 +286,36 @@ export default function ScheduleView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <div className="border-border bg-background flex overflow-hidden rounded-md border">
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode("calendar");
+              }}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium ${
+                viewMode === "calendar"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-surface"
+              }`}
+            >
+              <CalendarDaysIcon className="h-3.5 w-3.5" />
+              Calendar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode("grid");
+              }}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium ${
+                viewMode === "grid"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-surface"
+              }`}
+            >
+              <TableCellsIcon className="h-3.5 w-3.5" />
+              Grid
+            </button>
+          </div>
           <Badge variant="success">No conflict · {conflictCounts.none.toString()}</Badge>
           <Badge variant="warning">Partial · {conflictCounts.partial.toString()}</Badge>
           <Badge variant="danger">Full · {conflictCounts.full.toString()}</Badge>
@@ -332,50 +365,67 @@ export default function ScheduleView({
         </div>
       </div>
 
-      {/* Calendar */}
-      <div className="border-border bg-background rounded-xl border p-4" style={{ height: 700 }}>
-        <DnDCalendar
-          localizer={localizer}
-          events={events}
-          startAccessor="start"
-          endAccessor="end"
-          views={["month", "week", "day", "agenda"]}
-          defaultView="day"
-          defaultDate={
-            implementation.window_start_date
-              ? new Date(implementation.window_start_date + "T00:00:00")
-              : new Date()
-          }
-          tooltipAccessor={(event: CalEvent) => event.resource.tooltip}
-          min={new Date(0, 0, 0, 7, 0, 0)}
-          max={new Date(0, 0, 0, 20, 0, 0)}
-          onSelectEvent={(event) => {
-            setOpenSessionId(event.resource.sessionId);
-          }}
-          onEventDrop={handleEventDrop}
-          onEventResize={handleEventDrop}
-          eventPropGetter={(event: CalEvent) => {
-            const fill = colorForClass(event.resource.classId);
-            const borderColor = CONFLICT_BORDER[event.resource.conflictStatus];
-            const hasBorder = event.resource.conflictStatus !== "none";
-            return {
-              style: {
-                backgroundColor: fill,
-                borderLeft: hasBorder ? `4px solid ${borderColor}` : "none",
-                borderTop: hasBorder ? `1px solid ${borderColor}` : "none",
-                borderRight: hasBorder ? `1px solid ${borderColor}` : "none",
-                borderBottom: hasBorder ? `1px solid ${borderColor}` : "none",
-                color: "#0f172a",
-              },
-            };
-          }}
-          style={{ height: "100%" }}
+      {viewMode === "grid" ? (
+        <GridScheduleView
+          implementation={implementation}
+          sessions={filtered}
+          classes={classes}
+          trainers={trainers}
+          rooms={rooms}
+          orgTimeZone={orgTimeZone}
+          onOpenSession={setOpenSessionId}
         />
-      </div>
-      <p className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
-        Times shown in <b className="text-foreground font-medium normal-case">{orgTimeZone}</b> ·
-        drag any session to move · click for details
-      </p>
+      ) : (
+        <>
+          {/* Calendar */}
+          <div
+            className="border-border bg-background rounded-xl border p-4"
+            style={{ height: 700 }}
+          >
+            <DnDCalendar
+              localizer={localizer}
+              events={events}
+              startAccessor="start"
+              endAccessor="end"
+              views={["month", "week", "day", "agenda"]}
+              defaultView="day"
+              defaultDate={
+                implementation.window_start_date
+                  ? new Date(implementation.window_start_date + "T00:00:00")
+                  : new Date()
+              }
+              tooltipAccessor={(event: CalEvent) => event.resource.tooltip}
+              min={new Date(0, 0, 0, 7, 0, 0)}
+              max={new Date(0, 0, 0, 20, 0, 0)}
+              onSelectEvent={(event) => {
+                setOpenSessionId(event.resource.sessionId);
+              }}
+              onEventDrop={handleEventDrop}
+              onEventResize={handleEventDrop}
+              eventPropGetter={(event: CalEvent) => {
+                const fill = colorForClass(event.resource.classId);
+                const borderColor = CONFLICT_BORDER[event.resource.conflictStatus];
+                const hasBorder = event.resource.conflictStatus !== "none";
+                return {
+                  style: {
+                    backgroundColor: fill,
+                    borderLeft: hasBorder ? `4px solid ${borderColor}` : "none",
+                    borderTop: hasBorder ? `1px solid ${borderColor}` : "none",
+                    borderRight: hasBorder ? `1px solid ${borderColor}` : "none",
+                    borderBottom: hasBorder ? `1px solid ${borderColor}` : "none",
+                    color: "#0f172a",
+                  },
+                };
+              }}
+              style={{ height: "100%" }}
+            />
+          </div>
+          <p className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
+            Times shown in <b className="text-foreground font-medium normal-case">{orgTimeZone}</b>{" "}
+            · drag any session to move · click for details
+          </p>
+        </>
+      )}
 
       <div className="border-border flex items-center justify-between border-t pt-4">
         <a
