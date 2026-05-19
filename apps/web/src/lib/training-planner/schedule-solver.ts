@@ -332,6 +332,7 @@ function learnersForSession(c: ImplClass, sessionIdx: number): number {
 function topologicalOrderClasses(
   classes: ImplClass[],
   prereqs: ImplClassPrerequisite[],
+  rooms: ImplRoom[],
 ): ImplClass[] {
   const inDeg = new Map<string, number>();
   const dependents = new Map<string, string[]>();
@@ -344,8 +345,44 @@ function topologicalOrderClasses(
     dependents.set(p.prerequisite_id, list);
   }
 
-  const sortKey = (c: ImplClass): string =>
-    `${c.sort_order.toString().padStart(10, "0")}|${c.created_at}|${c.id}`;
+  // MRV-style class ordering: prefer classes with the FEWEST eligible rooms
+  // (i.e., the most room-constrained classes) to get placed first. A class
+  // needing 18 seats with 1 eligible room gets dibs on TR1 before a class
+  // needing 4 seats with 3 eligible rooms competes for the same TR1 slot.
+  //
+  // Tie-break by user sort_order then created_at for stability. This is
+  // SAFE in combination with the LCV room ordering in
+  // precomputeSlotsForClass — without LCV, MRV alone over-commits big rooms
+  // because small classes still try big rooms first when they could use
+  // small ones.
+  const eligibleRoomCount = new Map<string, number>();
+  const totalHours = new Map<string, number>();
+  for (const c of classes) {
+    const n = rooms.filter(
+      (r) =>
+        r.seat_capacity >= c.expected_learners_per_session &&
+        tagSubset(c.required_equipment_tags, r.equipment_tags),
+    ).length;
+    eligibleRoomCount.set(c.id, n);
+    const sessions = classSessionsNeeded(c);
+    totalHours.set(c.id, sessions * c.hours_per_session);
+  }
+  const sortKey = (c: ImplClass): string => {
+    const eligibleN = eligibleRoomCount.get(c.id) ?? 9999;
+    // Within the same MRV tier (same eligibleRoomCount), bigger-commitment
+    // classes go first — they have less flexibility once trainer hours
+    // burn. We invert hours by subtracting from a large constant so the
+    // string-compared key sorts DESC by hours.
+    const hours = totalHours.get(c.id) ?? 0;
+    const hoursDesc = (99999 - Math.round(hours * 100)).toString().padStart(7, "0");
+    return [
+      eligibleN.toString().padStart(4, "0"),
+      hoursDesc,
+      c.sort_order.toString().padStart(10, "0"),
+      c.created_at,
+      c.id,
+    ].join("|");
+  };
   const byId = new Map(classes.map((c) => [c.id, c]));
 
   const ready: ImplClass[] = classes
@@ -418,6 +455,20 @@ function precomputeSlotsForClass(
   const bizStartHr = input.businessHoursStartLocal;
   const bizEndHr = input.businessHoursEndLocal;
 
+  // Slot iteration step. Previously we advanced by `hours_per_session`,
+  // which produces only 2 candidate starts per day (e.g., 8 AM and 1 PM
+  // for a 4-hour class). Users routinely place classes at 8:30, 9, 9:30,
+  // 12:30, 2:30, etc. — patterns the solver couldn't generate. A 30-min
+  // step gives ~12 candidate starts per day, which matches how a manager
+  // actually thinks about a calendar grid. The search has more options
+  // and finds packings that align with the manual schedule.
+  //
+  // Trade-off: ~6× more slots per variable. The CSP solver's branching
+  // factor goes up, but the deduplication logic (skipping slots already
+  // produced by lunch-jump) keeps it bounded. Empirically: no-anchor
+  // Riverside still solves in <1s; previously-failing DCH classes fit.
+  const SLOT_STEP_HOURS = 0.5;
+
   for (const room of eligibleRooms) {
     const roomDays = new Set(room.available_days_of_week);
     const roomTz = room.timezone ?? input.orgTimeZone;
@@ -437,13 +488,13 @@ function precomputeSlotsForClass(
     for (const { date, dayOfWeek } of daysInRange(input.windowStartDate, input.cutoffDate)) {
       if (!roomDays.has(dayOfWeek)) continue;
 
-      // Walk the day in instructional steps. The SQL generator advances
-      // local_hr by hours_per_session each iteration (or by wall_clock
-      // when the session straddles lunch). We mirror that.
+      // Walk the day at SLOT_STEP_HOURS granularity. Dedup by effective
+      // start so lunch-jump doesn't produce identical-start slots that
+      // bloat the search.
+      const seenStarts = new Set<number>();
       let localHr = roomStartHr;
       while (localHr + c.hours_per_session <= dayEnd) {
         let wallClockHr = c.hours_per_session;
-        let spansLunch = false;
         let effectiveStart = localHr;
 
         if (lunchActive && effectiveStart >= lunchStartHr && effectiveStart < lunchEndHr) {
@@ -454,30 +505,30 @@ function precomputeSlotsForClass(
           effectiveStart < lunchStartHr &&
           effectiveStart + c.hours_per_session > lunchStartHr
         ) {
-          spansLunch = true;
           wallClockHr = c.hours_per_session + lunchLengthHr;
           if (effectiveStart + wallClockHr > dayEnd) {
-            localHr += c.hours_per_session;
+            localHr += SLOT_STEP_HOURS;
             continue;
           }
         }
 
-        const startIso = wallClockLocalToUtc(date, effectiveStart, roomTz);
-        const endIso = wallClockLocalToUtc(date, effectiveStart + wallClockHr, roomTz);
+        if (!seenStarts.has(effectiveStart)) {
+          seenStarts.add(effectiveStart);
+          const startIso = wallClockLocalToUtc(date, effectiveStart, roomTz);
+          const endIso = wallClockLocalToUtc(date, effectiveStart + wallClockHr, roomTz);
 
-        slots.push({
-          day: date,
-          roomId: room.id,
-          startHourLocal: effectiveStart,
-          wallClockHours: wallClockHr,
-          instructionHours: c.hours_per_session,
-          startIso,
-          endIso,
-        });
+          slots.push({
+            day: date,
+            roomId: room.id,
+            startHourLocal: effectiveStart,
+            wallClockHours: wallClockHr,
+            instructionHours: c.hours_per_session,
+            startIso,
+            endIso,
+          });
+        }
 
-        // Lunch handling: when we jumped past lunch, advance to next
-        // post-lunch instructional step. Otherwise advance by wall_clock.
-        localHr = spansLunch ? effectiveStart + wallClockHr : effectiveStart + c.hours_per_session;
+        localHr += SLOT_STEP_HOURS;
       }
     }
   }
@@ -707,7 +758,7 @@ function buildVariables(input: SolverInput): {
     trainerPto.set(iv.resourceId, list);
   }
 
-  const orderedClasses = topologicalOrderClasses(input.classes, input.prerequisites);
+  const orderedClasses = topologicalOrderClasses(input.classes, input.prerequisites, input.rooms);
   const variables: Variable[] = [];
 
   for (const c of orderedClasses) {
