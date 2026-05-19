@@ -1137,6 +1137,16 @@ export async function setStep(id: string, step: number): Promise<ActionResult<Im
   return updateImpl(id, { current_step: step });
 }
 
+// Toggle between the CSP solver ('auto') and hand-built scheduling
+// ('manual'). The Calculate page reads this to pick its CTA; the Schedule
+// page reads it to decide whether to mount the session pool sidebar.
+export async function setScheduleMode(
+  id: string,
+  mode: "auto" | "manual",
+): Promise<ActionResult<Implementation>> {
+  return updateImpl(id, { schedule_mode: mode });
+}
+
 // ── schedule generator ─────────────────────────────────────────────────────
 
 export type ScheduleGenResult = {

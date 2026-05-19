@@ -25,7 +25,7 @@ import {
 } from "@/lib/training-planner/feasibility";
 import { type ScheduleGenResult } from "../../actions";
 import { dryRunScheduleCached } from "@/lib/training-planner/cached-reads";
-import GenerateButton from "./generate-button";
+import BuildModeSection from "./build-mode-section";
 
 type Params = Promise<{ id: string }>;
 
@@ -180,8 +180,9 @@ export default async function CalculatePage({ params }: { params: Params }) {
 
       <CompletionCard result={feas} impl={implTyped} />
 
-      <GenerateButton
+      <BuildModeSection
         implementationId={id}
+        initialMode={implTyped.schedule_mode}
         ready={feas.ready}
         existingSessions={sessionCount ?? 0}
       />
