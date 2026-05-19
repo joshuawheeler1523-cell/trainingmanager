@@ -5,6 +5,12 @@ import { MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon } from "@heroicons/re
 import type { ImplClass, ImplRoom, ImplSession, ImplTrainer, Implementation } from "@arbor/shared";
 import { toCalendarLocal, fromCalendarLocal } from "@/lib/timezone";
 import { resolveClassColor } from "./class-palette";
+import type { PoolDragPayload } from "./session-pool";
+import { getActivePoolDrag } from "./active-pool-drag";
+import {
+  validateManualPlacement,
+  type ValidationContext,
+} from "@/lib/training-planner/manual-placement";
 
 type Props = {
   implementation: Implementation;
@@ -20,6 +26,20 @@ type Props = {
     newStartIso: string;
     newEndIso: string;
   }) => void;
+  /** Optional manual-placement hook. When provided (manual mode), the grid
+   *  accepts drops from the SessionPool sidebar. Receives the validated
+   *  candidate; the caller persists it via placeManualSession. */
+  onPlaceFromPool?: (args: {
+    classId: string;
+    roomId: string;
+    startLocalDate: string;
+    startLocalHour: number;
+  }) => void;
+  /** Required when onPlaceFromPool is set — the unsaved working state the
+   *  client-side validator runs against. Passed through from schedule-view
+   *  so the pool's drag preview reflects all draft + published sessions. */
+  classTrainers?: ValidationContext["classTrainers"];
+  pto?: ValidationContext["pto"];
 };
 
 // Time grid: 7:00 AM → 7:00 PM in 30-min increments.
@@ -124,6 +144,14 @@ function buildPlacementsForRoom(
   return byDay;
 }
 
+// Slot index → fractional local hour (e.g. slot 2 with 30-min step starting
+// at 7 AM → 8.0). The pool drop side needs the local-hour form because the
+// validator works in calendar time, not UTC.
+function slotIdxToLocalHour(slotIdx: number): number {
+  const totalMin = SLOT_START_HOUR * 60 + slotIdx * SLOT_STEP_MIN;
+  return totalMin / 60;
+}
+
 // Convert a drop target (roomId, date, slotIdx) back to ISO timestamps,
 // preserving the moved session's duration.
 function dropToIso(
@@ -153,6 +181,9 @@ export default function GridScheduleView({
   orgTimeZone,
   onOpenSession,
   onMoveSession,
+  onPlaceFromPool,
+  classTrainers,
+  pto,
 }: Props) {
   const slots = useMemo(() => buildSlots(), []);
   const weekdays = useMemo(
@@ -163,6 +194,32 @@ export default function GridScheduleView({
 
   const classMap = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
   const trainerMap = useMemo(() => new Map(trainers.map((t) => [t.id, t])), [trainers]);
+
+  // Shared validator context — only built when manual mode is wired in.
+  // Declared above the early-return so the hook order stays stable.
+  const validationCtx: ValidationContext | null = useMemo(() => {
+    if (!onPlaceFromPool) return null;
+    return {
+      impl: implementation,
+      classes,
+      rooms,
+      trainers,
+      classTrainers: classTrainers ?? [],
+      sessions,
+      pto: pto ?? [],
+      orgTimeZone,
+    };
+  }, [
+    onPlaceFromPool,
+    implementation,
+    classes,
+    rooms,
+    trainers,
+    classTrainers,
+    sessions,
+    pto,
+    orgTimeZone,
+  ]);
 
   const [zoom, setZoom] = useState<Zoom>("comfortable");
 
@@ -245,6 +302,8 @@ export default function GridScheduleView({
             preset={preset}
             onOpenSession={onOpenSession}
             onMoveSession={onMoveSession}
+            onPlaceFromPool={onPlaceFromPool}
+            validationCtx={validationCtx}
           />
         ))}
       </div>
@@ -265,6 +324,8 @@ function RoomGrid({
   preset,
   onOpenSession,
   onMoveSession,
+  onPlaceFromPool,
+  validationCtx,
 }: {
   room: ImplRoom;
   sessions: ImplSession[];
@@ -276,12 +337,20 @@ function RoomGrid({
   preset: Preset;
   onOpenSession: (sessionId: string) => void;
   onMoveSession: Props["onMoveSession"];
+  onPlaceFromPool: Props["onPlaceFromPool"];
+  validationCtx: ValidationContext | null;
 }) {
   const placements = useMemo(
     () => buildPlacementsForRoom(sessions, room.id, weekdays, orgTimeZone, slots),
     [sessions, room.id, weekdays, orgTimeZone, slots],
   );
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  // For pool drags, the hover preview needs to know whether THIS specific
+  // cell would accept the drop — tinted green when valid, red when not.
+  // Tracked separately so it doesn't fight the move-drag tint.
+  const [poolHover, setPoolHover] = useState<{ key: string; ok: boolean; reason?: string } | null>(
+    null,
+  );
 
   type CellState = { kind: "free" } | { kind: "start"; placed: Placed } | { kind: "occupied" };
   const grid: CellState[][] = Array.from({ length: slots.length }, () =>
@@ -307,21 +376,60 @@ function RoomGrid({
   function onDropTo(date: string, slotIdx: number, e: DragEvent<HTMLTableCellElement>) {
     e.preventDefault();
     setDragOverKey(null);
+    setPoolHover(null);
     const payload = e.dataTransfer.getData("application/json");
     if (!payload) return;
-    let parsed: { sessionId: string; durationMin: number };
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(payload) as { sessionId: string; durationMin: number };
+      parsed = JSON.parse(payload);
     } catch {
       return;
     }
-    const { startIso, endIso } = dropToIso(date, slotIdx, parsed.durationMin, orgTimeZone);
+    if (!parsed || typeof parsed !== "object") return;
+    const kind = (parsed as { kind?: string }).kind;
+
+    if (kind === "pool") {
+      if (!onPlaceFromPool) return;
+      const pool = parsed as PoolDragPayload;
+      const startLocalHour = slotIdxToLocalHour(slotIdx);
+      onPlaceFromPool({
+        classId: pool.classId,
+        roomId: room.id,
+        startLocalDate: date,
+        startLocalHour,
+      });
+      return;
+    }
+
+    // Legacy payload: moving an already-placed session.
+    const move = parsed as { sessionId?: string; durationMin?: number };
+    if (typeof move.sessionId !== "string" || typeof move.durationMin !== "number") return;
+    const { startIso, endIso } = dropToIso(date, slotIdx, move.durationMin, orgTimeZone);
     onMoveSession({
-      sessionId: parsed.sessionId,
+      sessionId: move.sessionId,
       newRoomId: room.id,
       newStartIso: startIso,
       newEndIso: endIso,
     });
+  }
+
+  // Validate a candidate pool drop against the shared validator. Cheap to
+  // call per dragOver event — the validator runs in-memory over rows already
+  // in props. The result drives both the cell tint and the cursor effect.
+  function previewPoolDrop(
+    classId: string,
+    date: string,
+    slotIdx: number,
+  ): { ok: boolean; reason?: string } {
+    if (!validationCtx) return { ok: false, reason: "Manual mode not enabled." };
+    const startLocalHour = slotIdxToLocalHour(slotIdx);
+    const result = validateManualPlacement(
+      { classId, roomId: room.id, startLocalDate: date, startLocalHour },
+      validationCtx,
+    );
+    if (result.ok) return { ok: true };
+    const first = result.reasons[0];
+    return first ? { ok: false, reason: first } : { ok: false };
   }
 
   return (
@@ -389,18 +497,50 @@ function RoomGrid({
                   }
                   const key = `${w.date}|${slotIdx.toString()}`;
                   const isOver = dragOverKey === key;
+                  // Pool preview wins visually when active — it carries the
+                  // valid/invalid signal the user is shopping for.
+                  const isPoolOver = poolHover?.key === key;
+                  const poolOk = poolHover?.ok ?? false;
+                  const cellBg = isPoolOver
+                    ? poolOk
+                      ? "bg-emerald-200/40 dark:bg-emerald-700/30"
+                      : "bg-rose-200/40 dark:bg-rose-700/30"
+                    : isOver
+                      ? "bg-primary/10"
+                      : "";
                   return (
                     <td
                       key={w.date}
-                      className={`border-border border-b border-r ${isOver ? "bg-primary/10" : ""}`}
+                      title={isPoolOver && !poolOk ? poolHover.reason : undefined}
+                      className={`border-border border-b border-r ${cellBg}`}
                       style={{ height: preset.rowH }}
                       onDragOver={(e) => {
                         e.preventDefault();
+                        // Pool-mode preview path. The active pool drag is
+                        // published to a module-level signal on dragStart
+                        // because HTML5 DnD hides the dataTransfer payload
+                        // until drop. The grid reads it here, validates the
+                        // candidate against the shared validator, and tints
+                        // the cell green/red.
+                        const active = getActivePoolDrag();
+                        if (active && validationCtx && onPlaceFromPool) {
+                          const verdict = previewPoolDrop(active.classId, w.date, slotIdx);
+                          e.dataTransfer.dropEffect = verdict.ok ? "copy" : "none";
+                          if (!isPoolOver || poolOk !== verdict.ok) {
+                            setPoolHover({
+                              key,
+                              ok: verdict.ok,
+                              ...(verdict.reason ? { reason: verdict.reason } : {}),
+                            });
+                          }
+                          return;
+                        }
                         e.dataTransfer.dropEffect = "move";
                         if (dragOverKey !== key) setDragOverKey(key);
                       }}
                       onDragLeave={() => {
                         if (dragOverKey === key) setDragOverKey(null);
+                        if (poolHover?.key === key) setPoolHover(null);
                       }}
                       onDrop={(e) => {
                         onDropTo(w.date, slotIdx, e);

@@ -4,6 +4,7 @@ import { useMemo, useState, type DragEvent } from "react";
 import { CheckCircleIcon, MagnifyingGlassIcon } from "@heroicons/react/20/solid";
 import type { ImplClass, ImplSession } from "@arbor/shared";
 import { resolveClassColor } from "./class-palette";
+import { setActivePoolDrag } from "./active-pool-drag";
 
 type Props = {
   classes: ImplClass[];
@@ -211,6 +212,13 @@ function PoolChip({ item, indexInRemaining }: { item: PoolItem; indexInRemaining
     // anchor in grid-schedule-view so pre-drop preview lines up with where
     // the block will actually land.
     e.dataTransfer.setDragImage(e.currentTarget, 4, 4);
+    // Publish to the module-level signal so grid cells can read the class
+    // id during dragOver — dataTransfer payload bytes are hidden until drop.
+    setActivePoolDrag(payload);
+  }
+
+  function onDragEnd() {
+    setActivePoolDrag(null);
   }
 
   return (
@@ -218,6 +226,7 @@ function PoolChip({ item, indexInRemaining }: { item: PoolItem; indexInRemaining
       type="button"
       draggable
       onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       title={`Drag ${item.className} session #${(indexInRemaining + 1).toString()} onto the grid`}
       className="border-border/60 text-foreground hover:ring-primary/40 inline-flex cursor-grab items-center justify-center rounded-md border px-2 py-1 text-[10px] font-semibold tabular-nums hover:ring-2 active:cursor-grabbing"
       style={{ backgroundColor: item.color }}

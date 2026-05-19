@@ -18,6 +18,8 @@ export default async function SchedulePage({ params }: { params: Params }) {
     { data: trainers },
     { data: rooms },
     { data: org },
+    { data: classTrainers },
+    { data: pto },
   ] = await Promise.all([
     supabase
       .from("implementations")
@@ -46,6 +48,14 @@ export default async function SchedulePage({ params }: { params: Params }) {
       .eq("org_id", orgId)
       .order("name"),
     supabase.from("organizations").select("time_zone").eq("id", orgId).maybeSingle(),
+    supabase
+      .from("impl_class_trainers")
+      .select("impl_class_id, impl_trainer_id")
+      .eq("org_id", orgId),
+    supabase
+      .from("impl_trainer_unavailability")
+      .select("impl_trainer_id, starts_at, ends_at")
+      .eq("org_id", orgId),
   ]);
 
   if (!impl) notFound();
@@ -61,6 +71,8 @@ export default async function SchedulePage({ params }: { params: Params }) {
       rooms={rooms ?? []}
       backHref={`/training-planner/${id}/calculate`}
       orgTimeZone={orgTimeZone}
+      classTrainers={classTrainers ?? []}
+      pto={pto ?? []}
     />
   );
 }

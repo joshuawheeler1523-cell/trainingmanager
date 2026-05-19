@@ -26,6 +26,7 @@ import type { ImplClass, ImplRoom, ImplSession, ImplTrainer, Implementation } fr
 import { Badge, Eyebrow } from "@/components/ui";
 import { toCalendarLocal, fromCalendarLocal } from "@/lib/timezone";
 import {
+  placeManualSession,
   publishImplementation,
   setSessionStatus,
   updateSessionAssignments,
@@ -40,6 +41,10 @@ type Props = {
   rooms: ImplRoom[];
   backHref: string;
   orgTimeZone: string;
+  /** Manual-mode validator inputs — passed through to the grid so the pool
+   *  drag preview reflects all draft + published sessions client-side. */
+  classTrainers?: { impl_class_id: string; impl_trainer_id: string }[];
+  pto?: { impl_trainer_id: string; starts_at: string; ends_at: string }[];
 };
 
 type Resource = {
@@ -92,6 +97,8 @@ export default function ScheduleView({
   rooms,
   backHref,
   orgTimeZone,
+  classTrainers,
+  pto,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -169,6 +176,26 @@ export default function ScheduleView({
       };
     });
   }, [filtered, classMap, trainerMap, roomMap, orgTimeZone]);
+
+  function handlePlaceFromPool(args: {
+    classId: string;
+    roomId: string;
+    startLocalDate: string;
+    startLocalHour: number;
+  }) {
+    startTransition(async () => {
+      const r = await placeManualSession({
+        implementationId: implementation.id,
+        ...args,
+      });
+      if (r.ok) {
+        toast.success("Session placed");
+        router.refresh();
+      } else {
+        toast.error(r.error.message);
+      }
+    });
+  }
 
   function handleGridMove(args: {
     sessionId: string;
@@ -404,6 +431,9 @@ export default function ScheduleView({
                 orgTimeZone={orgTimeZone}
                 onOpenSession={setOpenSessionId}
                 onMoveSession={handleGridMove}
+                onPlaceFromPool={handlePlaceFromPool}
+                classTrainers={classTrainers ?? []}
+                pto={pto ?? []}
               />
             </div>
           </div>
