@@ -13,9 +13,10 @@ import PageHeader from "@/components/ui/page-header";
 import { Eyebrow } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import { isManager } from "@/lib/auth/role";
+import { getCurrentRole, isManager } from "@/lib/auth/role";
 import { Label } from "@/components/labels";
 import SetupChecklist from "./setup-checklist";
+import InstructorDashboard from "./instructor-dashboard";
 import type { CapacityRow, Instructor } from "@arbor/shared";
 
 export default async function DashboardPage() {
@@ -28,6 +29,14 @@ export default async function DashboardPage() {
         <div className="text-muted-foreground p-6 text-sm">No active organization.</div>
       </div>
     );
+  }
+
+  // Non-manager roles (instructor / viewer) see a personal "what's on my
+  // plate" view instead of the org-wide rollup. Managers get the existing
+  // capacity / KPI / department dashboard below.
+  const role = await getCurrentRole(orgId);
+  if (role === "instructor" || role === "viewer") {
+    return <InstructorDashboard orgId={orgId} />;
   }
 
   const orgAdmin = await isManager(orgId);
