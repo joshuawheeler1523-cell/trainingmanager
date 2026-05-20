@@ -21,30 +21,35 @@ import {
   WrenchScrewdriverIcon,
   Bars3Icon,
   XMarkIcon,
-  ArrowRightEndOnRectangleIcon,
   StarIcon,
 } from "@heroicons/react/24/outline";
 import type { ToggleableModule } from "@arbor/shared";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/labels";
-import { logout } from "@/app/(authenticated)/actions";
+import { Eyebrow } from "@/components/ui";
 
 type IconType = React.ComponentType<{ className?: string }>;
+
+// SidebarCounts: live numerals shown next to specific nav items so the
+// menu reads as information density, not just navigation. Each is a count
+// of "things on the user's plate" — RLS scopes it per-role automatically.
+export type SidebarCounts = {
+  workIntake?: number;
+  requestQueue?: number;
+  oneOnOnes?: number;
+};
 
 type NavItem = {
   href: string;
   label: React.ReactNode;
   icon: IconType;
-  badge?: number;
+  countKey?: keyof SidebarCounts;
 };
 type NavGroup = { title: string; items: NavItem[] };
 type ModuleFlags = Record<ToggleableModule, boolean>;
 
 const HOME: NavItem = { href: "/", label: "Dashboard", icon: HomeIcon };
 
-// Nav groups are computed per-render based on the org's enabled modules.
-// Modules off → item hidden. Hospital training has all modules on, so the
-// nav looks identical to before this change.
 function teamGroup(modules: ModuleFlags): NavGroup {
   const items: NavItem[] = [
     { href: "/instructors", label: <Label kind="entity.instructor" plural />, icon: UserGroupIcon },
@@ -60,16 +65,31 @@ function teamGroup(modules: ModuleFlags): NavGroup {
 function workGroup(modules: ModuleFlags): NavGroup {
   const items: NavItem[] = [
     { href: "/allocations", label: "Allocations", icon: AdjustmentsHorizontalIcon },
-    { href: "/tras", label: "Work Intake", icon: ClipboardDocumentListIcon },
+    {
+      href: "/tras",
+      label: "Work Intake",
+      icon: ClipboardDocumentListIcon,
+      countKey: "workIntake",
+    },
   ];
   if (modules["module.education_requests"]) {
-    items.push({ href: "/request-queue", label: "Request Queue", icon: InboxStackIcon });
+    items.push({
+      href: "/request-queue",
+      label: "Request Queue",
+      icon: InboxStackIcon,
+      countKey: "requestQueue",
+    });
   }
   items.push({ href: "/projects", label: "Special Projects", icon: BriefcaseIcon });
   if (modules["module.training_planner"]) {
     items.push({ href: "/training-planner", label: "Training Planner", icon: CalendarDaysIcon });
   }
-  items.push({ href: "/one-on-ones", label: "1:1s", icon: ChatBubbleLeftRightIcon });
+  items.push({
+    href: "/one-on-ones",
+    label: "1:1s",
+    icon: ChatBubbleLeftRightIcon,
+    countKey: "oneOnOnes",
+  });
   return { title: "Work", items };
 }
 
@@ -96,10 +116,12 @@ function isActive(pathname: string, href: string): boolean {
 function NavLink({
   item,
   pathname,
+  count,
   onNavigate,
 }: {
   item: NavItem;
   pathname: string;
+  count: number | undefined;
   onNavigate?: (() => void) | undefined;
 }) {
   const active = isActive(pathname, item.href);
@@ -112,21 +134,30 @@ function NavLink({
       }}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-        active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-surface",
+        // Editorial active state: left-edge sage rail + bolder type, no
+        // background pill. Inactive items hover to surface for affordance.
+        "group relative flex items-center gap-2.5 py-1.5 pl-4 pr-3 text-sm transition-colors",
+        active
+          ? "text-foreground font-display border-l-2 border-[var(--primary)] font-medium"
+          : "text-muted-foreground hover:text-foreground border-l-2 border-transparent font-normal",
       )}
     >
-      <Icon className={cn("h-4 w-4 shrink-0", !active && "text-muted-foreground")} />
+      <Icon
+        className={cn(
+          "h-3.5 w-3.5 shrink-0",
+          active ? "text-[var(--primary)]" : "text-muted-foreground/70",
+        )}
+      />
       <span className="truncate">{item.label}</span>
-      {typeof item.badge === "number" && item.badge > 0 && (
+      {typeof count === "number" && count > 0 && (
         <span
           className={cn(
-            "ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
-            active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-amber-500 text-white",
+            "ml-auto font-mono text-[10.5px] tabular-nums",
+            active ? "text-[var(--primary)]" : "text-muted-foreground",
           )}
-          aria-label={`${item.badge.toString()} pending`}
+          aria-label={`${count.toString()} on your plate`}
         >
-          {item.badge}
+          {count}
         </span>
       )}
     </Link>
@@ -135,19 +166,37 @@ function NavLink({
 
 function NavGroupBlock({
   group,
+  number,
   pathname,
+  counts,
   onNavigate,
 }: {
   group: NavGroup;
+  number: string;
   pathname: string;
+  counts: SidebarCounts;
   onNavigate?: (() => void) | undefined;
 }) {
   return (
     <div>
-      <p className="text-muted-foreground mb-1 px-3 text-xs font-semibold">{group.title}</p>
-      <div className="space-y-0.5">
+      <div className="border-border/60 mb-1 flex items-baseline gap-2 border-b border-dashed pb-1.5 pl-4 pr-3">
+        <Eyebrow className="text-muted-foreground">
+          <span className="tabular-nums opacity-60">{number}</span>
+          <span aria-hidden="true" className="mx-1.5 opacity-40">
+            —
+          </span>
+          {group.title}
+        </Eyebrow>
+      </div>
+      <div className="space-y-px">
         {group.items.map((item) => (
-          <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
+          <NavLink
+            key={item.href}
+            item={item}
+            pathname={pathname}
+            count={item.countKey ? counts[item.countKey] : undefined}
+            onNavigate={onNavigate}
+          />
         ))}
       </div>
     </div>
@@ -157,15 +206,27 @@ function NavGroupBlock({
 function SidebarContent({
   isAdmin,
   modules,
+  counts,
   onNavigate,
 }: {
   isAdmin: boolean;
   modules: ModuleFlags;
+  counts: SidebarCounts;
   onNavigate?: (() => void) | undefined;
 }) {
   const pathname = usePathname();
   const team = teamGroup(modules);
   const work = workGroup(modules);
+  // Section numbering is computed left-to-right so hidden Admin doesn't
+  // skip a number for non-admin users.
+  const numberedGroups: { group: NavGroup; number: string }[] = [
+    { group: team, number: "01" },
+    { group: work, number: "02" },
+    { group: INSIGHTS_GROUP, number: "03" },
+    { group: TOOLS_GROUP, number: "04" },
+  ];
+  if (isAdmin) numberedGroups.push({ group: ADMIN_GROUP, number: "05" });
+
   return (
     <>
       <div className="border-border flex h-16 shrink-0 items-center border-b px-4">
@@ -189,47 +250,59 @@ function SidebarContent({
       </div>
 
       <nav
-        className="flex flex-1 flex-col gap-5 overflow-y-auto px-2 py-4"
+        className="flex flex-1 flex-col gap-5 overflow-y-auto py-5"
         aria-label="Primary navigation"
       >
-        <div className="space-y-0.5">
-          <NavLink item={HOME} pathname={pathname} onNavigate={onNavigate} />
+        <div>
+          <NavLink item={HOME} pathname={pathname} count={undefined} onNavigate={onNavigate} />
         </div>
-        <NavGroupBlock group={team} pathname={pathname} onNavigate={onNavigate} />
-        <NavGroupBlock group={work} pathname={pathname} onNavigate={onNavigate} />
-        <NavGroupBlock group={INSIGHTS_GROUP} pathname={pathname} onNavigate={onNavigate} />
-        <NavGroupBlock group={TOOLS_GROUP} pathname={pathname} onNavigate={onNavigate} />
-        {isAdmin && (
-          <NavGroupBlock group={ADMIN_GROUP} pathname={pathname} onNavigate={onNavigate} />
-        )}
+        {numberedGroups.map(({ group, number }) => (
+          <NavGroupBlock
+            key={group.title}
+            group={group}
+            number={number}
+            pathname={pathname}
+            counts={counts}
+            onNavigate={onNavigate}
+          />
+        ))}
       </nav>
 
-      <div className="border-border border-t px-2 py-3">
-        <form action={logout}>
-          <button
-            type="submit"
-            className="text-muted-foreground hover:bg-surface hover:text-foreground flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors"
-          >
-            <ArrowRightEndOnRectangleIcon className="h-4 w-4 shrink-0" />
-            <span>Sign out</span>
-          </button>
-        </form>
+      <div className="border-border/60 text-muted-foreground/80 border-t px-4 py-3 font-mono text-[10px] uppercase tracking-[0.08em]">
+        <span aria-hidden="true">⌘K</span>
+        <span className="ml-2">to search</span>
       </div>
     </>
   );
 }
 
 /** Desktop sidebar — visible on md+, sticky full-height. */
-export function DesktopSidebar({ isAdmin, modules }: { isAdmin: boolean; modules: ModuleFlags }) {
+export function DesktopSidebar({
+  isAdmin,
+  modules,
+  counts,
+}: {
+  isAdmin: boolean;
+  modules: ModuleFlags;
+  counts: SidebarCounts;
+}) {
   return (
     <aside className="border-border bg-background sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r md:flex">
-      <SidebarContent isAdmin={isAdmin} modules={modules} />
+      <SidebarContent isAdmin={isAdmin} modules={modules} counts={counts} />
     </aside>
   );
 }
 
 /** Mobile drawer — hamburger trigger + slide-in panel. */
-export function MobileSidebar({ isAdmin, modules }: { isAdmin: boolean; modules: ModuleFlags }) {
+export function MobileSidebar({
+  isAdmin,
+  modules,
+  counts,
+}: {
+  isAdmin: boolean;
+  modules: ModuleFlags;
+  counts: SidebarCounts;
+}) {
   const [open, setOpen] = useState(false);
   const close = () => {
     setOpen(false);
@@ -259,7 +332,7 @@ export function MobileSidebar({ isAdmin, modules }: { isAdmin: boolean; modules:
               <XMarkIcon className="h-5 w-5" />
             </button>
           </Dialog.Close>
-          <SidebarContent isAdmin={isAdmin} modules={modules} onNavigate={close} />
+          <SidebarContent isAdmin={isAdmin} modules={modules} counts={counts} onNavigate={close} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
