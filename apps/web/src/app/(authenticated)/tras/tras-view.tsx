@@ -7,6 +7,7 @@ import EmptyState from "@/components/ui/empty-state";
 import { Badge, Eyebrow, type BadgeVariant } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import TraFormDialog from "./tra-form-dialog";
+import { RoleGate } from "@/components/auth/role-gate";
 import { TRA_PRIORITY_VALUES, TRA_STATUS_VALUES } from "@arbor/shared";
 import type { Tra, TraPriority, TraStatus } from "@arbor/shared";
 
@@ -110,17 +111,19 @@ export default function TrasView({ tras, departments }: Props) {
           </div>
         </div>
 
-        <TraFormDialog
-          trigger={
-            <button
-              type="button"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
-            >
-              <PlusIcon className="h-4 w-4" />
-              New work intake
-            </button>
-          }
-        />
+        <RoleGate roles={["manager", "instructor"]}>
+          <TraFormDialog
+            trigger={
+              <button
+                type="button"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+              >
+                <PlusIcon className="h-4 w-4" />
+                New work intake
+              </button>
+            }
+          />
+        </RoleGate>
       </div>
 
       {/* Secondary filters — kept compact; priority/department/archived */}

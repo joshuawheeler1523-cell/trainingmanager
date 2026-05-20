@@ -62,7 +62,7 @@ function teamGroup(modules: ModuleFlags): NavGroup {
   return { title: "Team", items };
 }
 
-function workGroup(modules: ModuleFlags): NavGroup {
+function workGroup(modules: ModuleFlags, isAdmin: boolean): NavGroup {
   const items: NavItem[] = [
     { href: "/allocations", label: "Allocations", icon: AdjustmentsHorizontalIcon },
     {
@@ -84,12 +84,16 @@ function workGroup(modules: ModuleFlags): NavGroup {
   if (modules["module.training_planner"]) {
     items.push({ href: "/training-planner", label: "Training Planner", icon: CalendarDaysIcon });
   }
-  items.push({
-    href: "/one-on-ones",
-    label: "1:1s",
-    icon: ChatBubbleLeftRightIcon,
-    countKey: "oneOnOnes",
-  });
+  // 1:1s is manager-only; the page renders a "managers only" placeholder
+  // for everyone else, so hide the link to avoid a dangling dead nav item.
+  if (isAdmin) {
+    items.push({
+      href: "/one-on-ones",
+      label: "1:1s",
+      icon: ChatBubbleLeftRightIcon,
+      countKey: "oneOnOnes",
+    });
+  }
   return { title: "Work", items };
 }
 
@@ -216,7 +220,7 @@ function SidebarContent({
 }) {
   const pathname = usePathname();
   const team = teamGroup(modules);
-  const work = workGroup(modules);
+  const work = workGroup(modules, isAdmin);
   // Section numbering is computed left-to-right so hidden Admin doesn't
   // skip a number for non-admin users.
   const numberedGroups: { group: NavGroup; number: string }[] = [
