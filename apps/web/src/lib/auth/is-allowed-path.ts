@@ -5,6 +5,7 @@ const UNAUTHENTICATED_ALLOWED = [
   "/auth/callback",
   "/auth/reset",
   "/auth/verify",
+  "/accept-invite/", // token-gated set-password page for new users
   "/public/",
   "/agency-signup",
   "/legal",
@@ -29,6 +30,7 @@ const ORG_CHECK_SKIP = [
   "/auth/callback",
   "/auth/reset",
   "/auth/verify",
+  "/accept-invite/",
   "/public/",
   "/agency",
   "/agency-signup",
