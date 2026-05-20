@@ -18,6 +18,14 @@ vi.mock("@/lib/auth/current-department", () => ({
   getCurrentDepartmentId: mockGetCurrentDepartmentId,
 }));
 
+// Mock the role helper so tests don't try to call the real Supabase RPC.
+// Default to manager so existing happy-path tests keep passing; specific
+// tests can override per-call to assert the FORBIDDEN branch.
+vi.mock("@/lib/auth/role", () => ({
+  getCurrentRole: vi.fn(() => Promise.resolve("manager")),
+  isManager: vi.fn(() => Promise.resolve(true)),
+}));
+
 const { createTra, addDeliverable, markTraDocumented, markTraComplete, cancelTra } =
   await import("./actions");
 const { computeDeliverableEstimatedHours, traPriorityToProjectPriority } =

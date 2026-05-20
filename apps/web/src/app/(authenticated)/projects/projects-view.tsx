@@ -9,6 +9,7 @@ import EmptyState from "@/components/ui/empty-state";
 import { Badge, Eyebrow, type BadgeVariant } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import ProjectFormDialog from "./project-form-dialog";
+import { RoleGate } from "@/components/auth/role-gate";
 import {
   PROJECT_STATUS_VALUES,
   PROJECT_PRIORITY_VALUES,
@@ -130,16 +131,18 @@ export default function ProjectsView({ projects }: Props) {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setOpenCreate(true);
-          }}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium"
-        >
-          <PlusIcon className="h-4 w-4" />
-          New project
-        </button>
+        <RoleGate roles={["manager", "instructor"]}>
+          <button
+            type="button"
+            onClick={() => {
+              setOpenCreate(true);
+            }}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium"
+          >
+            <PlusIcon className="h-4 w-4" />
+            New project
+          </button>
+        </RoleGate>
       </div>
 
       {/* Priority filter, secondary */}

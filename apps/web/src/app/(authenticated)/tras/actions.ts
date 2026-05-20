@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
+import { getCurrentRole } from "@/lib/auth/role";
 import {
   traInsertSchema,
   traUpdateSchema,
@@ -60,6 +61,13 @@ async function ctx() {
       ok: false as const,
       error: { code: "NO_DEPARTMENT", message: "No active department" },
     };
+  }
+  // TRA mutations are manager + instructor. Instructors create their own
+  // draft/documented TRAs; row-level scoping happens in RLS. Viewers are
+  // blocked here so they fail fast with a clean error.
+  const role = await getCurrentRole(orgId);
+  if (role !== "manager" && role !== "instructor") {
+    return { ok: false as const, error: { code: "FORBIDDEN", message: "Permission denied" } };
   }
   return { ok: true as const, supabase, orgId, departmentId };
 }

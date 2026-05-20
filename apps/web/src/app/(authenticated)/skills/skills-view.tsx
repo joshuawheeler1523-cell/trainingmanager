@@ -12,6 +12,7 @@ import {
   ArrowUpTrayIcon,
 } from "@heroicons/react/20/solid";
 import SkillFormDialog from "./skill-form-dialog";
+import { ManagerOnly } from "@/components/auth/role-gate";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import CsvImportDialog from "@/components/csv-import-dialog";
 import { Badge, Eyebrow, Tabs, type TabItem } from "@/components/ui";
@@ -198,21 +199,23 @@ function LibraryTab({
               </button>
             }
           />
-          <SkillFormDialog
-            mode="create"
-            trigger={
-              <button
-                type="button"
-                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
-              >
-                <PlusIcon className="h-4 w-4" />
-                Add skill
-              </button>
-            }
-            onSuccess={() => {
-              router.refresh();
-            }}
-          />
+          <ManagerOnly>
+            <SkillFormDialog
+              mode="create"
+              trigger={
+                <button
+                  type="button"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Add skill
+                </button>
+              }
+              onSuccess={() => {
+                router.refresh();
+              }}
+            />
+          </ManagerOnly>
         </div>
       </div>
 

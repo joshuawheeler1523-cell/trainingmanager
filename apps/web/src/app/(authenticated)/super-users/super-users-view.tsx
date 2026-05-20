@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import EmptyState from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import { ManagerOnly } from "@/components/auth/role-gate";
 import SuperUserFormDialog from "./super-user-form-dialog";
 import { markSuperUserTrained, restoreSuperUser, softDeleteSuperUser } from "./actions";
 import type { SuperUserWithClass } from "@arbor/shared";
@@ -180,18 +181,20 @@ export default function SuperUsersView(props: Props) {
             <PrinterIcon className="h-4 w-4" />
             Print
           </Link>
-          <SuperUserFormDialog
-            mode="create"
-            classes={props.classes}
-            trigger={
-              <button
-                type="button"
-                className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90"
-              >
-                Add super user
-              </button>
-            }
-          />
+          <ManagerOnly>
+            <SuperUserFormDialog
+              mode="create"
+              classes={props.classes}
+              trigger={
+                <button
+                  type="button"
+                  className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90"
+                >
+                  Add super user
+                </button>
+              }
+            />
+          </ManagerOnly>
         </div>
       </div>
 

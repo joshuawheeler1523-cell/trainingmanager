@@ -18,6 +18,11 @@ vi.mock("@/lib/auth/current-department", () => ({
   getCurrentDepartmentId: mockGetCurrentDepartmentId,
 }));
 
+vi.mock("@/lib/auth/role", () => ({
+  getCurrentRole: vi.fn(() => Promise.resolve("manager")),
+  isManager: vi.fn(() => Promise.resolve(true)),
+}));
+
 const {
   createProject,
   updateProject,

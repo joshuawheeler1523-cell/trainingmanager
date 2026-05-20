@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
+import { isManager } from "@/lib/auth/role";
 import {
   bucketInsertSchema,
   bucketUpdateSchema,
@@ -53,6 +54,12 @@ async function ctx() {
       ok: false as const,
       error: { code: "NO_DEPARTMENT", message: "No active department" },
     };
+  }
+  // Defense-in-depth: allocation mutations are manager-only. RLS also
+  // enforces this; the app-layer check fails fast with a clean error
+  // before any DB round-trip.
+  if (!(await isManager(orgId))) {
+    return { ok: false as const, error: { code: "FORBIDDEN", message: "Permission denied" } };
   }
   return { ok: true as const, supabase, orgId, departmentId };
 }
