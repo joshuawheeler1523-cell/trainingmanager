@@ -5815,6 +5815,7 @@ export type Database = {
         };
         Returns: undefined;
       };
+      auth_user_id_by_email: { Args: { p_email: string }; Returns: string };
       calculate_period_rev_share: {
         Args: {
           p_agency_id: string;

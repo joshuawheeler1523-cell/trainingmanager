@@ -4,16 +4,16 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { env } from "@/lib/env";
 import type { Database } from "@/lib/supabase/database.types";
-import AcceptForm from "./accept-form";
+import AcceptForm, { SetPasswordForm } from "./accept-form";
 
 type Params = Promise<{ token: string }>;
 
-// /accept-invite/[token] — public route. Renders three states:
-//   1. Token invalid / unknown → 404-ish copy
+// /accept-invite/[token] — public route. Renders:
+//   1. Token invalid / unknown → "not found" copy
 //   2. Token expired or already accepted → status copy
-//   3. Token valid + user signed in → "Accept" CTA
-//      Token valid + user NOT signed in → "Sign in to accept" CTA that
-//      redirects to /login?next=/accept-invite/<token>
+//   3. Token valid + user NOT signed in → SetPasswordForm (primary flow)
+//   4. Token valid + user signed in with matching email → Accept CTA
+//   5. Token valid + user signed in with DIFFERENT email → warning
 
 export default async function AcceptInvitePage({ params }: { params: Params }) {
   const { token } = await params;
@@ -97,17 +97,12 @@ export default async function AcceptInvitePage({ params }: { params: Params }) {
         ) : (
           <p className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
             You&apos;re signed in as <span className="font-medium">{user.email}</span>, but this
-            invitation is for <span className="font-medium">{invite.email}</span>. Sign out and sign
-            back in with the matching email.
+            invitation is for <span className="font-medium">{invite.email}</span>. Sign out and try
+            the link again.
           </p>
         )
       ) : (
-        <Link
-          href={`/login?next=${encodeURIComponent(`/accept-invite/${token}`)}`}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 mt-4 inline-flex rounded-md px-3 py-1.5 text-sm font-medium"
-        >
-          Sign in to accept
-        </Link>
+        <SetPasswordForm token={token} email={invite.email} />
       )}
     </Shell>
   );

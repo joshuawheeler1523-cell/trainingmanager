@@ -102,13 +102,13 @@ export function inviteEmailHtml(args: {
       ${logoBlock}
       <h2 style="font-size:18px;margin:0 0 12px;">${safeInviter} invited you to ${safeOrg}</h2>
       <p style="font-size:14px;line-height:1.5;color:#475569;">
-        Click the button below to accept the invitation and sign in. The link is
+        Click the button below to set your password and sign in. The link is
         valid for 7 days.
       </p>
       <p style="margin:24px 0;">
         <a href="${args.acceptUrl}"
            style="background:${primary};color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;">
-          Accept invitation
+          Set up your account
         </a>
       </p>
       <p style="font-size:12px;color:#64748b;">
@@ -128,7 +128,7 @@ export function inviteEmailText(args: {
   return [
     `${inviter} invited you to ${args.orgName}.`,
     "",
-    "Accept the invitation here (valid for 7 days):",
+    "Set up your account here (valid for 7 days):",
     args.acceptUrl,
     "",
   ].join("\n");
