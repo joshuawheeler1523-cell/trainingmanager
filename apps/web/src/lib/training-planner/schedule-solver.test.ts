@@ -13,7 +13,6 @@ function makeRoom(over: Partial<ImplRoom> = {}): ImplRoom {
   return {
     id: over.id ?? "r1",
     org_id: "o1",
-    department_id: "d1",
     implementation_id: "i1",
     name: over.name ?? "Room A",
     location: null,
@@ -36,7 +35,6 @@ function makeTrainer(over: Partial<ImplTrainer> = {}): ImplTrainer {
   return {
     id: over.id ?? "t1",
     org_id: "o1",
-    department_id: "d1",
     implementation_id: "i1",
     instructor_id: over.instructor_id ?? null,
     name: over.name ?? "Trainer A",
@@ -55,7 +53,6 @@ function makeClass(over: Partial<ImplClass> = {}): ImplClass {
   return {
     id: over.id ?? "c1",
     org_id: "o1",
-    department_id: "d1",
     implementation_id: "i1",
     module_id: null,
     name: over.name ?? "Class A",
@@ -65,6 +62,7 @@ function makeClass(over: Partial<ImplClass> = {}): ImplClass {
     total_people_to_train: over.total_people_to_train ?? 10,
     required_equipment_tags: over.required_equipment_tags ?? [],
     required_equipment_notes: null,
+    color: over.color ?? null,
     sort_order: over.sort_order ?? 0,
     created_at: "2026-05-01T00:00:00Z",
     updated_at: "2026-05-01T00:00:00Z",
@@ -140,7 +138,6 @@ describe("solve - prereq ordering", () => {
         {
           id: "p1",
           org_id: "o1",
-          department_id: "d1",
           impl_class_id: "c1",
           prerequisite_id: "c2",
           created_at: "2026-05-01T00:00:00Z",
@@ -595,6 +592,7 @@ function localToUtc(date: string, hour: number, tz: string): string {
   return new Date(guess).toISOString();
 }
 
-// Used in tests but not exported.
-void {} as ClassTrainerLink;
-void {} as ImplClassPrerequisite;
+// Used in tests but not exported — silence "unused import" without forcing a
+// type compatibility check on a bare empty literal.
+void (undefined as unknown as ClassTrainerLink);
+void (undefined as unknown as ImplClassPrerequisite);
