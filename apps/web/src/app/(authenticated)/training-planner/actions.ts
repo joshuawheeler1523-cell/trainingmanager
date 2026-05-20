@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { calcTag } from "@/lib/training-planner/cached-reads";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
+import { isManager } from "@/lib/auth/role";
 import {
   externalInstructorCreateSchema,
   implementationInsertSchema,
@@ -79,6 +80,12 @@ async function ctx() {
       ok: false as const,
       error: { code: "NO_DEPARTMENT", message: "No active department" },
     };
+  }
+  // Training Planner mutations (implementations, rooms, trainers, classes,
+  // sessions, schedule generation) are manager-only. RLS enforces; this
+  // is the defense-in-depth app-layer gate.
+  if (!(await isManager(orgId))) {
+    return { ok: false as const, error: { code: "FORBIDDEN", message: "Permission denied" } };
   }
   return { ok: true as const, supabase, orgId, departmentId };
 }

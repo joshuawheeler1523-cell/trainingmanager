@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
+import { getCurrentRole } from "@/lib/auth/role";
 import {
   projectInsertSchema,
   projectUpdateSchema,
@@ -69,6 +70,13 @@ async function ctx() {
       ok: false as const,
       error: { code: "NO_DEPARTMENT", message: "No active department" },
     };
+  }
+  // Project mutations are manager + instructor. Row-level scoping happens
+  // in RLS (e.g. instructors can only touch projects they're a member of).
+  // Viewers are blocked here so they fail fast with a clean error.
+  const role = await getCurrentRole(orgId);
+  if (role !== "manager" && role !== "instructor") {
+    return { ok: false as const, error: { code: "FORBIDDEN", message: "Permission denied" } };
   }
   return { ok: true as const, supabase, orgId, departmentId };
 }

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui";
 import RecommendationsBanner from "@/components/recommendations-banner";
 import CsvImportDialog from "@/components/csv-import-dialog";
 import ClassFormDialog from "./class-form-dialog";
+import { ManagerOnly } from "@/components/auth/role-gate";
 import { importClassesCsv } from "./actions";
 import type { ClassWithHours, Instructor, Recommendation } from "@arbor/shared";
 
@@ -155,18 +156,20 @@ export default function ClassesView({ classes, instructors, showDeleted, recomme
               </button>
             }
           />
-          <ClassFormDialog
-            mode="create"
-            instructors={instructors}
-            trigger={
-              <button
-                type="button"
-                className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
-              >
-                + Add class
-              </button>
-            }
-          />
+          <ManagerOnly>
+            <ClassFormDialog
+              mode="create"
+              instructors={instructors}
+              trigger={
+                <button
+                  type="button"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+                >
+                  + Add class
+                </button>
+              }
+            />
+          </ManagerOnly>
         </div>
       </div>
       <DataTable data={classes} columns={columns} searchPlaceholder="Search classes…" />

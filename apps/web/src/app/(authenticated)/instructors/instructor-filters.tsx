@@ -11,6 +11,7 @@ import InstructorFormDialog from "./instructor-form-dialog";
 import BulkAnnualHoursDialog from "./bulk-annual-hours-dialog";
 import CsvImportDialog from "@/components/csv-import-dialog";
 import { Label } from "@/components/labels";
+import { ManagerOnly } from "@/components/auth/role-gate";
 import { importInstructorsCsv } from "./actions";
 
 type Props = {
@@ -152,17 +153,19 @@ export default function InstructorFilters({ departments, activeInstructorCount }
             </button>
           }
         />
-        <InstructorFormDialog
-          mode="create"
-          trigger={
-            <button
-              type="button"
-              className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90"
-            >
-              Add <Label kind="entity.instructor" />
-            </button>
-          }
-        />
+        <ManagerOnly>
+          <InstructorFormDialog
+            mode="create"
+            trigger={
+              <button
+                type="button"
+                className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90"
+              >
+                Add <Label kind="entity.instructor" />
+              </button>
+            }
+          />
+        </ManagerOnly>
       </div>
     </div>
   );

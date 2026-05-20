@@ -15,6 +15,7 @@ import {
   type ImplStatus,
 } from "@arbor/shared";
 import { archiveImplementation, createImplementation, duplicateImplementation } from "./actions";
+import { ManagerOnly } from "@/components/auth/role-gate";
 
 type PlannerRow = Implementation & {
   class_count: number;
@@ -162,48 +163,50 @@ export default function TrainingPlannerView({ implementations, buckets }: Props)
           </div>
         </div>
 
-        <div className="flex items-end gap-2">
-          <input
-            aria-label="New implementation name"
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleCreate();
-            }}
-            placeholder="New implementation name"
-            className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-sm"
-          />
-          <select
-            aria-label="Allocation bucket"
-            value={bucketId}
-            onChange={(e) => {
-              setBucketId(e.target.value);
-            }}
-            disabled={buckets.length === 0}
-            className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-sm disabled:opacity-50"
-          >
-            {buckets.length === 0 ? (
-              <option value="">No buckets yet</option>
-            ) : (
-              buckets.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))
-            )}
-          </select>
-          <button
-            type="button"
-            disabled={pending || !name.trim() || !bucketId}
-            onClick={handleCreate}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-          >
-            <PlusIcon className="h-4 w-4" />
-            New implementation
-          </button>
-        </div>
+        <ManagerOnly>
+          <div className="flex items-end gap-2">
+            <input
+              aria-label="New implementation name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCreate();
+              }}
+              placeholder="New implementation name"
+              className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-sm"
+            />
+            <select
+              aria-label="Allocation bucket"
+              value={bucketId}
+              onChange={(e) => {
+                setBucketId(e.target.value);
+              }}
+              disabled={buckets.length === 0}
+              className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-sm disabled:opacity-50"
+            >
+              {buckets.length === 0 ? (
+                <option value="">No buckets yet</option>
+              ) : (
+                buckets.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))
+              )}
+            </select>
+            <button
+              type="button"
+              disabled={pending || !name.trim() || !bucketId}
+              onClick={handleCreate}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+            >
+              <PlusIcon className="h-4 w-4" />
+              New implementation
+            </button>
+          </div>
+        </ManagerOnly>
       </div>
 
       {filtered.length === 0 ? (
