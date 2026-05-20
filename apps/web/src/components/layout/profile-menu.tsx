@@ -91,7 +91,15 @@ export default function ProfileMenu({ email, name, isAdmin }: Props) {
 
           <DropdownMenu.Separator className="bg-border my-1 h-px" />
 
-          <DropdownMenu.Item asChild>
+          <DropdownMenu.Item
+            asChild
+            onSelect={(e) => {
+              // Keep the menu mounted so the form has time to submit the
+              // server action. Without this, Radix closes the menu on
+              // click, unmounting the form before the POST fires.
+              e.preventDefault();
+            }}
+          >
             <form action={logout} className="w-full">
               <button
                 type="submit"
