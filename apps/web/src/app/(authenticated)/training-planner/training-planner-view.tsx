@@ -272,32 +272,34 @@ export default function TrainingPlannerView({ implementations, buckets }: Props)
                     <CompletionBar percent={i.completion_pct} />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={() => {
-                          handleDuplicate(i);
-                        }}
-                        aria-label={`Duplicate ${i.name}`}
-                        title="Duplicate (copies rooms, trainers, classes, modules, prereqs — no sessions)"
-                        className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-50"
-                      >
-                        <DocumentDuplicateIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={() => {
-                          handleDelete(i);
-                        }}
-                        aria-label={`Delete ${i.name}`}
-                        title="Delete"
-                        className="text-muted-foreground hover:text-destructive rounded p-1 disabled:opacity-50"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
+                    <ManagerOnly>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => {
+                            handleDuplicate(i);
+                          }}
+                          aria-label={`Duplicate ${i.name}`}
+                          title="Duplicate (copies rooms, trainers, classes, modules, prereqs — no sessions)"
+                          className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-50"
+                        >
+                          <DocumentDuplicateIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => {
+                            handleDelete(i);
+                          }}
+                          aria-label={`Delete ${i.name}`}
+                          title="Delete"
+                          className="text-muted-foreground hover:text-destructive rounded p-1 disabled:opacity-50"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </ManagerOnly>
                   </td>
                 </tr>
               ))}

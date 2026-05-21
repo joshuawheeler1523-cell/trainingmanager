@@ -259,64 +259,66 @@ function LibraryTab({
                     {s.certifying_authority ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <SkillFormDialog
-                        mode="edit"
-                        skill={s}
-                        trigger={
-                          <button
-                            type="button"
-                            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-                          >
-                            <PencilSquareIcon className="h-3.5 w-3.5" />
-                            Edit
-                          </button>
-                        }
-                        onSuccess={() => {
-                          router.refresh();
-                        }}
-                      />
-                      {s.is_archived ? (
-                        <ConfirmDialog
+                    <ManagerOnly>
+                      <div className="flex items-center justify-end gap-2">
+                        <SkillFormDialog
+                          mode="edit"
+                          skill={s}
                           trigger={
                             <button
                               type="button"
-                              disabled={pending}
-                              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs disabled:opacity-50"
+                              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
                             >
-                              <ArrowUturnLeftIcon className="h-3.5 w-3.5" />
-                              Restore
+                              <PencilSquareIcon className="h-3.5 w-3.5" />
+                              Edit
                             </button>
                           }
-                          title="Restore skill?"
-                          description="This skill will be visible in the library again."
-                          confirmLabel="Restore"
-                          onConfirm={() => {
-                            handleRestore(s.id);
+                          onSuccess={() => {
+                            router.refresh();
                           }}
                         />
-                      ) : (
-                        <ConfirmDialog
-                          trigger={
-                            <button
-                              type="button"
-                              disabled={pending}
-                              className="text-destructive hover:text-destructive/80 inline-flex items-center gap-1 text-xs disabled:opacity-50"
-                            >
-                              <ArchiveBoxIcon className="h-3.5 w-3.5" />
-                              Archive
-                            </button>
-                          }
-                          title="Archive skill?"
-                          description="This skill will be hidden from the library. Existing instructor skills are kept."
-                          confirmLabel="Archive"
-                          destructive
-                          onConfirm={() => {
-                            handleArchive(s.id);
-                          }}
-                        />
-                      )}
-                    </div>
+                        {s.is_archived ? (
+                          <ConfirmDialog
+                            trigger={
+                              <button
+                                type="button"
+                                disabled={pending}
+                                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs disabled:opacity-50"
+                              >
+                                <ArrowUturnLeftIcon className="h-3.5 w-3.5" />
+                                Restore
+                              </button>
+                            }
+                            title="Restore skill?"
+                            description="This skill will be visible in the library again."
+                            confirmLabel="Restore"
+                            onConfirm={() => {
+                              handleRestore(s.id);
+                            }}
+                          />
+                        ) : (
+                          <ConfirmDialog
+                            trigger={
+                              <button
+                                type="button"
+                                disabled={pending}
+                                className="text-destructive hover:text-destructive/80 inline-flex items-center gap-1 text-xs disabled:opacity-50"
+                              >
+                                <ArchiveBoxIcon className="h-3.5 w-3.5" />
+                                Archive
+                              </button>
+                            }
+                            title="Archive skill?"
+                            description="This skill will be hidden from the library. Existing instructor skills are kept."
+                            confirmLabel="Archive"
+                            destructive
+                            onConfirm={() => {
+                              handleArchive(s.id);
+                            }}
+                          />
+                        )}
+                      </div>
+                    </ManagerOnly>
                   </td>
                 </tr>
               ))}

@@ -365,44 +365,46 @@ function SuperUserRow({
         </button>
       </td>
       <td className="px-4 py-3 text-right">
-        <div className="inline-flex items-center gap-1">
-          {!archived && (
-            <SuperUserFormDialog
-              mode="edit"
-              classes={classes}
-              superUser={su}
-              trigger={
-                <button
-                  type="button"
-                  className="text-muted-foreground hover:text-foreground rounded p-1"
-                  aria-label="Edit"
-                >
-                  <PencilSquareIcon className="h-4 w-4" />
-                </button>
-              }
-            />
-          )}
-          {archived ? (
-            <button
-              type="button"
-              onClick={handleRestore}
-              disabled={pending}
-              className="text-muted-foreground hover:text-foreground rounded px-2 py-1 text-xs disabled:opacity-50"
-            >
-              Restore
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleArchive}
-              disabled={pending}
-              aria-label="Archive"
-              className="text-muted-foreground hover:text-destructive rounded p-1 disabled:opacity-50"
-            >
-              <TrashIcon className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+        <ManagerOnly>
+          <div className="inline-flex items-center gap-1">
+            {!archived && (
+              <SuperUserFormDialog
+                mode="edit"
+                classes={classes}
+                superUser={su}
+                trigger={
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground rounded p-1"
+                    aria-label="Edit"
+                  >
+                    <PencilSquareIcon className="h-4 w-4" />
+                  </button>
+                }
+              />
+            )}
+            {archived ? (
+              <button
+                type="button"
+                onClick={handleRestore}
+                disabled={pending}
+                className="text-muted-foreground hover:text-foreground rounded px-2 py-1 text-xs disabled:opacity-50"
+              >
+                Restore
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleArchive}
+                disabled={pending}
+                aria-label="Archive"
+                className="text-muted-foreground hover:text-destructive rounded p-1 disabled:opacity-50"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </ManagerOnly>
       </td>
     </tr>
   );

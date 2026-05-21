@@ -29,6 +29,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import BucketFormDialog from "./bucket-form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
+import { ManagerOnly } from "@/components/auth/role-gate";
 import { applyBucketTemplate, archiveBucket, unarchiveBucket, reorderBuckets } from "./actions";
 import { BUCKET_TEMPLATES, type BucketTemplate } from "./templates";
 import type { AllocationBucket } from "@arbor/shared";
@@ -94,62 +95,64 @@ function SortableRow({
         {bucket.display_order}
       </td>
       <td className="px-4 py-3 text-right">
-        <div className="flex items-center justify-end gap-2">
-          <BucketFormDialog
-            mode="edit"
-            bucket={bucket}
-            trigger={
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-              >
-                <PencilSquareIcon className="h-3.5 w-3.5" />
-                Edit
-              </button>
-            }
-            onSuccess={onEdited}
-          />
-          {bucket.is_archived ? (
-            <ConfirmDialog
+        <ManagerOnly>
+          <div className="flex items-center justify-end gap-2">
+            <BucketFormDialog
+              mode="edit"
+              bucket={bucket}
               trigger={
                 <button
                   type="button"
-                  disabled={pending}
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs disabled:opacity-50"
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
                 >
-                  <ArrowUturnLeftIcon className="h-3.5 w-3.5" />
-                  Restore
+                  <PencilSquareIcon className="h-3.5 w-3.5" />
+                  Edit
                 </button>
               }
-              title="Restore bucket?"
-              description="This bucket will be selectable again across allocations."
-              confirmLabel="Restore"
-              onConfirm={() => {
-                onRestore(bucket.id);
-              }}
+              onSuccess={onEdited}
             />
-          ) : (
-            <ConfirmDialog
-              trigger={
-                <button
-                  type="button"
-                  disabled={pending}
-                  className="text-destructive hover:text-destructive/80 inline-flex items-center gap-1 text-xs disabled:opacity-50"
-                >
-                  <ArchiveBoxIcon className="h-3.5 w-3.5" />
-                  Archive
-                </button>
-              }
-              title="Archive bucket?"
-              description="The bucket will be hidden, but existing allocation rows for it remain. You can restore later."
-              confirmLabel="Archive"
-              destructive
-              onConfirm={() => {
-                onArchive(bucket.id);
-              }}
-            />
-          )}
-        </div>
+            {bucket.is_archived ? (
+              <ConfirmDialog
+                trigger={
+                  <button
+                    type="button"
+                    disabled={pending}
+                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs disabled:opacity-50"
+                  >
+                    <ArrowUturnLeftIcon className="h-3.5 w-3.5" />
+                    Restore
+                  </button>
+                }
+                title="Restore bucket?"
+                description="This bucket will be selectable again across allocations."
+                confirmLabel="Restore"
+                onConfirm={() => {
+                  onRestore(bucket.id);
+                }}
+              />
+            ) : (
+              <ConfirmDialog
+                trigger={
+                  <button
+                    type="button"
+                    disabled={pending}
+                    className="text-destructive hover:text-destructive/80 inline-flex items-center gap-1 text-xs disabled:opacity-50"
+                  >
+                    <ArchiveBoxIcon className="h-3.5 w-3.5" />
+                    Archive
+                  </button>
+                }
+                title="Archive bucket?"
+                description="The bucket will be hidden, but existing allocation rows for it remain. You can restore later."
+                confirmLabel="Archive"
+                destructive
+                onConfirm={() => {
+                  onArchive(bucket.id);
+                }}
+              />
+            )}
+          </div>
+        </ManagerOnly>
       </td>
     </tr>
   );
@@ -257,24 +260,26 @@ export default function BucketsTab({ buckets }: Props) {
           />
           Show archived ({archived.length})
         </label>
-        <div className="flex items-center gap-2">
-          {hasActive && <TemplatePickerDialog onApply={handleApplyTemplate} pending={pending} />}
-          <BucketFormDialog
-            mode="create"
-            trigger={
-              <button
-                type="button"
-                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
-              >
-                <PlusIcon className="h-4 w-4" />
-                Add bucket
-              </button>
-            }
-            onSuccess={() => {
-              router.refresh();
-            }}
-          />
-        </div>
+        <ManagerOnly>
+          <div className="flex items-center gap-2">
+            {hasActive && <TemplatePickerDialog onApply={handleApplyTemplate} pending={pending} />}
+            <BucketFormDialog
+              mode="create"
+              trigger={
+                <button
+                  type="button"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Add bucket
+                </button>
+              }
+              onSuccess={() => {
+                router.refresh();
+              }}
+            />
+          </div>
+        </ManagerOnly>
       </div>
 
       {(showArchived ? archived : orderedActive).length === 0 ? (
