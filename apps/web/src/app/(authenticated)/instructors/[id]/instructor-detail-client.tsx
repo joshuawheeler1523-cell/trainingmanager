@@ -12,6 +12,7 @@ import {
 } from "@heroicons/react/20/solid";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import InstructorFormDialog from "@/app/(authenticated)/instructors/instructor-form-dialog";
+import { ReadOnlyBanner } from "@/components/auth/read-only-context";
 import { softDeleteInstructor, restoreInstructor } from "@/app/(authenticated)/instructors/actions";
 import {
   addInstructorSkill,
@@ -821,6 +822,9 @@ export default function InstructorDetailClient({
 
   return (
     <div>
+      <div className="px-6 pt-4">
+        <ReadOnlyBanner />
+      </div>
       {/* Header */}
       <div className="border-border bg-background flex items-start justify-between gap-4 border-b px-6 py-4">
         <div>

@@ -10,6 +10,7 @@ import CommandPalette from "./command-palette";
 import HelpDrawer from "./help-drawer";
 import NotificationBell, { type NotificationRow } from "./notification-bell";
 import { DesktopSidebar, MobileSidebar, type SidebarCounts } from "./sidebar";
+import { FormReadOnlyContext } from "@/components/auth/read-only-context";
 
 type Props = {
   children: React.ReactNode;
@@ -54,68 +55,70 @@ export default function AppShell({
   });
 
   return (
-    <div className="bg-canvas flex min-h-screen">
-      {/* Skip to content — visible only when focused via keyboard. */}
-      <a
-        href="#main-content"
-        className="bg-primary text-primary-foreground focus:ring-ring sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2"
-      >
-        Skip to main content
-      </a>
+    <FormReadOnlyContext>
+      <div className="bg-canvas flex min-h-screen">
+        {/* Skip to content — visible only when focused via keyboard. */}
+        <a
+          href="#main-content"
+          className="bg-primary text-primary-foreground focus:ring-ring sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2"
+        >
+          Skip to main content
+        </a>
 
-      <DesktopSidebar isAdmin={isAdmin} modules={modules} counts={sidebarCounts} />
+        <DesktopSidebar isAdmin={isAdmin} modules={modules} counts={sidebarCounts} />
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top bar */}
-        <header className="border-border bg-background sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-4">
-          <MobileSidebar isAdmin={isAdmin} modules={modules} counts={sidebarCounts} />
-          <div className="min-w-0 flex-1">{orgSwitcherSlot}</div>
-          <div className="flex items-center gap-1">
-            {isArborAdmin && (
-              <Link
-                href="/arbor"
-                className="border-primary text-primary hover:bg-primary hover:text-primary-foreground inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
-                title="Arbor super-admin console"
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Top bar */}
+          <header className="border-border bg-background sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-4">
+            <MobileSidebar isAdmin={isAdmin} modules={modules} counts={sidebarCounts} />
+            <div className="min-w-0 flex-1">{orgSwitcherSlot}</div>
+            <div className="flex items-center gap-1">
+              {isArborAdmin && (
+                <Link
+                  href="/arbor"
+                  className="border-primary text-primary hover:bg-primary hover:text-primary-foreground inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+                  title="Arbor super-admin console"
+                >
+                  <ShieldCheckIcon className="h-3.5 w-3.5" />
+                  Arbor admin
+                </Link>
+              )}
+              <NotificationBell initial={initialNotifications} userId={userId} />
+              <button
+                type="button"
+                onClick={() => {
+                  setHelpOpen(true);
+                }}
+                className="text-muted-foreground hover:bg-surface hover:text-foreground flex items-center rounded-md p-1.5"
+                aria-label="Help"
+                title="Help (?)"
               >
-                <ShieldCheckIcon className="h-3.5 w-3.5" />
-                Arbor admin
-              </Link>
-            )}
-            <NotificationBell initial={initialNotifications} userId={userId} />
-            <button
-              type="button"
-              onClick={() => {
-                setHelpOpen(true);
-              }}
-              className="text-muted-foreground hover:bg-surface hover:text-foreground flex items-center rounded-md p-1.5"
-              aria-label="Help"
-              title="Help (?)"
-            >
-              <QuestionMarkCircleIcon className="h-5 w-5" />
-            </button>
-            <ProfileMenu email={userEmail} name={userName} isAdmin={isAdmin} />
-          </div>
-        </header>
+                <QuestionMarkCircleIcon className="h-5 w-5" />
+              </button>
+              <ProfileMenu email={userEmail} name={userName} isAdmin={isAdmin} />
+            </div>
+          </header>
 
-        {/* Page content */}
-        <main id="main-content" tabIndex={-1} className="bg-canvas flex-1">
-          {children}
-        </main>
+          {/* Page content */}
+          <main id="main-content" tabIndex={-1} className="bg-canvas flex-1">
+            {children}
+          </main>
+        </div>
+
+        {/* Global overlays */}
+        <CommandPalette
+          open={commandOpen}
+          onClose={() => {
+            setCommandOpen(false);
+          }}
+        />
+        <HelpDrawer
+          open={helpOpen}
+          onClose={() => {
+            setHelpOpen(false);
+          }}
+        />
       </div>
-
-      {/* Global overlays */}
-      <CommandPalette
-        open={commandOpen}
-        onClose={() => {
-          setCommandOpen(false);
-        }}
-      />
-      <HelpDrawer
-        open={helpOpen}
-        onClose={() => {
-          setHelpOpen(false);
-        }}
-      />
-    </div>
+    </FormReadOnlyContext>
   );
 }

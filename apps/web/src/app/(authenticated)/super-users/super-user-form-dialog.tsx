@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { superUserInsertSchema, superUserUpdateSchema } from "@arbor/shared";
 import type { SuperUser } from "@arbor/shared";
 import { createSuperUser, updateSuperUser } from "./actions";
+import { ReadOnlyBanner, useFormReadOnly } from "@/components/auth/read-only-context";
 
 type ClassOption = { id: string; name: string };
 
@@ -97,6 +98,7 @@ export default function SuperUserFormDialog(props: Props) {
   });
 
   const trainedChecked = watch("trained");
+  const readOnly = useFormReadOnly();
 
   async function onSubmit(values: FormValues) {
     const payload = {
@@ -143,6 +145,7 @@ export default function SuperUserFormDialog(props: Props) {
           <Dialog.Description className="text-muted-foreground mt-1 text-xs">
             Track a power user / SME on a class or system. Either link a class or enter a topic.
           </Dialog.Description>
+          <ReadOnlyBanner />
 
           <form
             onSubmit={(e) => {
@@ -264,13 +267,15 @@ export default function SuperUserFormDialog(props: Props) {
                   Cancel
                 </button>
               </Dialog.Close>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
-              >
-                {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Add super user"}
-              </button>
+              {!readOnly && (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                >
+                  {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Add super user"}
+                </button>
+              )}
             </div>
           </form>
         </Dialog.Content>

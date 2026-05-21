@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { traInsertSchema, TRA_PRIORITY_VALUES } from "@arbor/shared";
 import type { TraPriority } from "@arbor/shared";
 import { createTra } from "./actions";
+import { ReadOnlyBanner, useFormReadOnly } from "@/components/auth/read-only-context";
 
 type Props = {
   trigger: React.ReactNode;
@@ -49,6 +50,8 @@ export default function TraFormDialog({ trigger }: Props) {
     },
   });
 
+  const readOnly = useFormReadOnly();
+
   function onSubmit(values: FormValues) {
     startTransition(async () => {
       const result = await createTra({
@@ -84,6 +87,8 @@ export default function TraFormDialog({ trigger }: Props) {
           <Dialog.Description className="text-muted-foreground mt-1 text-xs">
             Just a name to start. You&apos;ll fill in the rest of the intake form on the next page.
           </Dialog.Description>
+
+          <ReadOnlyBanner />
 
           <form
             onSubmit={(e) => {
@@ -136,13 +141,15 @@ export default function TraFormDialog({ trigger }: Props) {
                   Cancel
                 </button>
               </Dialog.Close>
-              <button
-                type="submit"
-                disabled={isSubmitting || pending}
-                className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
-              >
-                {isSubmitting || pending ? "Creating…" : "Create & continue"}
-              </button>
+              {!readOnly && (
+                <button
+                  type="submit"
+                  disabled={isSubmitting || pending}
+                  className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                >
+                  {isSubmitting || pending ? "Creating…" : "Create & continue"}
+                </button>
+              )}
             </div>
           </form>
         </Dialog.Content>

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { bucketInsertSchema, bucketUpdateSchema, BUCKET_COLORS } from "@arbor/shared";
 import type { AllocationBucket } from "@arbor/shared";
 import { createBucket, updateBucket } from "./actions";
+import { ReadOnlyBanner, useFormReadOnly } from "@/components/auth/read-only-context";
 
 type CreateProps = {
   mode: "create";
@@ -81,6 +82,7 @@ export default function BucketFormDialog(props: Props) {
   });
 
   const color = watch("color");
+  const readOnly = useFormReadOnly();
 
   async function onSubmit(data: FormValues) {
     const result = isEdit ? await updateBucket(props.bucket.id, data) : await createBucket(data);
@@ -110,6 +112,8 @@ export default function BucketFormDialog(props: Props) {
           <Dialog.Title className="text-foreground text-base font-semibold">
             {isEdit ? "Edit bucket" : "Add bucket"}
           </Dialog.Title>
+
+          <ReadOnlyBanner />
 
           <form
             onSubmit={(e) => {
@@ -171,13 +175,15 @@ export default function BucketFormDialog(props: Props) {
                   Cancel
                 </button>
               </Dialog.Close>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
-              >
-                {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Create bucket"}
-              </button>
+              {!readOnly && (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                >
+                  {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Create bucket"}
+                </button>
+              )}
             </div>
           </form>
         </Dialog.Content>

@@ -9,6 +9,7 @@ import { instructorInsertSchema, instructorUpdateSchema } from "@arbor/shared";
 import type { Instructor } from "@arbor/shared";
 import { useLabel } from "@/components/labels";
 import { createInstructor, updateInstructor } from "./actions";
+import { ReadOnlyBanner, useFormReadOnly } from "@/components/auth/read-only-context";
 
 type CreateProps = {
   mode: "create";
@@ -106,6 +107,8 @@ export default function InstructorFormDialog(props: Props) {
     defaultValues,
   });
 
+  const readOnly = useFormReadOnly();
+
   async function onSubmit(data: FormValues) {
     const result = isEdit
       ? await updateInstructor(props.instructor.id, data)
@@ -136,6 +139,8 @@ export default function InstructorFormDialog(props: Props) {
           <Dialog.Title className="text-foreground text-base font-semibold">
             {isEdit ? `Edit ${entityLabel}` : `Add ${entityLabel}`}
           </Dialog.Title>
+
+          <ReadOnlyBanner />
 
           <form
             onSubmit={(e) => {
@@ -285,13 +290,15 @@ export default function InstructorFormDialog(props: Props) {
                   Cancel
                 </button>
               </Dialog.Close>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
-              >
-                {isSubmitting ? "Saving…" : isEdit ? "Save changes" : `Add ${entityLabel}`}
-              </button>
+              {!readOnly && (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                >
+                  {isSubmitting ? "Saving…" : isEdit ? "Save changes" : `Add ${entityLabel}`}
+                </button>
+              )}
             </div>
           </form>
         </Dialog.Content>

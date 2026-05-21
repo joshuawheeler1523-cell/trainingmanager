@@ -19,6 +19,7 @@ import {
 } from "@arbor/shared";
 import { useIsNarrow } from "@/lib/use-media-query";
 import { Badge, Eyebrow, Tabs, type BadgeVariant, type TabItem } from "@/components/ui";
+import { ReadOnlyBanner } from "@/components/auth/read-only-context";
 import ProjectFormDialog from "../project-form-dialog";
 import OverviewTab from "./overview-tab";
 import TasksTab from "./tasks-tab";
@@ -138,6 +139,9 @@ export default function ProjectDetailClient({
 
   return (
     <div>
+      <div className="px-6 pt-4">
+        <ReadOnlyBanner />
+      </div>
       {/* Header — editorial Eyebrow breadcrumb + serif title + Badges */}
       <div className="border-border bg-background border-b px-6 py-5">
         <Link

@@ -220,17 +220,19 @@ export default function ProjectsView({ projects }: Props) {
                     <ProgressBar percent={p.percent_complete} taskCount={p.task_count} />
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => {
-                        handleDelete(p);
-                      }}
-                      aria-label={`Delete ${p.name}`}
-                      className="text-muted-foreground hover:text-destructive disabled:opacity-50"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
+                    <RoleGate roles={["manager", "instructor"]}>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => {
+                          handleDelete(p);
+                        }}
+                        aria-label={`Delete ${p.name}`}
+                        className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </RoleGate>
                   </td>
                 </tr>
               ))}
