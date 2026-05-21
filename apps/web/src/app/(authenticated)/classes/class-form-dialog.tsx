@@ -10,6 +10,7 @@ import { classInputSchema } from "@arbor/shared";
 import type { Class, ClassInput, Instructor } from "@arbor/shared";
 import { useLabel } from "@/components/labels";
 import { createClass, updateClass, assignInstructorToClass } from "./actions";
+import { ReadOnlyBanner, useFormReadOnly } from "@/components/auth/read-only-context";
 
 // Frequency presets that auto-fill offerings_per_year. Numbers reflect
 // typical hospital education planning (50 working weeks/yr, 12 months,
@@ -461,6 +462,8 @@ export default function ClassFormDialog(props: Props) {
     defaultValues,
   });
 
+  const readOnly = useFormReadOnly();
+
   function closeReset() {
     setOpen(false);
     setStep(0);
@@ -529,6 +532,8 @@ export default function ClassFormDialog(props: Props) {
             )}
           </div>
 
+          <ReadOnlyBanner />
+
           {/* Step indicators */}
           {!isEdit && (
             <div className="mb-5 flex gap-1.5">
@@ -582,19 +587,21 @@ export default function ClassFormDialog(props: Props) {
                     Cancel
                   </button>
                 </Dialog.Close>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
-                >
-                  {isSubmitting
-                    ? "Saving…"
-                    : isEdit
-                      ? "Save changes"
-                      : step < 2
-                        ? "Next"
-                        : "Create class"}
-                </button>
+                {!readOnly && (
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="bg-primary text-primary-foreground rounded-md px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                  >
+                    {isSubmitting
+                      ? "Saving…"
+                      : isEdit
+                        ? "Save changes"
+                        : step < 2
+                          ? "Next"
+                          : "Create class"}
+                  </button>
+                )}
               </div>
             </div>
           </form>

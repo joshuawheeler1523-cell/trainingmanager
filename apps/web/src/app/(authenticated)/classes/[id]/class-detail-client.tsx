@@ -18,6 +18,7 @@ import {
 import ClassFormDialog from "@/app/(authenticated)/classes/class-form-dialog";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { Badge, Eyebrow, Tabs, type TabItem } from "@/components/ui";
+import { ReadOnlyBanner } from "@/components/auth/read-only-context";
 import { cn } from "@/lib/utils";
 import {
   softDeleteClass,
@@ -1631,6 +1632,9 @@ export default function ClassDetailClient({
 
   return (
     <div>
+      <div className="px-6 pt-4">
+        <ReadOnlyBanner />
+      </div>
       {/* Header — eyebrow breadcrumb + serif title + status badge */}
       <div className="border-border bg-background flex items-start justify-between gap-4 border-b px-6 py-5">
         <div>

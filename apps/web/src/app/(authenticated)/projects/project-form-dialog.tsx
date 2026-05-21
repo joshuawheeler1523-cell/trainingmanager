@@ -14,6 +14,7 @@ import {
   type ProjectStatus,
 } from "@arbor/shared";
 import { createProject, updateProject } from "./actions";
+import { ReadOnlyBanner, useFormReadOnly } from "@/components/auth/read-only-context";
 
 type FormValues = {
   name: string;
@@ -57,6 +58,8 @@ export default function ProjectFormDialog({ mode, initial, onClose }: Props) {
       total_estimated_hours: initial?.total_estimated_hours ?? "",
     },
   });
+
+  const readOnly = useFormReadOnly();
 
   function onSubmit(values: FormValues) {
     const payload = {
@@ -103,6 +106,8 @@ export default function ProjectFormDialog({ mode, initial, onClose }: Props) {
           <Dialog.Description className="text-muted-foreground mt-1 text-xs">
             Capture the high-level project shape. Tasks and team members come next.
           </Dialog.Description>
+
+          <ReadOnlyBanner />
 
           <form
             onSubmit={(e) => {
@@ -222,13 +227,15 @@ export default function ProjectFormDialog({ mode, initial, onClose }: Props) {
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                disabled={pending || isSubmitting}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-              >
-                {pending || isSubmitting ? "Saving…" : mode === "create" ? "Create" : "Save"}
-              </button>
+              {!readOnly && (
+                <button
+                  type="submit"
+                  disabled={pending || isSubmitting}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                >
+                  {pending || isSubmitting ? "Saving…" : mode === "create" ? "Create" : "Save"}
+                </button>
+              )}
             </div>
           </form>
         </Dialog.Content>
