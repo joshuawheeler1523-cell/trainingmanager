@@ -257,11 +257,16 @@ export async function updateTask(
   const c = await ctx();
   if (!c.ok) return c;
 
+  const patch = stripUndefined(parsed.data);
+  // Reaching 100% auto-completes the task, unless the caller is setting a
+  // status explicitly in the same update.
+  if (patch.percent_complete === 100 && patch.status === undefined) {
+    patch.status = "completed";
+  }
+
   const { data, error } = await c.supabase
     .from("tasks")
-    .update(
-      stripUndefined(parsed.data as Record<string, unknown>) as unknown as TablesUpdate<"tasks">,
-    )
+    .update(patch as unknown as TablesUpdate<"tasks">)
     .eq("id", id)
     .eq("org_id", c.orgId)
     .select()

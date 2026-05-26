@@ -342,7 +342,11 @@ export default function TaskDrawer({
                 disabled={pending}
                 onBlur={(e) => {
                   const v = Number(e.target.value);
-                  if (v !== task.percent_complete) patch({ percent_complete: v });
+                  if (v !== task.percent_complete) {
+                    const p: Record<string, unknown> = { percent_complete: v };
+                    if (v >= 100) p["status"] = "completed";
+                    patch(p);
+                  }
                 }}
                 className={`${fieldClass} tabular-nums`}
               />

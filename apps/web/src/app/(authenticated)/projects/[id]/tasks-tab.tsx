@@ -99,6 +99,14 @@ export default function TasksTab({
 
   const openTask = openTaskId ? (tasks.find((t) => t.id === openTaskId) ?? null) : null;
 
+  const memberNameById = new Map(team.map((m) => [m.id, m.instructor?.full_name ?? "Unknown"]));
+  const assigneesByTask = new Map<string, string[]>();
+  for (const a of assignments) {
+    const list = assigneesByTask.get(a.task_id) ?? [];
+    list.push(memberNameById.get(a.project_team_member_id) ?? "Unknown");
+    assigneesByTask.set(a.task_id, list);
+  }
+
   return (
     <div className="space-y-3">
       <ImportExportControls project={project} tasks={tasks} />
@@ -124,7 +132,9 @@ export default function TasksTab({
           <table className="w-full text-sm">
             <thead className="bg-surface text-muted-foreground text-xs">
               <tr>
-                <Th className="w-1/2">Task</Th>
+                <Th className="w-1/3">Task</Th>
+                <Th>Assigned</Th>
+                <Th>Dates</Th>
                 <Th>Status</Th>
                 <Th className="w-32">Progress</Th>
                 <Th>Hours</Th>
@@ -147,6 +157,21 @@ export default function TasksTab({
                     {t.description && (
                       <p className="text-muted-foreground line-clamp-1 text-xs">{t.description}</p>
                     )}
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    {(() => {
+                      const names = assigneesByTask.get(t.id) ?? [];
+                      if (names.length === 0)
+                        return <span className="text-muted-foreground">Unassigned</span>;
+                      return (
+                        <span className="text-foreground line-clamp-1" title={names.join(", ")}>
+                          {names.join(", ")}
+                        </span>
+                      );
+                    })()}
+                  </td>
+                  <td className="text-muted-foreground whitespace-nowrap px-3 py-2 text-xs tabular-nums">
+                    {formatDateRange(t.start_date, t.end_date)}
                   </td>
                   <td className="px-3 py-2">
                     <select
@@ -266,6 +291,22 @@ export default function TasksTab({
       )}
     </div>
   );
+}
+
+// Date-only strings (YYYY-MM-DD) are parsed component-wise to avoid a UTC
+// midnight shifting the displayed day backwards in negative-offset zones.
+function formatDate(d: string | null): string | null {
+  if (!d) return null;
+  const [y, m, day] = d.split("-").map(Number);
+  if (!y || !m || !day) return d;
+  return new Date(y, m - 1, day).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatDateRange(start: string | null, end: string | null): string {
+  const s = formatDate(start);
+  const e = formatDate(end);
+  if (!s && !e) return "—";
+  return `${s ?? "—"} → ${e ?? "—"}`;
 }
 
 function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
