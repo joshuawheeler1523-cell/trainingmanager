@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import EmptyState from "@/components/ui/empty-state";
@@ -57,7 +56,6 @@ const PRIORITY_LABEL: Record<ProjectPriority, string> = {
 };
 
 export default function ProjectsView({ projects }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
   const [priorityFilter, setPriorityFilter] = useState<ProjectPriority | "all">("all");
@@ -73,12 +71,8 @@ export default function ProjectsView({ projects }: Props) {
     }
     startTransition(async () => {
       const result = await archiveProject(p.id);
-      if (result.ok) {
-        toast.success(`"${p.name}" deleted`);
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success(`"${p.name}" deleted`);
+      else toast.error(result.error.message);
     });
   }
 

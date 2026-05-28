@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CheckIcon, ClipboardDocumentIcon, LinkIcon } from "@heroicons/react/20/solid";
 import type { Project } from "@arbor/shared";
@@ -10,7 +9,6 @@ import { generateShareToken, revokeShareToken } from "../actions";
 type Props = { project: Project };
 
 export default function ShareCard({ project }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
 
@@ -23,12 +21,8 @@ export default function ShareCard({ project }: Props) {
   function handleGenerate() {
     startTransition(async () => {
       const result = await generateShareToken(project.id);
-      if (result.ok) {
-        toast.success("Public share link created");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Public share link created");
+      else toast.error(result.error.message);
     });
   }
 
@@ -36,12 +30,8 @@ export default function ShareCard({ project }: Props) {
     if (!confirm("Revoke the public link? Anyone with the URL will lose access.")) return;
     startTransition(async () => {
       const result = await revokeShareToken(project.id);
-      if (result.ok) {
-        toast.success("Link revoked");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Link revoked");
+      else toast.error(result.error.message);
     });
   }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ExclamationTriangleIcon, LightBulbIcon, SparklesIcon } from "@heroicons/react/20/solid";
 import { generateSchedule, type ScheduleGenResult } from "../../actions";
@@ -42,7 +41,6 @@ const STRATEGIES: { value: SolverStrategy; label: string; description: string }[
 ];
 
 export default function GenerateButton({ implementationId, ready, existingSessions }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<ScheduleGenResult | null>(null);
   const [strategy, setStrategy] = useState<SolverStrategy>("balanced");
@@ -69,7 +67,6 @@ export default function GenerateButton({ implementationId, ready, existingSessio
         } else {
           toast.success(`Generated ${r.data.sessions.toString()} sessions, no conflicts`);
         }
-        router.refresh();
       } else {
         toast.error(r.error.message);
       }

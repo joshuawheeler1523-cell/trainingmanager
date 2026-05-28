@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import { ArrowUturnLeftIcon } from "@heroicons/react/20/solid";
 import type { ImplClass } from "@arbor/shared";
 import { updateClassColor } from "../../actions";
@@ -14,7 +13,6 @@ type Props = {
 };
 
 export default function ClassColorLegend({ implementationId, classes }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -43,9 +41,7 @@ export default function ClassColorLegend({ implementationId, classes }: Props) {
           void _dropped;
           return rest;
         });
-        return;
       }
-      router.refresh();
     });
   }
 

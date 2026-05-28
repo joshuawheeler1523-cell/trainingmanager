@@ -148,12 +148,8 @@ export default function OneOnOneEditor({
     if (!confirm("Mark this 1:1 complete? The capacity snapshot will be re-captured.")) return;
     startTransition(async () => {
       const result = await completeOneOnOne(session.id);
-      if (result.ok) {
-        toast.success("1:1 complete");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("1:1 complete");
+      else toast.error(result.error.message);
     });
   }
 

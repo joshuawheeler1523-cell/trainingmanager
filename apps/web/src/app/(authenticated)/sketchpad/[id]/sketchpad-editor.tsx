@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Calendar, dateFnsLocalizer, type Event as CalEventBase } from "react-big-calendar";
@@ -269,7 +268,6 @@ function parseDurationToMinutes(raw: string): number | null {
 }
 
 export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   // Optimistic layer over sessions — drag-drop / edits apply synchronously,
@@ -543,7 +541,6 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     startTransition(async () => {
       const result = await updateSchedule(schedule.id, patch);
       if (!result.ok) toast.error(result.error.message);
-      router.refresh();
     });
   }
 
@@ -561,7 +558,6 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
       if (result.ok) {
         setNewRoomName("");
         if (!qaRoomId) setQaRoomId(result.data.id);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -573,7 +569,6 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     startTransition(async () => {
       const result = await deleteRoom(id, schedule.id);
       if (!result.ok) toast.error(result.error.message);
-      router.refresh();
     });
   }
 
@@ -583,7 +578,6 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     startTransition(async () => {
       const result = await updateRoom(id, schedule.id, { name: v });
       if (!result.ok) toast.error(result.error.message);
-      router.refresh();
     });
   }
 
@@ -637,7 +631,6 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
         // Reset Class but keep Trainer / Duration / Room / Time so a planner
         // can rapid-fire add a series of sessions for the same trainer.
         setQaClass("");
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -659,11 +652,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
         ...(patch.learner_count !== undefined ? { learner_count: patch.learner_count } : {}),
         ...(patch.notes !== undefined ? { notes: patch.notes } : {}),
       });
-      if (result.ok) {
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -735,7 +724,6 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
         toast.success(`Placed ${inserted.toString()} session${inserted === 1 ? "" : "s"}`);
       }
       setAutoOpen(false);
-      router.refresh();
     });
   }
 
@@ -754,7 +742,6 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
           }`,
         );
         setPasteOpen(false);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -771,11 +758,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
         }
       }
       const result = await recolorClassInSchedule(schedule.id, className, color);
-      if (result.ok) {
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -830,7 +813,6 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
         const newDayDate = new Date(result.data.copy.starts_at);
         const idx = days.findIndex((d) => sameDay(d, newDayDate));
         if (idx >= 0 && idx !== selectedDay) setSelectedDay(idx);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -864,7 +846,6 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
             result.data.deleted === 1 ? "" : "s"
           }`,
         );
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -876,12 +857,8 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
     startTransition(async () => {
       applyOptimisticPatch({ kind: "delete", id });
       const result = await deleteSession(id, schedule.id);
-      if (result.ok) {
-        setDrawerSessionId(null);
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) setDrawerSessionId(null);
+      else toast.error(result.error.message);
     });
   }
 

@@ -363,7 +363,6 @@ function UnassignedSection({
 }
 
 function SuperUserRow({ su, classes }: { su: ImplSuperUserWithClass; classes: ClassOption[] }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
   const archived = su.deleted_at != null;
@@ -373,8 +372,7 @@ function SuperUserRow({ su, classes }: { su: ImplSuperUserWithClass; classes: Cl
     startTransition(async () => {
       const result = await markImplSuperUserTrained(su.id, su.trained_at == null);
       setBusy(false);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -384,12 +382,8 @@ function SuperUserRow({ su, classes }: { su: ImplSuperUserWithClass; classes: Cl
     startTransition(async () => {
       const result = await softDeleteImplSuperUser(su.id);
       setBusy(false);
-      if (result.ok) {
-        toast.success("Archived");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Archived");
+      else toast.error(result.error.message);
     });
   }
 
@@ -398,12 +392,8 @@ function SuperUserRow({ su, classes }: { su: ImplSuperUserWithClass; classes: Cl
     startTransition(async () => {
       const result = await restoreImplSuperUser(su.id);
       setBusy(false);
-      if (result.ok) {
-        toast.success("Restored");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Restored");
+      else toast.error(result.error.message);
     });
   }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Calendar, dateFnsLocalizer, type Event } from "react-big-calendar";
 import withDragAndDrop, {
@@ -103,7 +102,6 @@ export default function ScheduleView({
   classTrainers,
   pto,
 }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
 
@@ -233,12 +231,8 @@ export default function ScheduleView({
   function handleUnplaceFromPool(sessionId: string) {
     startTransition(async () => {
       const r = await unplaceManualSession(sessionId, implementation.id);
-      if (r.ok) {
-        toast.success("Session returned to pool");
-        router.refresh();
-      } else {
-        toast.error(r.error.message);
-      }
+      if (r.ok) toast.success("Session returned to pool");
+      else toast.error(r.error.message);
     });
   }
 
@@ -253,12 +247,8 @@ export default function ScheduleView({
         implementationId: implementation.id,
         ...args,
       });
-      if (r.ok) {
-        toast.success("Session placed");
-        router.refresh();
-      } else {
-        toast.error(r.error.message);
-      }
+      if (r.ok) toast.success("Session placed");
+      else toast.error(r.error.message);
     });
   }
 
@@ -302,7 +292,6 @@ export default function ScheduleView({
         return;
       }
       toast.success(roomChanged ? "Session moved to new room" : "Session moved");
-      router.refresh();
     });
   }
 
@@ -321,12 +310,8 @@ export default function ScheduleView({
       // change (i.e., on server failure / no router.refresh).
       applyOptimisticMove({ id: sessionId, start: startIso, end: endIso });
       const result = await updateSessionTime(sessionId, implementation.id, startIso, endIso);
-      if (result.ok) {
-        toast.success("Session moved");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Session moved");
+      else toast.error(result.error.message);
     });
   }
 
@@ -354,12 +339,8 @@ export default function ScheduleView({
       return;
     startTransition(async () => {
       const result = await publishImplementation(implementation.id);
-      if (result.ok) {
-        toast.success(`Published ${result.data.count.toString()} sessions`);
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success(`Published ${result.data.count.toString()} sessions`);
+      else toast.error(result.error.message);
     });
   }
 
@@ -372,12 +353,8 @@ export default function ScheduleView({
       return;
     startTransition(async () => {
       const result = await clearDraftSessions(implementation.id);
-      if (result.ok) {
-        toast.success(`Cleared ${result.data.count.toString()} draft sessions`);
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success(`Cleared ${result.data.count.toString()} draft sessions`);
+      else toast.error(result.error.message);
     });
   }
 
@@ -675,14 +652,12 @@ function SessionDrawer({
   orgTimeZone: string;
   onClose: () => void;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   function patch(p: { impl_trainer_id?: string | null; impl_room_id?: string | null }) {
     startTransition(async () => {
       const result = await updateSessionAssignments(session.id, implementationId, p);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -694,7 +669,6 @@ function SessionDrawer({
       if (result.ok) {
         toast.success("Session cancelled");
         onClose();
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }

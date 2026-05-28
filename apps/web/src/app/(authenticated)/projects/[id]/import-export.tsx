@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowDownTrayIcon, ArrowUpTrayIcon } from "@heroicons/react/20/solid";
 import * as XLSX from "xlsx";
@@ -27,7 +26,6 @@ type Props = {
 type SheetRow = Record<string, string | number | boolean | null | undefined>;
 
 export default function ImportExportControls({ project, tasks }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [diff, setDiff] = useState<ImportDiff | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -106,7 +104,6 @@ export default function ImportExportControls({ project, tasks }: Props) {
           `Imported ${r.inserted.toString()} added, ${r.updated.toString()} updated, ${r.deleted.toString()} removed`,
         );
         setDiff(null);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }

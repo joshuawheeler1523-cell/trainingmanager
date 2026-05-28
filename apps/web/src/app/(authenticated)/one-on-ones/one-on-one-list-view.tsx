@@ -46,12 +46,8 @@ export default function OneOnOneListView({
       return;
     startTransition(async () => {
       const result = await deleteOneOnOne(id);
-      if (result.ok) {
-        toast.success("Deleted");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Deleted");
+      else toast.error(result.error.message);
     });
   }
 

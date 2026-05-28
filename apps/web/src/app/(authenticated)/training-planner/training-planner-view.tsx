@@ -108,12 +108,8 @@ export default function TrainingPlannerView({ implementations, buckets }: Props)
     }
     startTransition(async () => {
       const result = await archiveImplementation(i.id);
-      if (result.ok) {
-        toast.success(`"${i.name}" deleted`);
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success(`"${i.name}" deleted`);
+      else toast.error(result.error.message);
     });
   }
 

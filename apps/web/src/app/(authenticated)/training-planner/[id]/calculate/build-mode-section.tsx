@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useOptimistic, useTransition, startTransition as _st } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { SparklesIcon, Squares2X2Icon } from "@heroicons/react/20/solid";
 import GenerateButton from "./generate-button";
@@ -26,7 +25,6 @@ export default function BuildModeSection({
   ready,
   existingSessions,
 }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [mode, setMode] = useOptimistic(initialMode, (_state, next: Mode) => next);
 
@@ -37,11 +35,7 @@ export default function BuildModeSection({
         setMode(next);
       });
       const r = await setScheduleMode(implementationId, next);
-      if (!r.ok) {
-        toast.error(r.error.message);
-        return;
-      }
-      router.refresh();
+      if (!r.ok) toast.error(r.error.message);
     });
   }
 

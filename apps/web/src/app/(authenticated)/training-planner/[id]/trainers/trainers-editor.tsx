@@ -176,8 +176,8 @@ export default function TrainersEditor({
         setHours("20");
         toast.success(`Added "${name}" to the external pool`);
         // Pool list lives in the `instructors` prop, which is read from the
-        // server — refresh so the new pool entry shows in subsequent pickers.
-        router.refresh();
+        // server. The createTrainer action revalidates the page so the new
+        // pool entry flows in automatically — no explicit refresh needed.
       } else {
         toast.error(trainerResult.error.message);
       }
@@ -215,12 +215,8 @@ export default function TrainersEditor({
     }
     startTransition(async () => {
       const result = await softDeleteExternalInstructor(instructorId, implementationId);
-      if (result.ok) {
-        toast.success("Removed from pool");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Removed from pool");
+      else toast.error(result.error.message);
     });
   }
 
@@ -249,7 +245,6 @@ export default function TrainersEditor({
         markCleanAfterRemoteChange(trainerId, linked.data);
         setPromotingTrainerId(null);
         toast.success("Linked to external pool");
-        router.refresh();
       } else {
         toast.error(linked.error.message);
       }
@@ -637,7 +632,6 @@ function TrainerRow({
   onCancelPromote: () => void;
   onPromote: (instructorId: string, name: string, email: string | null) => void;
 }) {
-  const router = useRouter();
   const [ptoPending, startPtoTransition] = useTransition();
   const [draftStart, setDraftStart] = useState("");
   const [draftEnd, setDraftEnd] = useState("");
@@ -659,7 +653,6 @@ function TrainerRow({
         setDraftEnd("");
         setDraftReason("");
         toast.success("Time off added");
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -669,8 +662,7 @@ function TrainerRow({
   function handleDeletePto(id: string) {
     startPtoTransition(async () => {
       const result = await deleteTrainerUnavailability(id, implementationId);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
