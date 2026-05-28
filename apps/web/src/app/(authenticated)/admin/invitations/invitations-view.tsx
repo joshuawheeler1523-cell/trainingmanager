@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -26,7 +25,6 @@ export type InvitationRow = {
 };
 
 export default function InvitationsView({ invitations }: { invitations: InvitationRow[] }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -42,7 +40,6 @@ export default function InvitationsView({ invitations }: { invitations: Invitati
         } else {
           toast.success("Expiry extended (email delivery is unconfigured)");
         }
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -53,12 +50,8 @@ export default function InvitationsView({ invitations }: { invitations: Invitati
     if (!confirm("Revoke this invitation? The link will stop working.")) return;
     startTransition(async () => {
       const result = await revokeInvitation(id);
-      if (result.ok) {
-        toast.success("Invitation revoked");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Invitation revoked");
+      else toast.error(result.error.message);
     });
   }
 

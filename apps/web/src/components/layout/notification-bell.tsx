@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { BellIcon } from "@heroicons/react/24/outline";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
@@ -29,7 +28,6 @@ export default function NotificationBell({
   initial: NotificationRow[];
   userId: string;
 }) {
-  const router = useRouter();
   const [items, setItems] = useState<NotificationRow[]>(initial);
 
   // Realtime subscription: listen for INSERTs to public.notifications scoped
@@ -72,13 +70,11 @@ export default function NotificationBell({
       prev.map((p) => (p.id === n.id ? { ...p, read_at: new Date().toISOString() } : p)),
     );
     await markNotificationRead(n.id);
-    router.refresh();
   }
 
   async function handleMarkAll() {
     setItems((prev) => prev.map((p) => ({ ...p, read_at: new Date().toISOString() })));
     await markAllNotificationsRead();
-    router.refresh();
   }
 
   return (

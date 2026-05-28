@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PaperAirplaneIcon, TrashIcon } from "@heroicons/react/20/solid";
 import { inviteUser, removeMember, updateMember } from "../actions";
@@ -42,7 +41,6 @@ const fieldClass =
   "border-input bg-background text-foreground rounded-md border px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-ring";
 
 export default function TeamView({ members }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const [inviteEmail, setInviteEmail] = useState("");
@@ -68,7 +66,6 @@ export default function TeamView({ members }: Props) {
           );
         }
         setInviteEmail("");
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -78,11 +75,7 @@ export default function TeamView({ members }: Props) {
   function handleUpdate(m: MemberRow, patch: Partial<Pick<MemberRow, "role" | "visibility">>) {
     startTransition(async () => {
       const result = await updateMember(m.id, patch);
-      if (result.ok) {
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -95,12 +88,8 @@ export default function TeamView({ members }: Props) {
       return;
     startTransition(async () => {
       const result = await removeMember(m.id);
-      if (result.ok) {
-        toast.success("Member removed");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Member removed");
+      else toast.error(result.error.message);
     });
   }
 

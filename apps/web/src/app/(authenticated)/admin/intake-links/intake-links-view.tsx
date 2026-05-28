@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ClipboardDocumentIcon, PlusIcon, TrashIcon, CheckIcon } from "@heroicons/react/20/solid";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
@@ -15,7 +14,6 @@ type Props = {
 };
 
 export default function IntakeLinksView({ links, origin }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [showCreate, setShowCreate] = useState(false);
   const [label, setLabel] = useState("");
@@ -33,7 +31,6 @@ export default function IntakeLinksView({ links, origin }: Props) {
         setLabel("");
         setExpiresAt("");
         setShowCreate(false);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -43,12 +40,8 @@ export default function IntakeLinksView({ links, origin }: Props) {
   function handleRevoke(id: string) {
     startTransition(async () => {
       const result = await revokeIntakeLink(id);
-      if (result.ok) {
-        toast.success("Link revoked");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Link revoked");
+      else toast.error(result.error.message);
     });
   }
 
