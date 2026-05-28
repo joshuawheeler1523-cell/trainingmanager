@@ -253,7 +253,6 @@ function InstructorsTab({
   assignments: Assignment[];
   allInstructors: Instructor[];
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [addingId, setAddingId] = useState("");
   const instructorLower = useLabel("entity.instructor", { lower: true });
@@ -315,12 +314,8 @@ function InstructorsTab({
   function removeAssignment(instructorId: string) {
     startTransition(async () => {
       const result = await unassignInstructorFromClass(classId, instructorId);
-      if (result.ok) {
-        toast.success("Instructor removed");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Instructor removed");
+      else toast.error(result.error.message);
     });
   }
 
@@ -335,7 +330,6 @@ function InstructorsTab({
       if (result.ok) {
         toast.success("Instructor added");
         setAddingId("");
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -349,7 +343,6 @@ function InstructorsTab({
         toast.success(
           `Distributed ${String(result.data.total)} offerings across ${String(result.data.count)} instructors`,
         );
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -657,7 +650,6 @@ function SkillRequirementsTab({
   allSkills: Skill[];
   qualifiedInstructorCount: number;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
   const [draftSkillId, setDraftSkillId] = useState("");
@@ -694,7 +686,6 @@ function SkillRequirementsTab({
       if (result.ok) {
         toast.success("Requirement added");
         resetDraft();
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -716,7 +707,6 @@ function SkillRequirementsTab({
       if (result.ok) {
         toast.success("Requirement updated");
         setEditingId(null);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -726,12 +716,8 @@ function SkillRequirementsTab({
   function handleRemove(rowId: string) {
     startTransition(async () => {
       const result = await removeClassSkillRequirement(rowId, classId);
-      if (result.ok) {
-        toast.success("Requirement removed");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Requirement removed");
+      else toast.error(result.error.message);
     });
   }
 
@@ -1064,7 +1050,6 @@ function RoadmapTab({
   steps: RoadmapStep[];
   instructionHoursPerOffering: number | null;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
   const [draftCompetency, setDraftCompetency] = useState("");
@@ -1112,7 +1097,6 @@ function RoadmapTab({
       if (result.ok) {
         toast.success("Step added");
         resetDraft();
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -1143,7 +1127,6 @@ function RoadmapTab({
       if (result.ok) {
         toast.success("Step updated");
         setEditingId(null);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -1153,20 +1136,15 @@ function RoadmapTab({
   function handleRemove(rowId: string) {
     startTransition(async () => {
       const result = await deleteRoadmapStep(rowId, classId);
-      if (result.ok) {
-        toast.success("Step removed");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Step removed");
+      else toast.error(result.error.message);
     });
   }
 
   function handleMove(rowId: string, direction: "up" | "down") {
     startTransition(async () => {
       const result = await moveRoadmapStep(rowId, classId, direction);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -1618,12 +1596,8 @@ export default function ClassDetailClient({
   function handleRestore() {
     startTransition(async () => {
       const result = await restoreClass(cls.id);
-      if (result.ok) {
-        toast.success("Class restored");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Class restored");
+      else toast.error(result.error.message);
     });
   }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -131,30 +130,21 @@ function LibraryTab({
   showArchived: boolean;
   setShowArchived: (v: boolean) => void;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   function handleArchive(id: string) {
     startTransition(async () => {
       const result = await archiveSkill(id);
-      if (result.ok) {
-        toast.success("Skill archived");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Skill archived");
+      else toast.error(result.error.message);
     });
   }
 
   function handleRestore(id: string) {
     startTransition(async () => {
       const result = await unarchiveSkill(id);
-      if (result.ok) {
-        toast.success("Skill restored");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Skill restored");
+      else toast.error(result.error.message);
     });
   }
 
@@ -211,9 +201,7 @@ function LibraryTab({
                   Add skill
                 </button>
               }
-              onSuccess={() => {
-                router.refresh();
-              }}
+              onSuccess={() => {}}
             />
           </ManagerOnly>
         </div>
@@ -273,9 +261,7 @@ function LibraryTab({
                               Edit
                             </button>
                           }
-                          onSuccess={() => {
-                            router.refresh();
-                          }}
+                          onSuccess={() => {}}
                         />
                         {s.is_archived ? (
                           <ConfirmDialog

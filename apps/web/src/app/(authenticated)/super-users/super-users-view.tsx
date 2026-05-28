@@ -277,42 +277,29 @@ function SuperUserRow({
   su: SuperUserWithClass;
   classes: { id: string; name: string }[];
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const archived = su.deleted_at != null;
 
   function toggleTrained() {
     startTransition(async () => {
       const result = await markSuperUserTrained(su.id, su.trained_at == null);
-      if (result.ok) {
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
   function handleArchive() {
     startTransition(async () => {
       const result = await softDeleteSuperUser(su.id);
-      if (result.ok) {
-        toast.success("Archived");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Archived");
+      else toast.error(result.error.message);
     });
   }
 
   function handleRestore() {
     startTransition(async () => {
       const result = await restoreSuperUser(su.id);
-      if (result.ok) {
-        toast.success("Restored");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Restored");
+      else toast.error(result.error.message);
     });
   }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import * as Dialog from "@radix-ui/react-dialog";
 import { PlusIcon, TrashIcon, XMarkIcon } from "@heroicons/react/20/solid";
@@ -41,7 +40,6 @@ const STATUS_BADGE: Record<RequestStatus, string> = {
 };
 
 export default function RequestSheet({ request, assignments, instructors, onClose }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const [reviewNotes, setReviewNotes] = useState(request.review_notes ?? "");
@@ -69,24 +67,16 @@ export default function RequestSheet({ request, assignments, instructors, onClos
   function handleStatusChange(next: RequestStatus) {
     startTransition(async () => {
       const result = await updateRequestStatus(request.id, { status: next });
-      if (result.ok) {
-        toast.success("Status updated");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Status updated");
+      else toast.error(result.error.message);
     });
   }
 
   function handleSaveReviewNotes() {
     startTransition(async () => {
       const result = await updateRequest(request.id, { review_notes: reviewNotes || null });
-      if (result.ok) {
-        toast.success("Review notes saved");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Review notes saved");
+      else toast.error(result.error.message);
     });
   }
 
@@ -107,7 +97,6 @@ export default function RequestSheet({ request, assignments, instructors, onClos
         toast.success("Instructor assigned");
         setPickInstructor("");
         setPickHours(4);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -117,12 +106,8 @@ export default function RequestSheet({ request, assignments, instructors, onClos
   function handleRemove(assignmentId: string) {
     startTransition(async () => {
       const result = await unassignRequestInstructor(assignmentId);
-      if (result.ok) {
-        toast.success("Removed");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Removed");
+      else toast.error(result.error.message);
     });
   }
 

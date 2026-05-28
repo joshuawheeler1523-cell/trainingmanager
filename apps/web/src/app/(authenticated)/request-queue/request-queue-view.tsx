@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -71,7 +70,6 @@ export default function RequestQueueView({
   buckets,
   origin,
 }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openId, setOpenId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -104,7 +102,6 @@ export default function RequestQueueView({
         } catch {
           toast.success("Intake link created — copy it from Admin → Intake links");
         }
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -179,7 +176,6 @@ export default function RequestQueueView({
         });
       } else {
         toast.success(`Moved to ${COLUMN_LABELS[targetStatus]}`);
-        router.refresh();
       }
     });
   }

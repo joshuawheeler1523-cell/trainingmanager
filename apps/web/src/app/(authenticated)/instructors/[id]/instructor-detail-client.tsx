@@ -120,7 +120,6 @@ function SkillsTab({
   instructorSkills: InstructorSkillRow[];
   allSkills: Skill[];
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   // Optimistic skill rows so edits (proficiency, cert flags, dates) flip
@@ -182,7 +181,6 @@ function SkillsTab({
       if (result.ok) {
         toast.success("Skill added");
         resetDraft();
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -229,12 +227,8 @@ function SkillsTab({
   function handleRemove(rowId: string) {
     startTransition(async () => {
       const result = await removeInstructorSkill(rowId, instructorId);
-      if (result.ok) {
-        toast.success("Skill removed");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Skill removed");
+      else toast.error(result.error.message);
     });
   }
 
@@ -811,12 +805,8 @@ export default function InstructorDetailClient({
   function handleRestore() {
     startTransition(async () => {
       const result = await restoreInstructor(instructor.id);
-      if (result.ok) {
-        toast.success("Instructor restored");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Instructor restored");
+      else toast.error(result.error.message);
     });
   }
 
