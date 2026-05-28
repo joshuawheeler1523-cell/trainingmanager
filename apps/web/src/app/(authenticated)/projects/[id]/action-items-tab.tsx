@@ -1,7 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useOptimistic, useTransition } from "react";
 import { toast } from "sonner";
 import {
   type Instructor,
@@ -22,26 +21,27 @@ type Props = {
 };
 
 export default function ActionItemsTab({ project, tasks, team, actionItems }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [optimisticItems, applyItemPatch] = useOptimistic(
+    actionItems,
+    (state, op: { id: string; is_complete: boolean }) =>
+      state.map((i) => (i.id === op.id ? { ...i, is_complete: op.is_complete } : i)),
+  );
 
   const taskMap = new Map(tasks.map((t) => [t.id, t]));
   const memberMap = new Map(team.map((m) => [m.id, m]));
 
   function handleToggle(item: TaskActionItem) {
     startTransition(async () => {
+      applyItemPatch({ id: item.id, is_complete: !item.is_complete });
       const result = await updateActionItem(item.id, project.id, {
         is_complete: !item.is_complete,
       });
-      if (result.ok) {
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
-  if (actionItems.length === 0) {
+  if (optimisticItems.length === 0) {
     return (
       <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
         <p className="text-foreground text-sm font-medium">No action items yet</p>
@@ -52,8 +52,8 @@ export default function ActionItemsTab({ project, tasks, team, actionItems }: Pr
     );
   }
 
-  const open = actionItems.filter((a) => !a.is_complete);
-  const done = actionItems.filter((a) => a.is_complete);
+  const open = optimisticItems.filter((a) => !a.is_complete);
+  const done = optimisticItems.filter((a) => a.is_complete);
 
   return (
     <div className="space-y-6">

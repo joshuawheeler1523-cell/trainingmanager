@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useOptimistic, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import {
@@ -57,7 +56,6 @@ export default function TaskDrawer({
   milestones,
   onClose,
 }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   // Optimistic mirror of the task so controlled <select>s (status,
@@ -138,7 +136,6 @@ export default function TaskDrawer({
       if (result.ok) {
         setPickMember("");
         setPickHours(0);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -148,8 +145,7 @@ export default function TaskDrawer({
   function handleRemoveAssignment(id: string) {
     startTransition(async () => {
       const result = await unassignTaskMember(id, project.id);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -171,7 +167,6 @@ export default function TaskDrawer({
       });
       if (result.ok) {
         setPickPredecessor("");
-        router.refresh();
       } else if (result.error.message.toLowerCase().includes("cycle")) {
         toast.error("That predecessor would create a cycle.");
       } else {
@@ -183,8 +178,7 @@ export default function TaskDrawer({
   function handleRemovePredecessor(depId: string) {
     startTransition(async () => {
       const result = await deleteDependency(depId, project.id);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -196,12 +190,8 @@ export default function TaskDrawer({
     if (!desc) return;
     startTransition(async () => {
       const result = await createActionItem(task.id, project.id, { description: desc });
-      if (result.ok) {
-        setNewItem("");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) setNewItem("");
+      else toast.error(result.error.message);
     });
   }
 
@@ -221,8 +211,7 @@ export default function TaskDrawer({
   function handleDeleteActionItem(id: string) {
     startTransition(async () => {
       const result = await deleteActionItem(id, project.id);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -232,7 +221,6 @@ export default function TaskDrawer({
       if (result.ok) {
         toast.success("Task deleted");
         onClose();
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }

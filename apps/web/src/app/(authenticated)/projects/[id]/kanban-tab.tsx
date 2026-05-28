@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -59,7 +58,6 @@ export default function KanbanTab({
   dependencies,
   milestones,
 }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [statusOverride, setStatusOverride] = useState<Record<string, TaskStatus>>({});
@@ -117,7 +115,6 @@ export default function KanbanTab({
         });
       } else {
         toast.success(`Moved to ${COLUMN_LABELS[targetStatus]}`);
-        router.refresh();
       }
     });
   }

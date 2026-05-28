@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import {
@@ -44,11 +43,25 @@ export default function TasksTab({
   dependencies,
   milestones,
 }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+
+  // Optimistic mirror: lets status/percent/delete clicks reflect instantly
+  // instead of waiting 400-800ms for the server roundtrip + re-render.
+  // Server actions call revalidatePath, so Next streams the fresh tree
+  // back as part of the action response — no router.refresh needed.
+  const [optimisticTasks, applyTaskOp] = useOptimistic(
+    tasks,
+    (
+      state,
+      op: { kind: "patch"; id: string; changes: Partial<Task> } | { kind: "remove"; id: string },
+    ) =>
+      op.kind === "remove"
+        ? state.filter((t) => t.id !== op.id)
+        : state.map((t) => (t.id === op.id ? { ...t, ...op.changes } : t)),
+  );
 
   function handleCreateTask() {
     const name = newName.trim();
@@ -59,7 +72,6 @@ export default function TasksTab({
         toast.success("Task created");
         setNewName("");
         setCreating(false);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -67,37 +79,36 @@ export default function TasksTab({
   }
 
   function handleStatusChange(t: Task, status: TaskStatus) {
-    const patch: Record<string, unknown> = { status };
-    if (status === "completed") patch["percent_complete"] = 100;
+    const changes: Partial<Task> = { status };
+    if (status === "completed") changes.percent_complete = 100;
     startTransition(async () => {
-      const result = await updateTask(t.id, project.id, patch);
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      applyTaskOp({ kind: "patch", id: t.id, changes });
+      const result = await updateTask(t.id, project.id, changes);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
   function handlePercentChange(t: Task, percent: number) {
     startTransition(async () => {
-      const result = await updateTask(t.id, project.id, { percent_complete: percent });
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      const changes: Partial<Task> = { percent_complete: percent };
+      if (percent >= 100) changes.status = "completed";
+      applyTaskOp({ kind: "patch", id: t.id, changes });
+      const result = await updateTask(t.id, project.id, changes);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
   function handleDeleteTask(t: Task) {
     startTransition(async () => {
+      applyTaskOp({ kind: "remove", id: t.id });
+      if (openTaskId === t.id) setOpenTaskId(null);
       const result = await deleteTask(t.id, project.id);
-      if (result.ok) {
-        toast.success("Task deleted");
-        if (openTaskId === t.id) setOpenTaskId(null);
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Task deleted");
+      else toast.error(result.error.message);
     });
   }
 
-  const openTask = openTaskId ? (tasks.find((t) => t.id === openTaskId) ?? null) : null;
+  const openTask = openTaskId ? (optimisticTasks.find((t) => t.id === openTaskId) ?? null) : null;
 
   const memberNameById = new Map(team.map((m) => [m.id, m.instructor?.full_name ?? "Unknown"]));
   const assigneesByTask = new Map<string, string[]>();
@@ -109,8 +120,8 @@ export default function TasksTab({
 
   return (
     <div className="space-y-3">
-      <ImportExportControls project={project} tasks={tasks} />
-      {tasks.length === 0 && !creating ? (
+      <ImportExportControls project={project} tasks={optimisticTasks} />
+      {optimisticTasks.length === 0 && !creating ? (
         <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
           <p className="text-foreground text-sm font-medium">No tasks yet</p>
           <p className="text-muted-foreground mt-1 text-xs">
@@ -142,7 +153,7 @@ export default function TasksTab({
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {tasks.map((t) => (
+              {optimisticTasks.map((t) => (
                 <tr key={t.id} className="hover:bg-surface/50">
                   <td className="px-3 py-2">
                     <button
@@ -260,7 +271,7 @@ export default function TasksTab({
           </button>
         </div>
       ) : (
-        tasks.length > 0 && (
+        optimisticTasks.length > 0 && (
           <button
             type="button"
             onClick={() => {
@@ -278,7 +289,7 @@ export default function TasksTab({
         <TaskDrawer
           project={project}
           task={openTask}
-          allProjectTasks={tasks}
+          allProjectTasks={optimisticTasks}
           team={team}
           assignments={assignments.filter((a) => a.task_id === openTask.id)}
           actionItems={actionItems.filter((a) => a.task_id === openTask.id)}

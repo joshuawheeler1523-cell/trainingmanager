@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   type Milestone,
@@ -172,7 +171,6 @@ export default function GanttTab({
   milestones,
   dependencies,
 }: Props) {
-  const router = useRouter();
   const [, startTransition] = useTransition();
   const [zoom, setZoom] = useState<Zoom>("week");
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
@@ -277,8 +275,7 @@ export default function GanttTab({
         start_date: start,
         end_date: end,
       });
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
@@ -328,7 +325,6 @@ export default function GanttTab({
       if (result.ok) {
         toast.success("Task created — click to rename");
         setOpenTaskId(result.data.id);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }

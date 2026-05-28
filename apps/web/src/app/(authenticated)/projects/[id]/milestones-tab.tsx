@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import { type Milestone, type Project } from "@arbor/shared";
@@ -13,10 +12,20 @@ type Props = {
 };
 
 export default function MilestonesTab({ project, milestones }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("");
   const [dueDate, setDueDate] = useState("");
+
+  const [optimisticMilestones, applyMilestoneOp] = useOptimistic(
+    milestones,
+    (
+      state,
+      op: { kind: "toggle"; id: string; is_complete: boolean } | { kind: "remove"; id: string },
+    ) =>
+      op.kind === "remove"
+        ? state.filter((m) => m.id !== op.id)
+        : state.map((m) => (m.id === op.id ? { ...m, is_complete: op.is_complete } : m)),
+  );
 
   function handleCreate() {
     const n = name.trim();
@@ -27,7 +36,6 @@ export default function MilestonesTab({ project, milestones }: Props) {
         toast.success("Milestone added");
         setName("");
         setDueDate("");
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -36,25 +44,22 @@ export default function MilestonesTab({ project, milestones }: Props) {
 
   function handleToggle(m: Milestone) {
     startTransition(async () => {
+      applyMilestoneOp({ kind: "toggle", id: m.id, is_complete: !m.is_complete });
       const result = await updateMilestone(m.id, project.id, { is_complete: !m.is_complete });
-      if (result.ok) router.refresh();
-      else toast.error(result.error.message);
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
   function handleDelete(id: string) {
     startTransition(async () => {
+      applyMilestoneOp({ kind: "remove", id });
       const result = await deleteMilestone(id, project.id);
-      if (result.ok) {
-        toast.success("Milestone deleted");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Milestone deleted");
+      else toast.error(result.error.message);
     });
   }
 
-  const sorted = [...milestones].sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const sorted = [...optimisticMilestones].sort((a, b) => a.due_date.localeCompare(b.due_date));
 
   return (
     <div className="space-y-4">

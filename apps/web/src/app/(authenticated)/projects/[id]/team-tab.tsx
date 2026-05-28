@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import {
@@ -22,10 +21,26 @@ type Props = {
 };
 
 export default function TeamTab({ project, team, instructors }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  const assignedIds = new Set(team.map((m) => m.instructor_id));
+  const [optimisticTeam, applyTeamOp] = useOptimistic(
+    team,
+    (
+      state,
+      op:
+        | {
+            kind: "patch";
+            id: string;
+            changes: { role?: ProjectRole; allocated_hours?: number };
+          }
+        | { kind: "remove"; id: string },
+    ) =>
+      op.kind === "remove"
+        ? state.filter((m) => m.id !== op.id)
+        : state.map((m) => (m.id === op.id ? { ...m, ...op.changes } : m)),
+  );
+
+  const assignedIds = new Set(optimisticTeam.map((m) => m.instructor_id));
   const available = instructors.filter((i) => !assignedIds.has(i.id));
 
   const [pickInstructor, setPickInstructor] = useState("");
@@ -45,7 +60,6 @@ export default function TeamTab({ project, team, instructors }: Props) {
         setPickInstructor("");
         setPickRole("member");
         setPickHours(0);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -54,30 +68,24 @@ export default function TeamTab({ project, team, instructors }: Props) {
 
   function handleUpdate(m: TeamMember, patch: { role?: ProjectRole; allocated_hours?: number }) {
     startTransition(async () => {
+      applyTeamOp({ kind: "patch", id: m.id, changes: patch });
       const result = await updateTeamMember(m.id, project.id, patch);
-      if (result.ok) {
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
   function handleRemove(memberId: string) {
     startTransition(async () => {
+      applyTeamOp({ kind: "remove", id: memberId });
       const result = await removeTeamMember(memberId, project.id);
-      if (result.ok) {
-        toast.success("Team member removed");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Team member removed");
+      else toast.error(result.error.message);
     });
   }
 
   return (
     <div className="space-y-4">
-      {team.length === 0 ? (
+      {optimisticTeam.length === 0 ? (
         <div className="border-border bg-surface rounded-lg border border-dashed p-8 text-center">
           <p className="text-foreground text-sm font-medium">No team members yet</p>
           <p className="text-muted-foreground mt-1 text-xs">
@@ -96,7 +104,7 @@ export default function TeamTab({ project, team, instructors }: Props) {
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {team.map((m) => (
+              {optimisticTeam.map((m) => (
                 <tr key={m.id}>
                   <td className="text-foreground px-3 py-2">
                     {m.instructor?.full_name ?? "Unknown"}
