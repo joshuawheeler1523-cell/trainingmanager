@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   PlusIcon,
@@ -39,7 +38,6 @@ export default function GroupsTab({
   groupAllocations,
   instructors,
 }: Props) {
-  const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(groups[0]?.id ?? null);
 
   // Reselect first group if the selected one was deleted (after refresh).
@@ -95,9 +93,7 @@ export default function GroupsTab({
                   Create group
                 </button>
               }
-              onSuccess={() => {
-                router.refresh();
-              }}
+              onSuccess={() => {}}
             />
           </div>
         </div>
@@ -124,7 +120,6 @@ export default function GroupsTab({
             }
             onSuccess={(g) => {
               setSelectedId(g.id);
-              router.refresh();
             }}
           />
         </div>
@@ -190,11 +185,8 @@ function GroupDetail({
   instructors: Instructor[];
   memberGroupCount: Map<string, number>;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const onChanged = () => {
-    router.refresh();
-  };
+  const onChanged = () => {};
   const [memberSearch, setMemberSearch] = useState("");
   const [pickToAdd, setPickToAdd] = useState("");
   const instructorPlural = useLabel("entity.instructor", { plural: true, lower: true });

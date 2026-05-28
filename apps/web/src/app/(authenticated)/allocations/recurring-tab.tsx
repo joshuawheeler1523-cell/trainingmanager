@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   PlusIcon,
@@ -35,7 +34,6 @@ const STATUS_BADGE: Record<RecurringTask["status"], string> = {
 };
 
 export default function RecurringTab({ tasks, assignments, buckets, instructors }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [showArchived, setShowArchived] = useState(false);
 
@@ -60,24 +58,16 @@ export default function RecurringTab({ tasks, assignments, buckets, instructors 
     const next = t.status === "paused" ? "active" : "paused";
     startTransition(async () => {
       const result = await setRecurringTaskStatus(t.id, next);
-      if (result.ok) {
-        toast.success(next === "paused" ? "Task paused" : "Task resumed");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success(next === "paused" ? "Task paused" : "Task resumed");
+      else toast.error(result.error.message);
     });
   }
 
   function handleArchive(id: string) {
     startTransition(async () => {
       const result = await archiveRecurringTask(id);
-      if (result.ok) {
-        toast.success("Task archived");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Task archived");
+      else toast.error(result.error.message);
     });
   }
 
@@ -108,9 +98,7 @@ export default function RecurringTab({ tasks, assignments, buckets, instructors 
               Add recurring task
             </button>
           }
-          onSuccess={() => {
-            router.refresh();
-          }}
+          onSuccess={() => {}}
         />
       </div>
 
@@ -241,9 +229,7 @@ export default function RecurringTab({ tasks, assignments, buckets, instructors 
                                   Edit
                                 </button>
                               }
-                              onSuccess={() => {
-                                router.refresh();
-                              }}
+                              onSuccess={() => {}}
                             />
                             <button
                               type="button"

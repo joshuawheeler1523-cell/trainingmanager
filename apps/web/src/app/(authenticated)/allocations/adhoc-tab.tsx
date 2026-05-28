@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PlusIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/20/solid";
 import AdHocFormDialog from "./adhoc-form-dialog";
@@ -25,7 +24,6 @@ const STATUS_BADGE: Record<AdHocStatus, string> = {
 };
 
 export default function AdHocTab({ tasks, buckets, instructors }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const instructorLower = useLabel("entity.instructor", { lower: true });
 
@@ -71,23 +69,15 @@ export default function AdHocTab({ tasks, buckets, instructors }: Props) {
   function handleStatusChange(id: string, status: AdHocStatus) {
     startTransition(async () => {
       const result = await setAdHocTaskStatus(id, status);
-      if (result.ok) {
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
   function handleDelete(id: string) {
     startTransition(async () => {
       const result = await deleteAdHocTask(id);
-      if (result.ok) {
-        toast.success("Task deleted");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Task deleted");
+      else toast.error(result.error.message);
     });
   }
 
@@ -204,9 +194,7 @@ export default function AdHocTab({ tasks, buckets, instructors }: Props) {
               Add ad-hoc task
             </button>
           }
-          onSuccess={() => {
-            router.refresh();
-          }}
+          onSuccess={() => {}}
         />
       </div>
 
@@ -308,9 +296,7 @@ export default function AdHocTab({ tasks, buckets, instructors }: Props) {
                               Edit
                             </button>
                           }
-                          onSuccess={() => {
-                            router.refresh();
-                          }}
+                          onSuccess={() => {}}
                         />
                         <ConfirmDialog
                           trigger={

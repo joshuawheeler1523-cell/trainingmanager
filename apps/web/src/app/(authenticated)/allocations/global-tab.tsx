@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import * as Dialog from "@radix-ui/react-dialog";
 import SliderRow from "./slider-row";
@@ -18,7 +17,6 @@ type Props = {
 };
 
 export default function GlobalTab({ buckets, globals, defaultUserCount }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -74,7 +72,6 @@ export default function GlobalTab({ buckets, globals, defaultUserCount }: Props)
       if (result.ok) {
         toast.success("Global defaults saved");
         setConfirmOpen(false);
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }

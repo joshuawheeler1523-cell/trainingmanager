@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AdjustmentsHorizontalIcon, ArrowPathIcon } from "@heroicons/react/20/solid";
@@ -264,7 +263,6 @@ function CustomizeSheet({
   hasIndividualOverrides: boolean;
   onClose: () => void;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [slate, setSlate] = useState(initialSlate);
 
@@ -293,7 +291,6 @@ function CustomizeSheet({
       const result = await saveIndividualAllocations(instructor.id, slate);
       if (result.ok) {
         toast.success("Individual allocations saved");
-        router.refresh();
         onClose();
       } else {
         toast.error(result.error.message);
@@ -306,7 +303,6 @@ function CustomizeSheet({
       const result = await resetIndividualAllocations(instructor.id);
       if (result.ok) {
         toast.success("Reset to group/global default");
-        router.refresh();
         onClose();
       } else {
         toast.error(result.error.message);

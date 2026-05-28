@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useOptimistic, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
@@ -159,7 +158,6 @@ function SortableRow({
 }
 
 export default function BucketsTab({ buckets }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [showArchived, setShowArchived] = useState(false);
 
@@ -193,34 +191,23 @@ export default function BucketsTab({ buckets }: Props) {
       setOrderedActive(next);
       const payload = next.map((b, i) => ({ id: b.id, display_order: i }));
       const result = await reorderBuckets(payload);
-      if (!result.ok) {
-        toast.error(result.error.message);
-      }
-      router.refresh();
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 
   function handleArchive(id: string) {
     startTransition(async () => {
       const result = await archiveBucket(id);
-      if (result.ok) {
-        toast.success("Bucket archived");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Bucket archived");
+      else toast.error(result.error.message);
     });
   }
 
   function handleRestore(id: string) {
     startTransition(async () => {
       const result = await unarchiveBucket(id);
-      if (result.ok) {
-        toast.success("Bucket restored");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Bucket restored");
+      else toast.error(result.error.message);
     });
   }
 
@@ -231,7 +218,6 @@ export default function BucketsTab({ buckets }: Props) {
         toast.success(`${template.label} applied`, {
           description: `Created ${String(result.data.created)} buckets with default percentages.`,
         });
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -274,9 +260,7 @@ export default function BucketsTab({ buckets }: Props) {
                   Add bucket
                 </button>
               }
-              onSuccess={() => {
-                router.refresh();
-              }}
+              onSuccess={() => {}}
             />
           </div>
         </ManagerOnly>
@@ -307,9 +291,7 @@ export default function BucketsTab({ buckets }: Props) {
                     pending={pending}
                     onArchive={handleArchive}
                     onRestore={handleRestore}
-                    onEdited={() => {
-                      router.refresh();
-                    }}
+                    onEdited={() => {}}
                   />
                 ))}
               </tbody>
@@ -334,9 +316,7 @@ export default function BucketsTab({ buckets }: Props) {
                         pending={pending}
                         onArchive={handleArchive}
                         onRestore={handleRestore}
-                        onEdited={() => {
-                          router.refresh();
-                        }}
+                        onEdited={() => {}}
                       />
                     ))}
                   </tbody>
