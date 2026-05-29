@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Tra, TraAudienceRole } from "@arbor/shared";
 import { saveTraAudienceRoles, updateTra } from "../actions";
@@ -22,7 +21,6 @@ type Props = {
 };
 
 export default function Step3Audience({ tra, audienceRoles, disabled }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const initialRoles = useMemo<AudienceRoleRow[]>(
@@ -77,7 +75,6 @@ export default function Step3Audience({ tra, audienceRoles, disabled }: Props) {
         return;
       }
       toast.success("Saved");
-      router.refresh();
     });
   }
 

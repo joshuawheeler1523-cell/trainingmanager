@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { TRA_ROOT_CAUSE_VALUES, type Tra, type TraRootCauseAnswer } from "@arbor/shared";
 import { updateTra } from "../actions";
@@ -13,7 +12,6 @@ type Props = {
 };
 
 export default function Step2Need({ tra, disabled }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const [businessProblem, setBusinessProblem] = useState(tra.business_problem ?? "");
@@ -52,12 +50,8 @@ export default function Step2Need({ tra, disabled }: Props) {
         prior_attempts: priorAttempts || null,
         cost_of_inaction: costOfInaction || null,
       });
-      if (r.ok) {
-        toast.success("Saved");
-        router.refresh();
-      } else {
-        toast.error(r.error.message);
-      }
+      if (r.ok) toast.success("Saved");
+      else toast.error(r.error.message);
     });
   }
 

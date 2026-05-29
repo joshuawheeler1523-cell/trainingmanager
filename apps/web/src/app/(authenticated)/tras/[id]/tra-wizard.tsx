@@ -137,12 +137,8 @@ export default function TraWizard({
   ) {
     startTransition(async () => {
       const r = await fn();
-      if (r.ok) {
-        toast.success(label);
-        router.refresh();
-      } else {
-        toast.error(r.error.message);
-      }
+      if (r.ok) toast.success(label);
+      else toast.error(r.error.message);
     });
   }
 

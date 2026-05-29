@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   TRA_DELIVERY_CADENCE_VALUES,
@@ -73,7 +72,6 @@ export default function Step5LearningDesign({
   deliverableTypes,
   disabled,
 }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const initialObjectives = useMemo<ObjectiveRow[]>(
@@ -180,7 +178,6 @@ export default function Step5LearningDesign({
         return;
       }
       toast.success("Saved");
-      router.refresh();
     });
   }
 

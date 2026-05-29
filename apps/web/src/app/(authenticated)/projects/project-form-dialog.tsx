@@ -79,11 +79,7 @@ export default function ProjectFormDialog({ mode, initial, onClose }: Props) {
       if (result.ok) {
         toast.success(mode === "create" ? "Project created" : "Project updated");
         onClose();
-        if (mode === "create") {
-          router.push(`/projects/${result.data.id}`);
-        } else {
-          router.refresh();
-        }
+        if (mode === "create") router.push(`/projects/${result.data.id}`);
       } else {
         toast.error(result.error.message);
       }

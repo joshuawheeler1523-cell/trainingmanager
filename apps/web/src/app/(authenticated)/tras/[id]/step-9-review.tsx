@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArchiveBoxIcon,
@@ -55,7 +54,6 @@ export default function Step9Review({
   onConvert,
   goToStep,
 }: Props) {
-  const router = useRouter();
   const [adjustmentsPending, startTransition] = useTransition();
   const [adjustments, setAdjustments] = useState(tra.adjustments_notes ?? "");
 
@@ -92,12 +90,8 @@ export default function Step9Review({
   function handleApply() {
     startTransition(async () => {
       const r = await updateTra(tra.id, { adjustments_notes: adjustments || null });
-      if (r.ok) {
-        toast.success("Adjustments saved");
-        router.refresh();
-      } else {
-        toast.error(r.error.message);
-      }
+      if (r.ok) toast.success("Adjustments saved");
+      else toast.error(r.error.message);
     });
   }
 

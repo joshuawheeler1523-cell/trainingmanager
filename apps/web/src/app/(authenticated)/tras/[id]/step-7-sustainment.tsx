@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Tra } from "@arbor/shared";
 import { updateTra } from "../actions";
@@ -13,7 +12,6 @@ type Props = {
 };
 
 export default function Step7Sustainment({ tra, disabled }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const [contentOwner, setContentOwner] = useState(tra.content_owner ?? "");
@@ -32,12 +30,8 @@ export default function Step7Sustainment({ tra, disabled }: Props) {
         reinforcement_plan: reinforcement || null,
         review_cadence: reviewCadence || null,
       });
-      if (r.ok) {
-        toast.success("Saved");
-        router.refresh();
-      } else {
-        toast.error(r.error.message);
-      }
+      if (r.ok) toast.success("Saved");
+      else toast.error(r.error.message);
     });
   }
 

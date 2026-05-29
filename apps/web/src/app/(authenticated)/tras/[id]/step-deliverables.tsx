@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import { computeDeliverableEstimatedHours } from "@arbor/shared";
@@ -30,7 +29,6 @@ export default function StepDeliverables({
   deliverableTypes,
   disabled,
 }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const typesById = useMemo(
@@ -87,7 +85,6 @@ export default function StepDeliverables({
       if (result.ok) {
         toast.success("Deliverable added");
         resetAddForm();
-        router.refresh();
       } else {
         toast.error(result.error.message);
       }
@@ -97,12 +94,8 @@ export default function StepDeliverables({
   function handleRemove(deliverableId: string) {
     startTransition(async () => {
       const result = await removeDeliverable(deliverableId, traId);
-      if (result.ok) {
-        toast.success("Removed");
-        router.refresh();
-      } else {
-        toast.error(result.error.message);
-      }
+      if (result.ok) toast.success("Removed");
+      else toast.error(result.error.message);
     });
   }
 
@@ -338,7 +331,6 @@ function DeliverableRow({
   disabled: boolean;
   onRemove: () => void;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const [name, setName] = useState(deliverable.name);
@@ -358,10 +350,7 @@ function DeliverableRow({
   function persist(patch: Record<string, unknown>) {
     startTransition(async () => {
       const result = await updateDeliverable(deliverable.id, traId, patch);
-      if (!result.ok) {
-        toast.error(result.error.message);
-      }
-      router.refresh();
+      if (!result.ok) toast.error(result.error.message);
     });
   }
 

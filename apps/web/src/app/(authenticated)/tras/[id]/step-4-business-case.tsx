@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   TRA_PRIORITY_VALUES,
@@ -36,7 +35,6 @@ type Props = {
 };
 
 export default function Step4BusinessCase({ tra, kpis, successCriteria, disabled }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const initialKpis = useMemo<KpiRow[]>(
@@ -114,7 +112,6 @@ export default function Step4BusinessCase({ tra, kpis, successCriteria, disabled
         return;
       }
       toast.success("Saved");
-      router.refresh();
     });
   }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { TRA_WCAG_TARGET_VALUES, type Tra, type TraWcagTarget } from "@arbor/shared";
 import { updateTra } from "../actions";
@@ -13,7 +12,6 @@ type Props = {
 };
 
 export default function Step6Logistics({ tra, disabled }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const [tech, setTech] = useState(tra.technology_requirements ?? "");
@@ -41,12 +39,8 @@ export default function Step6Logistics({ tra, disabled }: Props) {
         pilot_group: pilot || null,
         feedback_mechanism: feedback || null,
       });
-      if (r.ok) {
-        toast.success("Saved");
-        router.refresh();
-      } else {
-        toast.error(r.error.message);
-      }
+      if (r.ok) toast.success("Saved");
+      else toast.error(r.error.message);
     });
   }
 

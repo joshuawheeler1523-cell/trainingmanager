@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
@@ -105,7 +104,6 @@ export default function CsvImportDialog({
   columns,
   serverAction,
 }: Props) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<Record<string, string>[] | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -171,7 +169,6 @@ export default function CsvImportDialog({
       } else {
         toast.warning(`Imported ${entity} with errors: ${summary}`);
       }
-      router.refresh();
     });
   }
 

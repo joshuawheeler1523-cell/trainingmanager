@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { TRA_APPROVAL_TYPE_VALUES, type TraApproval, type TraApprovalType } from "@arbor/shared";
 import { saveTraApprovals } from "../actions";
@@ -30,7 +29,6 @@ type Props = {
 };
 
 export default function Step8Approvals({ traId, approvals, disabled }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const initialRows = useMemo<Record<TraApprovalType, Row>>(() => {
@@ -72,12 +70,8 @@ export default function Step8Approvals({ traId, approvals, disabled }: Props) {
         ];
       });
       const r = await saveTraApprovals(traId, payload);
-      if (r.ok) {
-        toast.success("Saved");
-        router.refresh();
-      } else {
-        toast.error(r.error.message);
-      }
+      if (r.ok) toast.success("Saved");
+      else toast.error(r.error.message);
     });
   }
 

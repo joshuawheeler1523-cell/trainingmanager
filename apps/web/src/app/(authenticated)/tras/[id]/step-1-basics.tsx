@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   TRA_NEEDED_BY_DRIVER_VALUES,
@@ -32,7 +31,6 @@ type Props = {
 };
 
 export default function Step1Basics({ tra, stakeholders, disabled }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const [projectName, setProjectName] = useState(tra.project_name);
@@ -102,7 +100,6 @@ export default function Step1Basics({ tra, stakeholders, disabled }: Props) {
         return;
       }
       toast.success("Saved");
-      router.refresh();
     });
   }
 

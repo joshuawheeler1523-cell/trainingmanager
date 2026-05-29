@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
 import { bulkSetAnnualHours } from "./actions";
@@ -12,7 +11,6 @@ type Props = {
 };
 
 export default function BulkAnnualHoursDialog({ trigger, instructorCount }: Props) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [hours, setHours] = useState("1880");
   const [confirming, setConfirming] = useState(false);
@@ -38,7 +36,6 @@ export default function BulkAnnualHoursDialog({ trigger, instructorCount }: Prop
             result.data.updated === 1 ? "" : "s"
           }`,
         );
-        router.refresh();
         setOpen(false);
         reset();
       } else {

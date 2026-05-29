@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import * as Dialog from "@radix-ui/react-dialog";
 import { XMarkIcon } from "@heroicons/react/20/solid";
@@ -29,7 +28,6 @@ const fieldCls =
   "border-input bg-background text-foreground w-full rounded-md border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
 export default function NewRequestDialog({ buckets, onClose }: Props) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const [title, setTitle] = useState("");
@@ -65,7 +63,6 @@ export default function NewRequestDialog({ buckets, onClose }: Props) {
       });
       if (result.ok) {
         toast.success("Request added to queue");
-        router.refresh();
         onClose();
       } else {
         toast.error(result.error.message);
