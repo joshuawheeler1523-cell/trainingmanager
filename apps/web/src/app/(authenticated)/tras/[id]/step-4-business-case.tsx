@@ -75,28 +75,6 @@ export default function Step4BusinessCase({ tra, kpis, successCriteria, disabled
 
   function handleSave() {
     startTransition(async () => {
-      const traUpdate = await updateTra(tra.id, {
-        priority: priority || null,
-        budget_range: budgetRange || null,
-        funding_source: fundingSource || null,
-      });
-      if (!traUpdate.ok) {
-        toast.error(traUpdate.error.message);
-        return;
-      }
-      const kpiSave = await saveTraKpis(
-        tra.id,
-        kpiRows.map((r, i) => ({
-          position: i,
-          metric: r.metric || null,
-          baseline: r.baseline || null,
-          target: r.target || null,
-        })),
-      );
-      if (!kpiSave.ok) {
-        toast.error(kpiSave.error.message);
-        return;
-      }
       // Drop empty success-criteria rows so we don't insert blank ones for
       // checkpoints the user didn't fill in.
       const successPayload = successRows
@@ -106,7 +84,34 @@ export default function Step4BusinessCase({ tra, kpis, successCriteria, disabled
           criteria: r.criteria || null,
           measurement_owner: r.measurement_owner || null,
         }));
-      const successSave = await saveTraSuccessCriteria(tra.id, successPayload);
+
+      // tra row + tra_kpis + tra_success_criteria are independent writes;
+      // fan out instead of chaining three round-trips on every Save click.
+      const [traUpdate, kpiSave, successSave] = await Promise.all([
+        updateTra(tra.id, {
+          priority: priority || null,
+          budget_range: budgetRange || null,
+          funding_source: fundingSource || null,
+        }),
+        saveTraKpis(
+          tra.id,
+          kpiRows.map((r, i) => ({
+            position: i,
+            metric: r.metric || null,
+            baseline: r.baseline || null,
+            target: r.target || null,
+          })),
+        ),
+        saveTraSuccessCriteria(tra.id, successPayload),
+      ]);
+      if (!traUpdate.ok) {
+        toast.error(traUpdate.error.message);
+        return;
+      }
+      if (!kpiSave.ok) {
+        toast.error(kpiSave.error.message);
+        return;
+      }
       if (!successSave.ok) {
         toast.error(successSave.error.message);
         return;

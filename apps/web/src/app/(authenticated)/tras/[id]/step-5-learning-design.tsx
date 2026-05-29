@@ -130,49 +130,53 @@ export default function Step5LearningDesign({
 
   function handleSave() {
     startTransition(async () => {
-      const traUpdate = await updateTra(tra.id, {
-        existing_content: existingContent || null,
-        recommended_modalities: modalities,
-        estimated_seat_time_hours: seatTime === "" ? null : Number(seatTime),
-        delivery_cadence: cadence || null,
-        assessment_approaches: assessmentApproaches,
-      });
+      // Four independent writes (tra row, objectives, SMEs, evaluation plan)
+      // — fan out instead of chaining four round-trips per Save click.
+      const [traUpdate, objSave, smeSave, evalSave] = await Promise.all([
+        updateTra(tra.id, {
+          existing_content: existingContent || null,
+          recommended_modalities: modalities,
+          estimated_seat_time_hours: seatTime === "" ? null : Number(seatTime),
+          delivery_cadence: cadence || null,
+          assessment_approaches: assessmentApproaches,
+        }),
+        saveTraObjectives(
+          tra.id,
+          objectiveRows
+            .filter((r) => r.text.trim() !== "")
+            .map((r, i) => ({ position: i, text: r.text })),
+        ),
+        saveTraSmes(
+          tra.id,
+          smeRows.map((r, i) => ({
+            position: i,
+            name: r.name || null,
+            email: r.email || null,
+            availability_hours: r.availability_hours === "" ? null : Number(r.availability_hours),
+          })),
+        ),
+        saveTraEvaluationPlan(
+          tra.id,
+          evalRows
+            .filter((r) => r.enabled)
+            .map((r) => ({
+              kirkpatrick_level: r.level,
+              measurement_method: r.measurement_method || null,
+            })),
+        ),
+      ]);
       if (!traUpdate.ok) {
         toast.error(traUpdate.error.message);
         return;
       }
-      const objSave = await saveTraObjectives(
-        tra.id,
-        objectiveRows
-          .filter((r) => r.text.trim() !== "")
-          .map((r, i) => ({ position: i, text: r.text })),
-      );
       if (!objSave.ok) {
         toast.error(objSave.error.message);
         return;
       }
-      const smeSave = await saveTraSmes(
-        tra.id,
-        smeRows.map((r, i) => ({
-          position: i,
-          name: r.name || null,
-          email: r.email || null,
-          availability_hours: r.availability_hours === "" ? null : Number(r.availability_hours),
-        })),
-      );
       if (!smeSave.ok) {
         toast.error(smeSave.error.message);
         return;
       }
-      const evalSave = await saveTraEvaluationPlan(
-        tra.id,
-        evalRows
-          .filter((r) => r.enabled)
-          .map((r) => ({
-            kirkpatrick_level: r.level,
-            measurement_method: r.measurement_method || null,
-          })),
-      );
       if (!evalSave.ok) {
         toast.error(evalSave.error.message);
         return;

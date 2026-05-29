@@ -51,25 +51,27 @@ export default function Step3Audience({ tra, audienceRoles, disabled }: Props) {
 
   function handleSave() {
     startTransition(async () => {
-      const traUpdate = await updateTra(tra.id, {
-        audience_locations: locations,
-        audience_languages: languages,
-        prerequisite_knowledge: prereq || null,
-        tech_access: techAccess || null,
-        accessibility_needs: accessibility || null,
-      });
+      const [traUpdate, rolesSave] = await Promise.all([
+        updateTra(tra.id, {
+          audience_locations: locations,
+          audience_languages: languages,
+          prerequisite_knowledge: prereq || null,
+          tech_access: techAccess || null,
+          accessibility_needs: accessibility || null,
+        }),
+        saveTraAudienceRoles(
+          tra.id,
+          rolesRows.map((r, i) => ({
+            position: i,
+            role: r.role || null,
+            headcount: r.headcount === "" ? null : Number(r.headcount),
+          })),
+        ),
+      ]);
       if (!traUpdate.ok) {
         toast.error(traUpdate.error.message);
         return;
       }
-      const rolesSave = await saveTraAudienceRoles(
-        tra.id,
-        rolesRows.map((r, i) => ({
-          position: i,
-          role: r.role || null,
-          headcount: r.headcount === "" ? null : Number(r.headcount),
-        })),
-      );
       if (!rolesSave.ok) {
         toast.error(rolesSave.error.message);
         return;

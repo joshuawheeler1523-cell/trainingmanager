@@ -71,30 +71,34 @@ export default function Step1Basics({ tra, stakeholders, disabled }: Props) {
 
   function handleSave() {
     startTransition(async () => {
-      const traUpdate = await updateTra(tra.id, {
-        project_name: projectName,
-        requestor_name: requestorName || null,
-        requestor_role: requestorRole || null,
-        requestor_department: requestorDepartment || null,
-        requesting_department: requestingDepartment || null,
-        executive_sponsor: executiveSponsor || null,
-        needed_by_date: neededByDate || null,
-        needed_by_driver: neededByDriver || null,
-      });
+      // The tra row and tra_stakeholders rows are independent — fire both
+      // saves in parallel so the wizard "Save" doesn't queue two round-trips.
+      const [traUpdate, stakeholderSave] = await Promise.all([
+        updateTra(tra.id, {
+          project_name: projectName,
+          requestor_name: requestorName || null,
+          requestor_role: requestorRole || null,
+          requestor_department: requestorDepartment || null,
+          requesting_department: requestingDepartment || null,
+          executive_sponsor: executiveSponsor || null,
+          needed_by_date: neededByDate || null,
+          needed_by_driver: neededByDriver || null,
+        }),
+        saveTraStakeholders(
+          tra.id,
+          stakeholderRows.map((r, i) => ({
+            position: i,
+            name: r.name || null,
+            role: r.role || null,
+            decision_rights: r.decision_rights || null,
+            email: r.email || null,
+          })),
+        ),
+      ]);
       if (!traUpdate.ok) {
         toast.error(traUpdate.error.message);
         return;
       }
-      const stakeholderSave = await saveTraStakeholders(
-        tra.id,
-        stakeholderRows.map((r, i) => ({
-          position: i,
-          name: r.name || null,
-          role: r.role || null,
-          decision_rights: r.decision_rights || null,
-          email: r.email || null,
-        })),
-      );
       if (!stakeholderSave.ok) {
         toast.error(stakeholderSave.error.message);
         return;
