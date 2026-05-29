@@ -56,6 +56,7 @@ export default async function DashboardPage() {
     { data: classRows },
     { data: classAssignmentRows },
     { data: departments },
+    { count: memberCount },
   ] = await Promise.all([
     supabase
       .from("instructors")
@@ -108,18 +109,17 @@ export default async function DashboardPage() {
     orgAdmin
       ? supabase.from("departments").select("id, name").eq("org_id", orgId).order("name")
       : Promise.resolve({ data: null }),
+    // Member count drives the setup checklist (need >1 to be considered
+    // "team invited"). Cheap head count; skip when not an admin since the
+    // checklist only renders for managers anyway.
+    orgAdmin
+      ? supabase
+          .from("org_memberships")
+          .select("*", { count: "exact", head: true })
+          .eq("org_id", orgId)
+          .not("accepted_at", "is", null)
+      : Promise.resolve({ count: null }),
   ]);
-
-  // Member count drives the setup checklist (need >1 to be considered
-  // "team invited"). Cheap head count; skip when not an admin since the
-  // checklist only renders for managers anyway.
-  const { count: memberCount } = orgAdmin
-    ? await supabase
-        .from("org_memberships")
-        .select("*", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .not("accepted_at", "is", null)
-    : { count: null };
 
   // Compute counts from the fetched rows instead of separate count queries.
   const trasOpenList = (trasOpenRows ?? []) as {

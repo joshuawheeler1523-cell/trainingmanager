@@ -37,6 +37,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
     { data: allSkills },
     { data: qualified },
     { data: roadmapSteps },
+    { data: superUsers },
   ] = await Promise.all([
     supabase.from("classes_with_hours").select("*").eq("id", id).eq("org_id", orgId).maybeSingle(),
     supabase
@@ -74,15 +75,14 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       .eq("class_id", id)
       .eq("org_id", orgId)
       .order("position", { ascending: true }),
+    supabase
+      .from("super_users")
+      .select("*")
+      .eq("class_id", id)
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .order("full_name"),
   ]);
-
-  const { data: superUsers } = await supabase
-    .from("super_users")
-    .select("*")
-    .eq("class_id", id)
-    .eq("org_id", orgId)
-    .is("deleted_at", null)
-    .order("full_name");
 
   if (!cls) notFound();
 

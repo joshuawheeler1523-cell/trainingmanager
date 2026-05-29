@@ -50,7 +50,16 @@ async function SuperUsersBody({ searchParams }: { searchParams: SearchParams }) 
     query = query.eq("unit", unitFilter);
   }
 
-  const { data: rows } = await query;
+  const [{ data: rows }, { data: classRows }] = await Promise.all([
+    query,
+    supabase
+      .from("classes")
+      .select("id, name")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .eq("status", "active")
+      .order("name"),
+  ]);
 
   const list: SuperUserWithClass[] = (rows ?? []).map((row) => ({
     id: row.id,
@@ -71,14 +80,6 @@ async function SuperUsersBody({ searchParams }: { searchParams: SearchParams }) 
     version: row.version,
     class_name: row.classes?.name ?? null,
   }));
-
-  const { data: classRows } = await supabase
-    .from("classes")
-    .select("id, name")
-    .eq("org_id", orgId)
-    .is("deleted_at", null)
-    .eq("status", "active")
-    .order("name");
 
   const classes = (classRows ?? []) as { id: string; name: string }[];
 

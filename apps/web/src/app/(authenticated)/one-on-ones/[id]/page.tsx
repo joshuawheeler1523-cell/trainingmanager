@@ -16,16 +16,19 @@ export default async function OneOnOneEditorPage({ params }: { params: Params })
   const { id } = await params;
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) notFound();
-  if (!(await isManager(orgId))) notFound();
 
-  const { data: session } = await supabase
-    .from("one_on_ones")
-    .select("*")
-    .eq("id", id)
-    .eq("org_id", orgId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (!session) notFound();
+  // Race the manager check with the session lookup — both gate notFound().
+  const [isMgr, { data: session }] = await Promise.all([
+    isManager(orgId),
+    supabase
+      .from("one_on_ones")
+      .select("*")
+      .eq("id", id)
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+  ]);
+  if (!isMgr || !session) notFound();
 
   const instructorId = (session as OneOnOne).instructor_id;
 

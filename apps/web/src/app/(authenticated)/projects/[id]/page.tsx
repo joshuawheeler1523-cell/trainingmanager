@@ -22,16 +22,8 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) notFound();
 
-  const { data: project } = await supabase
-    .from("projects")
-    .select("*")
-    .eq("id", id)
-    .eq("org_id", orgId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (!project) notFound();
-
   const [
+    { data: project },
     { data: tasks },
     { data: teamMembers },
     { data: taskAssignments },
@@ -41,6 +33,13 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
     { data: dependencies },
     { data: externalDeps },
   ] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("*")
+      .eq("id", id)
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .maybeSingle(),
     supabase
       .from("tasks")
       .select("*")
@@ -92,6 +91,8 @@ export default async function ProjectDetailPage({ params }: { params: Params }) 
       .eq("org_id", orgId)
       .order("sort_order"),
   ]);
+
+  if (!project) notFound();
 
   const tasksList = (tasks ?? []) as Task[];
   const teamList = (teamMembers ?? []) as ProjectTeamMember[];
