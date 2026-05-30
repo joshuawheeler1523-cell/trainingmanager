@@ -1,0 +1,55 @@
+-- Flip the 4 remaining ERROR-level views to security_invoker. Pairs with
+-- 20260529000001 (which closed v_public_project_team via WHERE-gate).
+--
+-- Background: Supabase views default to SECURITY DEFINER (run as the view's
+-- creator), which bypasses RLS on the underlying tables. The advisor flagged
+-- 5 views; this clears the remaining 4 internal ones.
+--
+-- ── Risk analysis (what could break) ───────────────────────────────────────
+--
+-- These views read RLS-protected tables. After flipping, the caller's auth
+-- context is what RLS evaluates against. The consumers split into two
+-- patterns and both should remain functional:
+--
+--   1. Manager-scoped pages (dashboard, allocations, instructors list,
+--      one-on-ones, reports). Managers satisfy is_manager(org_id), which
+--      opens broad RLS access on every underlying table. Should work.
+--
+--   2. Self-scoped queries (instructor-dashboard, instructors/[id] for the
+--      logged-in instructor). The query filters by instructor_id; RLS lets
+--      a user see their own rows. Should work.
+--
+-- ── Underlying tables that each view reads ─────────────────────────────────
+--
+-- classes_with_hours: classes (org-scoped RLS)
+-- v_instructor_workload: class_instructor_assignments, classes,
+--   recurring_task_assignments, recurring_tasks, ad_hoc_tasks,
+--   education_request_assignments, education_requests, task_assignments,
+--   project_team_members, tasks, projects, impl_sessions, impl_classes,
+--   impl_trainers, implementations
+-- v_instructor_capacity: instructors + v_instructor_workload
+-- v_bucket_consumption: v_instructor_workload
+--
+-- ── Verification plan (post-deploy) ────────────────────────────────────────
+--
+-- Hit each of the following as a MANAGER and confirm the data still appears:
+--   - /dashboard               (avg utilization, capacity health columns)
+--   - /allocations             (team utilization roster, bucket consumption)
+--   - /instructors             (capacity column + util %)
+--   - /instructors/[id]        (workload table + capacity card)
+--   - /one-on-ones/[id]        (capacity card top-right + workload edits)
+--   - /classes                 (computed hours columns)
+--   - /classes/[id]            (computed hours)
+--
+-- Then as an INSTRUCTOR (logged-in as one):
+--   - /dashboard               (instructor view — own capacity card)
+--   - /classes/[id]            (computed hours — no leakage of other orgs)
+--
+-- If any of these go empty / partial after the migration, run:
+--   ALTER VIEW public.<view> RESET (security_invoker);
+-- to instantly revert that one view while we investigate the missing policy.
+
+ALTER VIEW public.classes_with_hours    SET (security_invoker = true);
+ALTER VIEW public.v_instructor_workload SET (security_invoker = true);
+ALTER VIEW public.v_instructor_capacity SET (security_invoker = true);
+ALTER VIEW public.v_bucket_consumption  SET (security_invoker = true);
