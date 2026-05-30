@@ -5941,6 +5941,16 @@ export type Database = {
       next_invoice_number: { Args: never; Returns: string };
       notify_aging_requests: { Args: never; Returns: undefined };
       notify_expiring_certifications: { Args: never; Returns: undefined };
+      org_identity: {
+        Args: { p_org_id: string };
+        Returns: {
+          entity_labels: Json;
+          module_flags: Json;
+          preset_key: string;
+          role_labels: Json;
+          user_role: string;
+        }[];
+      };
       proficiency_rank: { Args: { p_proficiency: string }; Returns: number };
       public_intake_default_bucket: {
         Args: { p_token: string };
@@ -5975,6 +5985,14 @@ export type Database = {
         }[];
       };
       set_share_token: { Args: { p_token: string }; Returns: undefined };
+      sidebar_counts: {
+        Args: { p_org_id: string };
+        Returns: {
+          one_on_ones_count: number;
+          request_queue_count: number;
+          work_intake_count: number;
+        }[];
+      };
       user_department_ids: { Args: never; Returns: string[] };
       user_org_ids: { Args: never; Returns: string[] };
       user_role_in_org: { Args: { p_org_id: string }; Returns: string };

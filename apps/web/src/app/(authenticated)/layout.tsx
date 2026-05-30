@@ -5,7 +5,6 @@ import OrgSwitcher from "@/components/OrgSwitcher";
 import DepartmentSwitcher from "@/components/DepartmentSwitcher";
 import AppShell from "@/components/layout/app-shell";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import { isManager } from "@/lib/auth/role";
 import { isArborAdmin } from "@/lib/auth/arbor-admin";
 import { getOrgIdentity } from "@/lib/labels/get-org-identity";
 import { OrgIdentityProvider } from "@/components/labels";
@@ -23,20 +22,12 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
       | string
       | undefined) ?? email;
 
-  // Initial notifications + admin flag + workspace identity + sidebar
-  // counts, all parallelized. Counts are head-only COUNT queries; cheap
-  // and RLS-scoped so each user sees their own "things on my plate."
+  // Layout fan-out: notifications + identity + sidebar counts + arbor-admin
+  // env check, all parallelized. sidebar_counts and org_identity each
+  // collapse multiple queries into one RPC, and admin is derived from
+  // identity.role so we don't fire a separate is_manager round-trip.
   const orgId = await getCurrentOrgId();
-  const sevenDaysOut = new Date(Date.now() + 7 * 86_400_000).toISOString();
-  const [
-    { data: notifications },
-    admin,
-    arborAdmin,
-    identity,
-    { count: workIntakeCount },
-    { count: requestQueueCount },
-    { count: oneOnOnesCount },
-  ] = await Promise.all([
+  const [{ data: notifications }, arborAdmin, identity, { data: countsRows }] = await Promise.all([
     // Bell shows up to 10 UNREAD; read history lives at /account/notifications.
     supabase
       .from("notifications")
@@ -45,34 +36,16 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
       .is("read_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
-    orgId ? isManager(orgId) : Promise.resolve(false),
     isArborAdmin(),
     orgId ? getOrgIdentity(orgId) : Promise.resolve(null),
-    orgId
-      ? supabase
-          .from("tras")
-          .select("*", { count: "exact", head: true })
-          .eq("org_id", orgId)
-          .in("status", ["draft", "documented", "submitted", "approved"])
-      : Promise.resolve({ count: 0 }),
-    orgId
-      ? supabase
-          .from("education_requests")
-          .select("*", { count: "exact", head: true })
-          .eq("org_id", orgId)
-          .in("status", ["new", "under_review"])
-          .is("deleted_at", null)
-      : Promise.resolve({ count: 0 }),
-    orgId
-      ? supabase
-          .from("one_on_ones")
-          .select("*", { count: "exact", head: true })
-          .eq("org_id", orgId)
-          .is("completed_at", null)
-          .gte("scheduled_for", new Date().toISOString())
-          .lte("scheduled_for", sevenDaysOut)
-      : Promise.resolve({ count: 0 }),
+    orgId ? supabase.rpc("sidebar_counts", { p_org_id: orgId }) : Promise.resolve({ data: null }),
   ]);
+
+  const counts = countsRows?.[0] ?? null;
+  const workIntakeCount = counts?.work_intake_count ?? 0;
+  const requestQueueCount = counts?.request_queue_count ?? 0;
+  const oneOnOnesCount = counts?.one_on_ones_count ?? 0;
+  const admin = identity?.role === "manager";
 
   return (
     <OrgGuard>
@@ -99,9 +72,9 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
           }
           initialNotifications={notifications ?? []}
           sidebarCounts={{
-            workIntake: workIntakeCount ?? 0,
-            requestQueue: requestQueueCount ?? 0,
-            oneOnOnes: oneOnOnesCount ?? 0,
+            workIntake: workIntakeCount,
+            requestQueue: requestQueueCount,
+            oneOnOnes: oneOnOnesCount,
           }}
         >
           {children}
