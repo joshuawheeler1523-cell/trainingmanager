@@ -37,10 +37,12 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
     { count: requestQueueCount },
     { count: oneOnOnesCount },
   ] = await Promise.all([
+    // Bell shows up to 10 UNREAD; read history lives at /account/notifications.
     supabase
       .from("notifications")
       .select("*")
       .eq("recipient_id", user.id)
+      .is("read_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
     orgId ? isManager(orgId) : Promise.resolve(false),

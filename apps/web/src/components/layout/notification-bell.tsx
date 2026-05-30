@@ -62,10 +62,14 @@ export default function NotificationBell({
     };
   }, [userId]);
 
-  const unreadCount = items.filter((n) => !n.read_at).length;
+  // The bell is an unread inbox — read items disappear here and live on at
+  // /account/notifications. Filtering by !read_at means optimistic mark-read
+  // updates instantly remove the item from the dropdown.
+  const visible = items.filter((n) => !n.read_at);
+  const unreadCount = visible.length;
 
   async function handleClickItem(n: NotificationRow) {
-    // Optimistically mark read so the badge clears.
+    // Optimistically mark read so the badge clears and the row disappears.
     setItems((prev) =>
       prev.map((p) => (p.id === n.id ? { ...p, read_at: new Date().toISOString() } : p)),
     );
@@ -117,14 +121,14 @@ export default function NotificationBell({
             )}
           </div>
           <ul className="divide-border max-h-96 divide-y overflow-y-auto">
-            {items.length === 0 ? (
+            {visible.length === 0 ? (
               <li className="text-muted-foreground px-3 py-6 text-center text-xs">
-                No notifications yet.
+                You&apos;re all caught up.
               </li>
             ) : (
-              items.map((n) => {
+              visible.map((n) => {
                 const Inner = (
-                  <div className={n.read_at ? "opacity-70" : ""}>
+                  <div>
                     <p className="text-foreground text-sm font-medium">{n.title}</p>
                     {n.body && (
                       <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{n.body}</p>
