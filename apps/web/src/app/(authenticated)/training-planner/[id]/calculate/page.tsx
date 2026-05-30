@@ -1,28 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  LightBulbIcon,
-  XCircleIcon,
-} from "@heroicons/react/20/solid";
 import { createClient } from "@/lib/supabase/server";
 import type { ClassDiagnosis } from "@/lib/training-planner/schedule-solver";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import type {
-  Implementation,
-  ImplRoom,
-  ImplTrainer,
-  ImplTrainerUnavailability,
-} from "@arbor/shared";
+import type { Implementation, ImplRoom, ImplTrainerUnavailability } from "@arbor/shared";
 import {
   computeFeasibility,
-  type ClassFeasibility,
   type FeasibilityResult,
   type FeasibilityVerdict,
   type Recommendation,
   type TrainerUnavailability,
 } from "@/lib/training-planner/feasibility";
+// ClassFeasibility / VerdictBanner / ClassFeasibilityTable / ClassRow /
+// UtilizationCards were removed as part of the redesign — they conveyed
+// information already shown by YesNoPanel + DiagnosisCard + SummaryCards.
 import { type ScheduleGenResult } from "../../actions";
 import { dryRunScheduleCached } from "@/lib/training-planner/cached-reads";
 import BuildModeSection from "./build-mode-section";
@@ -164,21 +155,23 @@ export default async function CalculatePage({ params }: { params: Params }) {
         verdict={feas.verdict}
       />
 
-      <VerdictBanner result={feas} />
-
       <SummaryCards result={feas} impl={implTyped} />
 
-      {dryRun && dryRun.capacity_gaps.length > 0 && <UnscheduledReasonsPanel dryRun={dryRun} />}
+      {/* Why it doesn't fit + how to fix it sit next to each other so the
+          user reads "NO" → "the bottleneck" → "the fix" in one scroll. */}
+      {dryRun && dryRun.capacity_gaps.length > 0 && (
+        <>
+          <UnscheduledReasonsPanel dryRun={dryRun} />
+          <RecommendationsBlock result={feas} />
+        </>
+      )}
 
-      <ResourceForecastPanel result={feas} rooms={rooms ?? []} trainers={trainers ?? []} />
+      <ResourceForecastPanel result={feas} rooms={rooms ?? []} />
 
-      <ClassFeasibilityTable result={feas} implementationId={id} />
-
-      <UtilizationCards result={feas} />
-
-      <RecommendationsBlock result={feas} />
-
-      <CompletionCard result={feas} impl={implTyped} />
+      {/* Completion estimate is only useful when the plan actually fits.
+          When infeasible the YesNoPanel + diagnoses already say "can't
+          complete" — repeating it as a card is noise. */}
+      {canSchedule && <CompletionCard result={feas} impl={implTyped} />}
 
       <BuildModeSection
         implementationId={id}
@@ -271,9 +264,14 @@ function UnscheduledReasonsPanel({ dryRun }: { dryRun: ScheduleGenResult }) {
   // fix; prefer that when present. The legacy SQL RPC (still used by the
   // dry-run cache path) doesn't, so we fall back to grouping the per-session
   // gap rows by class.
+  //
+  // The "biggest unlock" headline and the "aggregate quick fixes" bullets
+  // that used to live here were duplicates: the headline always restated
+  // the first diagnosis row verbatim, and the quick-fix bullets repeated the
+  // RecommendationsBlock that follows this panel. Both removed; the panel
+  // now does one job — show per-class bottlenecks with their recommended fix.
   const total = dryRun.capacity_gaps.length;
   const diagnoses = dryRun.diagnoses;
-  const headline = dryRun.headline_fix;
   const hasRichDiagnosis = diagnoses.length > 0;
 
   type Group = { className: string; count: number; reason: string };
@@ -295,28 +293,12 @@ function UnscheduledReasonsPanel({ dryRun }: { dryRun: ScheduleGenResult }) {
   return (
     <div className="border-border space-y-3 rounded-md border bg-rose-50/40 p-3 dark:bg-rose-950/20">
       <div className="flex items-baseline justify-between">
-        <p className="text-foreground text-sm font-semibold">
-          {total.toString()} session{total === 1 ? "" : "s"} can&apos;t fit
-        </p>
+        <p className="text-foreground text-sm font-semibold">Why it doesn&apos;t fit</p>
         <p className="text-muted-foreground text-[11px]">
-          From a dry-run of the actual scheduler. No rows were written.
+          {total.toString()} session{total === 1 ? "" : "s"} short, from a dry-run of the actual
+          scheduler. No rows were written.
         </p>
       </div>
-
-      {hasRichDiagnosis && headline && (
-        <div className="flex items-start gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-2.5 dark:border-emerald-700 dark:bg-emerald-950/30">
-          <LightBulbIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          <div className="text-xs text-emerald-900 dark:text-emerald-100">
-            <p className="font-semibold">Biggest unlock</p>
-            <p className="mt-0.5 leading-snug">
-              {headline.recommendedFix}{" "}
-              <span className="text-emerald-700/80 dark:text-emerald-200/80">
-                Would place {headline.sessionsUnblocked.toString()} of {total.toString()} sessions.
-              </span>
-            </p>
-          </div>
-        </div>
-      )}
 
       {hasRichDiagnosis ? (
         <ul className="space-y-2">
@@ -346,51 +328,20 @@ function UnscheduledReasonsPanel({ dryRun }: { dryRun: ScheduleGenResult }) {
           </tbody>
         </table>
       )}
-
-      {dryRun.recommendations && Object.keys(dryRun.recommendations).length > 0 && (
-        <div className="border-border border-t pt-2 text-[11px]">
-          <p className="text-foreground mb-1 font-semibold">Aggregate quick fixes:</p>
-          <ul className="text-muted-foreground list-disc space-y-0.5 pl-4">
-            {dryRun.recommendations.trainers_to_add != null &&
-              dryRun.recommendations.trainers_to_add > 0 && (
-                <li>
-                  Add{" "}
-                  <span className="text-foreground font-medium">
-                    {dryRun.recommendations.trainers_to_add.toString()}
-                  </span>{" "}
-                  more trainer
-                  {dryRun.recommendations.trainers_to_add === 1 ? "" : "s"} at typical hours/week.
-                </li>
-              )}
-            {dryRun.recommendations.trainer_hours_per_week_to_add != null &&
-              dryRun.recommendations.trainer_hours_per_week_to_add > 0 && (
-                <li>
-                  …or add{" "}
-                  <span className="text-foreground font-medium">
-                    {dryRun.recommendations.trainer_hours_per_week_to_add.toString()}
-                  </span>{" "}
-                  trainer-hours/week across the existing roster.
-                </li>
-              )}
-            {dryRun.recommendations.weeks_to_extend != null &&
-              dryRun.recommendations.weeks_to_extend > 0 && (
-                <li>
-                  …or extend the window by{" "}
-                  <span className="text-foreground font-medium">
-                    {dryRun.recommendations.weeks_to_extend.toString()}
-                  </span>{" "}
-                  week
-                  {dryRun.recommendations.weeks_to_extend === 1 ? "" : "s"}.
-                </li>
-              )}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }
 
 function DiagnosisCard({ d }: { d: ClassDiagnosis }) {
+  // The bottleneck badge now reads "Bottleneck: trainer hours" instead of
+  // a bare "TRAINER HOURS" so it's clearly a category, not a data label.
+  //
+  // The "Assigned trainers: Priya (4h/wk)" line that used to render below
+  // recommendedFix was removed because (a) recommendedFix already names the
+  // trainer slate and quotes the actual slate-hours-free figure, and
+  // (b) the per-trainer (Nh/wk) detail confused readers when the slate has
+  // multiple trainers — the visible number for one trainer didn't reconcile
+  // with the slate's total available hours mentioned in the same paragraph.
   return (
     <li className="border-border bg-background rounded-md border p-2.5">
       <div className="flex flex-wrap items-baseline gap-x-2">
@@ -399,16 +350,10 @@ function DiagnosisCard({ d }: { d: ClassDiagnosis }) {
           {d.unplacedSessions.toString()} session{d.unplacedSessions === 1 ? "" : "s"} short
         </span>
         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
-          {bottleneckLabel(d.bottleneck)}
+          Bottleneck: {bottleneckLabel(d.bottleneck)}
         </span>
       </div>
       <p className="text-foreground mt-1 text-xs leading-snug">{d.recommendedFix}</p>
-      {d.assignedTrainers.length > 0 && (
-        <p className="text-muted-foreground mt-1 text-[11px]">
-          Assigned trainers:{" "}
-          {d.assignedTrainers.map((t) => `${t.name} (${t.hoursPerWeek.toString()}h/wk)`).join(", ")}
-        </p>
-      )}
     </li>
   );
 }
@@ -426,44 +371,6 @@ function bottleneckLabel(b: ClassDiagnosis["bottleneck"]): string {
     case "room_busy_or_window":
       return "room / window";
   }
-}
-
-function VerdictBanner({ result }: { result: FeasibilityResult }) {
-  const v = result.verdict;
-  const cls: Record<FeasibilityVerdict, string> = {
-    feasible:
-      "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-100",
-    tight:
-      "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100",
-    infeasible:
-      "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-700 dark:bg-rose-950/30 dark:text-rose-100",
-  };
-  const Icon =
-    v === "feasible" ? CheckCircleIcon : v === "tight" ? ExclamationTriangleIcon : XCircleIcon;
-  const heading =
-    v === "feasible"
-      ? "Looks feasible"
-      : v === "tight"
-        ? "Tight — no buffer"
-        : "Infeasible as configured";
-  const subline = (() => {
-    if (v === "feasible") return "Current resources should cover the training within the window.";
-    if (v === "tight")
-      return "≥80% utilization on a resource. Any sick day or no-show puts the plan at risk.";
-    if (result.readyBlockers.length > 0) return result.readyBlockers[0] ?? "";
-    if (result.unscheduledSessions > 0)
-      return `${result.unscheduledSessions.toString()} session${result.unscheduledSessions === 1 ? "" : "s"} can't fit in the window.`;
-    return "One or more resources is over 100% utilized.";
-  })();
-  return (
-    <div className={`flex items-start gap-3 rounded-md border p-3 ${cls[v]}`}>
-      <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-      <div className="text-sm">
-        <p className="font-semibold">{heading}</p>
-        <p className="mt-0.5 text-xs">{subline}</p>
-      </div>
-    </div>
-  );
 }
 
 function SummaryCards({ result, impl }: { result: FeasibilityResult; impl: Implementation }) {
@@ -501,165 +408,6 @@ function SummaryCards({ result, impl }: { result: FeasibilityResult; impl: Imple
             : `${result.trainerUtilizationPct.toFixed(0)}% utilization`}
         </p>
       </Card>
-    </div>
-  );
-}
-
-function ClassFeasibilityTable({
-  result,
-  implementationId,
-}: {
-  result: FeasibilityResult;
-  implementationId: string;
-}) {
-  if (result.classFeasibility.length === 0) {
-    return (
-      <div className="border-border bg-background rounded-lg border p-4 text-xs">
-        <p className="text-muted-foreground">
-          No classes defined yet.{" "}
-          <Link
-            href={`/training-planner/${implementationId}/classes`}
-            className="font-medium underline"
-          >
-            Go to classes →
-          </Link>
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="border-border bg-background overflow-hidden rounded-lg border">
-      <div className="border-border border-b px-4 py-2">
-        <p className="text-foreground text-sm font-semibold">Per-class feasibility</p>
-        <p className="text-muted-foreground text-xs">
-          A row turns red when no current resource can host the class. Fix red rows before
-          generating.
-        </p>
-      </div>
-      <table className="text-foreground w-full text-left text-xs">
-        <thead className="text-muted-foreground bg-surface text-[10px] font-medium uppercase tracking-wide">
-          <tr>
-            <th className="px-3 py-2">Class</th>
-            <th className="px-3 py-2 text-right">Sessions</th>
-            <th className="px-3 py-2 text-right">Hours</th>
-            <th className="px-3 py-2 text-center">Room</th>
-            <th className="px-3 py-2 text-center">Trainer</th>
-            <th className="px-3 py-2 text-center">Prereq</th>
-            <th className="px-3 py-2">Blockers</th>
-          </tr>
-        </thead>
-        <tbody className="divide-border divide-y">
-          {result.classFeasibility.map((cf) => (
-            <ClassRow key={cf.classId} cf={cf} />
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ClassRow({ cf }: { cf: ClassFeasibility }) {
-  const rowTone = cf.blockers.length > 0 ? "bg-rose-50/40 dark:bg-rose-950/15" : "";
-  return (
-    <tr className={rowTone}>
-      <td className="px-3 py-2 font-medium">{cf.className}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{cf.sessionsNeeded.toString()}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{cf.totalHoursNeeded.toFixed(1)}</td>
-      <td className="px-3 py-2 text-center">
-        <Check ok={cf.roomCapacityOk} />
-      </td>
-      <td className="px-3 py-2 text-center">
-        <Check ok={cf.trainerSlateOk} />
-      </td>
-      <td className="px-3 py-2 text-center">
-        <Check ok={cf.prereqReachable} />
-      </td>
-      <td className="text-muted-foreground px-3 py-2">
-        {cf.blockers.length === 0 ? "—" : cf.blockers.join(" · ")}
-      </td>
-    </tr>
-  );
-}
-
-function Check({ ok }: { ok: boolean }) {
-  return ok ? (
-    <span className="text-emerald-600 dark:text-emerald-400" aria-label="OK">
-      ✓
-    </span>
-  ) : (
-    <span className="text-rose-600 dark:text-rose-400" aria-label="Blocker">
-      ✗
-    </span>
-  );
-}
-
-function UtilizationCards({ result }: { result: FeasibilityResult }) {
-  const topTrainer = result.trainerUtilization[0] ?? null;
-  const topRoom = result.roomUtilization[0] ?? null;
-  return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <div className="border-border bg-background rounded-lg border p-4">
-        <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-          Top-utilized trainer
-        </p>
-        {topTrainer ? (
-          <>
-            <p className="text-foreground mt-2 truncate text-sm font-semibold">{topTrainer.name}</p>
-            <p
-              className={`mt-1 text-2xl font-semibold tabular-nums ${utilTone(topTrainer.utilizationPct)}`}
-            >
-              {topTrainer.utilizationPct.toFixed(0)}%
-            </p>
-            <p className="text-muted-foreground text-xs tabular-nums">
-              {topTrainer.hoursAssigned.toFixed(1)}h assigned ·{" "}
-              {topTrainer.hoursAvailable.toFixed(0)}h available
-            </p>
-          </>
-        ) : (
-          <p className="text-muted-foreground mt-2 text-sm">No trainers.</p>
-        )}
-        {result.trainerUtilization.length > 1 && (
-          <div className="border-border text-muted-foreground mt-3 space-y-0.5 border-t pt-2 text-[11px]">
-            {result.trainerUtilization.slice(1, 4).map((t) => (
-              <p key={t.id} className="flex justify-between tabular-nums">
-                <span className="truncate">{t.name}</span>
-                <span className={utilTone(t.utilizationPct)}>{t.utilizationPct.toFixed(0)}%</span>
-              </p>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="border-border bg-background rounded-lg border p-4">
-        <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-          Top-utilized room
-        </p>
-        {topRoom ? (
-          <>
-            <p className="text-foreground mt-2 truncate text-sm font-semibold">{topRoom.name}</p>
-            <p
-              className={`mt-1 text-2xl font-semibold tabular-nums ${utilTone(topRoom.utilizationPct)}`}
-            >
-              {topRoom.utilizationPct.toFixed(0)}%
-            </p>
-            <p className="text-muted-foreground text-xs tabular-nums">
-              {topRoom.hoursAssigned.toFixed(1)}h assigned · {topRoom.hoursAvailable.toFixed(0)}h
-              available
-            </p>
-          </>
-        ) : (
-          <p className="text-muted-foreground mt-2 text-sm">No rooms.</p>
-        )}
-        {result.roomUtilization.length > 1 && (
-          <div className="border-border text-muted-foreground mt-3 space-y-0.5 border-t pt-2 text-[11px]">
-            {result.roomUtilization.slice(1, 4).map((r) => (
-              <p key={r.id} className="flex justify-between tabular-nums">
-                <span className="truncate">{r.name}</span>
-                <span className={utilTone(r.utilizationPct)}>{r.utilizationPct.toFixed(0)}%</span>
-              </p>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -757,20 +505,21 @@ function CompletionCard({ result, impl }: { result: FeasibilityResult; impl: Imp
 function ResourceForecastPanel({
   result,
   rooms,
-  trainers,
 }: {
   result: FeasibilityResult;
   rooms: ImplRoom[];
-  trainers: ImplTrainer[];
 }) {
+  // The right-column "Trainer headcount" sub-card was removed: have / short
+  // is already conveyed by the Trainer Hours summary card up top + the
+  // diagnoses panel. The "headcount is a floor" footnote it carried was the
+  // only unique signal; that nuance is captured in the per-class diagnoses
+  // when a class has a tight trainer pool.
   const fc = result.resourceForecast;
   const hasClasses = result.classFeasibility.length > 0;
 
   if (!hasClasses) return null;
 
   const roomsHave = countRoomsByTier(rooms);
-  const trainerCount = trainers.length;
-  const trainersShort = Math.max(0, fc.trainersNeeded - trainerCount);
 
   return (
     <div className="border-border bg-background rounded-lg border p-4">
@@ -788,7 +537,7 @@ function ResourceForecastPanel({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
+      <div className="mt-4">
         {/* Rooms-by-seat-capacity table */}
         <div>
           <p className="text-muted-foreground mb-2 text-[11px] font-medium uppercase tracking-wide">
@@ -854,37 +603,6 @@ function ResourceForecastPanel({
               </table>
             </div>
           )}
-        </div>
-
-        {/* Trainer headcount card (single-row, keeps card form) */}
-        <div className="border-border bg-surface/40 rounded-md border p-3">
-          <p className="text-muted-foreground mb-1 text-[11px] font-medium uppercase tracking-wide">
-            Trainer headcount
-          </p>
-          <p className="text-foreground text-sm">
-            <span className="text-2xl font-semibold tabular-nums">
-              {fc.trainersNeeded.toString()}
-            </span>{" "}
-            trainer{fc.trainersNeeded === 1 ? "" : "s"}
-          </p>
-          <p className="text-muted-foreground text-[11px] tabular-nums">
-            at ~{fc.fteHoursPerWeek.toString()} h/wk over {fc.weeks.toString()}{" "}
-            {fc.weeks === 1 ? "week" : "weeks"} · {fc.totalInstructionHours.toFixed(0)}h total
-          </p>
-          <p
-            className={`mt-2 text-xs tabular-nums ${
-              trainersShort > 0
-                ? "text-rose-600 dark:text-rose-400"
-                : "text-emerald-600 dark:text-emerald-400"
-            }`}
-          >
-            have {trainerCount.toString()} entered
-            {trainersShort > 0 ? ` · short ${trainersShort.toString()}` : " ✓"}
-          </p>
-          <p className="text-muted-foreground mt-3 text-[10px] leading-snug">
-            Headcount is a floor — classes with tight trainer pools (only one eligible trainer) may
-            require more even when total hours fit.
-          </p>
         </div>
       </div>
     </div>
