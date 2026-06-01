@@ -3,6 +3,7 @@ import type {
   AllocationDataset,
   CoverageDataset,
   DepartmentComparisonDataset,
+  InstructorScorecardDataset,
   ProjectStatusDataset,
   ReportDataset,
   SkillGapDataset,
@@ -37,6 +38,10 @@ export function ReportPdf({
     case "department-comparison":
       return (
         <DepartmentComparisonDoc data={dataset.data} orgName={orgName} reportName={reportName} />
+      );
+    case "instructor-scorecard":
+      return (
+        <InstructorScorecardDoc data={dataset.data} orgName={orgName} reportName={reportName} />
       );
   }
 }
@@ -408,6 +413,50 @@ function DepartmentComparisonDoc({
               {data.totals.open_intake_count.toString()}
             </Text>
           </View>
+        </View>
+      </Page>
+    </Document>
+  );
+}
+
+// ── Instructor Scorecard ───────────────────────────────────────────────────
+
+function InstructorScorecardDoc({
+  data,
+  orgName,
+  reportName,
+}: {
+  data: InstructorScorecardDataset;
+  orgName: string;
+  reportName: string;
+}) {
+  return (
+    <Document>
+      <Page size="A4" orientation="landscape" style={s.page}>
+        <ReportHeader title={reportName} subtitle={orgName} />
+        <View style={s.table}>
+          <View style={[s.row, s.rowHeader]}>
+            <Text style={[s.cell, { width: "24%" }]}>Instructor</Text>
+            <Text style={[s.cell, { width: "16%" }]}>Department</Text>
+            <Text style={[s.cell, { width: "12%" }]}>Utilization</Text>
+            <Text style={[s.cell, { width: "12%" }]}>Qualified</Text>
+            <Text style={[s.cell, { width: "12%" }]}>Assigned</Text>
+            <Text style={[s.cell, { width: "12%" }]}>Skills</Text>
+            <Text style={[s.cellLast, { width: "12%" }]}>Certs ≤90d</Text>
+          </View>
+          {data.rows.map((r) => (
+            <View style={s.row} key={r.instructor_id}>
+              <Text style={[s.cell, { width: "24%" }]}>{r.full_name}</Text>
+              <Text style={[s.cell, { width: "16%" }]}>{r.department ?? "—"}</Text>
+              <Text style={[s.cell, { width: "12%" }]}>
+                {r.utilization_pct == null ? "—" : `${round(r.utilization_pct).toString()}%`}
+              </Text>
+              <Text style={[s.cell, { width: "12%" }]}>{r.classes_qualified.toString()}</Text>
+              <Text style={[s.cell, { width: "12%" }]}>{r.classes_assigned.toString()}</Text>
+              <Text style={[s.cell, { width: "12%" }]}>{r.skills_count.toString()}</Text>
+              <Text style={[s.cellLast, { width: "12%" }]}>{r.expiring_cert_count.toString()}</Text>
+            </View>
+          ))}
         </View>
       </Page>
     </Document>

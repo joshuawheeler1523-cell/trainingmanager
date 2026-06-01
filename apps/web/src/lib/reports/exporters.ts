@@ -11,6 +11,7 @@ import type {
   AllocationDataset,
   CoverageDataset,
   DepartmentComparisonDataset,
+  InstructorScorecardDataset,
   ProjectStatusDataset,
   ReportDataset,
   SkillGapDataset,
@@ -38,6 +39,8 @@ export function datasetToSheets(dataset: ReportDataset): ExportSheet[] {
       return skillGapSheets(dataset.data);
     case "department-comparison":
       return departmentComparisonSheets(dataset.data);
+    case "instructor-scorecard":
+      return instructorScorecardSheets(dataset.data);
   }
 }
 
@@ -295,6 +298,38 @@ function departmentComparisonSheets(d: DepartmentComparisonDataset): ExportSheet
           "Open intake": d.totals.open_intake_count,
         },
       ],
+    },
+  ];
+}
+
+function instructorScorecardSheets(d: InstructorScorecardDataset): ExportSheet[] {
+  return [
+    {
+      name: "Scorecard",
+      columns: [
+        "Instructor",
+        "Department",
+        "Available (h)",
+        "Assigned (h)",
+        "Utilization %",
+        "Band",
+        "Classes qualified",
+        "Classes assigned",
+        "Skills",
+        "Certs expiring (90d)",
+      ],
+      rows: d.rows.map((r) => ({
+        Instructor: r.full_name,
+        Department: r.department ?? "—",
+        "Available (h)": round(r.annual_hours),
+        "Assigned (h)": round(r.assigned_hours),
+        "Utilization %": r.utilization_pct == null ? "" : round(r.utilization_pct),
+        Band: r.utilization_band ?? "—",
+        "Classes qualified": r.classes_qualified,
+        "Classes assigned": r.classes_assigned,
+        Skills: r.skills_count,
+        "Certs expiring (90d)": r.expiring_cert_count,
+      })),
     },
   ];
 }

@@ -37,6 +37,15 @@ export default function FilterPane({ slug, buckets, instructors, value, onChange
           This report is a live snapshot of every department right now — there are no filters to
           set.
         </p>
+      ) : slug === "instructor-scorecard" ? (
+        <MultiSelect
+          label={instructorPlural}
+          options={instructors.map((i) => ({ value: i.id, label: i.full_name }))}
+          value={(value.instructor_ids as string[] | undefined) ?? []}
+          onChange={(next) => {
+            setField("instructor_ids", next);
+          }}
+        />
       ) : (
         <DateRange
           start={value.start_date as string | undefined}

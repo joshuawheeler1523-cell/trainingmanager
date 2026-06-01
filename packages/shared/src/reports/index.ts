@@ -14,6 +14,7 @@ export const REPORT_SLUGS = [
   "project-status",
   "skill-gap",
   "department-comparison",
+  "instructor-scorecard",
 ] as const;
 export type ReportSlug = (typeof REPORT_SLUGS)[number];
 
@@ -71,6 +72,11 @@ export type SkillGapReportFilters = z.infer<typeof skillGapReportFilters>;
 export const departmentComparisonReportFilters = baseReportFilters;
 export type DepartmentComparisonReportFilters = z.infer<typeof departmentComparisonReportFilters>;
 
+export const instructorScorecardReportFilters = baseReportFilters.extend({
+  instructor_ids: z.array(z.string().uuid()).default([]),
+});
+export type InstructorScorecardReportFilters = z.infer<typeof instructorScorecardReportFilters>;
+
 // Discriminated union of all filter shapes so a saved-report row's filters
 // can be parsed against the correct schema by slug.
 export type ReportFilters =
@@ -79,7 +85,8 @@ export type ReportFilters =
   | CoverageReportFilters
   | ProjectStatusReportFilters
   | SkillGapReportFilters
-  | DepartmentComparisonReportFilters;
+  | DepartmentComparisonReportFilters
+  | InstructorScorecardReportFilters;
 
 export function filterSchemaForSlug(slug: ReportSlug) {
   switch (slug) {
@@ -95,6 +102,8 @@ export function filterSchemaForSlug(slug: ReportSlug) {
       return skillGapReportFilters;
     case "department-comparison":
       return departmentComparisonReportFilters;
+    case "instructor-scorecard":
+      return instructorScorecardReportFilters;
   }
 }
 
@@ -150,6 +159,13 @@ export const REPORT_METADATA: Record<ReportSlug, ReportMetadata> = {
     name: "Department Comparison",
     description:
       "Side-by-side rollup per department: headcount, average utilization, active projects, and open work intake — to see where capacity strain concentrates.",
+    category: "capacity",
+  },
+  "instructor-scorecard": {
+    slug: "instructor-scorecard",
+    name: "Instructor Scorecard",
+    description:
+      "Per-instructor one-pager: utilization, classes qualified vs assigned, skills held, and certifications expiring in 90 days.",
     category: "capacity",
   },
 };
@@ -319,6 +335,22 @@ export type DepartmentComparisonDataset = {
   };
 };
 
+export type InstructorScorecardDataset = {
+  rows: {
+    instructor_id: string;
+    full_name: string;
+    department: string | null;
+    annual_hours: number;
+    assigned_hours: number;
+    utilization_pct: number | null;
+    utilization_band: "under_utilized" | "balanced" | "at_risk" | "over_allocated" | null;
+    classes_qualified: number;
+    classes_assigned: number;
+    skills_count: number;
+    expiring_cert_count: number; // certs expiring within 90 days
+  }[];
+};
+
 // Discriminated dataset union for code that handles all reports generically.
 export type ReportDataset =
   | { slug: "allocation"; data: AllocationDataset }
@@ -326,7 +358,8 @@ export type ReportDataset =
   | { slug: "coverage"; data: CoverageDataset }
   | { slug: "project-status"; data: ProjectStatusDataset }
   | { slug: "skill-gap"; data: SkillGapDataset }
-  | { slug: "department-comparison"; data: DepartmentComparisonDataset };
+  | { slug: "department-comparison"; data: DepartmentComparisonDataset }
+  | { slug: "instructor-scorecard"; data: InstructorScorecardDataset };
 
 // ── pure helpers ────────────────────────────────────────────────────────────
 
