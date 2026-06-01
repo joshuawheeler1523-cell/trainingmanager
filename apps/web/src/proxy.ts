@@ -109,7 +109,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Authenticated but no accepted org membership: redirect to /onboarding
+  // Authenticated but no accepted org membership: agency members belong in the
+  // agency console, not org onboarding. Route them there; everyone else with no
+  // org goes to /onboarding.
   if (user && !skipOrgCheck(pathname)) {
     const { data: membership } = await supabase
       .from("org_memberships")
@@ -118,8 +120,14 @@ export async function proxy(request: NextRequest) {
       .maybeSingle();
 
     if (!membership) {
+      const { data: agencyMembership } = await supabase
+        .from("agency_memberships")
+        .select("agency_id")
+        .limit(1)
+        .maybeSingle();
+
       const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
+      url.pathname = agencyMembership ? "/agency" : "/onboarding";
       return NextResponse.redirect(url);
     }
   }
