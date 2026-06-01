@@ -44,6 +44,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 type Props = {
   buckets: AllocationBucket[];
+  allBuckets: AllocationBucket[];
   globals: GlobalAllocation[];
   groups: AllocationGroup[];
   groupMembers: AllocationGroupMember[];
@@ -107,7 +108,7 @@ export default function AllocationsView(props: Props) {
             />
           </div>
         )}
-        {tab === "buckets" && <BucketsTab buckets={props.buckets} />}
+        {tab === "buckets" && <BucketsTab buckets={props.allBuckets} />}
         {tab === "global" && (
           <GlobalTab
             buckets={props.buckets}

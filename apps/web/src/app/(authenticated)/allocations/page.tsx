@@ -48,12 +48,10 @@ export default async function AllocationsPage() {
     { data: capacityRows },
     { data: workloadRows },
   ] = await Promise.all([
-    supabase
-      .from("allocation_buckets")
-      .select("*")
-      .eq("org_id", orgId)
-      .eq("is_archived", false)
-      .order("display_order"),
+    // Fetch ALL buckets incl. archived — the Buckets tab needs the archived
+    // ones for its "Show archived" / Restore UI. Every other consumer below
+    // (pickers, summary) gets the active-only `buckets` derived from this.
+    supabase.from("allocation_buckets").select("*").eq("org_id", orgId).order("display_order"),
     supabase.from("global_allocations").select("*").eq("org_id", orgId),
     supabase.from("allocation_groups").select("*").eq("org_id", orgId).order("name"),
     supabase.from("allocation_group_members").select("*").eq("org_id", orgId),
@@ -84,7 +82,10 @@ export default async function AllocationsPage() {
     supabase.from("v_instructor_workload").select("*").eq("org_id", orgId),
   ]);
 
-  const buckets = (bucketRows ?? []) as AllocationBucket[];
+  const allBuckets = (bucketRows ?? []) as AllocationBucket[];
+  // Active-only set drives the pickers + summary across the other tabs; the
+  // Buckets tab receives the full set (allBuckets) so it can list/restore archived.
+  const buckets = allBuckets.filter((b) => !b.is_archived);
   const globals = (globalRows ?? []) as GlobalAllocation[];
   const groups = (groupRows ?? []) as AllocationGroup[];
   const groupMembers = (groupMemberRows ?? []) as AllocationGroupMember[];
@@ -186,6 +187,7 @@ export default async function AllocationsPage() {
       />
       <AllocationsView
         buckets={buckets}
+        allBuckets={allBuckets}
         globals={globals}
         groups={groups}
         groupMembers={groupMembers}
