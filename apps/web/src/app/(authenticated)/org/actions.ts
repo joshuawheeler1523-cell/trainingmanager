@@ -18,15 +18,11 @@ export async function switchOrg(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("org_memberships")
-    .select("org_id")
-    .eq("org_id", orgId)
-    .eq("user_id", user.id)
-    .not("accepted_at", "is", null)
-    .maybeSingle();
-
-  if (!membership) redirect("/onboarding");
+  // Authorize via resolved role rather than a direct membership row: agency
+  // admins have manager access to their client orgs without an org_membership
+  // (user_role_in_org returns 'manager' for them via is_agency_admin_of_org).
+  const { data: role } = await supabase.rpc("user_role_in_org", { p_org_id: orgId });
+  if (!role) redirect("/onboarding");
 
   const cookieStore = await cookies();
   cookieStore.set(CURRENT_ORG_COOKIE, orgId, {

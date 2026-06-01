@@ -122,16 +122,12 @@ export async function createClientOrgAction(
   }
 
   // 2. Create the default "General" department for the new org.
-  const { data: dept, error: deptErr } = await admin
-    .from("departments")
-    .insert({
-      org_id: org.id,
-      name: "General",
-      slug: "general",
-      description: "Default department for the organization.",
-    })
-    .select("id")
-    .single();
+  const { error: deptErr } = await admin.from("departments").insert({
+    org_id: org.id,
+    name: "General",
+    slug: "general",
+    description: "Default department for the organization.",
+  });
   if (deptErr) {
     // Best-effort cleanup
     await admin.from("organizations").delete().eq("id", org.id);
@@ -141,20 +137,10 @@ export async function createClientOrgAction(
     };
   }
 
-  // 3. Add the calling agency_admin as manager of the new org.
-  const nowIso = new Date().toISOString();
-  await admin.from("org_memberships").insert({
-    org_id: org.id,
-    user_id: user.id,
-    role: "manager",
-    accepted_at: nowIso,
-  });
-  await admin.from("department_memberships").insert({
-    department_id: dept.id,
-    user_id: user.id,
-    role: "admin",
-    accepted_at: nowIso,
-  });
+  // 3. (Intentionally no org_membership for the agency admin.) Agency admins
+  // get manager-equivalent access to every org under their agency via the
+  // is_agency_admin_of_org() helper baked into the role functions — so they
+  // operate inside client orgs WITHOUT counting as a hospital member/seat.
 
   // 4. Seed module feature flags from the preset.
   const moduleRows = TOGGLEABLE_MODULES.map((key) => ({

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BuildingOffice2Icon, UserGroupIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgencyId } from "@/lib/auth/agency";
+import { switchOrg } from "@/app/(authenticated)/org/actions";
 
 /**
  * Agency console dashboard. Lists every client org belonging to the agency
@@ -137,12 +138,16 @@ export default async function AgencyDashboardPage() {
                 return (
                   <tr key={org.id} className="hover:bg-surface">
                     <td className="px-5 py-3">
-                      <Link
-                        href={`/?org=${org.id}`}
-                        className="text-foreground hover:text-primary font-medium"
-                      >
-                        {org.name}
-                      </Link>
+                      <form action={switchOrg}>
+                        <input type="hidden" name="orgId" value={org.id} />
+                        <input type="hidden" name="returnPath" value="/dashboard" />
+                        <button
+                          type="submit"
+                          className="text-foreground hover:text-primary font-medium"
+                        >
+                          {org.name}
+                        </button>
+                      </form>
                       <p className="text-muted-foreground mt-0.5 text-xs">{org.slug}</p>
                     </td>
                     <td className="text-muted-foreground px-5 py-3 text-xs">
