@@ -9,6 +9,7 @@ import {
   departmentComparisonReportFilters,
   instructorScorecardReportFilters,
   projectStatusReportFilters,
+  utilizationTrendReportFilters,
   skillGapReportFilters,
   workloadReportFilters,
   type ReportDataset,
@@ -21,6 +22,7 @@ import { queryProjectStatusReport } from "./project-status";
 import { querySkillGapReport } from "./skill-gap";
 import { queryDepartmentComparisonReport } from "./department-comparison";
 import { queryInstructorScorecardReport } from "./instructor-scorecard";
+import { queryUtilizationTrendReport } from "./utilization-trend";
 import type { TypedSupabase } from "./types";
 
 export async function runReport(
@@ -73,6 +75,12 @@ export async function runReport(
       const parsed = instructorScorecardReportFilters.safeParse(rawFilters ?? {});
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid filters");
       const data = await queryInstructorScorecardReport(supabase, orgId, parsed.data);
+      return { slug, data };
+    }
+    case "utilization-trend": {
+      const parsed = utilizationTrendReportFilters.safeParse(rawFilters ?? {});
+      if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid filters");
+      const data = await queryUtilizationTrendReport(supabase, orgId, parsed.data);
       return { slug, data };
     }
   }

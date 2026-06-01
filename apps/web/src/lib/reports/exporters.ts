@@ -15,6 +15,7 @@ import type {
   ProjectStatusDataset,
   ReportDataset,
   SkillGapDataset,
+  UtilizationTrendDataset,
   WorkloadDataset,
 } from "@arbor/shared";
 
@@ -41,6 +42,8 @@ export function datasetToSheets(dataset: ReportDataset): ExportSheet[] {
       return departmentComparisonSheets(dataset.data);
     case "instructor-scorecard":
       return instructorScorecardSheets(dataset.data);
+    case "utilization-trend":
+      return utilizationTrendSheets(dataset.data);
   }
 }
 
@@ -329,6 +332,22 @@ function instructorScorecardSheets(d: InstructorScorecardDataset): ExportSheet[]
         "Classes assigned": r.classes_assigned,
         Skills: r.skills_count,
         "Certs expiring (90d)": r.expiring_cert_count,
+      })),
+    },
+  ];
+}
+
+function utilizationTrendSheets(d: UtilizationTrendDataset): ExportSheet[] {
+  return [
+    {
+      name: "Utilization Trend",
+      columns: ["Date", "Avg utilization %", "Instructors", "Assigned (h)", "Available (h)"],
+      rows: d.points.map((p) => ({
+        Date: p.snapshot_date,
+        "Avg utilization %": p.avg_utilization_pct == null ? "" : round(p.avg_utilization_pct),
+        Instructors: p.instructor_count,
+        "Assigned (h)": round(p.total_assigned_hours),
+        "Available (h)": round(p.total_annual_hours),
       })),
     },
   ];

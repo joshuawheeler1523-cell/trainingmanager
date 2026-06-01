@@ -15,6 +15,7 @@ export const REPORT_SLUGS = [
   "skill-gap",
   "department-comparison",
   "instructor-scorecard",
+  "utilization-trend",
 ] as const;
 export type ReportSlug = (typeof REPORT_SLUGS)[number];
 
@@ -77,6 +78,12 @@ export const instructorScorecardReportFilters = baseReportFilters.extend({
 });
 export type InstructorScorecardReportFilters = z.infer<typeof instructorScorecardReportFilters>;
 
+export const utilizationTrendReportFilters = baseReportFilters.extend({
+  // How many months of nightly snapshots to chart.
+  months: z.coerce.number().int().min(1).max(36).default(12),
+});
+export type UtilizationTrendReportFilters = z.infer<typeof utilizationTrendReportFilters>;
+
 // Discriminated union of all filter shapes so a saved-report row's filters
 // can be parsed against the correct schema by slug.
 export type ReportFilters =
@@ -86,7 +93,8 @@ export type ReportFilters =
   | ProjectStatusReportFilters
   | SkillGapReportFilters
   | DepartmentComparisonReportFilters
-  | InstructorScorecardReportFilters;
+  | InstructorScorecardReportFilters
+  | UtilizationTrendReportFilters;
 
 export function filterSchemaForSlug(slug: ReportSlug) {
   switch (slug) {
@@ -104,6 +112,8 @@ export function filterSchemaForSlug(slug: ReportSlug) {
       return departmentComparisonReportFilters;
     case "instructor-scorecard":
       return instructorScorecardReportFilters;
+    case "utilization-trend":
+      return utilizationTrendReportFilters;
   }
 }
 
@@ -166,6 +176,13 @@ export const REPORT_METADATA: Record<ReportSlug, ReportMetadata> = {
     name: "Instructor Scorecard",
     description:
       "Per-instructor one-pager: utilization, classes qualified vs assigned, skills held, and certifications expiring in 90 days.",
+    category: "capacity",
+  },
+  "utilization-trend": {
+    slug: "utilization-trend",
+    name: "Utilization Trend",
+    description:
+      "Org-wide average utilization over time from nightly snapshots. Builds history going forward — sparse at first, richer each night.",
     category: "capacity",
   },
 };
@@ -351,6 +368,16 @@ export type InstructorScorecardDataset = {
   }[];
 };
 
+export type UtilizationTrendDataset = {
+  points: {
+    snapshot_date: string;
+    avg_utilization_pct: number | null;
+    instructor_count: number;
+    total_assigned_hours: number;
+    total_annual_hours: number;
+  }[];
+};
+
 // Discriminated dataset union for code that handles all reports generically.
 export type ReportDataset =
   | { slug: "allocation"; data: AllocationDataset }
@@ -359,7 +386,8 @@ export type ReportDataset =
   | { slug: "project-status"; data: ProjectStatusDataset }
   | { slug: "skill-gap"; data: SkillGapDataset }
   | { slug: "department-comparison"; data: DepartmentComparisonDataset }
-  | { slug: "instructor-scorecard"; data: InstructorScorecardDataset };
+  | { slug: "instructor-scorecard"; data: InstructorScorecardDataset }
+  | { slug: "utilization-trend"; data: UtilizationTrendDataset };
 
 // ── pure helpers ────────────────────────────────────────────────────────────
 

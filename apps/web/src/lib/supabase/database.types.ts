@@ -646,6 +646,47 @@ export type Database = {
           },
         ];
       };
+      capacity_snapshots: {
+        Row: {
+          avg_utilization_pct: number | null;
+          created_at: string;
+          id: string;
+          instructor_count: number;
+          org_id: string;
+          snapshot_date: string;
+          total_annual_hours: number;
+          total_assigned_hours: number;
+        };
+        Insert: {
+          avg_utilization_pct?: number | null;
+          created_at?: string;
+          id?: string;
+          instructor_count?: number;
+          org_id: string;
+          snapshot_date?: string;
+          total_annual_hours?: number;
+          total_assigned_hours?: number;
+        };
+        Update: {
+          avg_utilization_pct?: number | null;
+          created_at?: string;
+          id?: string;
+          instructor_count?: number;
+          org_id?: string;
+          snapshot_date?: string;
+          total_annual_hours?: number;
+          total_assigned_hours?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "capacity_snapshots_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       class_instructor_assignments: {
         Row: {
           assigned_offerings: number;
@@ -5900,6 +5941,7 @@ export type Database = {
         }[];
       };
       is_agency_admin: { Args: { p_agency_id: string }; Returns: boolean };
+      is_agency_admin_of_org: { Args: { p_org_id: string }; Returns: boolean };
       is_agency_member: { Args: { p_agency_id: string }; Returns: boolean };
       is_department_admin: {
         Args: { p_department_id: string };
@@ -5993,6 +6035,7 @@ export type Database = {
           work_intake_count: number;
         }[];
       };
+      snapshot_capacity: { Args: never; Returns: undefined };
       user_department_ids: { Args: never; Returns: string[] };
       user_org_ids: { Args: never; Returns: string[] };
       user_role_in_org: { Args: { p_org_id: string }; Returns: string };

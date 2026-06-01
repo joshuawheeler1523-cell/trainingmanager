@@ -46,6 +46,16 @@ export default function FilterPane({ slug, buckets, instructors, value, onChange
             setField("instructor_ids", next);
           }}
         />
+      ) : slug === "utilization-trend" ? (
+        <NumberInput
+          label="Months of history"
+          value={(value.months as number | undefined) ?? 12}
+          min={1}
+          max={36}
+          onChange={(v) => {
+            setField("months", v);
+          }}
+        />
       ) : (
         <DateRange
           start={value.start_date as string | undefined}

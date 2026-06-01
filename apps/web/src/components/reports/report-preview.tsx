@@ -8,6 +8,7 @@ import ProjectStatusView from "./project-status-view";
 import SkillGapView from "./skill-gap-view";
 import DepartmentComparisonView from "./department-comparison-view";
 import InstructorScorecardView from "./instructor-scorecard-view";
+import UtilizationTrendView from "./utilization-trend-view";
 
 // Single dispatch component — renders the right per-slug view based on the
 // dataset's discriminator. Both the live filter pane preview and the saved-
@@ -29,5 +30,7 @@ export default function ReportPreview({ dataset }: { dataset: ReportDataset }) {
       return <DepartmentComparisonView data={dataset.data} />;
     case "instructor-scorecard":
       return <InstructorScorecardView data={dataset.data} />;
+    case "utilization-trend":
+      return <UtilizationTrendView data={dataset.data} />;
   }
 }

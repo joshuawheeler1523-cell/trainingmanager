@@ -7,6 +7,7 @@ import type {
   ProjectStatusDataset,
   ReportDataset,
   SkillGapDataset,
+  UtilizationTrendDataset,
   WorkloadDataset,
 } from "@arbor/shared";
 import { ReportHeader, periodSubtitle, reportStyles as s } from "./base";
@@ -43,6 +44,8 @@ export function ReportPdf({
       return (
         <InstructorScorecardDoc data={dataset.data} orgName={orgName} reportName={reportName} />
       );
+    case "utilization-trend":
+      return <UtilizationTrendDoc data={dataset.data} orgName={orgName} reportName={reportName} />;
   }
 }
 
@@ -455,6 +458,57 @@ function InstructorScorecardDoc({
               <Text style={[s.cell, { width: "12%" }]}>{r.classes_assigned.toString()}</Text>
               <Text style={[s.cell, { width: "12%" }]}>{r.skills_count.toString()}</Text>
               <Text style={[s.cellLast, { width: "12%" }]}>{r.expiring_cert_count.toString()}</Text>
+            </View>
+          ))}
+        </View>
+      </Page>
+    </Document>
+  );
+}
+
+// ── Utilization Trend ──────────────────────────────────────────────────────
+
+function UtilizationTrendDoc({
+  data,
+  orgName,
+  reportName,
+}: {
+  data: UtilizationTrendDataset;
+  orgName: string;
+  reportName: string;
+}) {
+  return (
+    <Document>
+      <Page size="A4" style={s.page}>
+        <ReportHeader title={reportName} subtitle={orgName} />
+        {data.points.length < 2 && (
+          <Text style={s.meta}>
+            {data.points.length.toString()} snapshot so far — a nightly job adds one each night.
+          </Text>
+        )}
+        <View style={s.table}>
+          <View style={[s.row, s.rowHeader]}>
+            <Text style={[s.cell, { width: "28%" }]}>Date</Text>
+            <Text style={[s.cell, { width: "22%" }]}>Avg utilization</Text>
+            <Text style={[s.cell, { width: "16%" }]}>Instructors</Text>
+            <Text style={[s.cell, { width: "17%" }]}>Assigned</Text>
+            <Text style={[s.cellLast, { width: "17%" }]}>Available</Text>
+          </View>
+          {[...data.points].reverse().map((p) => (
+            <View style={s.row} key={p.snapshot_date}>
+              <Text style={[s.cell, { width: "28%" }]}>{p.snapshot_date}</Text>
+              <Text style={[s.cell, { width: "22%" }]}>
+                {p.avg_utilization_pct == null
+                  ? "—"
+                  : `${round(p.avg_utilization_pct).toString()}%`}
+              </Text>
+              <Text style={[s.cell, { width: "16%" }]}>{p.instructor_count.toString()}</Text>
+              <Text style={[s.cell, { width: "17%" }]}>
+                {round(p.total_assigned_hours).toString()}h
+              </Text>
+              <Text style={[s.cellLast, { width: "17%" }]}>
+                {round(p.total_annual_hours).toString()}h
+              </Text>
             </View>
           ))}
         </View>
