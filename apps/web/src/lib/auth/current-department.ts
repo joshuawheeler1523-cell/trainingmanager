@@ -31,7 +31,7 @@ export const getCurrentDepartmentId = cache(async (): Promise<string | null> => 
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const isAdmin = await userIsOrgAdmin(supabase, user.id, orgId);
+  const isAdmin = await userIsManager(supabase, orgId);
 
   const stored = cookieStore.get(CURRENT_DEPARTMENT_COOKIE)?.value;
   if (stored) {
@@ -68,19 +68,18 @@ export const getCurrentDepartmentId = cache(async (): Promise<string | null> => 
   return anyMembership?.department_id ?? null;
 });
 
-async function userIsOrgAdmin(
+// Managers implicitly have access to every department in their org. Resolve via
+// the is_manager RPC (not a role-string compare): it's correct for direct
+// managers AND agency admins, who have manager-equivalent access to their client
+// orgs with no org/department membership row. The previous body compared against
+// a stale "org_admin" role that the three-role model never produces, so it always
+// returned false and managers fell through to the department-membership branch.
+async function userIsManager(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
   orgId: string,
 ): Promise<boolean> {
-  const { data } = await supabase
-    .from("org_memberships")
-    .select("role")
-    .eq("user_id", userId)
-    .eq("org_id", orgId)
-    .not("accepted_at", "is", null)
-    .maybeSingle();
-  return data?.role === "org_admin";
+  const { data } = await supabase.rpc("is_manager", { p_org_id: orgId });
+  return data === true;
 }
 
 async function userHasDepartmentMembership(
