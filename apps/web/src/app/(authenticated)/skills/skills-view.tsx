@@ -168,15 +168,35 @@ function LibraryTab({
             entity="skills"
             description="Upsert skills by name (case-insensitive). Existing skills with a matching name will be updated; new names will be inserted."
             columns={[
-              { key: "name", required: true, help: "Display name; max 200 chars" },
-              { key: "category", required: false, help: "Optional grouping label" },
-              { key: "description", required: false },
+              {
+                key: "name",
+                required: true,
+                help: "Display name; max 200 chars",
+                example: "BLS Provider",
+              },
+              {
+                key: "category",
+                required: false,
+                help: "Optional grouping label",
+                example: "Clinical",
+              },
+              {
+                key: "description",
+                required: false,
+                example: "Basic Life Support certification",
+              },
               {
                 key: "is_certification",
                 required: false,
                 help: "true / yes / 1 — anything else is false",
+                example: "true",
               },
-              { key: "certifying_authority", required: false, help: "Issuing body, if cert" },
+              {
+                key: "certifying_authority",
+                required: false,
+                help: "Issuing body, if cert",
+                example: "American Heart Association",
+              },
             ]}
             serverAction={importSkillsCsv}
             trigger={
