@@ -19,17 +19,16 @@ export const getCurrentOrgId = cache(async (): Promise<string | null> => {
   const stored = cookieStore.get(CURRENT_ORG_COOKIE)?.value;
 
   if (stored) {
-    const { data } = await supabase
-      .from("org_memberships")
-      .select("org_id")
-      .eq("org_id", stored)
-      .eq("user_id", user.id)
-      .not("accepted_at", "is", null)
-      .maybeSingle();
-    if (data) return data.org_id;
+    // Honor the cookie if the user has any resolved role in that org. This
+    // covers direct members AND agency admins (user_role_in_org returns
+    // 'manager' for them via is_agency_admin_of_org) without a membership row.
+    const { data: role } = await supabase.rpc("user_role_in_org", { p_org_id: stored });
+    if (role) return stored;
   }
 
-  // Fall back to most recently accepted membership
+  // Fall back to most recently accepted membership. Pure agency admins have no
+  // membership, so this is null for them — they reach a client org by switching
+  // into it from /agency (which sets the cookie honored above), not by default.
   const { data: fallback } = await supabase
     .from("org_memberships")
     .select("org_id")

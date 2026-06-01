@@ -12,11 +12,13 @@ vi.mock("next/headers", () => ({
 // Mock supabase server client
 const mockGetUser = vi.fn();
 const mockFrom = vi.fn();
+const mockRpc = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(() =>
     Promise.resolve({
       auth: { getUser: mockGetUser },
       from: mockFrom,
+      rpc: mockRpc,
     }),
   ),
 }));
@@ -47,6 +49,9 @@ function makeMembershipQuery(rows: { org_id: string }[] | null) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null });
+  // Default: the stored cookie resolves to no role (forces the fallback path).
+  // Tests that exercise a valid cookie override this per-case.
+  mockRpc.mockResolvedValue({ data: null, error: null });
 });
 
 describe("getCurrentOrgId", () => {
@@ -58,22 +63,17 @@ describe("getCurrentOrgId", () => {
     expect(await getCurrentOrgId()).toBeNull();
   });
 
-  it("returns the cookie org when the user has a valid accepted membership there", async () => {
+  it("returns the cookie org when the user has a resolved role there", async () => {
     mockCookies.mockResolvedValue(makeCookieStore(ORG_A));
-    mockFrom.mockReturnValue(makeMembershipQuery([{ org_id: ORG_A }]));
+    mockRpc.mockResolvedValue({ data: "manager", error: null });
 
     expect(await getCurrentOrgId()).toBe(ORG_A);
   });
 
-  it("falls back to most-recently-accepted membership when cookie org has no accepted membership", async () => {
+  it("falls back to most-recently-accepted membership when cookie org resolves to no role", async () => {
     mockCookies.mockResolvedValue(makeCookieStore(ORG_A));
-    let callCount = 0;
-    mockFrom.mockImplementation(() => {
-      callCount++;
-      // First call: validate stored cookie → no membership found
-      // Second call: fallback query → returns ORG_B
-      return makeMembershipQuery(callCount === 1 ? null : [{ org_id: ORG_B }]);
-    });
+    // rpc default → no role for the stored cookie; fallback query → ORG_B
+    mockFrom.mockReturnValue(makeMembershipQuery([{ org_id: ORG_B }]));
 
     expect(await getCurrentOrgId()).toBe(ORG_B);
   });
@@ -92,14 +92,11 @@ describe("getCurrentOrgId", () => {
     expect(await getCurrentOrgId()).toBeNull();
   });
 
-  it("ignores a cookie org the user is not a member of and returns the fallback", async () => {
+  it("ignores a cookie org the user has no role in and returns the fallback", async () => {
     const STRANGER_ORG = "org-zzzz-0000-0000-000000000000";
     mockCookies.mockResolvedValue(makeCookieStore(STRANGER_ORG));
-    let callCount = 0;
-    mockFrom.mockImplementation(() => {
-      callCount++;
-      return makeMembershipQuery(callCount === 1 ? null : [{ org_id: ORG_A }]);
-    });
+    // rpc default → no role for the stranger org; fallback query → ORG_A
+    mockFrom.mockReturnValue(makeMembershipQuery([{ org_id: ORG_A }]));
 
     expect(await getCurrentOrgId()).toBe(ORG_A);
   });
