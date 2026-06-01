@@ -128,18 +128,44 @@ export default function InstructorFilters({ departments, activeInstructorCount }
           entity="instructors"
           description="Upsert instructors by email (case-insensitive). Rows with no email always insert. Existing instructors with a matching email will be updated."
           columns={[
-            { key: "full_name", required: true, help: "Display name; max 200 chars" },
-            { key: "email", required: false, help: "Match key; valid email or blank" },
-            { key: "phone", required: false },
-            { key: "department", required: false, help: "Free-text label, e.g. Cardiology" },
-            { key: "location", required: false },
-            { key: "job_title", required: false },
-            { key: "start_date", required: false, help: "ISO date, e.g. 2025-04-15" },
-            { key: "annual_hours", required: false, help: "Integer 0–4000; default 1880" },
+            {
+              key: "full_name",
+              required: true,
+              help: "Display name; max 200 chars",
+              example: "Jane Doe",
+            },
+            {
+              key: "email",
+              required: false,
+              help: "Match key; valid email or blank",
+              example: "jane.doe@hospital.org",
+            },
+            { key: "phone", required: false, example: "555-0142" },
+            {
+              key: "department",
+              required: false,
+              help: "Free-text label, e.g. Cardiology",
+              example: "Cardiology",
+            },
+            { key: "location", required: false, example: "Main Campus" },
+            { key: "job_title", required: false, example: "RN Educator" },
+            {
+              key: "start_date",
+              required: false,
+              help: "ISO date, e.g. 2025-04-15",
+              example: "2025-04-15",
+            },
+            {
+              key: "annual_hours",
+              required: false,
+              help: "Integer 0–4000; default 1880",
+              example: "1880",
+            },
             {
               key: "status",
               required: false,
               help: "active / inactive / on_leave; default active",
+              example: "active",
             },
           ]}
           serverAction={importInstructorsCsv}

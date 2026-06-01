@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   ArrowUpTrayIcon,
+  ArrowDownTrayIcon,
   CheckCircleIcon,
   XCircleIcon,
   ArrowPathIcon,
@@ -35,7 +36,7 @@ type Props = {
   /** Description shown above the file picker. */
   description: string;
   /** Column headers the user should put in their CSV (in order). */
-  columns: { key: string; required: boolean; help?: string }[];
+  columns: { key: string; required: boolean; help?: string; example?: string }[];
   /** Server action receiving the parsed rows. */
   serverAction: (rows: Record<string, string>[]) => Promise<ServerActionResult>;
 };
@@ -120,6 +121,28 @@ export default function CsvImportDialog({
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  function downloadTemplate() {
+    const esc = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const lines = [columns.map((c) => esc(c.key)).join(",")];
+    // Include one example row only when the caller supplied examples, so the
+    // user sees the expected format without us inventing placeholder data.
+    if (columns.some((c) => c.example)) {
+      lines.push(columns.map((c) => esc(c.example ?? "")).join(","));
+    }
+    // Prepend a UTF-8 BOM so Excel opens it with the right encoding.
+    const blob = new Blob(["﻿" + lines.join("\r\n") + "\r\n"], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${entity}-import-template.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   async function handleFile(file: File) {
     setParseError(null);
     setResult(null);
@@ -189,6 +212,16 @@ export default function CsvImportDialog({
           <Dialog.Description className="text-muted-foreground mt-1 text-xs">
             {description}
           </Dialog.Description>
+
+          {/* Template download — exact headers (and an example row) in order */}
+          <button
+            type="button"
+            onClick={downloadTemplate}
+            className="border-border text-foreground hover:bg-surface mt-3 inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium"
+          >
+            <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+            Download template
+          </button>
 
           {/* Column reference */}
           <details className="border-border mt-4 rounded-lg border">
