@@ -32,16 +32,23 @@ export default function FilterPane({ slug, buckets, instructors, value, onChange
         <p className="text-muted-foreground text-xs">Preview updates as you type.</p>
       </div>
 
-      <DateRange
-        start={value.start_date as string | undefined}
-        end={value.end_date as string | undefined}
-        onStart={(v) => {
-          setField("start_date", v || null);
-        }}
-        onEnd={(v) => {
-          setField("end_date", v || null);
-        }}
-      />
+      {slug === "department-comparison" ? (
+        <p className="text-muted-foreground text-xs">
+          This report is a live snapshot of every department right now — there are no filters to
+          set.
+        </p>
+      ) : (
+        <DateRange
+          start={value.start_date as string | undefined}
+          end={value.end_date as string | undefined}
+          onStart={(v) => {
+            setField("start_date", v || null);
+          }}
+          onEnd={(v) => {
+            setField("end_date", v || null);
+          }}
+        />
+      )}
 
       {(slug === "allocation" || slug === "coverage") && (
         <MultiSelect

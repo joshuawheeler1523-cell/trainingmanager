@@ -6,6 +6,7 @@
 import {
   allocationReportFilters,
   coverageReportFilters,
+  departmentComparisonReportFilters,
   projectStatusReportFilters,
   skillGapReportFilters,
   workloadReportFilters,
@@ -17,6 +18,7 @@ import { queryWorkloadReport } from "./workload";
 import { queryCoverageReport } from "./coverage";
 import { queryProjectStatusReport } from "./project-status";
 import { querySkillGapReport } from "./skill-gap";
+import { queryDepartmentComparisonReport } from "./department-comparison";
 import type { TypedSupabase } from "./types";
 
 export async function runReport(
@@ -57,6 +59,12 @@ export async function runReport(
       const parsed = skillGapReportFilters.safeParse(rawFilters ?? {});
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid filters");
       const data = await querySkillGapReport(supabase, orgId, parsed.data);
+      return { slug, data };
+    }
+    case "department-comparison": {
+      const parsed = departmentComparisonReportFilters.safeParse(rawFilters ?? {});
+      if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid filters");
+      const data = await queryDepartmentComparisonReport(supabase, orgId);
       return { slug, data };
     }
   }

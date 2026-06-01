@@ -2,6 +2,7 @@ import { Document, Page, Text, View } from "@react-pdf/renderer";
 import type {
   AllocationDataset,
   CoverageDataset,
+  DepartmentComparisonDataset,
   ProjectStatusDataset,
   ReportDataset,
   SkillGapDataset,
@@ -33,6 +34,10 @@ export function ReportPdf({
       return <ProjectStatusDoc data={dataset.data} orgName={orgName} reportName={reportName} />;
     case "skill-gap":
       return <SkillGapDoc data={dataset.data} orgName={orgName} reportName={reportName} />;
+    case "department-comparison":
+      return (
+        <DepartmentComparisonDoc data={dataset.data} orgName={orgName} reportName={reportName} />
+      );
   }
 }
 
@@ -330,6 +335,79 @@ function SkillGapDoc({
               <Text style={[s.cellLast, { width: "30%" }]}>{r.qualified_count.toString()}</Text>
             </View>
           ))}
+        </View>
+      </Page>
+    </Document>
+  );
+}
+
+// ── Department Comparison ──────────────────────────────────────────────────
+
+function DepartmentComparisonDoc({
+  data,
+  orgName,
+  reportName,
+}: {
+  data: DepartmentComparisonDataset;
+  orgName: string;
+  reportName: string;
+}) {
+  return (
+    <Document>
+      <Page size="A4" orientation="landscape" style={s.page}>
+        <ReportHeader title={reportName} subtitle={orgName} />
+        <View style={s.table}>
+          <View style={[s.row, s.rowHeader]}>
+            <Text style={[s.cell, { width: "28%" }]}>Department</Text>
+            <Text style={[s.cell, { width: "12%" }]}>Instructors</Text>
+            <Text style={[s.cell, { width: "12%" }]}>Available</Text>
+            <Text style={[s.cell, { width: "12%" }]}>Assigned</Text>
+            <Text style={[s.cell, { width: "12%" }]}>Avg util</Text>
+            <Text style={[s.cell, { width: "12%" }]}>Projects</Text>
+            <Text style={[s.cellLast, { width: "12%" }]}>Open intake</Text>
+          </View>
+          {data.rows.map((r) => (
+            <View style={s.row} key={r.department_id}>
+              <Text style={[s.cell, { width: "28%" }]}>{r.department_name}</Text>
+              <Text style={[s.cell, { width: "12%" }]}>{r.instructor_count.toString()}</Text>
+              <Text style={[s.cell, { width: "12%" }]}>
+                {round(r.total_annual_hours).toString()}h
+              </Text>
+              <Text style={[s.cell, { width: "12%" }]}>
+                {round(r.total_assigned_hours).toString()}h
+              </Text>
+              <Text style={[s.cell, { width: "12%" }]}>
+                {r.avg_utilization_pct == null
+                  ? "—"
+                  : `${round(r.avg_utilization_pct).toString()}%`}
+              </Text>
+              <Text style={[s.cell, { width: "12%" }]}>{r.active_project_count.toString()}</Text>
+              <Text style={[s.cellLast, { width: "12%" }]}>{r.open_intake_count.toString()}</Text>
+            </View>
+          ))}
+          <View style={[s.row, s.rowHeader]}>
+            <Text style={[s.cell, { width: "28%" }]}>All departments</Text>
+            <Text style={[s.cell, { width: "12%" }]}>
+              {data.totals.instructor_count.toString()}
+            </Text>
+            <Text style={[s.cell, { width: "12%" }]}>
+              {round(data.totals.total_annual_hours).toString()}h
+            </Text>
+            <Text style={[s.cell, { width: "12%" }]}>
+              {round(data.totals.total_assigned_hours).toString()}h
+            </Text>
+            <Text style={[s.cell, { width: "12%" }]}>
+              {data.totals.avg_utilization_pct == null
+                ? "—"
+                : `${round(data.totals.avg_utilization_pct).toString()}%`}
+            </Text>
+            <Text style={[s.cell, { width: "12%" }]}>
+              {data.totals.active_project_count.toString()}
+            </Text>
+            <Text style={[s.cellLast, { width: "12%" }]}>
+              {data.totals.open_intake_count.toString()}
+            </Text>
+          </View>
         </View>
       </Page>
     </Document>

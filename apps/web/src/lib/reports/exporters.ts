@@ -10,6 +10,7 @@ import * as XLSX from "xlsx";
 import type {
   AllocationDataset,
   CoverageDataset,
+  DepartmentComparisonDataset,
   ProjectStatusDataset,
   ReportDataset,
   SkillGapDataset,
@@ -35,6 +36,8 @@ export function datasetToSheets(dataset: ReportDataset): ExportSheet[] {
       return projectStatusSheets(dataset.data);
     case "skill-gap":
       return skillGapSheets(dataset.data);
+    case "department-comparison":
+      return departmentComparisonSheets(dataset.data);
   }
 }
 
@@ -253,6 +256,45 @@ function skillGapSheets(d: SkillGapDataset): ExportSheet[] {
         Skill: r.skill_name,
         Qualified: r.qualified_count,
       })),
+    },
+  ];
+}
+
+function departmentComparisonSheets(d: DepartmentComparisonDataset): ExportSheet[] {
+  const columns = [
+    "Department",
+    "Instructors",
+    "Available (h)",
+    "Assigned (h)",
+    "Avg utilization %",
+    "Active projects",
+    "Open intake",
+  ];
+  return [
+    {
+      name: "Departments",
+      columns,
+      rows: [
+        ...d.rows.map((r) => ({
+          Department: r.department_name,
+          Instructors: r.instructor_count,
+          "Available (h)": round(r.total_annual_hours),
+          "Assigned (h)": round(r.total_assigned_hours),
+          "Avg utilization %": r.avg_utilization_pct == null ? "" : round(r.avg_utilization_pct),
+          "Active projects": r.active_project_count,
+          "Open intake": r.open_intake_count,
+        })),
+        {
+          Department: "All departments",
+          Instructors: d.totals.instructor_count,
+          "Available (h)": round(d.totals.total_annual_hours),
+          "Assigned (h)": round(d.totals.total_assigned_hours),
+          "Avg utilization %":
+            d.totals.avg_utilization_pct == null ? "" : round(d.totals.avg_utilization_pct),
+          "Active projects": d.totals.active_project_count,
+          "Open intake": d.totals.open_intake_count,
+        },
+      ],
     },
   ];
 }

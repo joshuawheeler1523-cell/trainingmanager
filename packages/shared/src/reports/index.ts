@@ -13,6 +13,7 @@ export const REPORT_SLUGS = [
   "coverage",
   "project-status",
   "skill-gap",
+  "department-comparison",
 ] as const;
 export type ReportSlug = (typeof REPORT_SLUGS)[number];
 
@@ -65,6 +66,11 @@ export const skillGapReportFilters = baseReportFilters.extend({
 });
 export type SkillGapReportFilters = z.infer<typeof skillGapReportFilters>;
 
+// Department comparison is a current-state snapshot; it only needs the base
+// date range (unused today but kept for parity / future period scoping).
+export const departmentComparisonReportFilters = baseReportFilters;
+export type DepartmentComparisonReportFilters = z.infer<typeof departmentComparisonReportFilters>;
+
 // Discriminated union of all filter shapes so a saved-report row's filters
 // can be parsed against the correct schema by slug.
 export type ReportFilters =
@@ -72,7 +78,8 @@ export type ReportFilters =
   | WorkloadReportFilters
   | CoverageReportFilters
   | ProjectStatusReportFilters
-  | SkillGapReportFilters;
+  | SkillGapReportFilters
+  | DepartmentComparisonReportFilters;
 
 export function filterSchemaForSlug(slug: ReportSlug) {
   switch (slug) {
@@ -86,6 +93,8 @@ export function filterSchemaForSlug(slug: ReportSlug) {
       return projectStatusReportFilters;
     case "skill-gap":
       return skillGapReportFilters;
+    case "department-comparison":
+      return departmentComparisonReportFilters;
   }
 }
 
@@ -135,6 +144,13 @@ export const REPORT_METADATA: Record<ReportSlug, ReportMetadata> = {
     description:
       "Skills with insufficient coverage, expiring certifications, and over-coverage for hiring guidance.",
     category: "competency",
+  },
+  "department-comparison": {
+    slug: "department-comparison",
+    name: "Department Comparison",
+    description:
+      "Side-by-side rollup per department: headcount, average utilization, active projects, and open work intake — to see where capacity strain concentrates.",
+    category: "capacity",
   },
 };
 
@@ -281,13 +297,36 @@ export type SkillGapDataset = {
   }[];
 };
 
+export type DepartmentComparisonDataset = {
+  rows: {
+    department_id: string;
+    department_name: string;
+    instructor_count: number;
+    total_annual_hours: number;
+    total_assigned_hours: number;
+    avg_utilization_pct: number | null;
+    active_project_count: number;
+    open_intake_count: number;
+  }[];
+  // Org-wide totals for the footer row.
+  totals: {
+    instructor_count: number;
+    total_annual_hours: number;
+    total_assigned_hours: number;
+    avg_utilization_pct: number | null;
+    active_project_count: number;
+    open_intake_count: number;
+  };
+};
+
 // Discriminated dataset union for code that handles all reports generically.
 export type ReportDataset =
   | { slug: "allocation"; data: AllocationDataset }
   | { slug: "workload"; data: WorkloadDataset }
   | { slug: "coverage"; data: CoverageDataset }
   | { slug: "project-status"; data: ProjectStatusDataset }
-  | { slug: "skill-gap"; data: SkillGapDataset };
+  | { slug: "skill-gap"; data: SkillGapDataset }
+  | { slug: "department-comparison"; data: DepartmentComparisonDataset };
 
 // ── pure helpers ────────────────────────────────────────────────────────────
 
