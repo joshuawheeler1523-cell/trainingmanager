@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
   CheckCircleIcon,
   MagnifyingGlassIcon,
   PencilSquareIcon,
@@ -13,10 +14,16 @@ import {
 } from "@heroicons/react/20/solid";
 import { toast } from "sonner";
 import EmptyState from "@/components/ui/empty-state";
+import CsvImportDialog from "@/components/csv-import-dialog";
 import { cn } from "@/lib/utils";
 import { ManagerOnly } from "@/components/auth/role-gate";
 import SuperUserFormDialog from "./super-user-form-dialog";
-import { markSuperUserTrained, restoreSuperUser, softDeleteSuperUser } from "./actions";
+import {
+  importSuperUsersCsv,
+  markSuperUserTrained,
+  restoreSuperUser,
+  softDeleteSuperUser,
+} from "./actions";
 import type { SuperUserWithClass } from "@arbor/shared";
 
 type Props = {
@@ -174,6 +181,51 @@ export default function SuperUsersView(props: Props) {
             <ArrowDownTrayIcon className="h-4 w-4" />
             Export CSV
           </button>
+          <ManagerOnly>
+            <CsvImportDialog
+              entity="super users"
+              description="Each row creates a super user in the current department. A person can be a super user for multiple classes/topics, so rows always insert (no updating existing). Each row needs a class_name (matched to an existing class) OR a topic."
+              columns={[
+                {
+                  key: "full_name",
+                  required: true,
+                  help: "Display name; max 200 chars",
+                  example: "Jane Doe",
+                },
+                { key: "email", required: false, example: "jane.doe@hospital.org" },
+                { key: "phone", required: false, example: "555-0142" },
+                { key: "unit", required: false, help: "Unit / floor label", example: "ICU" },
+                {
+                  key: "class_name",
+                  required: false,
+                  help: "Must match an existing class name (case-insensitive)",
+                  example: "ACLS Certification",
+                },
+                {
+                  key: "topic",
+                  required: false,
+                  help: "Free-text topic; required if no class_name",
+                  example: "",
+                },
+                {
+                  key: "trained_at",
+                  required: false,
+                  help: "ISO date YYYY-MM-DD; blank = not yet trained",
+                  example: "2025-04-15",
+                },
+              ]}
+              serverAction={importSuperUsersCsv}
+              trigger={
+                <button
+                  type="button"
+                  className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium"
+                >
+                  <ArrowUpTrayIcon className="h-4 w-4" />
+                  Import CSV
+                </button>
+              }
+            />
+          </ManagerOnly>
           <Link
             href="/super-users/print"
             className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium"
