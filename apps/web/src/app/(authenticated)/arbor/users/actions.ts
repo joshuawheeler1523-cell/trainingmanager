@@ -42,7 +42,7 @@ export async function sendPasswordResetForUserAction(args: {
  */
 export async function sendMagicLinkForUserAction(args: {
   userId: string;
-}): Promise<ActionResult<{ emailSent: boolean }>> {
+}): Promise<ActionResult<{ emailSent: boolean; signInLink: string }>> {
   await requireArborAdmin();
   const admin = createAdminClient();
   const { data: userResp, error: lookupErr } = await admin.auth.admin.getUserById(args.userId);
@@ -73,7 +73,10 @@ export async function sendMagicLinkForUserAction(args: {
   await writeArborUserAuditLog(admin, args.userId, "ARBOR_ADMIN_USER_MAGIC_LINK_SENT", {
     email_sent: emailSent,
   });
-  return { ok: true, data: { emailSent } };
+  // Return the link itself so the admin can copy/paste it when email is
+  // unconfigured (degraded mode) — otherwise the only delivery path is the
+  // email that never sends. One-time link; expires per Supabase defaults.
+  return { ok: true, data: { emailSent, signInLink: linkData.properties.action_link } };
 }
 
 /**
