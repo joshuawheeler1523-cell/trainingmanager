@@ -1,8 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { ClipboardIcon } from "@heroicons/react/20/solid";
 import {
   deleteUserAction,
   forceSignOutUserAction,
@@ -23,6 +24,7 @@ export default function UserActions({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [signInLink, setSignInLink] = useState<string | null>(null);
 
   const wrap =
     (label: string, fn: () => Promise<{ ok: boolean }>, refreshAfter = false) =>
@@ -48,10 +50,11 @@ export default function UserActions({
     startTransition(async () => {
       const result = await sendMagicLinkForUserAction({ userId });
       if (result.ok) {
+        setSignInLink(result.data.signInLink);
         toast.success(
           result.data.emailSent
-            ? `Magic link sent to ${userEmail}`
-            : `Link generated but email failed (Resend not configured)`,
+            ? `Magic link sent to ${userEmail} (also shown below to copy)`
+            : `Link generated — email isn't configured, so copy it below`,
         );
       } else {
         toast.error(result.error.message);
@@ -127,6 +130,32 @@ export default function UserActions({
             Force sign-out everywhere
           </button>
         </div>
+
+        {signInLink && (
+          <div className="border-border bg-surface/40 mt-2 rounded-lg border p-3">
+            <p className="text-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+              One-time sign-in link
+            </p>
+            <div className="border-border bg-background flex items-center gap-2 rounded-md border p-2 text-xs">
+              <code className="text-foreground flex-1 truncate font-mono">{signInLink}</code>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(signInLink);
+                  toast.success("Link copied");
+                }}
+                className="border-border text-foreground hover:bg-surface inline-flex shrink-0 items-center gap-1 rounded border px-2 py-1"
+              >
+                <ClipboardIcon className="h-3.5 w-3.5" />
+                Copy
+              </button>
+            </div>
+            <p className="text-muted-foreground mt-1 text-[11px]">
+              Share with {userEmail}. Signs them in on click; expires per Supabase&apos;s default
+              (~1 hour). Generate a fresh one anytime.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Danger zone */}
