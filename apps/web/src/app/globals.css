@@ -210,6 +210,13 @@ html[data-theme="bright"] {
   --font-mono: var(--font-ui);
 }
 
+/* …and force literal code/pre/kbd to sans too — the browser + Tailwind preflight
+   default these to monospace directly (not via --font-mono), so the var override
+   above doesn't reach them. */
+html[data-theme="bright"] :is(code, pre, kbd, samp) {
+  font-family: var(--font-ui), -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+}
+
 /* ── Tailwind v4 theme mapping ──────────────────────────────────────────── */
 
 @theme inline {
