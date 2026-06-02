@@ -26,7 +26,7 @@ export default function RecommendationsBanner({
     if (!showWhenEmpty || !emptyMessage) return null;
     return (
       <div className="border-border bg-background flex items-center gap-2 rounded-xl border px-4 py-3">
-        <CheckCircleIcon className="h-5 w-5 text-emerald-500" />
+        <CheckCircleIcon className="text-success h-5 w-5" />
         <p className="text-foreground text-sm">{emptyMessage}</p>
       </div>
     );
@@ -50,7 +50,7 @@ export default function RecommendationsBanner({
         <ul className="divide-border border-border divide-y border-t">
           {recommendations.map((r) => {
             const Icon = r.severity === "critical" ? XCircleIcon : ExclamationTriangleIcon;
-            const iconCls = r.severity === "critical" ? "text-destructive" : "text-amber-500";
+            const iconCls = r.severity === "critical" ? "text-destructive" : "text-warning";
             return (
               <li key={r.id} className="px-4 py-3">
                 <div className="flex items-start gap-3">

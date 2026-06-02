@@ -503,8 +503,8 @@ function RoomGrid({
                   const poolOk = poolHover?.ok ?? false;
                   const cellBg = isPoolOver
                     ? poolOk
-                      ? "bg-emerald-200/40 dark:bg-emerald-700/30"
-                      : "bg-rose-200/40 dark:bg-rose-700/30"
+                      ? "bg-success/40"
+                      : "bg-danger/40"
                     : isOver
                       ? "bg-primary/10"
                       : "";
@@ -579,9 +579,9 @@ function SessionCell({
   const bg = resolveClassColor(placed.session.impl_class_id, cls?.color ?? null);
   const conflictBorder =
     placed.session.conflict_status === "full"
-      ? "ring-2 ring-rose-500 ring-inset"
+      ? "ring-2 ring-danger ring-inset"
       : placed.session.conflict_status === "partial"
-        ? "ring-2 ring-amber-500 ring-inset"
+        ? "ring-2 ring-warning ring-inset"
         : "";
   const durationMin =
     (new Date(placed.session.scheduled_end).getTime() -

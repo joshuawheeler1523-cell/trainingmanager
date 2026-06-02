@@ -91,7 +91,7 @@ export default function BulkAnnualHoursDialog({ trigger, instructorCount }: Prop
             </div>
 
             {confirming && (
-              <div className="border-border rounded-md border bg-amber-50/60 p-3 text-xs dark:bg-amber-950/20">
+              <div className="border-border bg-warning-bg/60 rounded-md border p-3 text-xs">
                 <p className="text-foreground font-medium">
                   This will overwrite annual hours on {instructorCount.toString()} instructor
                   {instructorCount === 1 ? "" : "s"}.

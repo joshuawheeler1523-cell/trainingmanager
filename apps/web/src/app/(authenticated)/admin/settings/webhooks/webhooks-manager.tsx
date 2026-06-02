@@ -211,8 +211,8 @@ export default function WebhooksManager({
       </form>
 
       {newSecret && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:bg-amber-900/20">
-          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+        <div className="border-warning-bd bg-warning-bg rounded-lg border p-4">
+          <p className="text-warning text-sm font-semibold">
             Signing secret (copy now — won&apos;t be shown again)
           </p>
           <pre className="bg-background text-foreground mt-2 overflow-x-auto rounded border p-3 font-mono text-xs">
@@ -341,9 +341,9 @@ export default function WebhooksManager({
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    delivered: "bg-emerald-100 text-emerald-800",
-    failed: "bg-rose-100 text-rose-800",
-    retrying: "bg-amber-100 text-amber-800",
+    delivered: "bg-success-bg text-success",
+    failed: "bg-danger-bg text-danger",
+    retrying: "bg-warning-bg text-warning",
     pending: "bg-slate-200 text-slate-700",
   };
   const cls = map[status] ?? "bg-slate-100 text-slate-600";

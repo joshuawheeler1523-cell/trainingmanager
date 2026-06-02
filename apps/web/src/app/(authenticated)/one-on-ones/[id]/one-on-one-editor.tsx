@@ -93,9 +93,9 @@ const fieldClass =
   "border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
 function utilizationBand(pct: number): { color: string; bg: string; label: string } {
-  if (pct >= 95) return { color: "text-rose-700", bg: "bg-rose-500", label: "over-allocated" };
-  if (pct >= 80) return { color: "text-amber-700", bg: "bg-amber-500", label: "at risk" };
-  if (pct >= 40) return { color: "text-emerald-700", bg: "bg-emerald-500", label: "balanced" };
+  if (pct >= 95) return { color: "text-danger", bg: "bg-danger", label: "over-allocated" };
+  if (pct >= 80) return { color: "text-warning", bg: "bg-warning", label: "at risk" };
+  if (pct >= 40) return { color: "text-success", bg: "bg-success", label: "balanced" };
   return { color: "text-slate-600", bg: "bg-slate-400", label: "under-utilized" };
 }
 
@@ -259,9 +259,9 @@ export default function OneOnOneEditor({
             <span
               className={
                 utilDelta > 0
-                  ? "text-rose-600"
+                  ? "text-danger"
                   : utilDelta < 0
-                    ? "text-emerald-600"
+                    ? "text-success"
                     : "text-muted-foreground"
               }
             >
@@ -924,7 +924,7 @@ function ConversationColumn({
                 }}
                 className={`rounded-full border px-2.5 py-0.5 text-[11px] disabled:opacity-50 ${
                   active
-                    ? "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200"
+                    ? "border-danger-bd bg-danger-bg text-danger"
                     : "border-input text-muted-foreground hover:bg-surface"
                 }`}
               >
@@ -1015,7 +1015,7 @@ function CarriedItemRow({
           onClick={() => {
             resolve("done");
           }}
-          className="text-muted-foreground rounded p-1 hover:text-emerald-600 disabled:opacity-50"
+          className="text-muted-foreground hover:text-success rounded p-1 disabled:opacity-50"
         >
           <CheckCircleIcon className="h-4 w-4" />
         </button>

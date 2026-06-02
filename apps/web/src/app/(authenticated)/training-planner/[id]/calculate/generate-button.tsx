@@ -133,7 +133,7 @@ export default function GenerateButton({ implementationId, ready, existingSessio
               className={
                 result.conflicts > 0
                   ? "text-destructive font-semibold tabular-nums"
-                  : "font-semibold tabular-nums text-emerald-600 dark:text-emerald-400"
+                  : "text-success font-semibold tabular-nums"
               }
             >
               {result.conflicts.toString()}
@@ -156,14 +156,14 @@ function DiagnosisPanel({ result }: { result: ScheduleGenResult }) {
   return (
     <div className="space-y-2">
       {hasRichDiagnosis && headline && (
-        <div className="rounded-md border border-emerald-300 bg-emerald-50 p-3 dark:border-emerald-700 dark:bg-emerald-950/30">
+        <div className="border-success-bd bg-success-bg rounded-md border p-3">
           <div className="flex items-start gap-2">
-            <LightBulbIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-            <div className="text-xs text-emerald-900 dark:text-emerald-100">
+            <LightBulbIcon className="text-success mt-0.5 h-4 w-4 shrink-0" />
+            <div className="text-success text-xs">
               <p className="font-semibold">Biggest unlock</p>
               <p className="mt-0.5">
                 {headline.recommendedFix}{" "}
-                <span className="text-emerald-700/80 dark:text-emerald-200/80">
+                <span className="text-success/80">
                   Would place {headline.sessionsUnblocked.toString()} of{" "}
                   {result.capacity_gaps.length.toString()} unscheduled sessions.
                 </span>
@@ -173,10 +173,10 @@ function DiagnosisPanel({ result }: { result: ScheduleGenResult }) {
         </div>
       )}
 
-      <div className="rounded-md border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950/30">
+      <div className="border-warning-bd bg-warning-bg rounded-md border p-3">
         <div className="flex items-start gap-2">
-          <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-          <div className="w-full text-xs text-amber-900 dark:text-amber-200">
+          <ExclamationTriangleIcon className="text-warning mt-0.5 h-4 w-4 shrink-0" />
+          <div className="text-warning w-full text-xs">
             <p className="font-semibold">Capacity gaps</p>
             {hasRichDiagnosis ? (
               <ul className="mt-1.5 space-y-2">
@@ -209,16 +209,16 @@ function DiagnosisRow({ d }: { d: ClassDiagnosis }) {
     <li>
       <div className="flex flex-wrap items-baseline gap-x-2">
         <span className="font-semibold">{d.className}</span>
-        <span className="tabular-nums text-amber-700/80 dark:text-amber-200/80">
+        <span className="text-warning/80 tabular-nums">
           {d.unplacedSessions.toString()} session{d.unplacedSessions === 1 ? "" : "s"} short
         </span>
-        <span className="text-[10px] uppercase tracking-wide text-amber-700/70 dark:text-amber-200/70">
+        <span className="text-warning/70 text-[10px] uppercase tracking-wide">
           {bottleneckLabel(d.bottleneck)}
         </span>
       </div>
       <p className="mt-0.5 leading-snug">{d.recommendedFix}</p>
       {d.assignedTrainers.length > 0 && (
-        <p className="mt-0.5 text-[11px] text-amber-700/70 dark:text-amber-200/70">
+        <p className="text-warning/70 mt-0.5 text-[11px]">
           Assigned:{" "}
           {d.assignedTrainers.map((t) => `${t.name} (${t.hoursPerWeek.toString()}h/wk)`).join(", ")}
         </p>

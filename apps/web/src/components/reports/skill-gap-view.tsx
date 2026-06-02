@@ -25,7 +25,7 @@ export default function SkillGapView({ data }: { data: SkillGapDataset }) {
               {data.insufficient_coverage.map((r) => (
                 <tr key={r.skill_id}>
                   <td className="text-foreground px-3 py-2 font-medium">{r.skill_name}</td>
-                  <td className="px-3 py-2 font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+                  <td className="text-danger px-3 py-2 font-semibold tabular-nums">
                     {r.qualified_count.toString()}
                   </td>
                   <td className="text-muted-foreground px-3 py-2 tabular-nums">
@@ -62,7 +62,7 @@ export default function SkillGapView({ data }: { data: SkillGapDataset }) {
                   <td className="text-foreground px-3 py-2">{r.skill_name}</td>
                   <td className="text-muted-foreground px-3 py-2 tabular-nums">{r.expires_at}</td>
                   <td
-                    className={`px-3 py-2 font-medium tabular-nums ${r.days_remaining < 30 ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400"}`}
+                    className={`px-3 py-2 font-medium tabular-nums ${r.days_remaining < 30 ? "text-danger" : "text-warning"}`}
                   >
                     {r.days_remaining.toString()}
                   </td>
@@ -117,7 +117,7 @@ function Section({
   const isEmpty = !children || (Array.isArray(children) && children.length === 0);
   const emptyCls =
     emptyTone === "emerald"
-      ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+      ? "border-success-bd bg-success-bg text-success"
       : "border-border bg-surface text-muted-foreground";
   return (
     <div>

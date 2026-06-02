@@ -182,7 +182,7 @@ export default function IntakeLinksView({ links, origin }: Props) {
                         title="Click to copy"
                       >
                         {copiedId === l.id ? (
-                          <CheckIcon className="h-3.5 w-3.5 text-emerald-500" />
+                          <CheckIcon className="text-success h-3.5 w-3.5" />
                         ) : (
                           <ClipboardDocumentIcon className="h-3.5 w-3.5" />
                         )}
@@ -195,9 +195,7 @@ export default function IntakeLinksView({ links, origin }: Props) {
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          active
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
-                            : "bg-surface text-muted-foreground"
+                          active ? "bg-success-bg text-success" : "bg-surface text-muted-foreground"
                         }`}
                       >
                         {active ? "Active" : expired ? "Expired" : "Revoked"}

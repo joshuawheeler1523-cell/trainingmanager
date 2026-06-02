@@ -152,8 +152,8 @@ function InviteManagerStep({ created, onDone }: { created: CreatedOrg; onDone: (
 
   return (
     <div className="space-y-6">
-      <div className="border-border flex items-start gap-3 rounded-lg border bg-emerald-50/40 p-4 dark:bg-emerald-950/20">
-        <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+      <div className="border-border bg-success-bg/40 flex items-start gap-3 rounded-lg border p-4">
+        <CheckCircleIcon className="text-success mt-0.5 h-5 w-5 shrink-0" />
         <div className="min-w-0">
           <p className="text-foreground text-sm font-semibold">
             <span className="font-bold">{created.name}</span> is ready

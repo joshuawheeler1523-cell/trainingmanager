@@ -11,9 +11,9 @@ const BAND_LABEL: Record<AllocationDataset["utilization_histogram"][number]["ban
 
 const BAND_COLOR: Record<AllocationDataset["utilization_histogram"][number]["band"], string> = {
   under_utilized: "bg-slate-300",
-  balanced: "bg-emerald-400",
-  at_risk: "bg-amber-400",
-  over_allocated: "bg-rose-500",
+  balanced: "bg-success",
+  at_risk: "bg-warning",
+  over_allocated: "bg-danger",
 };
 
 export default function AllocationView({ data }: { data: AllocationDataset }) {
@@ -68,9 +68,7 @@ export default function AllocationView({ data }: { data: AllocationDataset }) {
                   </td>
                   <td
                     className={`px-3 py-2 font-medium tabular-nums ${
-                      b.variance_percent >= 0
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-rose-600 dark:text-rose-400"
+                      b.variance_percent >= 0 ? "text-success" : "text-danger"
                     }`}
                   >
                     {b.variance_percent >= 0 ? "+" : ""}

@@ -66,7 +66,7 @@ export default function ShareCard({ project }: Props) {
               className="text-muted-foreground hover:text-foreground"
             >
               {copied ? (
-                <CheckIcon className="h-4 w-4 text-emerald-500" />
+                <CheckIcon className="text-success h-4 w-4" />
               ) : (
                 <ClipboardDocumentIcon className="h-4 w-4" />
               )}

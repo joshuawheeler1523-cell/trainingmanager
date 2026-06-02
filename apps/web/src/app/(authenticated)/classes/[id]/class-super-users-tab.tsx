@@ -140,8 +140,8 @@ function RowItem({
           disabled={pending}
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
             su.trained_at
-              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
-              : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300"
+              ? "bg-success-bg text-success hover:bg-success-bg"
+              : "bg-warning-bg text-warning hover:bg-warning-bg"
           } disabled:opacity-50`}
         >
           <CheckCircleIcon className="h-3.5 w-3.5" />

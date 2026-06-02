@@ -40,7 +40,7 @@ export default function Sidebar({ orgSwitcher }: Props) {
               href={href}
               className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 active
-                  ? "bg-blue-50 text-blue-700"
+                  ? "bg-info-bg text-info"
                   : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }`}
             >

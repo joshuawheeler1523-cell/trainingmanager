@@ -101,8 +101,8 @@ export default function ApiKeysList({ keys }: { keys: Key[] }) {
       </form>
 
       {newKey && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:bg-amber-900/20">
-          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+        <div className="border-warning-bd bg-warning-bg rounded-lg border p-4">
+          <p className="text-warning text-sm font-semibold">
             Your new API key (copy now — it won&apos;t be shown again)
           </p>
           <pre className="bg-background text-foreground mt-2 overflow-x-auto rounded border p-3 font-mono text-xs">

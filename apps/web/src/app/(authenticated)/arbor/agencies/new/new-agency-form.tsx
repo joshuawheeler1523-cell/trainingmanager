@@ -215,8 +215,8 @@ function slugify(s: string): string {
 function AgencyCreatedSuccess({ created }: { created: CreatedAgency }) {
   return (
     <div className="border-border bg-background space-y-5 rounded-xl border p-6">
-      <div className="flex items-start gap-3 rounded-lg bg-emerald-50/40 p-4 dark:bg-emerald-950/20">
-        <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+      <div className="bg-success-bg/40 flex items-start gap-3 rounded-lg p-4">
+        <CheckCircleIcon className="text-success mt-0.5 h-5 w-5 shrink-0" />
         <div className="min-w-0">
           <p className="text-foreground text-sm font-semibold">
             Agency <span className="font-bold">{created.agencyName}</span> is ready

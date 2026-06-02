@@ -130,7 +130,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
 
       {/* Payment recorded? */}
       {invoice.status === "paid" ? (
-        <section className="border-border rounded-xl border bg-emerald-50 p-5 dark:bg-emerald-900/20">
+        <section className="border-border bg-success-bg rounded-xl border p-5">
           <p className="text-foreground text-sm font-semibold">Payment recorded</p>
           <dl className="mt-2 space-y-1 text-sm">
             <div className="flex">
@@ -181,9 +181,9 @@ function formatCents(cents: number): string {
 function statusBadge(status: string): string {
   const map: Record<string, string> = {
     draft: "bg-slate-200 text-slate-700",
-    sent: "bg-blue-100 text-blue-800",
-    paid: "bg-emerald-100 text-emerald-800",
-    overdue: "bg-rose-100 text-rose-800",
+    sent: "bg-info-bg text-info",
+    paid: "bg-success-bg text-success",
+    overdue: "bg-danger-bg text-danger",
     void: "bg-slate-100 text-slate-500 line-through",
     cancelled: "bg-slate-100 text-slate-500",
   };

@@ -45,7 +45,7 @@ const COLUMN_LABELS: Record<TaskStatus, string> = {
 const PRIORITY_BADGE: Record<TaskPriority, string> = {
   low: "bg-surface text-muted-foreground",
   medium: "bg-primary/10 text-primary",
-  high: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
+  high: "bg-warning-bg text-warning",
   critical: "bg-destructive/10 text-destructive",
 };
 

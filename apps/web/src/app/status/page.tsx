@@ -13,23 +13,23 @@ export const metadata = { title: `Status — ${PROVIDER_IDENTITY.tradeName}` };
 
 const SEVERITY_TONE: Record<string, { bg: string; fg: string; icon: typeof CheckCircleIcon }> = {
   minor: {
-    bg: "bg-amber-50 dark:bg-amber-900/20",
-    fg: "text-amber-800 dark:text-amber-200",
+    bg: "bg-warning-bg",
+    fg: "text-warning",
     icon: ExclamationTriangleIcon,
   },
   major: {
-    bg: "bg-orange-50 dark:bg-orange-900/20",
-    fg: "text-orange-800 dark:text-orange-200",
+    bg: "bg-warning-bg",
+    fg: "text-warning",
     icon: ExclamationTriangleIcon,
   },
   critical: {
-    bg: "bg-rose-50 dark:bg-rose-900/20",
-    fg: "text-rose-800 dark:text-rose-200",
+    bg: "bg-danger-bg",
+    fg: "text-danger",
     icon: ExclamationCircleIcon,
   },
   maintenance: {
-    bg: "bg-blue-50 dark:bg-blue-900/20",
-    fg: "text-blue-800 dark:text-blue-200",
+    bg: "bg-info-bg",
+    fg: "text-info",
     icon: WrenchScrewdriverIcon,
   },
 };
@@ -73,13 +73,11 @@ export default async function StatusPage() {
 
         {/* Headline */}
         {active.length === 0 ? (
-          <div className="mt-6 flex items-center gap-3 rounded-xl border border-emerald-300 bg-emerald-50 p-5 dark:bg-emerald-900/20">
-            <CheckCircleIcon className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+          <div className="border-success-bd bg-success-bg mt-6 flex items-center gap-3 rounded-xl border p-5">
+            <CheckCircleIcon className="text-success h-6 w-6" />
             <div>
-              <p className="text-base font-semibold text-emerald-900 dark:text-emerald-200">
-                All systems operational
-              </p>
-              <p className="text-xs text-emerald-800 dark:text-emerald-300/90">
+              <p className="text-success text-base font-semibold">All systems operational</p>
+              <p className="text-success text-xs">
                 No active incidents. Last 90 days: {resolved.length.toString()} resolved incident
                 {resolved.length === 1 ? "" : "s"}.
               </p>
@@ -157,7 +155,7 @@ export default async function StatusPage() {
                       {(i.resolved_at ?? i.started_at).replace("T", " ").slice(0, 16)}
                     </p>
                   </div>
-                  <CheckCircleIcon className="h-5 w-5 text-emerald-500" />
+                  <CheckCircleIcon className="text-success h-5 w-5" />
                 </li>
               ))}
             </ul>

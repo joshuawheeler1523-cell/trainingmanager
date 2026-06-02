@@ -91,12 +91,12 @@ export default async function ArborOrgDetailPage({ params }: { params: Promise<{
           </div>
           <div className="text-right">
             {org.suspended_at ? (
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-800 dark:bg-rose-900/20 dark:text-rose-300">
+              <span className="bg-danger-bg text-danger inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium">
                 <ExclamationTriangleIcon className="h-3.5 w-3.5" />
                 Suspended
               </span>
             ) : (
-              <span className="inline-block rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+              <span className="bg-success-bg text-success inline-block rounded-md px-2.5 py-1 text-xs font-medium">
                 Active
               </span>
             )}
@@ -105,11 +105,9 @@ export default async function ArborOrgDetailPage({ params }: { params: Promise<{
       </header>
 
       {org.suspended_at && (
-        <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 dark:bg-rose-900/20">
-          <p className="text-sm font-semibold text-rose-900 dark:text-rose-200">
-            This organization is suspended.
-          </p>
-          <p className="mt-1 text-xs text-rose-800 dark:text-rose-300/90">
+        <div className="border-danger-bd bg-danger-bg rounded-xl border p-4">
+          <p className="text-danger text-sm font-semibold">This organization is suspended.</p>
+          <p className="text-danger mt-1 text-xs">
             Since {org.suspended_at.slice(0, 10)}.{" "}
             {org.suspended_reason ? `Reason: ${org.suspended_reason}` : ""}
           </p>

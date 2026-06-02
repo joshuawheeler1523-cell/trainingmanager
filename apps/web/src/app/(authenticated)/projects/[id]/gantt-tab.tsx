@@ -56,14 +56,14 @@ const STATUS_COLOR: Record<TaskStatus, { bar: string; ring: string; text: string
     text: "text-primary-foreground",
   },
   on_hold: {
-    bar: "bg-amber-300 dark:bg-amber-500/60",
-    ring: "ring-amber-500",
-    text: "text-amber-950 dark:text-amber-50",
+    bar: "bg-warning",
+    ring: "ring-warning",
+    text: "text-warning",
   },
   completed: {
-    bar: "bg-emerald-400 dark:bg-emerald-500/70",
-    ring: "ring-emerald-600",
-    text: "text-emerald-950 dark:text-emerald-50",
+    bar: "bg-success",
+    ring: "ring-success",
+    text: "text-success",
   },
 };
 

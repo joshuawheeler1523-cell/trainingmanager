@@ -18,8 +18,8 @@ type Props = {
 
 const STATUS_BADGE: Record<AdHocStatus, string> = {
   open: "bg-primary/10 text-primary",
-  in_progress: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-  done: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  in_progress: "bg-warning-bg text-warning",
+  done: "bg-success-bg text-success",
   cancelled: "bg-surface text-muted-foreground",
 };
 

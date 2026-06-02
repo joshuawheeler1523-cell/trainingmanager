@@ -76,7 +76,7 @@ export default function PublicRequestForm({ token }: { token: string }) {
   if (submitted) {
     return (
       <div className="text-center">
-        <CheckCircleIcon className="mx-auto h-10 w-10 text-emerald-500" />
+        <CheckCircleIcon className="text-success mx-auto h-10 w-10" />
         <h2 className="text-foreground mt-3 text-lg font-semibold">Request submitted</h2>
         <p className="text-muted-foreground mt-2 text-sm">
           Thanks for the details. The training team will review and follow up by email.

@@ -799,7 +799,7 @@ function TrainerRow({
             onClick={onToggle}
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
               ptoCount > 0
-                ? "bg-amber-100 text-amber-900 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-100 dark:hover:bg-amber-900/50"
+                ? "bg-warning-bg text-warning hover:bg-warning-bg"
                 : "text-muted-foreground hover:bg-surface"
             }`}
           >

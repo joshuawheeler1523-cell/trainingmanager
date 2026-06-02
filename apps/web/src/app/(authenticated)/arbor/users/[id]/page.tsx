@@ -90,12 +90,12 @@ export default async function ArborUserDetailPage({ params }: { params: Promise<
           </div>
           <div className="text-right">
             {isBanned ? (
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-800 dark:bg-rose-900/20 dark:text-rose-300">
+              <span className="bg-danger-bg text-danger inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium">
                 <ExclamationTriangleIcon className="h-3.5 w-3.5" />
                 Suspended
               </span>
             ) : (
-              <span className="inline-block rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+              <span className="bg-success-bg text-success inline-block rounded-md px-2.5 py-1 text-xs font-medium">
                 Active
               </span>
             )}

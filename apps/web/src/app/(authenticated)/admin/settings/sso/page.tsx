@@ -39,9 +39,9 @@ export default async function SsoSettingsPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-blue-300 bg-blue-50 p-4 text-sm dark:bg-blue-900/20">
-        <p className="font-semibold text-blue-900 dark:text-blue-200">Setup steps</p>
-        <ol className="mt-2 list-inside list-decimal space-y-1 text-xs text-blue-800 dark:text-blue-300/90">
+      <div className="border-info-bd bg-info-bg rounded-lg border p-4 text-sm">
+        <p className="text-info font-semibold">Setup steps</p>
+        <ol className="text-info mt-2 list-inside list-decimal space-y-1 text-xs">
           <li>
             In your IdP, create a SAML 2.0 application. Set ACS URL to{" "}
             <code>https://your-arbor-host/auth/v1/sso/saml/acs</code> and entity id to your Arbor

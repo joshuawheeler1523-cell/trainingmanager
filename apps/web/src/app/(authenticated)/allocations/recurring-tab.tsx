@@ -29,7 +29,7 @@ type Props = {
 
 const STATUS_BADGE: Record<RecurringTask["status"], string> = {
   active: "bg-primary/10 text-primary",
-  paused: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
+  paused: "bg-warning-bg text-warning",
   archived: "bg-surface text-muted-foreground",
 };
 

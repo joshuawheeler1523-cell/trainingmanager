@@ -44,10 +44,10 @@ export default function CoverageView({ data }: { data: CoverageDataset }) {
                       <div
                         className={`h-full ${
                           r.coverage_percent >= 100
-                            ? "bg-emerald-500"
+                            ? "bg-success"
                             : r.coverage_percent >= 80
-                              ? "bg-amber-400"
-                              : "bg-rose-500"
+                              ? "bg-warning"
+                              : "bg-danger"
                         }`}
                         style={{ width: `${Math.min(100, r.coverage_percent).toString()}%` }}
                       />
@@ -77,8 +77,8 @@ export default function CoverageView({ data }: { data: CoverageDataset }) {
 
 function Pill({ color, children }: { color: "amber" | "rose"; children: React.ReactNode }) {
   const cls = {
-    amber: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-    rose: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200",
+    amber: "bg-warning-bg text-warning",
+    rose: "bg-danger-bg text-danger",
   }[color];
   return (
     <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>{children}</span>

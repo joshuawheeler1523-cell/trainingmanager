@@ -127,9 +127,7 @@ export default function SsoConfigList({ configs }: { configs: Config[] }) {
                     </td>
                     <td className="px-5 py-3">
                       {c.enabled ? (
-                        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                          ✓ Enabled
-                        </span>
+                        <span className="text-success text-xs font-medium">✓ Enabled</span>
                       ) : (
                         <span className="text-muted-foreground text-xs">Disabled</span>
                       )}

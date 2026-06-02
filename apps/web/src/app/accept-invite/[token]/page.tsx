@@ -95,7 +95,7 @@ export default async function AcceptInvitePage({ params }: { params: Params }) {
         user.email?.toLowerCase() === invite.email.toLowerCase() ? (
           <AcceptForm token={token} />
         ) : (
-          <p className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+          <p className="border-warning-bd bg-warning-bg text-warning mt-4 rounded-md border p-3 text-xs">
             You&apos;re signed in as <span className="font-medium">{user.email}</span>, but this
             invitation is for <span className="font-medium">{invite.email}</span>. Sign out and try
             the link again.

@@ -47,11 +47,9 @@ export default async function AgencyDomainPage() {
       </div>
 
       {!apiConfigured && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm dark:bg-amber-900/20">
-          <p className="font-semibold text-amber-900 dark:text-amber-200">
-            Vercel API not configured
-          </p>
-          <p className="mt-1 text-xs text-amber-800 dark:text-amber-300/90">
+        <div className="border-warning-bd bg-warning-bg rounded-lg border p-4 text-sm">
+          <p className="text-warning font-semibold">Vercel API not configured</p>
+          <p className="text-warning mt-1 text-xs">
             Set <code>VERCEL_API_TOKEN</code> and <code>VERCEL_PROJECT_ID</code> in the deployment
             environment for domain verification to work end-to-end. Domains can still be saved
             below; verification will fail until the env vars are set.
@@ -65,11 +63,9 @@ export default async function AgencyDomainPage() {
         {activeDomain ? (
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="bg-success inline-block h-2 w-2 rounded-full" />
               <span className="text-foreground font-mono text-sm">{activeDomain}</span>
-              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                ✓ Verified
-              </span>
+              <span className="text-success text-xs font-medium">✓ Verified</span>
             </div>
             {verifiedAt && (
               <p className="text-muted-foreground mt-1 text-xs">
@@ -80,11 +76,9 @@ export default async function AgencyDomainPage() {
         ) : pendingDomain ? (
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
+              <span className="bg-warning inline-block h-2 w-2 rounded-full" />
               <span className="text-foreground font-mono text-sm">{pendingDomain}</span>
-              <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                Awaiting DNS verification
-              </span>
+              <span className="text-warning text-xs font-medium">Awaiting DNS verification</span>
             </div>
             <p className="text-muted-foreground mt-1 text-xs">
               Configure the DNS records below, then click Verify.

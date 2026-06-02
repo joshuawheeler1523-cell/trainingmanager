@@ -185,7 +185,7 @@ export default function SuperUsersView(props: Props) {
             {classesWithSU} of {props.classes.length} classes covered
           </span>
           {classesWithoutSU > 0 && (
-            <span className="text-amber-700 dark:text-amber-300">
+            <span className="text-warning">
               {classesWithoutSU} {classesWithoutSU === 1 ? "class needs" : "classes need"} a super
               user
             </span>
@@ -262,16 +262,12 @@ function ClassCard({
     <div className="border-border bg-background overflow-hidden rounded-xl border">
       <div
         className={`flex flex-wrap items-center gap-3 border-b px-4 py-2.5 ${
-          isEmpty
-            ? "border-amber-200 bg-amber-50/60 dark:border-amber-900/40 dark:bg-amber-950/20"
-            : "border-border bg-surface/40"
+          isEmpty ? "border-warning-bd bg-warning-bg/60" : "border-border bg-surface/40"
         }`}
       >
         <div className="min-w-0 flex-1">
           <p className="text-foreground text-sm font-semibold">{cls.name}</p>
-          <p
-            className={`mt-0.5 text-xs ${isEmpty ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground"}`}
-          >
+          <p className={`mt-0.5 text-xs ${isEmpty ? "text-warning" : "text-muted-foreground"}`}>
             {isEmpty ? (
               <>
                 <ExclamationTriangleIcon className="mr-1 inline h-3 w-3" />
@@ -428,8 +424,8 @@ function SuperUserRow({ su, classes }: { su: ImplSuperUserWithClass; classes: Cl
         disabled={disabled || archived}
         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
           su.trained_at
-            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
-            : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300"
+            ? "bg-success-bg text-success hover:bg-success-bg"
+            : "bg-warning-bg text-warning hover:bg-warning-bg"
         } disabled:opacity-50`}
       >
         <CheckCircleIcon className="h-3.5 w-3.5" />

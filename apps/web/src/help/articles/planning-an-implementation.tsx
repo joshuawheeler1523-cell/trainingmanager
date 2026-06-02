@@ -53,9 +53,9 @@ export const planningImplementation: HelpArticle = {
         </li>
       </ol>
       <p className="text-muted-foreground text-xs">
-        Conflict colors: <span className="text-emerald-600">green</span> = clear,{" "}
-        <span className="text-amber-600">amber</span> = one resource busy,{" "}
-        <span className="text-rose-600">red</span> = both busy or prereq unmet.
+        Conflict colors: <span className="text-success">green</span> = clear,{" "}
+        <span className="text-warning">amber</span> = one resource busy,{" "}
+        <span className="text-danger">red</span> = both busy or prereq unmet.
       </p>
     </div>
   ),

@@ -163,7 +163,7 @@ export default function Step9Review({
               type="button"
               disabled={pending}
               onClick={onComplete}
-              className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="bg-success hover:bg-success inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
             >
               <CheckCircleIcon className="h-4 w-4" />
               Mark complete
@@ -221,9 +221,9 @@ export default function Step9Review({
       {/* Gap banner — non-blocking, listed by section. Only shown while
           drafting; once a TRA is documented the gaps stop being noisy. */}
       {tra.status === "draft" && gaps.length > 0 && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/30">
+        <div className="border-warning-bd bg-warning-bg rounded-xl border p-4">
           <div className="flex items-start gap-2">
-            <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <ExclamationTriangleIcon className="text-warning mt-0.5 h-5 w-5 shrink-0" />
             <div className="min-w-0">
               <p className="text-foreground text-sm font-medium">
                 {gaps.length} field{gaps.length === 1 ? "" : "s"} typically expected before marking

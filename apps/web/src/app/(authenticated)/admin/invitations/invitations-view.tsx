@@ -122,7 +122,7 @@ export default function InvitationsView({ invitations }: { invitations: Invitati
                         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
                       >
                         {copiedId === i.id ? (
-                          <CheckIcon className="h-3.5 w-3.5 text-emerald-500" />
+                          <CheckIcon className="text-success h-3.5 w-3.5" />
                         ) : (
                           <ClipboardDocumentIcon className="h-3.5 w-3.5" />
                         )}

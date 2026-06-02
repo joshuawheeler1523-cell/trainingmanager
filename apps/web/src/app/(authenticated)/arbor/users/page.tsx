@@ -120,7 +120,7 @@ export default async function ArborUsersPage({
                         {isBanned ? (
                           <span className="text-destructive font-medium">Suspended</span>
                         ) : (
-                          <span className="text-emerald-700 dark:text-emerald-400">Active</span>
+                          <span className="text-success">Active</span>
                         )}
                       </td>
                     </tr>

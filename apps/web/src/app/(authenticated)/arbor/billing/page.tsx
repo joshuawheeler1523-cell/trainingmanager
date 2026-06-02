@@ -188,9 +188,9 @@ function Kpi({ label, value, tone }: { label: string; value: string; tone?: "war
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     draft: "bg-slate-200 text-slate-700",
-    sent: "bg-blue-100 text-blue-800",
-    paid: "bg-emerald-100 text-emerald-800",
-    overdue: "bg-rose-100 text-rose-800",
+    sent: "bg-info-bg text-info",
+    paid: "bg-success-bg text-success",
+    overdue: "bg-danger-bg text-danger",
     void: "bg-slate-100 text-slate-500 line-through",
     cancelled: "bg-slate-100 text-slate-500",
   };

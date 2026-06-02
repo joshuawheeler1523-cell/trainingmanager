@@ -237,12 +237,8 @@ function YesNoPanel({
     why = `${gapCount.toString()} session${gapCount === 1 ? "" : "s"} across ${classCount.toString()} class${classCount === 1 ? "" : "es"} can't be placed — see "${gapCount === 1 ? "the reason" : "the reasons"}" below.`;
   }
 
-  const cls = canSchedule
-    ? "border-emerald-300 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/30"
-    : "border-rose-300 bg-rose-50 dark:border-rose-700 dark:bg-rose-950/30";
-  const labelCls = canSchedule
-    ? "text-emerald-700 dark:text-emerald-200"
-    : "text-rose-700 dark:text-rose-200";
+  const cls = canSchedule ? "border-success-bd bg-success-bg" : "border-danger-bd bg-danger-bg";
+  const labelCls = canSchedule ? "text-success" : "text-danger";
 
   return (
     <div className={`rounded-lg border p-4 ${cls}`}>
@@ -291,7 +287,7 @@ function UnscheduledReasonsPanel({ dryRun }: { dryRun: ScheduleGenResult }) {
   })();
 
   return (
-    <div className="border-border space-y-3 rounded-md border bg-rose-50/40 p-3 dark:bg-rose-950/20">
+    <div className="border-border bg-danger-bg/40 space-y-3 rounded-md border p-3">
       <div className="flex items-baseline justify-between">
         <p className="text-foreground text-sm font-semibold">Why it doesn&apos;t fit</p>
         <p className="text-muted-foreground text-[11px]">
@@ -349,7 +345,7 @@ function DiagnosisCard({ d }: { d: ClassDiagnosis }) {
         <span className="text-muted-foreground text-xs tabular-nums">
           {d.unplacedSessions.toString()} session{d.unplacedSessions === 1 ? "" : "s"} short
         </span>
-        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+        <span className="bg-warning-bg text-warning rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">
           Bottleneck: {bottleneckLabel(d.bottleneck)}
         </span>
       </div>
@@ -415,11 +411,9 @@ function SummaryCards({ result, impl }: { result: FeasibilityResult; impl: Imple
 function RecommendationsBlock({ result }: { result: FeasibilityResult }) {
   if (result.recommendations.length === 0) return null;
   return (
-    <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/20">
-      <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-        To close the gap, pick one of:
-      </p>
-      <ul className="mt-2 space-y-1 text-xs text-amber-900 dark:text-amber-100">
+    <div className="border-warning-bd bg-warning-bg rounded-lg border p-4">
+      <p className="text-warning text-sm font-semibold">To close the gap, pick one of:</p>
+      <ul className="text-warning mt-2 space-y-1 text-xs">
         {result.recommendations.map((r, i) => (
           <li key={i} className="leading-relaxed">
             • {recommendationLabel(r)}
@@ -490,7 +484,7 @@ function CompletionCard({ result, impl }: { result: FeasibilityResult; impl: Imp
         <div>
           <p className="text-muted-foreground text-[11px]">Gap</p>
           <p
-            className={`text-sm font-semibold tabular-nums ${isOver ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}
+            className={`text-sm font-semibold tabular-nums ${isOver ? "text-danger" : "text-success"}`}
           >
             {isOver
               ? `+${result.daysOverTarget.toString()} day${result.daysOverTarget === 1 ? "" : "s"} late`
@@ -586,11 +580,11 @@ function ResourceForecastPanel({
                         </td>
                         <td className="px-3 py-2 text-center">
                           {short > 0 ? (
-                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-200">
+                            <span className="bg-danger-bg text-danger rounded-full px-2 py-0.5 text-[10px] font-semibold">
                               short {short.toString()}
                             </span>
                           ) : (
-                            <span className="text-emerald-600 dark:text-emerald-400">✓</span>
+                            <span className="text-success">✓</span>
                           )}
                         </td>
                         <td className="text-muted-foreground px-3 py-2">
@@ -636,7 +630,7 @@ function Card({ label, children }: { label: string; children: React.ReactNode })
 
 function utilTone(pct: number | null): string {
   if (pct === null) return "text-muted-foreground";
-  if (pct >= 100) return "text-rose-600 dark:text-rose-400";
-  if (pct >= 80) return "text-amber-600 dark:text-amber-400";
-  return "text-emerald-600 dark:text-emerald-400";
+  if (pct >= 100) return "text-danger";
+  if (pct >= 80) return "text-warning";
+  return "text-success";
 }

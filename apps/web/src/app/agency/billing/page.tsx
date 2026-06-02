@@ -4,9 +4,9 @@ import { getCurrentAgencyId } from "@/lib/auth/agency";
 
 const INVOICE_STATUS_BADGE: Record<string, string> = {
   draft: "bg-slate-200 text-slate-700",
-  sent: "bg-blue-100 text-blue-800",
-  paid: "bg-emerald-100 text-emerald-800",
-  overdue: "bg-rose-100 text-rose-800",
+  sent: "bg-info-bg text-info",
+  paid: "bg-success-bg text-success",
+  overdue: "bg-danger-bg text-danger",
   void: "bg-slate-100 text-slate-500 line-through",
   cancelled: "bg-slate-100 text-slate-500",
 };
@@ -165,9 +165,9 @@ export default async function AgencyBillingPage() {
                         <span
                           className={`rounded px-1.5 py-0.5 text-xs font-medium ${
                             c.status === "active"
-                              ? "bg-emerald-100 text-emerald-800"
+                              ? "bg-success-bg text-success"
                               : c.status === "trial"
-                                ? "bg-amber-100 text-amber-800"
+                                ? "bg-warning-bg text-warning"
                                 : "bg-slate-100 text-slate-600"
                           }`}
                         >
@@ -262,7 +262,7 @@ function KpiCard({
   sub?: string | undefined;
   tone?: "warning" | undefined;
 }) {
-  const valueColor = tone === "warning" ? "text-amber-700" : "text-foreground";
+  const valueColor = tone === "warning" ? "text-warning" : "text-foreground";
   return (
     <div className="border-border bg-background rounded-xl border p-4">
       <p className="text-muted-foreground text-xs font-medium">{label}</p>

@@ -19,14 +19,14 @@ type Props = {
 };
 
 const TIER_FILL = {
-  ok: "fill-emerald-500",
-  near: "fill-amber-500",
+  ok: "fill-success",
+  near: "fill-warning",
   over: "fill-destructive",
 } as const;
 
 const TIER_DOT = {
-  ok: "bg-emerald-500",
-  near: "bg-amber-500",
+  ok: "bg-success",
+  near: "bg-warning",
   over: "bg-destructive",
 } as const;
 
@@ -137,7 +137,7 @@ export default function ForecastBars({ weeks, height = 140 }: Props) {
                   tier === "over"
                     ? "text-destructive"
                     : tier === "near"
-                      ? "text-amber-600 dark:text-amber-400"
+                      ? "text-warning"
                       : "text-foreground"
                 }`}
               >

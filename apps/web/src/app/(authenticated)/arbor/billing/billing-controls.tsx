@@ -125,9 +125,7 @@ export default function BillingControls() {
                     {r.skipped ? (
                       <span className="text-muted-foreground">{r.skip_reason ?? "skipped"}</span>
                     ) : (
-                      <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                        created
-                      </span>
+                      <span className="text-success font-medium">created</span>
                     )}
                   </td>
                   <td className="text-foreground px-3 py-2 font-mono text-xs">

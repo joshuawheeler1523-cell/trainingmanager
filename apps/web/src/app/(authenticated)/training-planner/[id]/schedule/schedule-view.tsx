@@ -469,7 +469,7 @@ export default function ScheduleView({
             type="button"
             disabled={pending || draftCount === 0}
             onClick={handleClearDrafts}
-            className="border-border bg-background text-foreground inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50 dark:hover:bg-rose-950/30 dark:hover:text-rose-200"
+            className="border-border bg-background text-foreground hover:border-danger-bd hover:bg-danger-bg hover:text-danger inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
             title="Delete every draft session. Published sessions stay."
           >
             <TrashIcon className="h-3.5 w-3.5" />
@@ -706,9 +706,7 @@ function SessionDrawer({
             {session.conflict_status !== "none" && session.conflict_reason && (
               <p
                 className={`mt-1 text-xs ${
-                  session.conflict_status === "full"
-                    ? "text-rose-600 dark:text-rose-400"
-                    : "text-amber-600 dark:text-amber-400"
+                  session.conflict_status === "full" ? "text-danger" : "text-warning"
                 }`}
               >
                 {session.conflict_reason}

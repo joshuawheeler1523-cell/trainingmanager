@@ -5,8 +5,8 @@ import type { ProjectStatusDataset } from "@arbor/shared";
 const STATUS_BADGE: Record<string, string> = {
   planning: "bg-surface text-muted-foreground",
   active: "bg-primary/10 text-primary",
-  on_hold: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  on_hold: "bg-warning-bg text-warning",
+  completed: "bg-success-bg text-success",
   cancelled: "bg-destructive/10 text-destructive",
 };
 
@@ -57,7 +57,7 @@ export default function ProjectStatusView({ data }: { data: ProjectStatusDataset
                   {r.task_count.toString()}
                 </td>
                 <td
-                  className={`px-3 py-2 tabular-nums ${r.overdue_task_count > 0 ? "font-semibold text-rose-600 dark:text-rose-400" : "text-muted-foreground"}`}
+                  className={`px-3 py-2 tabular-nums ${r.overdue_task_count > 0 ? "text-danger font-semibold" : "text-muted-foreground"}`}
                 >
                   {r.overdue_task_count.toString()}
                 </td>

@@ -28,15 +28,15 @@ export type TicketRow = {
 
 const STATUS_BADGE: Record<string, string> = {
   open: "bg-primary/10 text-primary",
-  pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-  resolved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  pending: "bg-warning-bg text-warning",
+  resolved: "bg-success-bg text-success",
   closed: "bg-surface text-muted-foreground",
 };
 
 const PRIORITY_BADGE: Record<string, string> = {
   low: "bg-surface text-muted-foreground",
   medium: "bg-primary/10 text-primary",
-  high: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
+  high: "bg-warning-bg text-warning",
   urgent: "bg-destructive/10 text-destructive",
 };
 

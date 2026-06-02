@@ -21,7 +21,7 @@ type Props = {
 const STATUS_BADGE: Record<ExternalDepStatus, string> = {
   open: "bg-surface text-muted-foreground",
   in_progress: "bg-primary/10 text-primary",
-  resolved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  resolved: "bg-success-bg text-success",
   blocked: "bg-destructive/10 text-destructive",
 };
 

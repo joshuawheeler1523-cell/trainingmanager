@@ -1223,7 +1223,7 @@ export default function SketchpadEditor({ schedule, rooms, sessions }: Props) {
 
       {/* Unassigned strip */}
       {unassignedSessions.length > 0 && (
-        <div className="border-border rounded-lg border bg-amber-50/40 p-3 dark:bg-amber-900/10">
+        <div className="border-border bg-warning-bg/40 rounded-lg border p-3">
           <p className="text-foreground mb-1.5 text-xs font-semibold">
             Unassigned ({unassignedSessions.length.toString()})
           </p>
@@ -1842,7 +1842,7 @@ function SessionDrawer({
             {conflictTooltip.length > 0 && (
               <ul className="mt-1 space-y-0.5">
                 {conflictTooltip.map((msg, i) => (
-                  <li key={i} className="text-xs text-rose-600 dark:text-rose-400">
+                  <li key={i} className="text-danger text-xs">
                     ⚠ {msg}
                   </li>
                 ))}
@@ -2152,7 +2152,7 @@ Lee, Sim Lab, 13:00, 60`}
         />
 
         {warnings.length > 0 && (
-          <ul className="space-y-0.5 rounded-md bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:bg-amber-900/30 dark:text-amber-100">
+          <ul className="bg-warning-bg text-warning space-y-0.5 rounded-md px-3 py-2 text-[11px]">
             {warnings.slice(0, 6).map((w, i) => (
               <li key={i}>⚠ {w}</li>
             ))}

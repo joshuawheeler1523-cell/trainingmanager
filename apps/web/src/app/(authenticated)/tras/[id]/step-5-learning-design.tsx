@@ -226,7 +226,7 @@ export default function Step5LearningDesign({
                 <RemoveRowButton onClick={remove} disabled={disabled} />
               </div>
               {!check.ok && (
-                <p className="mt-1 pl-6 text-xs text-amber-600 dark:text-amber-400">
+                <p className="text-warning mt-1 pl-6 text-xs">
                   {check.reason === "weak_phrase"
                     ? `Avoid "${check.phrase}" — it describes an internal state that can't be observed. Try a Bloom-style verb (demonstrate, perform, evaluate, …).`
                     : "No observable verb detected. Try starting with a Bloom-style verb like 'demonstrate', 'calculate', 'evaluate'."}

@@ -63,7 +63,7 @@ export default function AiAssistantPanel({ enabled, onClose }: Props) {
 function UnconfiguredState() {
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/20">
+      <div className="border-warning-bd bg-warning-bg rounded-md border p-4">
         <p className="text-foreground text-sm font-medium">AI Assistant not yet configured</p>
         <p className="text-muted-foreground mt-1 text-xs">
           The <code className="bg-surface rounded px-1">ai_estimation</code> feature flag is on for

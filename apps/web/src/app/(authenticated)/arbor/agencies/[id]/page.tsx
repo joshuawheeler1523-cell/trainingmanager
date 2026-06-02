@@ -78,12 +78,12 @@ export default async function ArborAgencyDetailPage({
           </div>
           <div className="text-right">
             {agency.suspended_at ? (
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-800 dark:bg-rose-900/20 dark:text-rose-300">
+              <span className="bg-danger-bg text-danger inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium">
                 <ExclamationTriangleIcon className="h-3.5 w-3.5" />
                 Suspended
               </span>
             ) : (
-              <span className="inline-block rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+              <span className="bg-success-bg text-success inline-block rounded-md px-2.5 py-1 text-xs font-medium">
                 Active
               </span>
             )}
@@ -92,11 +92,9 @@ export default async function ArborAgencyDetailPage({
       </header>
 
       {agency.suspended_at && (
-        <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 dark:bg-rose-900/20">
-          <p className="text-sm font-semibold text-rose-900 dark:text-rose-200">
-            This agency is suspended.
-          </p>
-          <p className="mt-1 text-xs text-rose-800 dark:text-rose-300/90">
+        <div className="border-danger-bd bg-danger-bg rounded-xl border p-4">
+          <p className="text-danger text-sm font-semibold">This agency is suspended.</p>
+          <p className="text-danger mt-1 text-xs">
             Suspended {agency.suspended_at.slice(0, 10)}.{" "}
             {agency.suspended_reason ? `Reason: ${agency.suspended_reason}` : ""}
           </p>
@@ -124,16 +122,14 @@ export default async function ArborAgencyDetailPage({
         {agency.custom_domain ? (
           <p className="text-foreground text-sm">
             <span className="font-mono">{agency.custom_domain}</span>{" "}
-            <span className="ml-2 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+            <span className="text-success ml-2 text-xs font-medium">
               ✓ Verified {agency.custom_domain_verified_at?.slice(0, 10) ?? ""}
             </span>
           </p>
         ) : agency.custom_domain_pending ? (
           <p className="text-foreground text-sm">
             <span className="font-mono">{agency.custom_domain_pending}</span>{" "}
-            <span className="ml-2 text-xs font-medium text-amber-700 dark:text-amber-400">
-              Awaiting DNS verification
-            </span>
+            <span className="text-warning ml-2 text-xs font-medium">Awaiting DNS verification</span>
           </p>
         ) : (
           <p className="text-muted-foreground text-sm italic">No custom domain configured.</p>
@@ -184,7 +180,7 @@ export default async function ArborAgencyDetailPage({
                       {o.suspended_at ? (
                         <span className="text-destructive">Suspended</span>
                       ) : (
-                        <span className="text-emerald-700 dark:text-emerald-400">Active</span>
+                        <span className="text-success">Active</span>
                       )}
                     </td>
                   </tr>

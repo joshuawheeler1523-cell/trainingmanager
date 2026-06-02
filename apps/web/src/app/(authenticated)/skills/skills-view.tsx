@@ -487,7 +487,7 @@ function MatrixTab({ matrix }: { matrix: MatrixData }) {
       <div className="text-muted-foreground text-xs">
         <p>
           Rows are instructors. Columns are classes with required skills. A green{" "}
-          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 align-middle text-[10px] font-bold text-white">
+          <span className="bg-success inline-flex h-4 w-4 items-center justify-center rounded-full align-middle text-[10px] font-bold text-white">
             ✓
           </span>{" "}
           means the instructor has every required skill at the required proficiency.
@@ -564,9 +564,9 @@ function MatrixTab({ matrix }: { matrix: MatrixData }) {
                       <div
                         className={`mt-0.5 text-[10px] tabular-nums ${
                           qCount === 0
-                            ? "text-rose-600 dark:text-rose-400"
+                            ? "text-danger"
                             : qCount === 1
-                              ? "text-amber-600 dark:text-amber-400"
+                              ? "text-warning"
                               : "text-muted-foreground"
                         }`}
                       >
@@ -599,23 +599,21 @@ function MatrixTab({ matrix }: { matrix: MatrixData }) {
                         <td
                           key={c.id}
                           className={`border-border border-r p-0 text-center ${
-                            qualified
-                              ? "bg-emerald-50 dark:bg-emerald-900/30"
-                              : "bg-rose-50/40 dark:bg-rose-950/20"
+                            qualified ? "bg-success-bg" : "bg-danger-bg/40"
                           }`}
                           title={qualified ? "Qualified" : "Missing required skill(s)"}
                         >
                           {qualified ? (
                             <span
                               aria-label="Qualified"
-                              className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white dark:bg-emerald-600"
+                              className="bg-success inline-flex h-6 w-6 items-center justify-center rounded-full text-sm font-bold text-white"
                             >
                               ✓
                             </span>
                           ) : (
                             <span
                               aria-label="Not qualified"
-                              className="text-base font-medium text-rose-400/70 dark:text-rose-500/70"
+                              className="text-danger/70 text-base font-medium"
                             >
                               ✕
                             </span>
@@ -624,11 +622,7 @@ function MatrixTab({ matrix }: { matrix: MatrixData }) {
                       );
                     })}
                     <td className="bg-background border-border sticky right-0 border-l px-2 py-1.5 text-right tabular-nums">
-                      <span
-                        className={
-                          total === 0 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"
-                        }
-                      >
+                      <span className={total === 0 ? "text-danger" : "text-muted-foreground"}>
                         {total.toString()}
                       </span>
                     </td>

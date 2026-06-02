@@ -168,7 +168,7 @@ export default function OrgSettingsControls({
               type="button"
               onClick={handleSuspend}
               disabled={pending || !reason.trim()}
-              className="mt-2 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+              className="bg-warning mt-2 rounded-md px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {pending ? "Suspending…" : "Suspend org"}
             </button>

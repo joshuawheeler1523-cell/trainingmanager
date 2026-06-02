@@ -100,7 +100,7 @@ function resolveSlate(args: {
 
 const SOURCE_BADGE: Record<AllocationSource, string> = {
   individual: "bg-primary/10 text-primary",
-  group: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
+  group: "bg-warning-bg text-warning",
   global: "bg-surface text-muted-foreground",
   none: "bg-destructive/10 text-destructive",
 };

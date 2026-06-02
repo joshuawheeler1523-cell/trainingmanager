@@ -191,11 +191,11 @@ export default function TeamView({ members }: Props) {
                   </td>
                   <td className="px-3 py-2">
                     {m.accepted_at ? (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+                      <span className="bg-success-bg text-success rounded-full px-2 py-0.5 text-xs font-medium">
                         Active
                       </span>
                     ) : (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+                      <span className="bg-warning-bg text-warning rounded-full px-2 py-0.5 text-xs font-medium">
                         Pending
                       </span>
                     )}

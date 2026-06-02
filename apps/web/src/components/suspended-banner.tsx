@@ -16,8 +16,8 @@ export default function SuspendedBanner({
 }) {
   return (
     <div className="bg-canvas flex min-h-screen items-center justify-center px-6">
-      <div className="max-w-md rounded-xl border border-amber-300 bg-amber-50 p-8 text-center dark:bg-amber-900/20">
-        <ExclamationTriangleIcon className="mx-auto h-10 w-10 text-amber-600 dark:text-amber-400" />
+      <div className="border-warning-bd bg-warning-bg max-w-md rounded-xl border p-8 text-center">
+        <ExclamationTriangleIcon className="text-warning mx-auto h-10 w-10" />
         <h1 className="text-foreground mt-4 text-2xl font-bold">Account suspended</h1>
         <p className="text-foreground mt-3 text-sm">
           Your {scope === "agency" ? "agency" : "organization"} has been temporarily suspended by{" "}

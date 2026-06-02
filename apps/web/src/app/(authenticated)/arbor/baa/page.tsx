@@ -81,9 +81,7 @@ export default async function ArborBaaPage() {
                       {b.effective_date ?? "—"}
                     </p>
                   </div>
-                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                    ✓ Active
-                  </span>
+                  <span className="text-success text-xs font-medium">✓ Active</span>
                 </li>
               );
             })}

@@ -103,7 +103,7 @@ export default async function PublicProjectPage({ params }: { params: Params }) 
               <ul className="border-border divide-border divide-y rounded-md border">
                 {milestoneList.map((m) => (
                   <li key={m.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-                    <span className={m.is_complete ? "text-emerald-500" : "text-amber-500"}>◆</span>
+                    <span className={m.is_complete ? "text-success" : "text-warning"}>◆</span>
                     <span className="text-foreground flex-1">{m.name}</span>
                     <span className="text-muted-foreground text-xs tabular-nums">
                       {new Date(m.due_date + "T00:00:00").toLocaleDateString()}

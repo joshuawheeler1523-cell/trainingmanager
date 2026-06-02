@@ -8,9 +8,9 @@ const BAND_BADGE: Record<
   string
 > = {
   under_utilized: "bg-slate-200 text-slate-700",
-  balanced: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
-  at_risk: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-  over_allocated: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200",
+  balanced: "bg-success-bg text-success",
+  at_risk: "bg-warning-bg text-warning",
+  over_allocated: "bg-danger-bg text-danger",
 };
 
 export default function WorkloadView({ data }: { data: WorkloadDataset }) {

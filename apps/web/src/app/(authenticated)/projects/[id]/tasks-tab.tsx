@@ -30,8 +30,8 @@ type Props = {
 const STATUS_BADGE: Record<TaskStatus, string> = {
   not_started: "bg-surface text-muted-foreground",
   in_progress: "bg-primary/10 text-primary",
-  on_hold: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
-  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  on_hold: "bg-warning-bg text-warning",
+  completed: "bg-success-bg text-success",
 };
 
 export default function TasksTab({

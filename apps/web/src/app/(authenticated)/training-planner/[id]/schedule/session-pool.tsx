@@ -147,7 +147,7 @@ export default function SessionPool({ classes, sessions, onUnplaceSession }: Pro
 
       {allDone ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-8 text-center">
-          <CheckCircleIcon className="h-10 w-10 text-emerald-500 dark:text-emerald-400" />
+          <CheckCircleIcon className="text-success h-10 w-10" />
           <p className="text-foreground text-sm font-semibold">All sessions placed</p>
           <p className="text-muted-foreground text-[11px] leading-snug">
             The pool is empty. Use “Publish drafts” above to lock the schedule.
@@ -192,9 +192,7 @@ export default function SessionPool({ classes, sessions, onUnplaceSession }: Pro
           onDragLeave={onZoneDragLeave}
           onDrop={onZoneDrop}
           className={`border-border flex items-center justify-center gap-1.5 border-t border-dashed px-3 py-2 text-[10.5px] font-medium transition-colors ${
-            dropHover
-              ? "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
-              : "text-muted-foreground"
+            dropHover ? "bg-warning-bg text-warning" : "text-muted-foreground"
           }`}
           aria-label="Drop a placed session here to remove it"
         >
@@ -219,7 +217,7 @@ function PoolCard({ item }: { item: PoolItem }) {
         <span className="text-muted-foreground flex-1 truncate text-[11px] line-through">
           {item.className}
         </span>
-        <CheckCircleIcon className="h-3.5 w-3.5 shrink-0 text-emerald-500 dark:text-emerald-400" />
+        <CheckCircleIcon className="text-success h-3.5 w-3.5 shrink-0" />
       </div>
     );
   }

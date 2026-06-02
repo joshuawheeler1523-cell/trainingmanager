@@ -212,7 +212,7 @@ export default function ProjectDetailClient({
 
       {/* Mobile fallback notice */}
       {isNarrow && (tab === "gantt" || tab === "calendar") && (
-        <div className="bg-amber-50 px-6 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+        <div className="bg-warning-bg text-warning px-6 py-2 text-xs">
           {tab === "gantt" ? "Gantt" : "Calendar"} is unavailable at this width — showing Kanban
           instead.
         </div>

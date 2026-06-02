@@ -97,6 +97,22 @@
   --status-gray: oklch(58% 0.01 240);
   --status-gray-bg: oklch(95% 0.005 240);
 
+  /* Intent tokens — success / warning / danger / info (fg, bg, border).
+     Editorial values reproduce the Tailwind pill colors used today so the
+     existing look is preserved; [data-theme] overrides retint them. */
+  --success: #047857; /* emerald-700 */
+  --success-bg: #d1fae5; /* emerald-100 */
+  --success-bd: #6ee7b7; /* emerald-300 */
+  --warning: #b45309; /* amber-700 */
+  --warning-bg: #fef3c7; /* amber-100 */
+  --warning-bd: #fcd34d; /* amber-300 */
+  --danger: #e11d48; /* rose-600 */
+  --danger-bg: #ffe4e6; /* rose-100 */
+  --danger-bd: #fda4af; /* rose-300 */
+  --info: #1d4ed8; /* blue-700 */
+  --info-bg: #dbeafe; /* blue-100 */
+  --info-bd: #93c5fd; /* blue-300 */
+
   /* Border radius — editorial scale */
   --radius: 0.375rem; /* 6px — default button/card */
   --radius-pill: 9999px;
@@ -169,6 +185,20 @@
   --status-purple-bg: rgba(162, 93, 220, 0.1);
   --status-gray: #676879;
   --status-gray-bg: rgba(103, 104, 121, 0.1);
+
+  /* Intent tokens — vivid Monday-style on white */
+  --success: #00875a;
+  --success-bg: #e3f7ef;
+  --success-bd: #9ae0c4;
+  --warning: #b15c00;
+  --warning-bg: #fff2e0;
+  --warning-bd: #ffd699;
+  --danger: #c4314b;
+  --danger-bg: #ffe9ed;
+  --danger-bd: #f6a6b2;
+  --info: #0073ea;
+  --info-bg: #e6f2fe;
+  --info-bd: #a9d2fb;
 }
 
 /* ── Tailwind v4 theme mapping ──────────────────────────────────────────── */
@@ -215,6 +245,20 @@
   --color-status-purple-bg: var(--status-purple-bg);
   --color-status-gray: var(--status-gray);
   --color-status-gray-bg: var(--status-gray-bg);
+
+  /* Intent tokens → utilities: text-success, bg-success-bg, border-success-bd … */
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-success-bd: var(--success-bd);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-bd: var(--warning-bd);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-bd: var(--danger-bd);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-info-bd: var(--info-bd);
 
   --radius-sm: var(--radius-xs);
   --radius-md: var(--radius);

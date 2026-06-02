@@ -18,7 +18,7 @@ export default function CapacityBar({ assigned, capacity, segments }: Props) {
 
   const tier = utilizationPct >= 95 ? "over" : utilizationPct >= 80 ? "near" : "ok";
   const fillClass =
-    tier === "over" ? "bg-destructive" : tier === "near" ? "bg-amber-500" : "bg-emerald-500";
+    tier === "over" ? "bg-destructive" : tier === "near" ? "bg-warning" : "bg-success";
 
   return (
     <div className="space-y-2">
@@ -31,11 +31,7 @@ export default function CapacityBar({ assigned, capacity, segments }: Props) {
         </span>
         <span
           className={`text-sm font-semibold tabular-nums ${
-            tier === "over"
-              ? "text-destructive"
-              : tier === "near"
-                ? "text-amber-600 dark:text-amber-400"
-                : "text-emerald-600 dark:text-emerald-400"
+            tier === "over" ? "text-destructive" : tier === "near" ? "text-warning" : "text-success"
           }`}
         >
           {utilizationPct.toFixed(0)}%

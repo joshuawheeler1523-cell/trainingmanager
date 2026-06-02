@@ -204,7 +204,7 @@ function DiffPreview({
               </summary>
               <ul className="text-muted-foreground mt-1 space-y-0.5 text-xs">
                 {diff.inserts.slice(0, 20).map((r, i) => (
-                  <li key={i} className="text-emerald-700 dark:text-emerald-400">
+                  <li key={i} className="text-success">
                     + {r.name}
                   </li>
                 ))}
@@ -222,7 +222,7 @@ function DiffPreview({
               </summary>
               <ul className="text-muted-foreground mt-1 space-y-0.5 text-xs">
                 {diff.updates.slice(0, 20).map((u) => (
-                  <li key={u.id} className="text-amber-700 dark:text-amber-400">
+                  <li key={u.id} className="text-warning">
                     ~ {u.next.name}{" "}
                     <span className="text-muted-foreground">[{u.changedFields.join(", ")}]</span>
                   </li>

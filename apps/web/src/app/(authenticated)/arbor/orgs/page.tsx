@@ -131,7 +131,7 @@ export default async function ArborOrgsPage({
                       {o.suspended_at ? (
                         <span className="text-destructive font-medium">Suspended</span>
                       ) : (
-                        <span className="text-emerald-700 dark:text-emerald-400">Active</span>
+                        <span className="text-success">Active</span>
                       )}
                     </td>
                     <td className="text-foreground px-5 py-2.5 tabular-nums">

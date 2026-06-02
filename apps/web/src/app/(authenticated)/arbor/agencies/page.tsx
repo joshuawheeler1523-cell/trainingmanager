@@ -102,11 +102,7 @@ export default async function ArborAgenciesPage() {
                     <td className="text-muted-foreground px-5 py-3 font-mono text-xs">
                       {a.custom_domain ? (
                         <span
-                          className={
-                            a.custom_domain_verified_at
-                              ? "text-emerald-700 dark:text-emerald-400"
-                              : "text-amber-700 dark:text-amber-400"
-                          }
+                          className={a.custom_domain_verified_at ? "text-success" : "text-warning"}
                         >
                           {a.custom_domain}
                         </span>
@@ -118,7 +114,7 @@ export default async function ArborAgenciesPage() {
                       {a.suspended_at ? (
                         <span className="text-destructive font-medium">Suspended</span>
                       ) : (
-                        <span className="text-emerald-700 dark:text-emerald-400">Active</span>
+                        <span className="text-success">Active</span>
                       )}
                     </td>
                     <td className="text-foreground px-5 py-3 tabular-nums">

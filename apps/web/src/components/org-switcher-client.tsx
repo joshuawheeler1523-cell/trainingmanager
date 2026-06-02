@@ -71,7 +71,7 @@ export default function OrgSwitcherClient({ orgs, currentOrgId, isAdmin = false 
                     <BuildingOfficeIcon className="h-4 w-4 shrink-0 text-gray-400" />
                     <span className="flex-1 truncate text-left">{org.name}</span>
                     {org.id === currentOrgId && (
-                      <CheckIcon className="h-4 w-4 shrink-0 text-blue-600" />
+                      <CheckIcon className="text-info h-4 w-4 shrink-0" />
                     )}
                   </button>
                 </form>

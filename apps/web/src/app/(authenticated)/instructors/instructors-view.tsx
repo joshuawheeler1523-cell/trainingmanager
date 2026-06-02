@@ -621,7 +621,7 @@ function RecommendationsTab({ recommendations }: { recommendations: Recommendati
   if (recommendations.length === 0) {
     return (
       <div className="border-border bg-surface rounded-xl border border-dashed p-10 text-center">
-        <CheckCircleIcon className="mx-auto h-8 w-8 text-emerald-500" />
+        <CheckCircleIcon className="text-success mx-auto h-8 w-8" />
         <p className="text-foreground mt-3 text-sm font-medium">All clear</p>
         <p className="text-muted-foreground mt-1 text-xs">
           No <Label kind="entity.instructor" plural lower /> are over-allocated right now.
@@ -645,7 +645,7 @@ function RecommendationsTab({ recommendations }: { recommendations: Recommendati
       <ul className="border-border bg-background divide-border divide-y rounded-xl border">
         {recommendations.map((r) => {
           const Icon = r.severity === "critical" ? XCircleIcon : ExclamationTriangleIcon;
-          const iconCls = r.severity === "critical" ? "text-destructive" : "text-amber-500";
+          const iconCls = r.severity === "critical" ? "text-destructive" : "text-warning";
           return (
             <li key={r.id} className="px-4 py-3">
               <div className="flex items-start gap-3">

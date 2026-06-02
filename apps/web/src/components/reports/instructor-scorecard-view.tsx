@@ -74,7 +74,7 @@ export default function InstructorScorecardView({ data }: { data: InstructorScor
                 <td
                   className={`px-3 py-2 text-right tabular-nums ${
                     r.expiring_cert_count > 0
-                      ? "font-semibold text-amber-600 dark:text-amber-400"
+                      ? "text-warning font-semibold"
                       : "text-muted-foreground"
                   }`}
                 >
