@@ -156,6 +156,12 @@ export default function ClassesView({ classes, instructors, showDeleted, recomme
               },
               { key: "hours_per_day", required: false, help: "Numeric; default 0", example: "8" },
               {
+                key: "custom_day_hours",
+                required: false,
+                help: "Multi-day classes with different hours each day: list one value per day separated by ; (e.g. 8;6;4). Must match total_days. Leave blank to use hours_per_day for every day.",
+                example: "",
+              },
+              {
                 key: "offerings_per_year",
                 required: false,
                 help: "Integer; default 0",

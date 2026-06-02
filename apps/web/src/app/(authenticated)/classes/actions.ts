@@ -329,6 +329,22 @@ const csvIntOr = (defaultValue: number) =>
       return Number.isNaN(n) ? Number.NaN : Math.trunc(n);
     });
 
+// Per-day hours for multi-day classes with different times each day.
+// Accepts a separated list (";", "|", or ",") e.g. "4;3;2". Empty → null
+// (fall back to a flat hours_per_day across every day).
+const csvDayHours = z
+  .string()
+  .nullish()
+  .transform((s) => {
+    const v = (s ?? "").trim();
+    if (v === "") return null;
+    return v
+      .split(/[;|,]/)
+      .map((p) => p.trim())
+      .filter((p) => p !== "")
+      .map((p) => Number(p));
+  });
+
 const csvClassSchema = z
   .object({
     name: z.string().trim().min(1, "name is required").max(200),
@@ -336,6 +352,7 @@ const csvClassSchema = z
     is_multi_day: csvBool,
     total_days: csvIntOr(1).pipe(z.number().int().min(1)),
     hours_per_day: csvNumberOr(0).pipe(z.number().min(0)),
+    custom_day_hours: csvDayHours,
     offerings_per_year: csvIntOr(0).pipe(z.number().int().min(0)),
     prep_hours_per_offering: csvNumberOr(0).pipe(z.number().min(0)),
     logistics_hours_per_offering: csvNumberOr(0).pipe(z.number().min(0)),
@@ -352,6 +369,28 @@ const csvClassSchema = z
         message: "is_multi_day=true requires total_days>=2",
         path: ["total_days"],
       });
+    }
+    if (d.custom_day_hours != null) {
+      if (!d.is_multi_day) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "custom_day_hours only applies when is_multi_day=true",
+          path: ["custom_day_hours"],
+        });
+      }
+      if (d.custom_day_hours.some((n) => Number.isNaN(n) || n < 0)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "custom_day_hours must be non-negative numbers (e.g. 4;3;2)",
+          path: ["custom_day_hours"],
+        });
+      } else if (d.custom_day_hours.length !== d.total_days) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `custom_day_hours must list exactly ${String(d.total_days)} values (one per day)`,
+          path: ["custom_day_hours"],
+        });
+      }
     }
   });
 
@@ -414,6 +453,7 @@ export async function importClassesCsv(rawRows: unknown): Promise<ActionResult<I
           is_multi_day: data.is_multi_day,
           total_days: data.total_days,
           hours_per_day: data.hours_per_day,
+          custom_day_hours: data.custom_day_hours,
           offerings_per_year: data.offerings_per_year,
           prep_hours_per_offering: data.prep_hours_per_offering,
           logistics_hours_per_offering: data.logistics_hours_per_offering,
@@ -439,6 +479,7 @@ export async function importClassesCsv(rawRows: unknown): Promise<ActionResult<I
           is_multi_day: data.is_multi_day,
           total_days: data.total_days,
           hours_per_day: data.hours_per_day,
+          custom_day_hours: data.custom_day_hours,
           offerings_per_year: data.offerings_per_year,
           prep_hours_per_offering: data.prep_hours_per_offering,
           logistics_hours_per_offering: data.logistics_hours_per_offering,
