@@ -29,9 +29,10 @@ export default async function ForecastPage() {
     );
   }
 
-  const [{ data: departments }, { data: forecast }] = await Promise.all([
+  const [{ data: departments }, { data: forecast }, { data: undated }] = await Promise.all([
     supabase.from("departments").select("id, name").eq("org_id", orgId).order("name"),
     supabase.rpc("capacity_forecast", { p_org_id: orgId }),
+    supabase.rpc("capacity_forecast_undated", { p_org_id: orgId }),
   ]);
 
   return (
@@ -41,7 +42,11 @@ export default async function ForecastPage() {
         description="Projected demand (committed + incoming pipeline) vs available capacity over the next 12 months, by department."
       />
       <div className="p-6">
-        <ForecastView initialMonths={forecast ?? []} departments={departments ?? []} />
+        <ForecastView
+          initialMonths={forecast ?? []}
+          initialUndated={undated ?? 0}
+          departments={departments ?? []}
+        />
       </div>
     </div>
   );

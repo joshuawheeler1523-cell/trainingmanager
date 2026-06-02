@@ -20,12 +20,15 @@ function monthLong(iso: string): string {
 
 export default function ForecastView({
   initialMonths,
+  initialUndated,
   departments,
 }: {
   initialMonths: CapacityForecastMonth[];
+  initialUndated: number;
   departments: Dept[];
 }) {
   const [months, setMonths] = useState<CapacityForecastMonth[]>(initialMonths);
+  const [undatedHours, setUndatedHours] = useState<number>(initialUndated);
   const [deptId, setDeptId] = useState<string>("");
   const [pending, startTransition] = useTransition();
 
@@ -33,8 +36,12 @@ export default function ForecastView({
     setDeptId(next);
     startTransition(async () => {
       const res = await capacityForecastAction(next === "" ? null : next);
-      if (res.ok) setMonths(res.data);
-      else toast.error(res.error.message);
+      if (res.ok) {
+        setMonths(res.data.months);
+        setUndatedHours(res.data.undatedHours);
+      } else {
+        toast.error(res.error.message);
+      }
     });
   }
 
@@ -217,6 +224,15 @@ export default function ForecastView({
           Pipeline = unassigned ad-hoc work + planned-but-unscheduled implementations. Unestimated
           incoming requests (work-intake without an hours estimate yet) are counted but not added to
           the bars. Capacity = active instructors&apos; annual hours ÷ 12, minus dated PTO.
+          {undatedHours > 0 && (
+            <>
+              {" "}
+              <span className="text-foreground font-medium">
+                + {Math.round(undatedHours).toLocaleString()} h of committed work has no date set
+              </span>{" "}
+              and isn&apos;t placed on the timeline above — add start/due dates to include it.
+            </>
+          )}
         </p>
       </section>
     </div>

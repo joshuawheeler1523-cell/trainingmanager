@@ -5890,6 +5890,10 @@ export type Database = {
           unestimated_pipeline_requests: number;
         }[];
       };
+      capacity_forecast_undated: {
+        Args: { p_department_id?: string; p_org_id: string };
+        Returns: number;
+      };
       current_agency_id: { Args: never; Returns: string };
       current_instructor_id: { Args: { p_org_id: string }; Returns: string };
       current_user_email: { Args: never; Returns: string };

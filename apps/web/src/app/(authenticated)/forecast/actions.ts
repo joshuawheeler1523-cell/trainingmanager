@@ -16,7 +16,7 @@ type ActionResult<T> =
  */
 export async function capacityForecastAction(
   departmentId: string | null,
-): Promise<ActionResult<CapacityForecastMonth[]>> {
+): Promise<ActionResult<{ months: CapacityForecastMonth[]; undatedHours: number }>> {
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
   if (!(await isManager(orgId))) {
@@ -25,11 +25,16 @@ export async function capacityForecastAction(
 
   // Omit p_department_id entirely for "all departments" (exactOptionalPropertyTypes
   // forbids passing an explicit undefined for an optional arg).
-  const { data, error } = await supabase.rpc(
-    "capacity_forecast",
-    departmentId ? { p_org_id: orgId, p_department_id: departmentId } : { p_org_id: orgId },
-  );
-  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  const forecastArgs = departmentId
+    ? { p_org_id: orgId, p_department_id: departmentId }
+    : { p_org_id: orgId };
+  const [forecast, undated] = await Promise.all([
+    supabase.rpc("capacity_forecast", forecastArgs),
+    supabase.rpc("capacity_forecast_undated", forecastArgs),
+  ]);
+  if (forecast.error) {
+    return { ok: false, error: { code: forecast.error.code, message: forecast.error.message } };
+  }
 
-  return { ok: true, data };
+  return { ok: true, data: { months: forecast.data, undatedHours: undated.data ?? 0 } };
 }
