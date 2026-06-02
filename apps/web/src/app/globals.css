@@ -201,6 +201,15 @@
   --info-bd: #a9d2fb;
 }
 
+/* Bright also unifies typography onto the single sans UI family — no serif
+   headings, no monospace labels — for the flat Monday.com feel. Editorial keeps
+   its serif-display + mono-label editorial system. `html[...]` outranks the
+   next/font className that sets these vars, so this reliably wins. */
+html[data-theme="bright"] {
+  --font-display: var(--font-ui);
+  --font-mono: var(--font-ui);
+}
+
 /* ── Tailwind v4 theme mapping ──────────────────────────────────────────── */
 
 @theme inline {
