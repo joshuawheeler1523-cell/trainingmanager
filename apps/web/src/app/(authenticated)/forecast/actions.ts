@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
-import type { CapacityForecastMonth } from "@arbor/shared";
+import type { CapacityForecastItem, CapacityForecastMonth } from "@arbor/shared";
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -14,9 +14,13 @@ type ActionResult<T> =
  * (null = all departments). Manager-only — the forecast is an org/department
  * aggregate. RLS still enforces tenancy inside the (SECURITY INVOKER) RPC.
  */
-export async function capacityForecastAction(
-  departmentId: string | null,
-): Promise<ActionResult<{ months: CapacityForecastMonth[]; undatedHours: number }>> {
+export async function capacityForecastAction(departmentId: string | null): Promise<
+  ActionResult<{
+    months: CapacityForecastMonth[];
+    undatedHours: number;
+    items: CapacityForecastItem[];
+  }>
+> {
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
   if (!(await isManager(orgId))) {
@@ -28,13 +32,22 @@ export async function capacityForecastAction(
   const forecastArgs = departmentId
     ? { p_org_id: orgId, p_department_id: departmentId }
     : { p_org_id: orgId };
-  const [forecast, undated] = await Promise.all([
+  const [forecast, undated, items] = await Promise.all([
     supabase.rpc("capacity_forecast", forecastArgs),
     supabase.rpc("capacity_forecast_undated", forecastArgs),
+    supabase.rpc("capacity_forecast_items", forecastArgs),
   ]);
   if (forecast.error) {
     return { ok: false, error: { code: forecast.error.code, message: forecast.error.message } };
   }
 
-  return { ok: true, data: { months: forecast.data, undatedHours: undated.data ?? 0 } };
+  return {
+    ok: true,
+    data: {
+      months: forecast.data,
+      undatedHours: undated.data ?? 0,
+      // RPC types `layer` as plain text; the DB only ever emits committed|pipeline.
+      items: (items.data ?? []) as CapacityForecastItem[],
+    },
+  };
 }

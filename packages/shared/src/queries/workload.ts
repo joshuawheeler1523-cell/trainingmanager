@@ -63,6 +63,18 @@ export type CapacityForecastMonth = {
   unestimated_pipeline_requests: number;
 };
 
+// One work item behind the forecast (from the capacity_forecast_items RPC).
+export type CapacityForecastItem = {
+  layer: "committed" | "pipeline";
+  source: string; // class | recurring_task | ad_hoc_task | education_request | project_task | impl_session | impl_planned | unestimated_request
+  label: string;
+  hours: number | null; // null for unestimated pipeline requests
+  starts: string | null; // ISO date, or null for ongoing (annualized) items
+  ends: string | null;
+  link_type: string | null; // "class" | "project" | "implementation" | null
+  link_id: string | null;
+};
+
 export type CapacityForecastSummary = {
   firstOverMonth: string | null; // ISO month where demand first exceeds available
   peakUtilMonth: string | null; // ISO month with the highest utilization

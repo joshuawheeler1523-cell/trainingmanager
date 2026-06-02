@@ -2,6 +2,7 @@ import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
+import type { CapacityForecastItem } from "@arbor/shared";
 import ForecastView from "./forecast-view";
 
 export const metadata = { title: "Capacity Forecast — Arbor" };
@@ -29,11 +30,13 @@ export default async function ForecastPage() {
     );
   }
 
-  const [{ data: departments }, { data: forecast }, { data: undated }] = await Promise.all([
-    supabase.from("departments").select("id, name").eq("org_id", orgId).order("name"),
-    supabase.rpc("capacity_forecast", { p_org_id: orgId }),
-    supabase.rpc("capacity_forecast_undated", { p_org_id: orgId }),
-  ]);
+  const [{ data: departments }, { data: forecast }, { data: undated }, { data: items }] =
+    await Promise.all([
+      supabase.from("departments").select("id, name").eq("org_id", orgId).order("name"),
+      supabase.rpc("capacity_forecast", { p_org_id: orgId }),
+      supabase.rpc("capacity_forecast_undated", { p_org_id: orgId }),
+      supabase.rpc("capacity_forecast_items", { p_org_id: orgId }),
+    ]);
 
   return (
     <div>
@@ -45,6 +48,7 @@ export default async function ForecastPage() {
         <ForecastView
           initialMonths={forecast ?? []}
           initialUndated={undated ?? 0}
+          initialItems={(items ?? []) as CapacityForecastItem[]}
           departments={departments ?? []}
         />
       </div>
