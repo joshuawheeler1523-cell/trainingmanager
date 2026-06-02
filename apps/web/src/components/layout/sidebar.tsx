@@ -16,6 +16,7 @@ import {
   BriefcaseIcon,
   CalendarDaysIcon,
   ChartBarIcon,
+  ArrowTrendingUpIcon,
   ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
   WrenchScrewdriverIcon,
@@ -97,10 +98,14 @@ function workGroup(modules: ModuleFlags, isAdmin: boolean): NavGroup {
   return { title: "Work", items };
 }
 
-const INSIGHTS_GROUP: NavGroup = {
-  title: "Insights",
-  items: [{ href: "/reports", label: "Reports", icon: ChartBarIcon }],
-};
+function insightsGroup(isAdmin: boolean): NavGroup {
+  const items: NavItem[] = [{ href: "/reports", label: "Reports", icon: ChartBarIcon }];
+  // Forecast is an org/department-wide projection — a manager view.
+  if (isAdmin) {
+    items.push({ href: "/forecast", label: "Forecast", icon: ArrowTrendingUpIcon });
+  }
+  return { title: "Insights", items };
+}
 
 const TOOLS_GROUP: NavGroup = {
   title: "Tools",
@@ -226,7 +231,7 @@ function SidebarContent({
   const numberedGroups: { group: NavGroup; number: string }[] = [
     { group: team, number: "01" },
     { group: work, number: "02" },
-    { group: INSIGHTS_GROUP, number: "03" },
+    { group: insightsGroup(isAdmin), number: "03" },
     { group: TOOLS_GROUP, number: "04" },
   ];
   if (isAdmin) numberedGroups.push({ group: ADMIN_GROUP, number: "05" });

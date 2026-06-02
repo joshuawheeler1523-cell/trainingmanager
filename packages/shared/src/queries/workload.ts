@@ -51,6 +51,64 @@ export type ForecastWeek = {
   utilization_pct: number | null;
 };
 
+// One month of the org/department Capacity Forecast (from the capacity_forecast
+// RPC). Demand = committed + pipeline; available already nets out dated PTO.
+export type CapacityForecastMonth = {
+  month_start: string; // ISO date (first of month)
+  committed_hours: number;
+  pipeline_hours: number;
+  pto_hours: number;
+  available_hours: number;
+  instructor_count: number;
+  unestimated_pipeline_requests: number;
+};
+
+export type CapacityForecastSummary = {
+  firstOverMonth: string | null; // ISO month where demand first exceeds available
+  peakUtilMonth: string | null; // ISO month with the highest utilization
+  peakUtilPct: number | null;
+  totalShortfallHours: number; // Σ max(0, demand − available) across the horizon
+  unestimatedRequests: number; // total unstaffed, unestimated incoming requests
+};
+
+export function capacityForecastSummary(months: CapacityForecastMonth[]): CapacityForecastSummary {
+  let firstOverMonth: string | null = null;
+  let peakUtilMonth: string | null = null;
+  let peakUtilPct: number | null = null;
+  let totalShortfallHours = 0;
+  let unestimatedRequests = 0;
+
+  for (const m of months) {
+    const demand = m.committed_hours + m.pipeline_hours;
+    const shortfall = Math.max(0, demand - m.available_hours);
+    totalShortfallHours += shortfall;
+    unestimatedRequests += m.unestimated_pipeline_requests;
+    if (shortfall > 0 && firstOverMonth === null) firstOverMonth = m.month_start;
+    const util = m.available_hours > 0 ? (demand / m.available_hours) * 100 : null;
+    if (util != null && (peakUtilPct === null || util > peakUtilPct)) {
+      peakUtilPct = util;
+      peakUtilMonth = m.month_start;
+    }
+  }
+
+  return {
+    firstOverMonth,
+    peakUtilMonth,
+    peakUtilPct,
+    totalShortfallHours,
+    unestimatedRequests,
+  };
+}
+
+// Demand-vs-capacity tier for a forecast month (mirrors forecastTier thresholds).
+export function capacityTier(demand: number, available: number): "ok" | "near" | "over" {
+  if (available <= 0) return demand > 0 ? "over" : "ok";
+  const pct = (demand / available) * 100;
+  if (pct >= 100) return "over";
+  if (pct >= 80) return "near";
+  return "ok";
+}
+
 // Group a flat list of workload rows by source. Useful for breakdown panels.
 export function groupWorkloadBySource(rows: WorkloadRow[]): Record<WorkloadSource, WorkloadRow[]> {
   const out: Record<WorkloadSource, WorkloadRow[]> = {

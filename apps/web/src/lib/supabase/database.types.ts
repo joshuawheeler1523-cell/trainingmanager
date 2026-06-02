@@ -5873,6 +5873,23 @@ export type Database = {
           pricing_tier: Database["public"]["Enums"]["contract_pricing_tier"];
         }[];
       };
+      capacity_forecast: {
+        Args: {
+          p_department_id?: string;
+          p_months?: number;
+          p_org_id: string;
+          p_start?: string;
+        };
+        Returns: {
+          available_hours: number;
+          committed_hours: number;
+          instructor_count: number;
+          month_start: string;
+          pipeline_hours: number;
+          pto_hours: number;
+          unestimated_pipeline_requests: number;
+        }[];
+      };
       current_agency_id: { Args: never; Returns: string };
       current_instructor_id: { Args: { p_org_id: string }; Returns: string };
       current_user_email: { Args: never; Returns: string };
