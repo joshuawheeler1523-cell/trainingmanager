@@ -15,6 +15,8 @@ import { archiveRecurringTask, setRecurringTaskStatus } from "./task-actions";
 import { recurringAnnualHours, effectiveOccurrencesPerYear } from "@arbor/shared";
 import type {
   AllocationBucket,
+  AllocationGroup,
+  AllocationGroupMember,
   Instructor,
   RecurringTask,
   RecurringTaskAssignment,
@@ -25,6 +27,8 @@ type Props = {
   assignments: RecurringTaskAssignment[];
   buckets: AllocationBucket[];
   instructors: Instructor[];
+  groups: AllocationGroup[];
+  groupMembers: AllocationGroupMember[];
 };
 
 const STATUS_BADGE: Record<RecurringTask["status"], string> = {
@@ -33,7 +37,14 @@ const STATUS_BADGE: Record<RecurringTask["status"], string> = {
   archived: "bg-surface text-muted-foreground",
 };
 
-export default function RecurringTab({ tasks, assignments, buckets, instructors }: Props) {
+export default function RecurringTab({
+  tasks,
+  assignments,
+  buckets,
+  instructors,
+  groups,
+  groupMembers,
+}: Props) {
   const [pending, startTransition] = useTransition();
   const [showArchived, setShowArchived] = useState(false);
 
@@ -89,6 +100,8 @@ export default function RecurringTab({ tasks, assignments, buckets, instructors 
           mode="create"
           buckets={buckets}
           instructors={instructors}
+          groups={groups}
+          groupMembers={groupMembers}
           trigger={
             <button
               type="button"
@@ -220,6 +233,8 @@ export default function RecurringTab({ tasks, assignments, buckets, instructors 
                               assignments={taskAssignments}
                               buckets={buckets}
                               instructors={instructors}
+                              groups={groups}
+                              groupMembers={groupMembers}
                               trigger={
                                 <button
                                   type="button"

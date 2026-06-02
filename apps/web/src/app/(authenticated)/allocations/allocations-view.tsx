@@ -142,6 +142,8 @@ export default function AllocationsView(props: Props) {
             assignments={props.recurringAssignments}
             buckets={props.buckets}
             instructors={props.instructors}
+            groups={props.groups}
+            groupMembers={props.groupMembers}
           />
         )}
         {tab === "adhoc" && (

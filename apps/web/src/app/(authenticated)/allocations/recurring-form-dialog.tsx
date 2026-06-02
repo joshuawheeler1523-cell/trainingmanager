@@ -15,6 +15,8 @@ import {
 } from "@arbor/shared";
 import type {
   AllocationBucket,
+  AllocationGroup,
+  AllocationGroupMember,
   Frequency,
   Instructor,
   RecurringTask,
@@ -28,6 +30,8 @@ type CreateProps = {
   trigger: React.ReactNode;
   buckets: AllocationBucket[];
   instructors: Instructor[];
+  groups: AllocationGroup[];
+  groupMembers: AllocationGroupMember[];
   onSuccess?: () => void;
 };
 
@@ -38,6 +42,8 @@ type EditProps = {
   trigger: React.ReactNode;
   buckets: AllocationBucket[];
   instructors: Instructor[];
+  groups: AllocationGroup[];
+  groupMembers: AllocationGroupMember[];
   onSuccess?: () => void;
 };
 
@@ -140,6 +146,42 @@ export default function RecurringFormDialog(props: Props) {
     : [];
   const [assignments, setAssignments] = useState<AssignmentDraft[]>(initialAssignments);
   const [pickInstructor, setPickInstructor] = useState("");
+  const [pickGroup, setPickGroup] = useState("");
+
+  // Active, non-deleted instructor ids — the pool for "everyone" / group expansion.
+  const activeInstructorIds = useMemo(
+    () => new Set(props.instructors.filter((i) => i.deleted_at === null).map((i) => i.id)),
+    [props.instructors],
+  );
+
+  // Bulk-add: append instructor ids not already on the slate (snapshot of
+  // current membership; the list stays editable afterward).
+  function addInstructorIds(ids: string[]) {
+    setAssignments((prev) => {
+      const have = new Set(prev.map((a) => a.instructor_id));
+      const adds = ids
+        .filter((id) => activeInstructorIds.has(id) && !have.has(id))
+        .map((id) => ({ instructor_id: id }));
+      if (adds.length === 0) {
+        toast.info("Everyone in that selection is already assigned.");
+        return prev;
+      }
+      return [...prev, ...adds];
+    });
+  }
+
+  function addGroup() {
+    if (!pickGroup) return;
+    const memberIds = props.groupMembers
+      .filter((m) => m.group_id === pickGroup)
+      .map((m) => m.instructor_id);
+    addInstructorIds(memberIds);
+    setPickGroup("");
+  }
+
+  function addEveryone() {
+    addInstructorIds(Array.from(activeInstructorIds));
+  }
 
   useEffect(() => {
     if (open) setAssignments(initialAssignments);
@@ -384,6 +426,46 @@ export default function RecurringFormDialog(props: Props) {
                 </div>
               )}
 
+              {/* Bulk add — a whole group, or everyone at once. */}
+              <div className="flex flex-wrap items-center gap-2">
+                {props.groups.length > 0 && (
+                  <div className="flex flex-1 gap-2">
+                    <select
+                      value={pickGroup}
+                      onChange={(e) => {
+                        setPickGroup(e.target.value);
+                      }}
+                      className="border-input bg-background text-foreground flex-1 rounded-md border px-2 py-1.5 text-sm"
+                    >
+                      <option value="">Add a group…</option>
+                      {props.groups.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={addGroup}
+                      disabled={!pickGroup}
+                      className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                    >
+                      <PlusIcon className="h-4 w-4" />
+                      Add group
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={addEveryone}
+                  className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium"
+                  title="Assign every active instructor"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Everyone
+                </button>
+              </div>
+
               {availableInstructors.length > 0 && (
                 <div className="flex gap-2">
                   <select
@@ -410,6 +492,19 @@ export default function RecurringFormDialog(props: Props) {
                     Add
                   </button>
                 </div>
+              )}
+
+              {/* Clear-all when there are many assignees. */}
+              {assignments.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAssignments([]);
+                  }}
+                  className="text-muted-foreground hover:text-destructive text-xs underline-offset-2 hover:underline"
+                >
+                  Clear all {assignments.length} assignees
+                </button>
               )}
             </div>
 
