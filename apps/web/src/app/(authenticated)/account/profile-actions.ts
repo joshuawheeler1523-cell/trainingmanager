@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { THEME_COOKIE, coerceTheme } from "@/lib/theme";
 
 type ActionResult<T> =
   | { ok: true; data: T }
@@ -34,6 +36,28 @@ export async function updateProfileAction(input: unknown): Promise<ActionResult<
   });
   if (error) return { ok: false, error: { code: "UPDATE_FAILED", message: error.message } };
   revalidatePath("/account");
+  return { ok: true, data: true };
+}
+
+/**
+ * Persists the signed-in user's UI theme. Source of truth is user_metadata
+ * (so it follows them across devices via the session); we also mirror it to a
+ * non-httpOnly cookie that the pre-paint inline script reads to set
+ * <html data-theme> with no flash on subsequent loads.
+ */
+export async function setThemeAction(theme: string): Promise<ActionResult<true>> {
+  const t = coerceTheme(theme);
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ data: { theme: t } });
+  if (error) return { ok: false, error: { code: "UPDATE_FAILED", message: error.message } };
+
+  const cookieStore = await cookies();
+  cookieStore.set(THEME_COOKIE, t, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
   return { ok: true, data: true };
 }
 

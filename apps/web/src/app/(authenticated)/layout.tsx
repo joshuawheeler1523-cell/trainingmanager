@@ -8,6 +8,8 @@ import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isArborAdmin } from "@/lib/auth/arbor-admin";
 import { getOrgIdentity } from "@/lib/labels/get-org-identity";
 import { OrgIdentityProvider } from "@/components/labels";
+import ThemeBoot from "@/components/theme-boot";
+import { coerceTheme } from "@/lib/theme";
 
 export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -46,9 +48,11 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
   const requestQueueCount = counts?.request_queue_count ?? 0;
   const oneOnOnesCount = counts?.one_on_ones_count ?? 0;
   const admin = identity?.role === "manager";
+  const theme = coerceTheme((user.user_metadata as Record<string, unknown>).theme);
 
   return (
     <OrgGuard>
+      <ThemeBoot theme={theme} />
       <OrgIdentityProvider value={identity}>
         <AppShell
           orgSwitcherSlot={

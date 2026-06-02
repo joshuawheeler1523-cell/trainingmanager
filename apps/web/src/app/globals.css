@@ -105,6 +105,72 @@
   --radius-lg: 14px; /* hero frames, big section cards */
 }
 
+/* ── "Bright" theme — Monday.com-style: white surfaces, saturated accents ───
+   Overrides only the RAW tokens (plus a few direct-valued semantics). The
+   semantic layer (--background: var(--paper), etc.) re-resolves automatically
+   because CSS var() is evaluated at use time, so the whole app re-themes with
+   zero component edits. Toggled via <html data-theme="bright">. */
+[data-theme="bright"] {
+  /* Surfaces — white & cool light */
+  --cream: #f6f7fb; /* canvas */
+  --cream-2: #eceef5; /* secondary surface */
+  --paper: #ffffff; /* cards */
+  --card-elevated: #ffffff;
+
+  /* Ink (Monday's slate) */
+  --ink: #323338;
+  --ink-soft: #4b4e69;
+  --ink-mute: #676879;
+  --hair: rgba(50, 51, 56, 0.12);
+  --hair-soft: rgba(50, 51, 56, 0.07);
+
+  /* Brand — vivid blue primary, green accent, purple highlight */
+  --forest: #0073ea;
+  --forest-deep: #0060c0;
+  --sage: #00c875;
+  --sage-soft: #c3f3da;
+  --persimmon: #a25ddc;
+  --persimmon-deep: #7e4ec2;
+
+  /* Status — saturated (Monday's alert palette) */
+  --red: #e2445c;
+  --amber: #fdab3d;
+  --green: #00c875;
+
+  /* Allocation buckets — brighter, more distinct */
+  --b-training: #0073ea;
+  --b-coursedev: #00c875;
+  --b-admin: #676879;
+  --b-compliance: #fdab3d;
+  --b-pto: #a25ddc;
+
+  /* Direct-valued semantics that don't inherit from raw tokens */
+  --primary-foreground: #ffffff;
+  --highlight-foreground: #ffffff;
+  --input: rgba(50, 51, 56, 0.2);
+
+  /* Card shadows — cooler, slightly stronger on white */
+  --shadow-card: 0 1px 0 rgba(50, 51, 56, 0.04), 0 12px 28px -20px rgba(50, 51, 56, 0.22);
+  --shadow-card-hover: 0 1px 0 rgba(50, 51, 56, 0.06), 0 20px 40px -24px rgba(50, 51, 56, 0.32);
+  --shadow-hero: 0 1px 0 rgba(50, 51, 56, 0.04), 0 40px 90px -40px rgba(50, 51, 56, 0.32);
+
+  /* Capacity bands — brighter fills */
+  --capacity-green: #00c875;
+  --capacity-green-bg: rgba(0, 200, 117, 0.12);
+  --capacity-yellow: #fdab3d;
+  --capacity-yellow-bg: rgba(253, 171, 61, 0.16);
+  --capacity-red: #e2445c;
+  --capacity-red-bg: rgba(226, 68, 92, 0.12);
+
+  /* Status semantic colors */
+  --status-blue: #0073ea;
+  --status-blue-bg: rgba(0, 115, 234, 0.1);
+  --status-purple: #a25ddc;
+  --status-purple-bg: rgba(162, 93, 220, 0.1);
+  --status-gray: #676879;
+  --status-gray-bg: rgba(103, 104, 121, 0.1);
+}
+
 /* ── Tailwind v4 theme mapping ──────────────────────────────────────────── */
 
 @theme inline {

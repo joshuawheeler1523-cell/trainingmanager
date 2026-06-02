@@ -40,6 +40,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`${sourceSerif.variable} ${geist.variable} ${jetbrains.variable} h-full`}
     >
+      <head>
+        {/* Set the theme before first paint from the arbor_theme cookie so
+            there's no flash of the default palette. Tiny + synchronous; the
+            default (editorial) needs no attribute. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var m=document.cookie.match(/(?:^|; )arbor_theme=([^;]+)/);var t=m?decodeURIComponent(m[1]):'editorial';if(t&&t!=='editorial'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();",
+          }}
+        />
+      </head>
       <body className="bg-background text-foreground flex min-h-full flex-col antialiased">
         {children}
         <Toaster richColors closeButton position="top-right" />

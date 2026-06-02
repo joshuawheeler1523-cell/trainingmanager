@@ -9,6 +9,8 @@ import {
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import AccountForms from "./account-forms";
+import ThemeSwitcher from "./theme-switcher";
+import { coerceTheme } from "@/lib/theme";
 
 export const metadata = { title: "Account — Arbor" };
 
@@ -21,6 +23,7 @@ export default async function AccountPage() {
 
   const fullName = (user.user_metadata.full_name as string | undefined) ?? "";
   const email = user.email ?? "";
+  const theme = coerceTheme(user.user_metadata.theme);
 
   // Memberships across orgs + agencies the user belongs to. Helps the
   // user understand what they'll be removed from if they delete.
@@ -60,6 +63,9 @@ export default async function AccountPage() {
             }}
           />
         </Section>
+
+        {/* Appearance / theme */}
+        <ThemeSwitcher initial={theme} />
 
         {/* Password */}
         <Section icon={<KeyIcon className="h-5 w-5" />} title="Password">
