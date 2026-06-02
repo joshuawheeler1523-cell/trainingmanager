@@ -2,9 +2,12 @@
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import Link from "next/link";
-import { UserCircleIcon } from "@heroicons/react/24/outline";
+import { useEffect, useState } from "react";
+import { UserCircleIcon, SwatchIcon } from "@heroicons/react/24/outline";
 import { logout } from "@/app/(authenticated)/actions";
+import { setThemeAction } from "@/app/(authenticated)/account/profile-actions";
 import { useCurrentRole, Label } from "@/components/labels";
+import { THEME_LABELS, type Theme } from "@/lib/theme";
 
 type Props = {
   email: string;
@@ -14,6 +17,21 @@ type Props = {
 
 export default function ProfileMenu({ email, name, isAdmin }: Props) {
   const role = useCurrentRole();
+  const [theme, setThemeState] = useState<Theme>("editorial");
+  useEffect(() => {
+    setThemeState(
+      document.documentElement.getAttribute("data-theme") === "bright" ? "bright" : "editorial",
+    );
+  }, []);
+  const nextTheme: Theme = theme === "bright" ? "editorial" : "bright";
+
+  function toggleTheme() {
+    const root = document.documentElement;
+    if (nextTheme === "editorial") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", nextTheme);
+    setThemeState(nextTheme);
+    void setThemeAction(nextTheme);
+  }
 
   return (
     <DropdownMenu.Root>
@@ -47,6 +65,15 @@ export default function ProfileMenu({ email, name, isAdmin }: Props) {
               </p>
             )}
           </div>
+
+          <DropdownMenu.Item asChild>
+            <Link
+              href="/account"
+              className="text-foreground hover:bg-surface focus:bg-surface flex cursor-pointer items-center rounded-md px-3 py-1.5 text-sm outline-none"
+            >
+              Account &amp; appearance
+            </Link>
+          </DropdownMenu.Item>
 
           <DropdownMenu.Item asChild>
             <Link
@@ -87,6 +114,20 @@ export default function ProfileMenu({ email, name, isAdmin }: Props) {
             >
               Set Password
             </Link>
+          </DropdownMenu.Item>
+
+          <DropdownMenu.Separator className="bg-border my-1 h-px" />
+
+          <DropdownMenu.Item
+            onSelect={(e) => {
+              // Keep the menu open so the label flips and they can toggle back.
+              e.preventDefault();
+              toggleTheme();
+            }}
+            className="text-foreground hover:bg-surface focus:bg-surface flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-sm outline-none"
+          >
+            <SwatchIcon className="h-4 w-4" />
+            Switch to {THEME_LABELS[nextTheme]} theme
           </DropdownMenu.Item>
 
           <DropdownMenu.Separator className="bg-border my-1 h-px" />
