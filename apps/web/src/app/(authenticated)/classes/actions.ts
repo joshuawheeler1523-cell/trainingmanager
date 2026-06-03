@@ -349,6 +349,7 @@ const csvClassSchema = z
   .object({
     name: z.string().trim().min(1, "name is required").max(200),
     description: csvOptionalString,
+    module: csvOptionalString,
     is_multi_day: csvBool,
     total_days: csvIntOr(1).pipe(z.number().int().min(1)),
     hours_per_day: csvNumberOr(0).pipe(z.number().min(0)),
@@ -424,6 +425,34 @@ export async function importClassesCsv(rawRows: unknown): Promise<ActionResult<I
     if (!idByLowerName.has(key)) idByLowerName.set(key, c.id);
   }
 
+  // Modules referenced by the `module` column are resolved by name (case-
+  // insensitive) and auto-created on first sight, so an import can introduce
+  // new modules inline without a separate step.
+  const { data: existingModules } = await supabase
+    .from("class_modules")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .is("deleted_at", null);
+  const moduleIdByLowerName = new Map<string, string>();
+  for (const m of existingModules ?? []) {
+    const key = m.name.toLowerCase();
+    if (!moduleIdByLowerName.has(key)) moduleIdByLowerName.set(key, m.id);
+  }
+  const resolvedOrgId = orgId;
+  async function resolveModuleId(name: string | null): Promise<string | null> {
+    if (!name) return null;
+    const key = name.toLowerCase();
+    const existingId = moduleIdByLowerName.get(key);
+    if (existingId) return existingId;
+    const { data: created } = await supabase
+      .from("class_modules")
+      .insert({ org_id: resolvedOrgId, name })
+      .select("id")
+      .single();
+    if (created) moduleIdByLowerName.set(key, created.id);
+    return created?.id ?? null;
+  }
+
   const results: ImportRowResult[] = [];
   let created = 0;
   let updated = 0;
@@ -443,6 +472,7 @@ export async function importClassesCsv(rawRows: unknown): Promise<ActionResult<I
     }
     const data = parsed.data;
     const existingId = idByLowerName.get(data.name.toLowerCase());
+    const moduleId = await resolveModuleId(data.module);
 
     if (existingId) {
       const { error } = await supabase
@@ -450,6 +480,7 @@ export async function importClassesCsv(rawRows: unknown): Promise<ActionResult<I
         .update({
           name: data.name,
           description: data.description,
+          module_id: moduleId,
           is_multi_day: data.is_multi_day,
           total_days: data.total_days,
           hours_per_day: data.hours_per_day,
@@ -476,6 +507,7 @@ export async function importClassesCsv(rawRows: unknown): Promise<ActionResult<I
           department_id: departmentId,
           name: data.name,
           description: data.description,
+          module_id: moduleId,
           is_multi_day: data.is_multi_day,
           total_days: data.total_days,
           hours_per_day: data.hours_per_day,

@@ -38,6 +38,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
     { data: qualified },
     { data: roadmapSteps },
     { data: superUsers },
+    { data: moduleRows },
   ] = await Promise.all([
     supabase.from("classes_with_hours").select("*").eq("id", id).eq("org_id", orgId).maybeSingle(),
     supabase
@@ -82,6 +83,12 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       .eq("org_id", orgId)
       .is("deleted_at", null)
       .order("full_name"),
+    supabase
+      .from("class_modules")
+      .select("*")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .order("name"),
   ]);
 
   if (!cls) notFound();
@@ -97,6 +104,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       qualifiedInstructorCount={qualified?.length ?? 0}
       roadmapSteps={(roadmapSteps ?? []) as RoadmapStep[]}
       superUsers={superUsers ?? []}
+      modules={moduleRows ?? []}
     />
   );
 }

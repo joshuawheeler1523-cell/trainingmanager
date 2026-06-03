@@ -32,7 +32,12 @@ async function ClassContent({ searchParams }: { searchParams: SearchParams }) {
     classQuery = classQuery.is("deleted_at", null);
   }
 
-  const [{ data: classes }, { data: instructors }, { data: requirementRows }] = await Promise.all([
+  const [
+    { data: classes },
+    { data: instructors },
+    { data: requirementRows },
+    { data: moduleRows },
+  ] = await Promise.all([
     classQuery,
     supabase
       .from("instructors")
@@ -47,6 +52,12 @@ async function ClassContent({ searchParams }: { searchParams: SearchParams }) {
       .select("class_id")
       .eq("org_id", orgId)
       .eq("requirement", "required"),
+    supabase
+      .from("class_modules")
+      .select("*")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .order("name"),
   ]);
 
   // Coverage warnings: a class is under-covered when 0 or 1 active
@@ -81,6 +92,7 @@ async function ClassContent({ searchParams }: { searchParams: SearchParams }) {
     <ClassesView
       classes={classList}
       instructors={(instructors ?? []) as Instructor[]}
+      modules={moduleRows ?? []}
       showDeleted={showDeleted}
       recommendations={recommendations}
     />

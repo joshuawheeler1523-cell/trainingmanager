@@ -7,9 +7,10 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import { classInputSchema } from "@arbor/shared";
-import type { Class, ClassInput, Instructor } from "@arbor/shared";
+import type { Class, ClassInput, ClassModule, Instructor } from "@arbor/shared";
 import { useLabel } from "@/components/labels";
 import { createClass, updateClass, assignInstructorToClass } from "./actions";
+import { createClassModule } from "./modules/actions";
 import { ReadOnlyBanner, useFormReadOnly } from "@/components/auth/read-only-context";
 
 // Frequency presets that auto-fill offerings_per_year. Numbers reflect
@@ -40,11 +41,13 @@ type CreateProps = {
   mode: "create";
   trigger: React.ReactNode;
   instructors: Instructor[];
+  modules: ClassModule[];
   onSuccess?: (c: Class) => void;
 };
 type EditProps = {
   mode: "edit";
   cls: Class;
+  modules: ClassModule[];
   trigger: React.ReactNode;
   onSuccess?: (c: Class) => void;
 };
@@ -75,12 +78,113 @@ type AssignmentDraft = {
   offerings: number;
 };
 
+function ModuleField({
+  control,
+  setValue,
+  modules,
+}: {
+  control: ReturnType<typeof useForm<ClassInput>>["control"];
+  setValue: ReturnType<typeof useForm<ClassInput>>["setValue"];
+  modules: ClassModule[];
+}) {
+  const selected = useWatch({ control, name: "module_id" }) ?? "";
+  const [list, setList] = useState(modules);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function handleCreate() {
+    const name = newName.trim();
+    if (!name) return;
+    setSaving(true);
+    const result = await createClassModule({ name });
+    setSaving(false);
+    if (!result.ok) {
+      toast.error(result.error.message);
+      return;
+    }
+    setList((l) => [...l, result.data].sort((a, b) => a.name.localeCompare(b.name)));
+    setValue("module_id", result.data.id, { shouldDirty: true });
+    setNewName("");
+    setCreating(false);
+  }
+
+  return (
+    <div>
+      <Label htmlFor="module_id">Module</Label>
+      {creating ? (
+        <div className="flex gap-2">
+          <input
+            autoFocus
+            value={newName}
+            onChange={(e) => {
+              setNewName(e.target.value);
+            }}
+            placeholder="New module name…"
+            className={inputCls()}
+          />
+          <button
+            type="button"
+            disabled={saving || !newName.trim()}
+            onClick={() => {
+              void handleCreate();
+            }}
+            className="bg-primary text-primary-foreground shrink-0 rounded-md px-3 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
+          >
+            {saving ? "Adding…" : "Add"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCreating(false);
+              setNewName("");
+            }}
+            className="border-border text-foreground hover:bg-surface shrink-0 rounded-md border px-3 py-2 text-sm font-medium"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <select
+          id="module_id"
+          value={selected}
+          onChange={(e) => {
+            if (e.target.value === "__new__") {
+              setCreating(true);
+              return;
+            }
+            setValue("module_id", e.target.value, { shouldDirty: true });
+          }}
+          className={inputCls()}
+        >
+          <option value="">No module</option>
+          {list.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+          <option value="__new__">+ New module…</option>
+        </select>
+      )}
+      <p className="text-muted-foreground mt-1 text-xs">
+        Optional. Group related classes (e.g. an onboarding track) under a module.
+      </p>
+    </div>
+  );
+}
+
 function StepBasic({
   register,
+  control,
+  setValue,
   errors,
+  modules,
 }: {
   register: ReturnType<typeof useForm<ClassInput>>["register"];
+  control: ReturnType<typeof useForm<ClassInput>>["control"];
+  setValue: ReturnType<typeof useForm<ClassInput>>["setValue"];
   errors: Record<string, { message?: string } | undefined>;
+  modules: ClassModule[];
 }) {
   return (
     <div className="space-y-4">
@@ -104,6 +208,7 @@ function StepBasic({
           placeholder="Optional description…"
         />
       </div>
+      <ModuleField control={control} setValue={setValue} modules={modules} />
       <div>
         <Label htmlFor="status">Status</Label>
         <select id="status" {...register("status")} className={inputCls()}>
@@ -428,6 +533,7 @@ export default function ClassFormDialog(props: Props) {
         name: props.cls.name,
         description: props.cls.description ?? "",
         allocation_bucket_id: props.cls.allocation_bucket_id ?? "",
+        module_id: props.cls.module_id ?? "",
         is_multi_day: props.cls.is_multi_day,
         total_days: props.cls.total_days,
         ...(props.cls.hours_per_day != null ? { hours_per_day: props.cls.hours_per_day } : {}),
@@ -442,6 +548,7 @@ export default function ClassFormDialog(props: Props) {
     : {
         name: "",
         description: "",
+        module_id: "",
         is_multi_day: false,
         total_days: 1,
         offerings_per_year: 0,
@@ -552,7 +659,15 @@ export default function ClassFormDialog(props: Props) {
             }}
             className="space-y-4"
           >
-            {(isEdit || step === 0) && <StepBasic register={register} errors={errors} />}
+            {(isEdit || step === 0) && (
+              <StepBasic
+                register={register}
+                control={control}
+                setValue={setValue}
+                errors={errors}
+                modules={props.modules}
+              />
+            )}
             {(isEdit || step === 1) && (
               <StepTime control={control} register={register} setValue={setValue} errors={errors} />
             )}

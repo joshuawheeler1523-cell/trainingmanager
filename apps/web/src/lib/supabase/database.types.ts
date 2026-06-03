@@ -766,6 +766,53 @@ export type Database = {
           },
         ];
       };
+      class_modules: {
+        Row: {
+          color: string | null;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          description: string | null;
+          id: string;
+          name: string;
+          org_id: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          color?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          id?: string;
+          name: string;
+          org_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          color?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          id?: string;
+          name?: string;
+          org_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "class_modules_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       class_roadmap_steps: {
         Row: {
           class_id: string;
@@ -928,6 +975,7 @@ export type Database = {
           id: string;
           is_multi_day: boolean;
           logistics_hours_per_offering: number;
+          module_id: string | null;
           name: string;
           offerings_per_year: number;
           org_id: string;
@@ -950,6 +998,7 @@ export type Database = {
           id?: string;
           is_multi_day?: boolean;
           logistics_hours_per_offering?: number;
+          module_id?: string | null;
           name: string;
           offerings_per_year?: number;
           org_id: string;
@@ -972,6 +1021,7 @@ export type Database = {
           id?: string;
           is_multi_day?: boolean;
           logistics_hours_per_offering?: number;
+          module_id?: string | null;
           name?: string;
           offerings_per_year?: number;
           org_id?: string;
@@ -995,6 +1045,13 @@ export type Database = {
             columns: ["department_id"];
             isOneToOne: false;
             referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "classes_module_id_fkey";
+            columns: ["module_id"];
+            isOneToOne: false;
+            referencedRelation: "class_modules";
             referencedColumns: ["id"];
           },
           {
@@ -5696,12 +5753,14 @@ export type Database = {
           created_by: string | null;
           custom_day_hours: number[] | null;
           deleted_at: string | null;
+          department_id: string | null;
           description: string | null;
           hours_per_day: number | null;
           id: string | null;
           instruction_hours_per_offering: number | null;
           is_multi_day: boolean | null;
           logistics_hours_per_offering: number | null;
+          module_id: string | null;
           name: string | null;
           offerings_per_year: number | null;
           org_id: string | null;
@@ -5720,12 +5779,14 @@ export type Database = {
           created_by?: string | null;
           custom_day_hours?: number[] | null;
           deleted_at?: string | null;
+          department_id?: string | null;
           description?: string | null;
           hours_per_day?: number | null;
           id?: string | null;
           instruction_hours_per_offering?: never;
           is_multi_day?: boolean | null;
           logistics_hours_per_offering?: number | null;
+          module_id?: string | null;
           name?: string | null;
           offerings_per_year?: number | null;
           org_id?: string | null;
@@ -5744,12 +5805,14 @@ export type Database = {
           created_by?: string | null;
           custom_day_hours?: number[] | null;
           deleted_at?: string | null;
+          department_id?: string | null;
           description?: string | null;
           hours_per_day?: number | null;
           id?: string | null;
           instruction_hours_per_offering?: never;
           is_multi_day?: boolean | null;
           logistics_hours_per_offering?: number | null;
+          module_id?: string | null;
           name?: string | null;
           offerings_per_year?: number | null;
           org_id?: string | null;
@@ -5767,6 +5830,20 @@ export type Database = {
             columns: ["allocation_bucket_id"];
             isOneToOne: false;
             referencedRelation: "allocation_buckets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "classes_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "classes_module_id_fkey";
+            columns: ["module_id"];
+            isOneToOne: false;
+            referencedRelation: "class_modules";
             referencedColumns: ["id"];
           },
           {
