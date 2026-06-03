@@ -57,7 +57,8 @@ export type DiagnosisBottleneck =
   | "no_eligible_room" // no room passes seat / equipment filter
   | "room_capacity" // eligible rooms saturated — forced demand > pool hours, no smaller-room fallback
   | "trainer_capacity" // slate hours < hours this class needs
-  | "room_busy_or_window"; // resources exist but the search couldn't find clean slots
+  | "room_busy_or_window" // resources exist but the search couldn't find clean slots
+  | "day_length"; // no room-day window can fit one session + its lunch — a fit problem, not contention
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -950,6 +951,56 @@ function placedHoursInRooms(roomIds: Set<string>, placements: Placement[]): numb
   return total;
 }
 
+/** Largest contiguous instruction block (hours) that ANY eligible room-day can
+ *  fit for this class, using the SAME day-window + lunch arithmetic as
+ *  precomputeSlotsForClass. When this is < hours_per_session, NO (room, day,
+ *  start) slot can exist on any day — a *fit* problem (the session is too long
+ *  for the open day once lunch is accounted for), not contention. Adding rooms
+ *  or extending the window cannot help in that case. */
+function maxFittableInstructionHours(cls: ImplClass, input: SolverInput): number {
+  const lunchActive = input.lunchBreakLengthMinutes > 0;
+  const lunchStartHr = input.lunchBreakStartMinutes / 60;
+  const lunchLengthHr = input.lunchBreakLengthMinutes / 60;
+  const lunchEndHr = lunchStartHr + lunchLengthHr;
+  const bizStartHr = input.businessHoursStartLocal;
+  const bizEndHr = input.businessHoursEndLocal;
+
+  let best = 0;
+  for (const room of input.rooms) {
+    if (
+      room.seat_capacity < cls.expected_learners_per_session ||
+      !tagSubset(cls.required_equipment_tags, room.equipment_tags)
+    ) {
+      continue;
+    }
+
+    // Identical dayEnd math to precomputeSlotsForClass: the +lunch add-back is
+    // clamped by business-hours end, which is exactly what bites long sessions.
+    let dayEnd = room.start_hour_local + room.available_hours_per_day;
+    if (
+      lunchActive &&
+      lunchStartHr >= room.start_hour_local &&
+      lunchStartHr < room.start_hour_local + room.available_hours_per_day
+    ) {
+      dayEnd += lunchLengthHr;
+    }
+    dayEnd = Math.min(dayEnd, bizEndHr);
+    const roomStartHr = Math.max(room.start_hour_local, bizStartHr);
+    if (dayEnd <= roomStartHr) continue;
+
+    if (lunchActive && lunchStartHr > roomStartHr && lunchStartHr < dayEnd) {
+      // Three placements: end before lunch, start after lunch, or straddle it
+      // (the solver allows straddling when instruction + lunch fits the day).
+      best = Math.max(best, lunchStartHr - roomStartHr);
+      best = Math.max(best, dayEnd - lunchEndHr);
+      best = Math.max(best, dayEnd - lunchLengthHr - roomStartHr);
+    } else {
+      best = Math.max(best, dayEnd - roomStartHr);
+    }
+  }
+  return best;
+}
+
 function buildDiagnoses(
   gaps: Gap[],
   input: SolverInput,
@@ -1026,6 +1077,36 @@ function buildDiagnoses(
         recommendedFix = `No room can host "${cls.name}" — review room day-of-week availability and the implementation window.`;
       }
     } else {
+      // ── Day-length (fit) pre-check ──
+      // Before weighing contention, ask the question the ratio math can't: does
+      // ONE session even fit inside ONE room-day once the lunch break is
+      // accounted for? When it can't, zero sessions ever place, which drives
+      // both ratios below threshold and dumps us into the room_busy_or_window
+      // catch-all — telling the manager to "add a room / extend the window",
+      // neither of which can help. Pure time-geometry: e.g. an 8h session plus a
+      // straddled 1h lunch needs a 9h-wide day, but a 9:00–17:00 room offers 8h.
+      const maxFit = maxFittableInstructionHours(cls, input);
+      if (maxFit + 1e-9 < cls.hours_per_session) {
+        const lunchMins = input.lunchBreakLengthMinutes;
+        const lunchClause =
+          lunchMins > 0
+            ? ` (a session overlapping the ${lunchMins.toString()}-min lunch needs that much extra wall-clock time)`
+            : "";
+        diagnoses.push({
+          classId,
+          className: cls.name,
+          unplacedSessions: unplaced,
+          bottleneck: "day_length",
+          assignedTrainers,
+          eligibleRoomCount: eligibleRooms.length,
+          requiredSeats,
+          requiredEquipment,
+          hoursNeeded,
+          recommendedFix: `"${cls.name}" runs ${cls.hours_per_session.toString()}h, but no room's open day is long enough to hold one session${lunchClause} — the longest block any eligible room offers is ${maxFit.toFixed(1)}h. Adding rooms or extending the window won't help. Instead: lengthen the room day (raise its available hours/day or the business-hours end), open rooms earlier so the session ends before close, move or shorten the lunch break, or split "${cls.name}" into shorter sessions.`,
+        });
+        continue;
+      }
+
       // ── Slate (trainer) capacity math ──
       const slateIdSet = new Set(slateIds);
       const slateCap = slateTrainers.reduce(

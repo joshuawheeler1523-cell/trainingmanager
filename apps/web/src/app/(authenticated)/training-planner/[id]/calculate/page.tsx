@@ -366,6 +366,8 @@ function bottleneckLabel(b: ClassDiagnosis["bottleneck"]): string {
       return "trainer hours";
     case "room_busy_or_window":
       return "room / window";
+    case "day_length":
+      return "day too short";
   }
 }
 

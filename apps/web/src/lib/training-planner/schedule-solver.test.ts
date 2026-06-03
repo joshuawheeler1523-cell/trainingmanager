@@ -592,6 +592,46 @@ function localToUtc(date: string, hour: number, tz: string): string {
   return new Date(guess).toISOString();
 }
 
+// Regression: the "Community Connect" misdiagnosis. An 8h session cannot fit a
+// 9:00–17:00 room once a noon lunch is inserted (8h instruction + 1h straddled
+// lunch = 9h > the 8h day). The failure must be diagnosed as a day-length FIT
+// problem — not "rooms are fully booked, add a room / extend the window".
+describe("solve - day-length (fit) diagnosis", () => {
+  const dayLengthInput = (hoursPerSession: number) =>
+    makeInput({
+      businessHoursStartLocal: 8,
+      businessHoursEndLocal: 17,
+      lunchBreakStartMinutes: 720, // 12:00
+      lunchBreakLengthMinutes: 60, // 12:00–13:00
+      rooms: [makeRoom({ start_hour_local: 9, available_hours_per_day: 8, seat_capacity: 12 })],
+      classes: [
+        makeClass({
+          hours_per_session: hoursPerSession,
+          expected_learners_per_session: 12,
+          total_people_to_train: 12, // one session
+        }),
+      ],
+    });
+
+  it("flags an 8h session in a 9–5 room with lunch as day_length, not room/window", () => {
+    const result = solve(dayLengthInput(8));
+    expect(result.placements).toHaveLength(0);
+    expect(result.gaps.length).toBeGreaterThan(0);
+    expect(result.diagnoses).toHaveLength(1);
+    const d = result.diagnoses[0];
+    expect(d?.bottleneck).toBe("day_length");
+    expect(d?.bottleneck).not.toBe("room_busy_or_window");
+    expect(d?.recommendedFix).toMatch(/Adding rooms or extending the window/);
+  });
+
+  it("does NOT flag a 6h session that still fits via a lunch-straddling start", () => {
+    const result = solve(dayLengthInput(6));
+    expect(result.placements).toHaveLength(1);
+    expect(result.gaps).toHaveLength(0);
+    expect(result.diagnoses).toHaveLength(0);
+  });
+});
+
 // Used in tests but not exported — silence "unused import" without forcing a
 // type compatibility check on a bare empty literal.
 void (undefined as unknown as ClassTrainerLink);
