@@ -238,7 +238,7 @@ function SidebarContent({
 
   return (
     <>
-      <div className="border-border flex h-16 shrink-0 items-center border-b px-4">
+      <div className="border-border flex h-24 shrink-0 items-center border-b px-3">
         <Link
           href="/dashboard"
           aria-label="Arbor home"
@@ -248,12 +248,12 @@ function SidebarContent({
           }}
         >
           <Image
-            src="/branding/arbor-mark.png"
-            alt="Arbor"
-            width={180}
-            height={180}
+            src="/branding/arbor-logo-full.png"
+            alt="Arbor — Training Resource Management"
+            width={1024}
+            height={399}
             priority
-            className="h-12 w-auto"
+            className="h-[72px] w-auto"
           />
         </Link>
       </div>
