@@ -3,7 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import TraPdf from "@/components/pdf/tra-pdf";
-import type { Tra } from "@arbor/shared";
+import type { Tra, TraApproval, TraEvaluationPlan, TraSuccessCriteria } from "@arbor/shared";
 
 // GET /api/tras/[id]/pdf — generates a PDF for the TRA on demand and streams
 // it back as application/pdf. Auth is enforced via Supabase RLS (the cookie-
@@ -20,19 +20,36 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  const [{ data: tra }, { data: deliverables }, { data: types }, { data: org }] = await Promise.all(
-    [
-      supabase.from("tras").select("*").eq("id", id).eq("org_id", orgId).maybeSingle(),
-      supabase
-        .from("tra_deliverables")
-        .select("*")
-        .eq("tra_id", id)
-        .eq("org_id", orgId)
-        .order("created_at"),
-      supabase.from("deliverable_types").select("*").or(`org_id.eq.${orgId},org_id.is.null`),
-      supabase.from("organizations").select("name").eq("id", orgId).maybeSingle(),
-    ],
-  );
+  const scoped = <T extends { eq: (c: string, v: string) => T }>(q: T): T =>
+    q.eq("tra_id", id).eq("org_id", orgId);
+
+  const [
+    { data: tra },
+    { data: deliverables },
+    { data: types },
+    { data: org },
+    { data: stakeholders },
+    { data: audienceRoles },
+    { data: kpis },
+    { data: successCriteria },
+    { data: objectives },
+    { data: smes },
+    { data: evaluationPlan },
+    { data: approvals },
+  ] = await Promise.all([
+    supabase.from("tras").select("*").eq("id", id).eq("org_id", orgId).maybeSingle(),
+    scoped(supabase.from("tra_deliverables").select("*")).order("created_at"),
+    supabase.from("deliverable_types").select("*").or(`org_id.eq.${orgId},org_id.is.null`),
+    supabase.from("organizations").select("name").eq("id", orgId).maybeSingle(),
+    scoped(supabase.from("tra_stakeholders").select("*")).order("position"),
+    scoped(supabase.from("tra_audience_roles").select("*")).order("position"),
+    scoped(supabase.from("tra_kpis").select("*")).order("position"),
+    scoped(supabase.from("tra_success_criteria").select("*")).order("created_at"),
+    scoped(supabase.from("tra_objectives").select("*")).order("position"),
+    scoped(supabase.from("tra_smes").select("*")).order("position"),
+    scoped(supabase.from("tra_evaluation_plan").select("*")).order("created_at"),
+    scoped(supabase.from("tra_approvals").select("*")).order("created_at"),
+  ]);
 
   if (!tra) {
     return new NextResponse("Not Found", { status: 404 });
@@ -44,6 +61,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       tra: tra as Tra,
       deliverables: deliverables ?? [],
       deliverableTypes: types ?? [],
+      stakeholders: stakeholders ?? [],
+      audienceRoles: audienceRoles ?? [],
+      kpis: kpis ?? [],
+      // These three carry enum columns that the generated row types widen to
+      // string/number, so a narrowing cast is required.
+      successCriteria: (successCriteria ?? []) as TraSuccessCriteria[],
+      objectives: objectives ?? [],
+      smes: smes ?? [],
+      evaluationPlan: (evaluationPlan ?? []) as TraEvaluationPlan[],
+      approvals: (approvals ?? []) as TraApproval[],
     }),
   );
 

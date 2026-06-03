@@ -660,7 +660,18 @@ export default function ClassFormDialog(props: Props) {
 
           <form
             onSubmit={(e) => {
-              void handleSubmit(onSubmit)(e);
+              // Surface validation failures: without an onInvalid handler a bad
+              // field (e.g. one with no inline error rendered) silently blocks
+              // submit, so the dialog appears to "do nothing" and never closes.
+              void handleSubmit(onSubmit, (errs) => {
+                const first = Object.values(errs)[0];
+                const msg = first?.message;
+                toast.error(
+                  typeof msg === "string" && msg
+                    ? msg
+                    : "Please fix the highlighted fields before saving.",
+                );
+              })(e);
             }}
             className="space-y-4"
           >
