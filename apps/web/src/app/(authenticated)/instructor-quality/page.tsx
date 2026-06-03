@@ -127,8 +127,16 @@ export default async function InstructorQualityPage() {
         let linkOut: DeliverableRow["link"] = null;
         if (link) {
           const url = `${origin}/feedback/${link.token}`;
-          const qr = origin ? await QRCode.toDataURL(url, { margin: 1, width: 220 }) : "";
-          linkOut = { id: link.id, token: link.token, isActive: link.is_active, url, qr };
+          // PNG at print resolution (also scaled down for the on-card thumbnail)
+          // for clipboard/copy-paste; SVG is vector so it stays crisp pasted onto
+          // an outside deliverable at any size.
+          const [qr, svg] = origin
+            ? await Promise.all([
+                QRCode.toDataURL(url, { margin: 1, width: 512 }),
+                QRCode.toString(url, { type: "svg", margin: 1 }),
+              ])
+            : ["", ""];
+          linkOut = { id: link.id, token: link.token, isActive: link.is_active, url, qr, svg };
         }
         return {
           key: d.key,

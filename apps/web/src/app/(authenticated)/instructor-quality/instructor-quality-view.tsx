@@ -8,6 +8,8 @@ import {
   PlusIcon,
   ClipboardDocumentIcon,
   PrinterIcon,
+  PhotoIcon,
+  ArrowDownTrayIcon,
 } from "@heroicons/react/20/solid";
 import { generateFeedbackLink, recordQualityScore, setFeedbackLinkActive } from "./actions";
 import InstructorQualityScorecard from "@/components/instructor-quality-scorecard";
@@ -27,7 +29,14 @@ export type DeliverableRow = {
   departmentId: string;
   label: string;
   instructorNames: string[];
-  link: { id: string; token: string; isActive: boolean; url: string; qr: string } | null;
+  link: {
+    id: string;
+    token: string;
+    isActive: boolean;
+    url: string;
+    qr: string;
+    svg: string;
+  } | null;
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -353,6 +362,15 @@ function DeliverableCard({ row }: { row: DeliverableRow }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
+  const [imgResult, setImgResult] = useState<"" | "copied" | "downloaded">("");
+  const [announce, setAnnounce] = useState("");
+
+  function say(message: string) {
+    setAnnounce(message);
+    setTimeout(() => {
+      setAnnounce("");
+    }, 2000);
+  }
 
   function generate() {
     startTransition(async () => {
@@ -382,11 +400,61 @@ function DeliverableCard({ row }: { row: DeliverableRow }) {
     setTimeout(() => {
       setCopied(false);
     }, 1500);
+    say("Feedback link copied");
+  }
+
+  // Copy the QR image itself to the clipboard so it can be pasted straight onto
+  // an outside deliverable (slide, doc, email). Construct the ClipboardItem with
+  // a Blob promise — Safari requires the value resolve within the user gesture.
+  // Where the async Clipboard API is unavailable (or rejects) we fall back to a
+  // PNG download and say so, so the button feedback always matches what happened.
+  async function copyImage() {
+    const link = row.link;
+    if (!link || !link.qr) return;
+    try {
+      if (typeof ClipboardItem !== "undefined") {
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": fetch(link.qr).then((r) => r.blob()) }),
+        ]);
+        setImgResult("copied");
+        setTimeout(() => {
+          setImgResult("");
+        }, 1500);
+        say("QR image copied to clipboard");
+        return;
+      }
+    } catch {
+      // fall through to download
+    }
+    triggerDownload(link.qr, qrFilename(row.label, link.token, "png"));
+    setImgResult("downloaded");
+    setTimeout(() => {
+      setImgResult("");
+    }, 1500);
+    say("Clipboard unavailable — saved a PNG to your downloads");
+  }
+
+  function downloadPng() {
+    const link = row.link;
+    if (!link || !link.qr) return;
+    triggerDownload(link.qr, qrFilename(row.label, link.token, "png"));
+    say("PNG downloaded");
+  }
+
+  function downloadSvg() {
+    const link = row.link;
+    if (!link || !link.svg) return;
+    const blobUrl = URL.createObjectURL(new Blob([link.svg], { type: "image/svg+xml" }));
+    triggerDownload(blobUrl, qrFilename(row.label, link.token, "svg"));
+    setTimeout(() => {
+      URL.revokeObjectURL(blobUrl);
+    }, 1000);
+    say("SVG downloaded");
   }
 
   function print() {
     const link = row.link;
-    if (!link) return;
+    if (!link || !link.qr) return;
     const w = window.open("", "_blank", "width=480,height=640");
     if (!w) return;
     w.document.title = row.label;
@@ -411,30 +479,76 @@ function DeliverableCard({ row }: { row: DeliverableRow }) {
         </p>
         {row.link ? (
           <div className="mt-3 space-y-2">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {row.link.qr && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void copyImage();
+                  }}
+                  className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium"
+                  title="Copy the QR image to paste onto a slide, doc, or flyer"
+                >
+                  <PhotoIcon className="h-3.5 w-3.5" />
+                  {imgResult === "copied"
+                    ? "Copied!"
+                    : imgResult === "downloaded"
+                      ? "Saved PNG"
+                      : "Copy image"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={copy}
                 className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                title="Copy the feedback URL"
               >
                 <ClipboardDocumentIcon className="h-3.5 w-3.5" />
                 {copied ? "Copied!" : "Copy link"}
               </button>
-              <button
-                type="button"
-                onClick={print}
-                className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
-              >
-                <PrinterIcon className="h-3.5 w-3.5" />
-                Print
-              </button>
+              {row.link.qr && (
+                <>
+                  <button
+                    type="button"
+                    onClick={downloadPng}
+                    className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                    title="Download a PNG image"
+                  >
+                    <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                    PNG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={downloadSvg}
+                    className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                    title="Download a vector SVG — stays sharp at any print size"
+                  >
+                    <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                    SVG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={print}
+                    className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                    title="Open a printable QR card"
+                  >
+                    <PrinterIcon className="h-3.5 w-3.5" />
+                    Print
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 disabled={pending}
                 onClick={() => {
                   toggleActive(!row.link?.isActive);
                 }}
-                className="text-muted-foreground hover:text-foreground inline-flex items-center px-1 py-1 text-xs"
+                className="text-muted-foreground hover:text-foreground ml-auto inline-flex items-center px-1 py-1 text-xs"
+                title={
+                  row.link.isActive
+                    ? "Stop collecting feedback for this deliverable"
+                    : "Resume collecting feedback"
+                }
               >
                 {row.link.isActive ? "Deactivate" : "Reactivate"}
               </button>
@@ -442,6 +556,9 @@ function DeliverableCard({ row }: { row: DeliverableRow }) {
             {!row.link.isActive && (
               <p className="text-warning text-xs">Inactive — not collecting.</p>
             )}
+            <span aria-live="polite" className="sr-only">
+              {announce}
+            </span>
           </div>
         ) : (
           <button
@@ -467,6 +584,31 @@ function DeliverableCard({ row }: { row: DeliverableRow }) {
       )}
     </div>
   );
+}
+
+function triggerDownload(href: string, filename: string): void {
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function slugify(s: string): string {
+  return (
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "code"
+  );
+}
+
+// Always append a short token hash so non-Latin or duplicate labels (which
+// slugify down to the same "code") still produce unique, traceable filenames.
+function qrFilename(label: string, token: string, ext: string): string {
+  return `feedback-qr-${slugify(label)}-${token.slice(0, 6)}.${ext}`;
 }
 
 function escapeHtml(s: string): string {
