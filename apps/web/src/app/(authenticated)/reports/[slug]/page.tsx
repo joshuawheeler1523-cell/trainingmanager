@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeftIcon } from "@heroicons/react/20/solid";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import { REPORT_METADATA, REPORT_SLUGS, type ReportSlug, type SavedReport } from "@arbor/shared";
 import ReportRunner from "./report-runner";
 
@@ -24,21 +25,31 @@ export default async function ReportSlugPage({
   const sp = await searchParams;
   const savedId = sp.saved;
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
   if (!orgId) notFound();
 
   // Fetch shared filter data — buckets and instructors are used by multiple
   // filter panes, so we hand them in once.
   const [{ data: buckets }, { data: instructors }, savedRes] = await Promise.all([
-    supabase.from("allocation_buckets").select("id, name").eq("org_id", orgId).order("name"),
-    supabase
-      .from("instructors")
-      .select("id, full_name")
-      .eq("org_id", orgId)
-      .eq("is_external", false)
-      .is("deleted_at", null)
-      .eq("status", "active")
-      .order("full_name"),
+    applyDeptScope(
+      supabase.from("allocation_buckets").select("id, name").eq("org_id", orgId).order("name"),
+      scope,
+    ),
+    applyDeptScope(
+      supabase
+        .from("instructors")
+        .select("id, full_name")
+        .eq("org_id", orgId)
+        .eq("is_external", false)
+        .is("deleted_at", null)
+        .eq("status", "active")
+        .order("full_name"),
+      scope,
+    ),
     savedId
       ? supabase
           .from("saved_reports")

@@ -4,7 +4,7 @@ import {
   type AllocationReportFilters,
   type WorkloadRow,
 } from "@arbor/shared";
-import type { TypedSupabase } from "./types";
+import { scopeDept, type TypedSupabase } from "./types";
 
 // Resource Allocation Summary (User Guide §12.2):
 //   - hours by bucket vs target % (from global_allocations)
@@ -17,6 +17,7 @@ import type { TypedSupabase } from "./types";
 export async function queryAllocationReport(
   supabase: TypedSupabase,
   orgId: string,
+  departmentId: string | null,
   filters: AllocationReportFilters,
 ): Promise<AllocationDataset> {
   const [
@@ -28,26 +29,41 @@ export async function queryAllocationReport(
     { data: projectTasks },
     { data: projects },
   ] = await Promise.all([
-    supabase.from("v_instructor_workload").select("*").eq("org_id", orgId),
-    supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId),
-    supabase.from("allocation_buckets").select("id, name").eq("org_id", orgId),
-    supabase.from("global_allocations").select("bucket_id, target_percent").eq("org_id", orgId),
-    supabase
-      .from("instructors")
-      .select("id, full_name, annual_hours, status, deleted_at")
-      .eq("org_id", orgId)
-      .eq("is_external", false)
-      .is("deleted_at", null)
-      .eq("status", "active"),
-    supabase
-      .from("task_assignments")
-      .select("allocated_hours, task_id, project_team_member_id")
-      .eq("org_id", orgId),
-    supabase
-      .from("projects")
-      .select("id, priority, status")
-      .eq("org_id", orgId)
-      .is("deleted_at", null),
+    scopeDept(supabase.from("v_instructor_workload").select("*").eq("org_id", orgId), departmentId),
+    scopeDept(supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId), departmentId),
+    scopeDept(
+      supabase.from("allocation_buckets").select("id, name").eq("org_id", orgId),
+      departmentId,
+    ),
+    scopeDept(
+      supabase.from("global_allocations").select("bucket_id, target_percent").eq("org_id", orgId),
+      departmentId,
+    ),
+    scopeDept(
+      supabase
+        .from("instructors")
+        .select("id, full_name, annual_hours, status, deleted_at")
+        .eq("org_id", orgId)
+        .eq("is_external", false)
+        .is("deleted_at", null)
+        .eq("status", "active"),
+      departmentId,
+    ),
+    scopeDept(
+      supabase
+        .from("task_assignments")
+        .select("allocated_hours, task_id, project_team_member_id")
+        .eq("org_id", orgId),
+      departmentId,
+    ),
+    scopeDept(
+      supabase
+        .from("projects")
+        .select("id, priority, status")
+        .eq("org_id", orgId)
+        .is("deleted_at", null),
+      departmentId,
+    ),
   ]);
 
   const bucketList = (buckets ?? []) as { id: string; name: string }[];
