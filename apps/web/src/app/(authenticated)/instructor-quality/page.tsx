@@ -1,10 +1,10 @@
-import { headers } from "next/headers";
 import QRCode from "qrcode";
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import { isManager } from "@/lib/auth/role";
+import { getPublicBaseUrl } from "@/lib/public-url";
 import { loadInstructorQuality } from "@/lib/instructor-quality";
 import InstructorQualityView, {
   type DeliverableRow,
@@ -14,11 +14,11 @@ import InstructorQualityView, {
 export const metadata = { title: "Instructor Quality — Arbor" };
 
 export default async function InstructorQualityPage() {
-  const [supabase, orgId, scope, headerList] = await Promise.all([
+  const [supabase, orgId, scope, origin] = await Promise.all([
     createClient(),
     getCurrentOrgId(),
     getDepartmentScope(),
-    headers(),
+    getPublicBaseUrl(),
   ]);
 
   if (!orgId) {
@@ -39,10 +39,6 @@ export default async function InstructorQualityPage() {
       </div>
     );
   }
-
-  const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
-  const proto = headerList.get("x-forwarded-proto") ?? "https";
-  const origin = host ? `${proto}://${host}` : "";
 
   const qualityBundle = await loadInstructorQuality(supabase, orgId, scope);
 
