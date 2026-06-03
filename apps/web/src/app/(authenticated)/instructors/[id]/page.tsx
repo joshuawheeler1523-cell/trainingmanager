@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { loadInstructorQuality } from "@/lib/instructor-quality";
 import InstructorDetailClient from "./instructor-detail-client";
 import type { CapacityRow, Instructor, InstructorSkill, Skill, WorkloadRow } from "@arbor/shared";
 
@@ -65,6 +66,17 @@ export default async function InstructorDetailPage({ params }: { params: Params 
 
   if (!instructor) notFound();
 
+  // Full quality picture for this instructor, in their own department (so the
+  // profile shows everything regardless of the viewer's active scope), with
+  // department peers for context.
+  const deptId = (instructor as Instructor & { department_id?: string }).department_id;
+  const qualityBundle = await loadInstructorQuality(
+    supabase,
+    orgId,
+    deptId ? { all: false, id: deptId } : { all: true },
+    { instructorId: id },
+  );
+
   return (
     <InstructorDetailClient
       instructor={instructor as Instructor}
@@ -75,6 +87,8 @@ export default async function InstructorDetailPage({ params }: { params: Params 
       workloadRows={(workloadRows ?? []) as WorkloadRow[]}
       forecast={forecastRows ?? []}
       buckets={bucketRows ?? []}
+      quality={qualityBundle.byInstructor.get(id) ?? null}
+      qualityPeerOverall={qualityBundle.peerOverall}
     />
   );
 }

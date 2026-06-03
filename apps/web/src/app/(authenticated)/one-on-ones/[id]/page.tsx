@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { loadInstructorQuality } from "@/lib/instructor-quality";
 import { isManager } from "@/lib/auth/role";
 import type {
   Instructor,
@@ -136,6 +137,14 @@ export default async function OneOnOneEditorPage({ params }: { params: Params })
 
   if (!instructor) notFound();
 
+  const oooDept = (instructor as Instructor & { department_id?: string }).department_id;
+  const qualityBundle = await loadInstructorQuality(
+    supabase,
+    orgId,
+    oooDept ? { all: false, id: oooDept } : { all: true },
+    { instructorId },
+  );
+
   // Filter prior-session action items (which we asked for org-wide so we get
   // every open item) down to those that originated in OTHER sessions for the
   // SAME instructor. These are the ones that show under "From last 1:1."
@@ -150,6 +159,8 @@ export default async function OneOnOneEditorPage({ params }: { params: Params })
     <OneOnOneEditor
       session={session as OneOnOne}
       instructor={instructor as Instructor}
+      quality={qualityBundle.byInstructor.get(instructorId) ?? null}
+      qualityPeerOverall={qualityBundle.peerOverall}
       capacity={
         capacity
           ? {

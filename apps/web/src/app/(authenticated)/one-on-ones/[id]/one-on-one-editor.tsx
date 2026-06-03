@@ -46,6 +46,8 @@ import {
   updateOneOnOne,
 } from "../actions";
 import { Badge, Eyebrow } from "@/components/ui";
+import InstructorQualityScorecard from "@/components/instructor-quality-scorecard";
+import type { InstructorQuality } from "@/lib/instructor-quality";
 
 type WorkloadRow = {
   source: string;
@@ -59,6 +61,8 @@ type WorkloadRow = {
 type Props = {
   session: OneOnOne;
   instructor: Instructor;
+  quality: InstructorQuality | null;
+  qualityPeerOverall: number | null;
   capacity: { annual_hours: number; assigned_hours: number; utilization_pct: number } | null;
   workloadRows: WorkloadRow[];
   priorSessions: Array<{
@@ -102,6 +106,8 @@ function utilizationBand(pct: number): { color: string; bg: string; label: strin
 export default function OneOnOneEditor({
   session,
   instructor,
+  quality,
+  qualityPeerOverall,
   capacity,
   workloadRows,
   priorSessions,
@@ -275,6 +281,15 @@ export default function OneOnOneEditor({
           <TrendSparkline current={capacity?.utilization_pct ?? null} prior={priorSessions} />
         )}
       </div>
+
+      {quality && (quality.l1 || quality.scores.length > 0) && (
+        <div className="border-border bg-background rounded-xl border p-5">
+          <Eyebrow variant="mute" className="mb-3">
+            Delivery quality
+          </Eyebrow>
+          <InstructorQualityScorecard data={quality} peerOverall={qualityPeerOverall} compact />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* LEFT: workload */}

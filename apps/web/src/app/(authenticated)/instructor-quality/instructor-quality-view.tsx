@@ -8,37 +8,16 @@ import {
   PlusIcon,
   ClipboardDocumentIcon,
   PrinterIcon,
-  TrashIcon,
 } from "@heroicons/react/20/solid";
-import {
-  generateFeedbackLink,
-  recordQualityScore,
-  deleteQualityScore,
-  setFeedbackLinkActive,
-} from "./actions";
+import { generateFeedbackLink, recordQualityScore, setFeedbackLinkActive } from "./actions";
+import InstructorQualityScorecard from "@/components/instructor-quality-scorecard";
+import type { InstructorQuality } from "@/lib/instructor-quality";
 
-export type InstructorQualityRow = {
+export type InstructorRow = {
   id: string;
   name: string;
   department: string | null;
-  l1: {
-    responseCount: number;
-    overall: number | null;
-    knowledge: number | null;
-    clarity: number | null;
-    engagement: number | null;
-    pace: number | null;
-    nps: number | null;
-  } | null;
-  scores: {
-    id: string;
-    level: number;
-    metric: string;
-    score: number;
-    scoreMax: number;
-    periodLabel: string | null;
-    note: string | null;
-  }[];
+  quality: InstructorQuality;
 };
 
 export type DeliverableRow = {
@@ -59,21 +38,16 @@ const SOURCE_LABEL: Record<string, string> = {
   project_task: "Project / session",
 };
 
-const LEVELS = [
-  { n: 1, name: "Reaction", blurb: "Learner feedback on delivery" },
-  { n: 2, name: "Learning", blurb: "Did their cohorts reach competency" },
-  { n: 3, name: "Behavior", blurb: "Applied on the job" },
-  { n: 4, name: "Results", blurb: "Business impact" },
-] as const;
-
 type Tab = "quality" | "codes";
 
 export default function InstructorQualityView({
   instructors,
   deliverables,
+  peerOverall,
 }: {
-  instructors: InstructorQualityRow[];
+  instructors: InstructorRow[];
   deliverables: DeliverableRow[];
+  peerOverall: number | null;
 }) {
   const [tab, setTab] = useState<Tab>("quality");
 
@@ -104,7 +78,7 @@ export default function InstructorQualityView({
       </div>
 
       {tab === "quality" ? (
-        <QualityTab instructors={instructors} />
+        <QualityTab instructors={instructors} peerOverall={peerOverall} />
       ) : (
         <CodesTab deliverables={deliverables} />
       )}
@@ -114,22 +88,28 @@ export default function InstructorQualityView({
 
 // ── Quality (Kirkpatrick) ────────────────────────────────────────────────────
 
-function QualityTab({ instructors }: { instructors: InstructorQualityRow[] }) {
+function QualityTab({
+  instructors,
+  peerOverall,
+}: {
+  instructors: InstructorRow[];
+  peerOverall: number | null;
+}) {
   const [adding, setAdding] = useState(false);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <p className="text-muted-foreground text-xs">
-          Reaction (L1) comes from learner QR feedback. Learning, Behavior &amp; Results (L2–L4) are
-          recorded by managers.
+          Reaction (L1) comes from learner QR feedback, broken out by work type. Learning, Behavior
+          &amp; Results (L2–L4) are recorded by managers.
         </p>
         <button
           type="button"
           onClick={() => {
             setAdding((v) => !v);
           }}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
         >
           <PlusIcon className="h-4 w-4" />
           Add L2–L4 score
@@ -152,126 +132,20 @@ function QualityTab({ instructors }: { instructors: InstructorQualityRow[] }) {
       ) : (
         <div className="space-y-3">
           {instructors.map((i) => (
-            <InstructorCard key={i.id} row={i} />
+            <div key={i.id} className="border-border bg-background rounded-xl border p-4">
+              <div className="mb-3">
+                <span className="text-foreground text-sm font-semibold">{i.name}</span>
+                {i.department && (
+                  <span className="text-muted-foreground ml-2 text-xs">{i.department}</span>
+                )}
+              </div>
+              <InstructorQualityScorecard data={i.quality} peerOverall={peerOverall} />
+            </div>
           ))}
         </div>
       )}
     </div>
   );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-muted-foreground text-[10px] uppercase tracking-wide">{label}</div>
-      <div className="text-foreground text-sm font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-
-function InstructorCard({ row }: { row: InstructorQualityRow }) {
-  const [pending, startTransition] = useTransition();
-  const router = useRouter();
-
-  function remove(id: string) {
-    startTransition(async () => {
-      await deleteQualityScore(id);
-      router.refresh();
-    });
-  }
-
-  const l1 = row.l1;
-  const scoresByLevel = (n: number) => row.scores.filter((s) => s.level === n);
-
-  return (
-    <div className="border-border bg-background rounded-xl border p-4">
-      <div className="mb-3 flex items-baseline justify-between">
-        <div>
-          <span className="text-foreground text-sm font-semibold">{row.name}</span>
-          {row.department && (
-            <span className="text-muted-foreground ml-2 text-xs">{row.department}</span>
-          )}
-        </div>
-        {l1 && l1.overall != null && (
-          <span className="text-sm font-semibold text-[#e0922f]">
-            {l1.overall.toFixed(1)} ★{" "}
-            <span className="text-muted-foreground text-xs font-normal">
-              ({l1.responseCount} response{l1.responseCount === 1 ? "" : "s"})
-            </span>
-          </span>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-        {LEVELS.map((lvl) => (
-          <div key={lvl.n} className="border-border bg-surface rounded-lg border p-3">
-            <div className="text-muted-foreground mb-2 text-[10px] font-medium uppercase tracking-wide">
-              L{lvl.n} · {lvl.name}
-            </div>
-            {lvl.n === 1 ? (
-              l1 && l1.responseCount > 0 ? (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Metric
-                      label="Overall"
-                      value={l1.overall == null ? "—" : `${l1.overall.toFixed(1)}/5`}
-                    />
-                    <Metric label="NPS" value={l1.nps == null ? "—" : String(l1.nps)} />
-                  </div>
-                  <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
-                    <span>Know {fmt(l1.knowledge)}</span>
-                    <span>Clarity {fmt(l1.clarity)}</span>
-                    <span>Engage {fmt(l1.engagement)}</span>
-                    <span>Pace {fmt(l1.pace)}</span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-xs">
-                  No feedback yet — share a QR code from the Feedback codes tab.
-                </p>
-              )
-            ) : scoresByLevel(lvl.n).length === 0 ? (
-              <p className="text-muted-foreground text-xs">{lvl.blurb} — not recorded yet.</p>
-            ) : (
-              <ul className="space-y-1.5">
-                {scoresByLevel(lvl.n).map((s) => (
-                  <li key={s.id} className="text-xs">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-foreground font-medium">
-                        {s.metric}: {pct(s.score, s.scoreMax)}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={pending}
-                        onClick={() => {
-                          remove(s.id);
-                        }}
-                        className="text-muted-foreground hover:text-destructive shrink-0"
-                        aria-label="Remove score"
-                      >
-                        <TrashIcon className="h-3 w-3" />
-                      </button>
-                    </div>
-                    {s.periodLabel && (
-                      <span className="text-muted-foreground">{s.periodLabel}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function fmt(v: number | null): string {
-  return v == null ? "—" : v.toFixed(1);
-}
-function pct(score: number, max: number): string {
-  if (max === 100) return `${score.toFixed(0)}%`;
-  return `${score.toFixed(0)}/${max.toFixed(0)}`;
 }
 
 function ScoreForm({

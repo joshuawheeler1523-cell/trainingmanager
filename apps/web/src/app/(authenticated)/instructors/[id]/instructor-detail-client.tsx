@@ -39,6 +39,8 @@ import type { InstructorSkillRow } from "./page";
 import CapacityBar from "@/components/charts/capacity-bar";
 import BucketDonut from "@/components/charts/bucket-donut";
 import { HeatStrip, HeatStripLegend } from "@/components/ui";
+import InstructorQualityScorecard from "@/components/instructor-quality-scorecard";
+import type { InstructorQuality } from "@/lib/instructor-quality";
 
 type AuditEntry = {
   id: number;
@@ -59,6 +61,8 @@ type Props = {
   workloadRows: WorkloadRow[];
   forecast: ForecastWeek[];
   buckets: AllocationBucket[];
+  quality: InstructorQuality | null;
+  qualityPeerOverall: number | null;
 };
 
 type Tab = "main" | "audit";
@@ -783,6 +787,8 @@ export default function InstructorDetailClient({
   workloadRows,
   forecast,
   buckets,
+  quality,
+  qualityPeerOverall,
 }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("main");
@@ -910,6 +916,12 @@ export default function InstructorDetailClient({
         {activeTab === "main" && (
           <div className="space-y-6">
             <ProfileStrip instructor={instructor} />
+            {quality && (quality.l1 || quality.scores.length > 0) && (
+              <section className="border-border bg-background rounded-xl border p-5">
+                <h3 className="text-foreground mb-3 text-sm font-semibold">Delivery quality</h3>
+                <InstructorQualityScorecard data={quality} peerOverall={qualityPeerOverall} />
+              </section>
+            )}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               {/* Workload — primary content, takes 2 of 3 columns at lg */}
               <div className="lg:col-span-2">

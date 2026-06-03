@@ -5,9 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import { isManager } from "@/lib/auth/role";
+import { loadInstructorQuality } from "@/lib/instructor-quality";
 import InstructorQualityView, {
   type DeliverableRow,
-  type InstructorQualityRow,
+  type InstructorRow,
 } from "./instructor-quality-view";
 
 export const metadata = { title: "Instructor Quality — Arbor" };
@@ -43,13 +44,9 @@ export default async function InstructorQualityPage() {
   const proto = headerList.get("x-forwarded-proto") ?? "https";
   const origin = host ? `${proto}://${host}` : "";
 
-  const [
-    { data: instructorRows },
-    { data: qualityRows },
-    { data: scoreRows },
-    { data: workloadRows },
-    { data: linkRows },
-  ] = await Promise.all([
+  const qualityBundle = await loadInstructorQuality(supabase, orgId, scope);
+
+  const [{ data: instructorRows }, { data: workloadRows }, { data: linkRows }] = await Promise.all([
     applyDeptScope(
       supabase
         .from("instructors")
@@ -59,15 +56,6 @@ export default async function InstructorQualityPage() {
         .is("deleted_at", null)
         .eq("status", "active")
         .order("full_name"),
-      scope,
-    ),
-    applyDeptScope(supabase.from("v_instructor_quality").select("*").eq("org_id", orgId), scope),
-    applyDeptScope(
-      supabase
-        .from("instructor_quality_scores")
-        .select("*")
-        .eq("org_id", orgId)
-        .order("recorded_at", { ascending: false }),
       scope,
     ),
     applyDeptScope(
@@ -88,46 +76,18 @@ export default async function InstructorQualityPage() {
 
   const instructorName = new Map((instructorRows ?? []).map((i) => [i.id, i.full_name] as const));
 
-  // ── Per-instructor Kirkpatrick rollup ──────────────────────────────────────
-  const qualityByInstructor = new Map(
-    (qualityRows ?? []).map((q) => [q.instructor_id, q] as const),
-  );
-  const scoresByInstructor = new Map<string, typeof scoreRows>();
-  for (const s of scoreRows ?? []) {
-    const list = scoresByInstructor.get(s.instructor_id) ?? [];
-    list.push(s);
-    scoresByInstructor.set(s.instructor_id, list);
-  }
-
-  const instructors: InstructorQualityRow[] = (instructorRows ?? []).map((i) => {
-    const q = qualityByInstructor.get(i.id);
-    const scores = (scoresByInstructor.get(i.id) ?? []).map((s) => ({
-      id: s.id,
-      level: s.kirkpatrick_level,
-      metric: s.metric,
-      score: s.score,
-      scoreMax: s.score_max,
-      periodLabel: s.period_label,
-      note: s.note,
-    }));
-    return {
-      id: i.id,
-      name: i.full_name,
-      department: i.department,
-      l1: q
-        ? {
-            responseCount: q.response_count ?? 0,
-            overall: q.overall_avg,
-            knowledge: q.knowledge_avg,
-            clarity: q.clarity_avg,
-            engagement: q.engagement_avg,
-            pace: q.pace_avg,
-            nps: q.nps,
-          }
-        : null,
-      scores,
-    };
-  });
+  const instructors: InstructorRow[] = (instructorRows ?? []).map((i) => ({
+    id: i.id,
+    name: i.full_name,
+    department: i.department,
+    quality: qualityBundle.byInstructor.get(i.id) ?? {
+      l1: null,
+      scores: [],
+      bySource: [],
+      monthly: [],
+      comments: [],
+    },
+  }));
 
   // ── Deliverables (deduped) + QR for those with a link ──────────────────────
   const linkByKey = new Map<string, NonNullable<typeof linkRows>[number]>();
@@ -188,10 +148,14 @@ export default async function InstructorQualityPage() {
     <div>
       <PageHeader
         title="Instructor Quality"
-        description="Track delivery quality per instructor across the Kirkpatrick four levels — learner reaction (via QR feedback), learning, behavior, and results."
+        description="Delivery quality per instructor across the Kirkpatrick four levels — learner reaction (QR feedback), learning, behavior, results — with a per-work-type breakdown and trend."
       />
       <div className="p-6">
-        <InstructorQualityView instructors={instructors} deliverables={deliverables} />
+        <InstructorQualityView
+          instructors={instructors}
+          deliverables={deliverables}
+          peerOverall={qualityBundle.peerOverall}
+        />
       </div>
     </div>
   );
