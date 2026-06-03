@@ -60,18 +60,21 @@ export async function submitPublicRequest(
     };
   }
 
-  // Anon submissions land in the org's "general" department by default.
-  const { data: dept } = await anonClient
-    .from("departments")
-    .select("id")
-    .eq("org_id", link.org_id)
-    .eq("slug", "general")
-    .maybeSingle();
-  const departmentId = dept?.id;
+  // Anon submissions land in the org's General department — or its oldest
+  // department when there's no 'general'-slug one. Resolved via a token-gated
+  // SECURITY DEFINER RPC so the anon client never needs SELECT on departments.
+  const { data: departmentId, error: deptErr } = await anonClient.rpc(
+    "public_intake_default_department",
+    { p_token: token },
+  );
+  if (deptErr) return { ok: false, error: { code: deptErr.code, message: deptErr.message } };
   if (!departmentId) {
     return {
       ok: false,
-      error: { code: "NO_DEPARTMENT", message: "Org has no default department" },
+      error: {
+        code: "NO_DEPARTMENT",
+        message: "This org has no departments configured. Ask an admin to create one.",
+      },
     };
   }
 

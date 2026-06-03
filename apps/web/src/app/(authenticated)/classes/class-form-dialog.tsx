@@ -7,7 +7,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
 import { PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import { classInputSchema } from "@arbor/shared";
-import type { Class, ClassInput, ClassModule, Instructor } from "@arbor/shared";
+import type { AllocationBucket, Class, ClassInput, ClassModule, Instructor } from "@arbor/shared";
 import { useLabel } from "@/components/labels";
 import { createClass, updateClass, assignInstructorToClass } from "./actions";
 import { createClassModule } from "./modules/actions";
@@ -42,12 +42,14 @@ type CreateProps = {
   trigger: React.ReactNode;
   instructors: Instructor[];
   modules: ClassModule[];
+  buckets: AllocationBucket[];
   onSuccess?: (c: Class) => void;
 };
 type EditProps = {
   mode: "edit";
   cls: Class;
   modules: ClassModule[];
+  buckets: AllocationBucket[];
   trigger: React.ReactNode;
   onSuccess?: (c: Class) => void;
 };
@@ -179,12 +181,14 @@ function StepBasic({
   setValue,
   errors,
   modules,
+  buckets,
 }: {
   register: ReturnType<typeof useForm<ClassInput>>["register"];
   control: ReturnType<typeof useForm<ClassInput>>["control"];
   setValue: ReturnType<typeof useForm<ClassInput>>["setValue"];
   errors: Record<string, { message?: string } | undefined>;
   modules: ClassModule[];
+  buckets: AllocationBucket[];
 }) {
   return (
     <div className="space-y-4">
@@ -208,6 +212,26 @@ function StepBasic({
           placeholder="Optional description…"
         />
       </div>
+      {buckets.length > 0 && (
+        <div>
+          <Label htmlFor="allocation_bucket_id">Allocation bucket</Label>
+          <select
+            id="allocation_bucket_id"
+            {...register("allocation_bucket_id")}
+            className={inputCls()}
+          >
+            <option value="">No bucket</option>
+            {buckets.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Teaching time for this class counts toward this allocation bucket.
+          </p>
+        </div>
+      )}
       <ModuleField control={control} setValue={setValue} modules={modules} />
       <div>
         <Label htmlFor="status">Status</Label>
@@ -549,6 +573,7 @@ export default function ClassFormDialog(props: Props) {
         name: "",
         description: "",
         module_id: "",
+        allocation_bucket_id: "",
         is_multi_day: false,
         total_days: 1,
         offerings_per_year: 0,
@@ -682,6 +707,7 @@ export default function ClassFormDialog(props: Props) {
                 setValue={setValue}
                 errors={errors}
                 modules={props.modules}
+                buckets={props.buckets}
               />
             )}
             {(isEdit || step === 1) && (

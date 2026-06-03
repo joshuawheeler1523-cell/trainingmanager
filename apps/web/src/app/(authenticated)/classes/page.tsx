@@ -41,6 +41,7 @@ async function ClassContent({ searchParams }: { searchParams: SearchParams }) {
     { data: instructors },
     { data: requirementRows },
     { data: moduleRows },
+    { data: bucketRows },
   ] = await Promise.all([
     classQuery,
     applyDeptScope(
@@ -69,6 +70,15 @@ async function ClassContent({ searchParams }: { searchParams: SearchParams }) {
         .eq("org_id", orgId)
         .is("deleted_at", null)
         .order("name"),
+      scope,
+    ),
+    applyDeptScope(
+      supabase
+        .from("allocation_buckets")
+        .select("*")
+        .eq("org_id", orgId)
+        .eq("is_archived", false)
+        .order("display_order"),
       scope,
     ),
   ]);
@@ -106,6 +116,7 @@ async function ClassContent({ searchParams }: { searchParams: SearchParams }) {
       classes={classList}
       instructors={(instructors ?? []) as Instructor[]}
       modules={moduleRows ?? []}
+      buckets={bucketRows ?? []}
       showDeleted={showDeleted}
       recommendations={recommendations}
     />

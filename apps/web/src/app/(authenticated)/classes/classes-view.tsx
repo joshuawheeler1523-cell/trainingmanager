@@ -12,7 +12,13 @@ import CsvImportDialog from "@/components/csv-import-dialog";
 import ClassFormDialog from "./class-form-dialog";
 import { ManagerOnly } from "@/components/auth/role-gate";
 import { importClassesCsv } from "./actions";
-import type { ClassModule, ClassWithHours, Instructor, Recommendation } from "@arbor/shared";
+import type {
+  AllocationBucket,
+  ClassModule,
+  ClassWithHours,
+  Instructor,
+  Recommendation,
+} from "@arbor/shared";
 
 function StatusBadge({ status, deleted }: { status: string; deleted: boolean }) {
   if (deleted) return <Badge variant="neutral">Archived</Badge>;
@@ -98,6 +104,7 @@ type Props = {
   classes: ClassWithHours[];
   instructors: Instructor[];
   modules: ClassModule[];
+  buckets: AllocationBucket[];
   showDeleted: boolean;
   recommendations: Recommendation[];
 };
@@ -106,6 +113,7 @@ export default function ClassesView({
   classes,
   instructors,
   modules,
+  buckets,
   showDeleted,
   recommendations,
 }: Props) {
@@ -274,6 +282,7 @@ export default function ClassesView({
               mode="create"
               instructors={instructors}
               modules={modules}
+              buckets={buckets}
               trigger={
                 <button
                   type="button"

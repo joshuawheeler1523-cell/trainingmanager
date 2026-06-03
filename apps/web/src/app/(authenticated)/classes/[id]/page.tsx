@@ -44,6 +44,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
     { data: roadmapSteps },
     { data: superUsers },
     { data: moduleRows },
+    { data: bucketRows },
   ] = await Promise.all([
     supabase.from("classes_with_hours").select("*").eq("id", id).eq("org_id", orgId).maybeSingle(),
     supabase
@@ -97,6 +98,15 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
         .order("name"),
       scope,
     ),
+    applyDeptScope(
+      supabase
+        .from("allocation_buckets")
+        .select("*")
+        .eq("org_id", orgId)
+        .eq("is_archived", false)
+        .order("display_order"),
+      scope,
+    ),
   ]);
 
   if (!cls) notFound();
@@ -113,6 +123,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       roadmapSteps={(roadmapSteps ?? []) as RoadmapStep[]}
       superUsers={superUsers ?? []}
       modules={moduleRows ?? []}
+      buckets={bucketRows ?? []}
     />
   );
 }

@@ -23,6 +23,7 @@ const SOURCE_LABEL: Record<string, string> = {
   impl_session: "Implementation",
   impl_planned: "Planned rollout",
   unestimated_request: "Incoming request",
+  tra: "Work intake (TRA)",
 };
 
 function itemHref(item: CapacityForecastItem): string | null {
@@ -34,6 +35,8 @@ function itemHref(item: CapacityForecastItem): string | null {
       return `/projects/${item.link_id}`;
     case "implementation":
       return `/training-planner/${item.link_id}`;
+    case "tra":
+      return `/tras/${item.link_id}`;
     default:
       return null;
   }
@@ -273,14 +276,16 @@ export default function ForecastView({
           </table>
         </div>
         <p className="text-muted-foreground border-border border-t px-3 py-2 text-[11px]">
-          Pipeline = unassigned ad-hoc work + planned-but-unscheduled implementations. Unestimated
-          incoming requests (work-intake without an hours estimate yet) are counted but not added to
-          the bars. Capacity = active instructors&apos; annual hours ÷ 12, minus dated PTO.
+          Pipeline = unassigned ad-hoc work + planned-but-unscheduled implementations + documented
+          work intake (TRAs) not yet converted to a project. Unestimated incoming requests
+          (work-intake without an hours estimate yet) are counted but not added to the bars.
+          Capacity = active instructors&apos; annual hours ÷ 12, minus dated PTO.
           {undatedHours > 0 && (
             <>
               {" "}
               <span className="text-foreground font-medium">
-                + {Math.round(undatedHours).toLocaleString()} h of committed work has no date set
+                + {Math.round(undatedHours).toLocaleString()} h of committed + incoming work has no
+                date set
               </span>{" "}
               and isn&apos;t placed on the timeline above — add start/due dates to include it.
             </>

@@ -6134,6 +6134,10 @@ export type Database = {
         Args: { p_token: string };
         Returns: string;
       };
+      public_intake_default_department: {
+        Args: { p_token: string };
+        Returns: string;
+      };
       purge_expired_audit_logs: {
         Args: { p_default_retention_days?: number };
         Returns: {

@@ -46,6 +46,7 @@ import {
   CLASS_MODALITY_LABELS,
 } from "@arbor/shared";
 import type {
+  AllocationBucket,
   ClassWithHours,
   ClassModule,
   Instructor,
@@ -80,6 +81,7 @@ type Props = {
   roadmapSteps: RoadmapStep[];
   superUsers: SuperUser[];
   modules: ClassModule[];
+  buckets: AllocationBucket[];
 };
 
 type Tab = "overview" | "roadmap" | "instructors" | "skills" | "super_users" | "audit";
@@ -1555,6 +1557,7 @@ export default function ClassDetailClient({
   roadmapSteps,
   superUsers,
   modules,
+  buckets,
 }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
@@ -1653,6 +1656,7 @@ export default function ClassDetailClient({
                 mode="edit"
                 cls={cls}
                 modules={modules}
+                buckets={buckets}
                 trigger={
                   <button
                     type="button"
