@@ -1,6 +1,7 @@
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import { implementationCompletion, type ImplClass, type Implementation } from "@arbor/shared";
 import TrainingPlannerView from "./training-planner-view";
 
@@ -11,7 +12,11 @@ type PlannerRow = Implementation & {
 };
 
 export default async function TrainingPlannerPage() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
   if (!orgId) {
     return (
       <div>
@@ -26,23 +31,35 @@ export default async function TrainingPlannerPage() {
 
   const [{ data: implementations }, { data: classes }, { data: sessions }, { data: bucketRows }] =
     await Promise.all([
-      supabase
-        .from("implementations")
-        .select("*")
-        .eq("org_id", orgId)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("impl_classes")
-        .select("id, implementation_id, total_people_to_train, expected_learners_per_session")
-        .eq("org_id", orgId),
-      supabase.from("impl_sessions").select("id, impl_class_id, status").eq("org_id", orgId),
-      supabase
-        .from("allocation_buckets")
-        .select("*")
-        .eq("org_id", orgId)
-        .eq("is_archived", false)
-        .order("display_order"),
+      applyDeptScope(
+        supabase
+          .from("implementations")
+          .select("*")
+          .eq("org_id", orgId)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false }),
+        scope,
+      ),
+      applyDeptScope(
+        supabase
+          .from("impl_classes")
+          .select("id, implementation_id, total_people_to_train, expected_learners_per_session")
+          .eq("org_id", orgId),
+        scope,
+      ),
+      applyDeptScope(
+        supabase.from("impl_sessions").select("id, impl_class_id, status").eq("org_id", orgId),
+        scope,
+      ),
+      applyDeptScope(
+        supabase
+          .from("allocation_buckets")
+          .select("*")
+          .eq("org_id", orgId)
+          .eq("is_archived", false)
+          .order("display_order"),
+        scope,
+      ),
     ]);
 
   const implList = (implementations ?? []) as Implementation[];

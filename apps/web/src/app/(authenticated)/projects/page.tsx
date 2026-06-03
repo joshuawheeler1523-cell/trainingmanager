@@ -1,11 +1,16 @@
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import ProjectsView from "./projects-view";
 import { projectPercentComplete, type Project, type Task } from "@arbor/shared";
 
 export default async function ProjectsPage() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
   if (!orgId) {
     return (
       <div>
@@ -16,13 +21,19 @@ export default async function ProjectsPage() {
   }
 
   const [{ data: projects }, { data: tasks }] = await Promise.all([
-    supabase
-      .from("projects")
-      .select("*")
-      .eq("org_id", orgId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false }),
-    supabase.from("tasks").select("project_id, status, percent_complete").eq("org_id", orgId),
+    applyDeptScope(
+      supabase
+        .from("projects")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false }),
+      scope,
+    ),
+    applyDeptScope(
+      supabase.from("tasks").select("project_id, status, percent_complete").eq("org_id", orgId),
+      scope,
+    ),
   ]);
 
   const projectsList = (projects ?? []) as Project[];

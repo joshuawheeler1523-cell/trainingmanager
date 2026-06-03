@@ -5869,6 +5869,7 @@ export type Database = {
         Row: {
           bucket_id: string | null;
           consumed_hours: number | null;
+          department_id: string | null;
           org_id: string | null;
         };
         Relationships: [];
@@ -5877,6 +5878,7 @@ export type Database = {
         Row: {
           annual_hours: number | null;
           assigned_hours: number | null;
+          department_id: string | null;
           full_name: string | null;
           instructor_id: string | null;
           org_id: string | null;
@@ -5884,6 +5886,13 @@ export type Database = {
           utilization_status: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "instructors_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "instructors_org_id_fkey";
             columns: ["org_id"];
@@ -5897,6 +5906,7 @@ export type Database = {
         Row: {
           annual_hours: number | null;
           bucket_id: string | null;
+          department_id: string | null;
           instructor_id: string | null;
           org_id: string | null;
           quantity: number | null;
@@ -6146,7 +6156,7 @@ export type Database = {
         }[];
       };
       qualified_instructors_for_org: {
-        Args: { p_org_id: string };
+        Args: { p_department_id?: string; p_org_id: string };
         Returns: {
           class_id: string;
           instructor_id: string;
@@ -6154,7 +6164,7 @@ export type Database = {
       };
       set_share_token: { Args: { p_token: string }; Returns: undefined };
       sidebar_counts: {
-        Args: { p_org_id: string };
+        Args: { p_department_id?: string; p_org_id: string };
         Returns: {
           one_on_ones_count: number;
           request_queue_count: number;
