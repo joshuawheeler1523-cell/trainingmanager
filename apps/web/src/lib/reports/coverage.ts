@@ -1,5 +1,5 @@
 import type { CoverageDataset, CoverageReportFilters } from "@arbor/shared";
-import type { TypedSupabase } from "./types";
+import { scopeDept, type TypedSupabase } from "./types";
 
 // Class Coverage Report (User Guide §12.2):
 //   - assigned offerings vs offerings_per_year
@@ -10,16 +10,26 @@ import type { TypedSupabase } from "./types";
 export async function queryCoverageReport(
   supabase: TypedSupabase,
   orgId: string,
+  departmentId: string | null,
   filters: CoverageReportFilters,
 ): Promise<CoverageDataset> {
   const [{ data: classes }, { data: assignments }, { data: buckets }] = await Promise.all([
-    supabase
-      .from("classes")
-      .select("id, name, offerings_per_year, allocation_bucket_id")
-      .eq("org_id", orgId)
-      .is("deleted_at", null),
-    supabase.from("class_instructor_assignments").select("class_id, assigned_offerings"),
-    supabase.from("allocation_buckets").select("id, name").eq("org_id", orgId),
+    scopeDept(
+      supabase
+        .from("classes")
+        .select("id, name, offerings_per_year, allocation_bucket_id")
+        .eq("org_id", orgId)
+        .is("deleted_at", null),
+      departmentId,
+    ),
+    scopeDept(
+      supabase.from("class_instructor_assignments").select("class_id, assigned_offerings"),
+      departmentId,
+    ),
+    scopeDept(
+      supabase.from("allocation_buckets").select("id, name").eq("org_id", orgId),
+      departmentId,
+    ),
   ]);
 
   const allowedBuckets = filters.bucket_ids.length > 0 ? new Set(filters.bucket_ids) : null;
@@ -41,11 +51,14 @@ export async function queryCoverageReport(
   // qualified_instructors_for_class RPC, batched. Skip classes with no
   // skill requirements (the RPC returns all active instructors for those —
   // not what we want for "qualified instructor count").
-  const { data: skillReqs } = await supabase
-    .from("class_skill_requirements")
-    .select("class_id")
-    .eq("org_id", orgId)
-    .eq("requirement", "required");
+  const { data: skillReqs } = await scopeDept(
+    supabase
+      .from("class_skill_requirements")
+      .select("class_id")
+      .eq("org_id", orgId)
+      .eq("requirement", "required"),
+    departmentId,
+  );
   const classesWithRequiredSkills = new Set((skillReqs ?? []).map((r) => r.class_id));
 
   const qualifiedCounts = new Map<string, number>();

@@ -3,7 +3,7 @@ import {
   type ProjectStatusDataset,
   type ProjectStatusReportFilters,
 } from "@arbor/shared";
-import type { TypedSupabase } from "./types";
+import { scopeDept, type TypedSupabase } from "./types";
 
 // Project Status Report (User Guide §12.2): cross-project rollup with
 // status, % complete, milestone progress, and overdue task count.
@@ -11,15 +11,28 @@ import type { TypedSupabase } from "./types";
 export async function queryProjectStatusReport(
   supabase: TypedSupabase,
   orgId: string,
+  departmentId: string | null,
   filters: ProjectStatusReportFilters,
 ): Promise<ProjectStatusDataset> {
   const [{ data: projects }, { data: tasks }, { data: milestones }] = await Promise.all([
-    supabase.from("projects").select("*").eq("org_id", orgId).is("deleted_at", null),
-    supabase
-      .from("tasks")
-      .select("id, project_id, status, percent_complete, end_date")
-      .eq("org_id", orgId),
-    supabase.from("milestones").select("id, project_id, is_complete, due_date").eq("org_id", orgId),
+    scopeDept(
+      supabase.from("projects").select("*").eq("org_id", orgId).is("deleted_at", null),
+      departmentId,
+    ),
+    scopeDept(
+      supabase
+        .from("tasks")
+        .select("id, project_id, status, percent_complete, end_date")
+        .eq("org_id", orgId),
+      departmentId,
+    ),
+    scopeDept(
+      supabase
+        .from("milestones")
+        .select("id, project_id, is_complete, due_date")
+        .eq("org_id", orgId),
+      departmentId,
+    ),
   ]);
 
   const today = new Date().toISOString().slice(0, 10);

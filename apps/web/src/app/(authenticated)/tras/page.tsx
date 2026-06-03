@@ -1,11 +1,16 @@
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import TrasView from "./tras-view";
 import type { Tra } from "@arbor/shared";
 
 export default async function TrasPage() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
   if (!orgId) {
     return (
       <div>
@@ -18,11 +23,10 @@ export default async function TrasPage() {
     );
   }
 
-  const { data } = await supabase
-    .from("tras")
-    .select("*")
-    .eq("org_id", orgId)
-    .order("created_at", { ascending: false });
+  const { data } = await applyDeptScope(
+    supabase.from("tras").select("*").eq("org_id", orgId).order("created_at", { ascending: false }),
+    scope,
+  );
   const tras = (data ?? []) as Tra[];
 
   const departments = Array.from(

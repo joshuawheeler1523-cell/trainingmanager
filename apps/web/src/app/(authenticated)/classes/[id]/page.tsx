@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import ClassDetailClient from "./class-detail-client";
 import type {
   ClassWithHours,
@@ -25,7 +26,11 @@ export type RoadmapStep = ClassRoadmapStep;
 export default async function ClassDetailPage({ params }: { params: Params }) {
   const { id } = await params;
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
   if (!orgId) notFound();
 
   const [
@@ -38,6 +43,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
     { data: qualified },
     { data: roadmapSteps },
     { data: superUsers },
+    { data: moduleRows },
   ] = await Promise.all([
     supabase.from("classes_with_hours").select("*").eq("id", id).eq("org_id", orgId).maybeSingle(),
     supabase
@@ -82,6 +88,15 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       .eq("org_id", orgId)
       .is("deleted_at", null)
       .order("full_name"),
+    applyDeptScope(
+      supabase
+        .from("class_modules")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .order("name"),
+      scope,
+    ),
   ]);
 
   if (!cls) notFound();
@@ -97,6 +112,7 @@ export default async function ClassDetailPage({ params }: { params: Params }) {
       qualifiedInstructorCount={qualified?.length ?? 0}
       roadmapSteps={(roadmapSteps ?? []) as RoadmapStep[]}
       superUsers={superUsers ?? []}
+      modules={moduleRows ?? []}
     />
   );
 }

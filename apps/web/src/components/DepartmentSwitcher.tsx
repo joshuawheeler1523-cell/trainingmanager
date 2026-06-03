@@ -1,19 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
-import { getCurrentDepartmentId } from "@/lib/auth/current-department";
+import { getCurrentDepartmentId, getDepartmentScope } from "@/lib/auth/current-department";
 import { isManager } from "@/lib/auth/role";
 import DepartmentSwitcherClient from "./department-switcher-client";
 
 export default async function DepartmentSwitcher() {
-  const [supabase, currentOrgId, currentDepartmentId] = await Promise.all([
+  const [supabase, currentOrgId, currentDepartmentId, scope] = await Promise.all([
     createClient(),
     getCurrentOrgId(),
     getCurrentDepartmentId(),
+    getDepartmentScope(),
   ]);
 
   if (!currentOrgId) return null;
 
   const manager = await isManager(currentOrgId);
+  const allActive = scope.all;
 
   // Departments visible to this user in the current org. Managers see all
   // departments in the org; everyone else only sees the ones they're a
@@ -50,6 +52,7 @@ export default async function DepartmentSwitcher() {
       departments={departments}
       currentDepartmentId={currentDepartmentId}
       isManager={manager}
+      allActive={allActive}
     />
   );
 }

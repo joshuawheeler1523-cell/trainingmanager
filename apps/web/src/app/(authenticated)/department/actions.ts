@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { CURRENT_DEPARTMENT_COOKIE } from "@/lib/auth/current-department";
+import { ALL_DEPARTMENTS, CURRENT_DEPARTMENT_COOKIE } from "@/lib/auth/current-department";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 
 /**
@@ -25,16 +25,7 @@ export async function switchDepartment(formData: FormData) {
   if (!user) redirect("/login");
   if (!orgId) redirect("/onboarding");
 
-  // Department must belong to current org.
-  const { data: dept } = await supabase
-    .from("departments")
-    .select("id")
-    .eq("id", departmentId)
-    .eq("org_id", orgId)
-    .maybeSingle();
-  if (!dept) redirect("/");
-
-  // Caller must be a department member OR a manager.
+  // Org-level role decides who may pick "All departments".
   const { data: orgMembership } = await supabase
     .from("org_memberships")
     .select("role")
@@ -44,15 +35,29 @@ export async function switchDepartment(formData: FormData) {
     .maybeSingle();
   const isManager = orgMembership?.role === "manager";
 
-  if (!isManager) {
-    const { data: deptMembership } = await supabase
-      .from("department_memberships")
+  if (departmentId === ALL_DEPARTMENTS) {
+    // Only managers get the org-wide view; others must stay in a department.
+    if (!isManager) redirect("/");
+  } else {
+    // Department must belong to current org.
+    const { data: dept } = await supabase
+      .from("departments")
       .select("id")
-      .eq("user_id", user.id)
-      .eq("department_id", departmentId)
-      .not("accepted_at", "is", null)
+      .eq("id", departmentId)
+      .eq("org_id", orgId)
       .maybeSingle();
-    if (!deptMembership) redirect("/");
+    if (!dept) redirect("/");
+
+    if (!isManager) {
+      const { data: deptMembership } = await supabase
+        .from("department_memberships")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("department_id", departmentId)
+        .not("accepted_at", "is", null)
+        .maybeSingle();
+      if (!deptMembership) redirect("/");
+    }
   }
 
   const cookieStore = await cookies();

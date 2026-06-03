@@ -13,6 +13,7 @@ const classFieldsSchema = z.object({
     .nullish()
     .transform((v) => (v === "" || v == null ? null : v)),
   allocation_bucket_id: optionalUuidToNull,
+  module_id: optionalUuidToNull,
   is_multi_day: z.boolean().default(false),
   total_days: z.coerce.number().int().min(1).default(1),
   hours_per_day: z.coerce
@@ -51,6 +52,37 @@ export const classInputSchema = classFieldsSchema.superRefine((data, ctx) => {
 });
 
 export const classUpdateSchema = classFieldsSchema.partial();
+
+// ── Class modules (a named grouping that holds multiple classes) ─────────────
+
+export const classModuleInputSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200),
+  description: z
+    .string()
+    .nullish()
+    .transform((v) => (v === "" || v == null ? null : v)),
+  color: z
+    .string()
+    .nullish()
+    .transform((v) => (v === "" || v == null ? null : v)),
+});
+
+export const classModuleUpdateSchema = classModuleInputSchema.partial();
+
+export type ClassModuleInput = z.infer<typeof classModuleInputSchema>;
+export type ClassModuleUpdate = z.infer<typeof classModuleUpdateSchema>;
+
+export type ClassModule = {
+  id: string;
+  org_id: string;
+  department_id: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
 export const classInstructorAssignmentSchema = z.object({
   instructor_id: z.string().uuid(),
@@ -128,6 +160,7 @@ export type Class = {
   name: string;
   description: string | null;
   allocation_bucket_id: string | null;
+  module_id: string | null;
   is_multi_day: boolean;
   total_days: number;
   hours_per_day: number | null;

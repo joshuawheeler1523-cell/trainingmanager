@@ -6,6 +6,52 @@ import { getCurrentOrgId } from "./current-org";
 
 export const CURRENT_DEPARTMENT_COOKIE = "current_department_id";
 
+// Cookie sentinel for managers viewing every department at once.
+export const ALL_DEPARTMENTS = "all";
+
+/**
+ * The active department scope for FILTERING list queries.
+ *   - { all: true }        → no department filter (manager "All departments")
+ *   - { all: false, id }   → restrict to a single department
+ *
+ * Distinct from getCurrentDepartmentId(), which resolves a CONCRETE department
+ * for STAMPING new rows even when the view is "All departments".
+ */
+export type DepartmentScope = { all: true } | { all: false; id: string };
+
+/**
+ * Apply the active department scope to a Supabase query builder. No-op when the
+ * scope is "All departments". The builder's .eq returns the same type, so this
+ * threads through any select chain.
+ */
+export function applyDeptScope<Q extends { eq(column: string, value: string): Q }>(
+  query: Q,
+  scope: DepartmentScope,
+): Q {
+  return scope.all ? query : query.eq("department_id", scope.id);
+}
+
+export const getDepartmentScope = cache(async (): Promise<DepartmentScope> => {
+  const [cookieStore, supabase, orgId] = await Promise.all([
+    cookies(),
+    createClient(),
+    getCurrentOrgId(),
+  ]);
+  if (!orgId) return { all: false, id: "" };
+
+  const stored = cookieStore.get(CURRENT_DEPARTMENT_COOKIE)?.value;
+  if (stored === ALL_DEPARTMENTS && (await userIsManager(supabase, orgId))) {
+    return { all: true };
+  }
+
+  const id = await getCurrentDepartmentId();
+  if (id) return { all: false, id };
+
+  // No concrete department resolvable: managers fall back to org-wide; everyone
+  // else gets an impossible id so queries return empty rather than leak.
+  return (await userIsManager(supabase, orgId)) ? { all: true } : { all: false, id: "" };
+});
+
 /**
  * Resolve the user's current department in the active org. Order:
  *   1. The cookie value, IF the user has access to that department AND
@@ -34,7 +80,7 @@ export const getCurrentDepartmentId = cache(async (): Promise<string | null> => 
   const isAdmin = await userIsManager(supabase, orgId);
 
   const stored = cookieStore.get(CURRENT_DEPARTMENT_COOKIE)?.value;
-  if (stored) {
+  if (stored && stored !== ALL_DEPARTMENTS) {
     const ok = await departmentBelongsToOrg(supabase, stored, orgId);
     if (ok && (isAdmin || (await userHasDepartmentMembership(supabase, user.id, stored)))) {
       return stored;

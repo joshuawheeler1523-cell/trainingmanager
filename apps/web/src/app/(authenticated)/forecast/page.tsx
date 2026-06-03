@@ -1,6 +1,7 @@
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getDepartmentScope } from "@/lib/auth/current-department";
 import { isManager } from "@/lib/auth/role";
 import type { CapacityForecastItem } from "@arbor/shared";
 import ForecastView from "./forecast-view";
@@ -8,7 +9,11 @@ import ForecastView from "./forecast-view";
 export const metadata = { title: "Capacity Forecast — Arbor" };
 
 export default async function ForecastPage() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
 
   if (!orgId) {
     return (
@@ -30,12 +35,17 @@ export default async function ForecastPage() {
     );
   }
 
+  // Default the forecast to the active department (when one is selected) so it
+  // matches the rest of the workspace; "All departments" → org-wide.
+  const activeDeptId = scope.all ? "" : scope.id;
+  const deptArg = activeDeptId ? { p_department_id: activeDeptId } : {};
+
   const [{ data: departments }, { data: forecast }, { data: undated }, { data: items }] =
     await Promise.all([
       supabase.from("departments").select("id, name").eq("org_id", orgId).order("name"),
-      supabase.rpc("capacity_forecast", { p_org_id: orgId }),
-      supabase.rpc("capacity_forecast_undated", { p_org_id: orgId }),
-      supabase.rpc("capacity_forecast_items", { p_org_id: orgId }),
+      supabase.rpc("capacity_forecast", { p_org_id: orgId, ...deptArg }),
+      supabase.rpc("capacity_forecast_undated", { p_org_id: orgId, ...deptArg }),
+      supabase.rpc("capacity_forecast_items", { p_org_id: orgId, ...deptArg }),
     ]);
 
   return (
@@ -50,6 +60,7 @@ export default async function ForecastPage() {
           initialUndated={undated ?? 0}
           initialItems={(items ?? []) as CapacityForecastItem[]}
           departments={departments ?? []}
+          initialDeptId={activeDeptId}
         />
       </div>
     </div>

@@ -4,6 +4,7 @@ import { Eyebrow } from "@/components/ui";
 import { REPORT_METADATA, REPORT_SLUGS } from "@arbor/shared";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getDepartmentScope } from "@/lib/auth/current-department";
 import { runReport } from "@/lib/reports/registry";
 
 const CATEGORY_LABEL = {
@@ -15,17 +16,22 @@ const CATEGORY_LABEL = {
 type Tone = "ok" | "info" | "warning" | "danger";
 
 export default async function ReportsPage() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
+  const departmentId = scope.all ? null : scope.id;
 
   // Run all five canonical reports with default filters, in parallel. Each is
   // best-effort: a throw becomes null and its KPI card shows "—".
   const results = orgId
     ? await Promise.all([
-        runReport("allocation", supabase, orgId, {}).catch(() => null),
-        runReport("workload", supabase, orgId, {}).catch(() => null),
-        runReport("coverage", supabase, orgId, {}).catch(() => null),
-        runReport("project-status", supabase, orgId, {}).catch(() => null),
-        runReport("skill-gap", supabase, orgId, {}).catch(() => null),
+        runReport("allocation", supabase, orgId, departmentId, {}).catch(() => null),
+        runReport("workload", supabase, orgId, departmentId, {}).catch(() => null),
+        runReport("coverage", supabase, orgId, departmentId, {}).catch(() => null),
+        runReport("project-status", supabase, orgId, departmentId, {}).catch(() => null),
+        runReport("skill-gap", supabase, orgId, departmentId, {}).catch(() => null),
       ])
     : [null, null, null, null, null];
 

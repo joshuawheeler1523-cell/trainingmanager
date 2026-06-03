@@ -11,12 +11,14 @@ type Props = {
   departments: Dept[];
   currentDepartmentId: string | null;
   isManager: boolean;
+  allActive: boolean;
 };
 
 export default function DepartmentSwitcherClient({
   departments,
   currentDepartmentId,
   isManager,
+  allActive,
 }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -34,8 +36,12 @@ export default function DepartmentSwitcherClient({
     };
   }, []);
 
-  const active = departments.find((d) => d.id === currentDepartmentId) ?? departments[0];
+  const active = allActive
+    ? { id: "all", name: "All departments" }
+    : (departments.find((d) => d.id === currentDepartmentId) ?? departments[0]);
   if (!active) return null;
+
+  const hasChoices = departments.length > 1 || isManager;
 
   return (
     <div ref={ref} className="relative">
@@ -48,14 +54,26 @@ export default function DepartmentSwitcherClient({
       >
         <Squares2X2Icon className="text-muted-foreground h-4 w-4 shrink-0" />
         <span className="max-w-[160px] truncate">{active.name}</span>
-        {departments.length > 1 && (
-          <ChevronUpDownIcon className="text-muted-foreground h-4 w-4 shrink-0" />
-        )}
+        {hasChoices && <ChevronUpDownIcon className="text-muted-foreground h-4 w-4 shrink-0" />}
       </button>
 
       {open && departments.length > 0 && (
         <div className="border-border bg-background absolute left-0 top-full z-50 mt-1 w-56 rounded-lg border py-1 shadow-lg">
           <p className="text-muted-foreground px-3 py-1 text-xs font-medium">Switch department</p>
+          {isManager && (
+            <form action={switchDepartment}>
+              <input type="hidden" name="departmentId" value="all" />
+              <input type="hidden" name="returnPath" value={pathname} />
+              <button
+                type="submit"
+                className="text-foreground hover:bg-surface flex w-full items-center gap-2 px-3 py-2 text-sm"
+              >
+                <Squares2X2Icon className="text-muted-foreground h-4 w-4 shrink-0" />
+                <span className="flex-1 truncate text-left">All departments</span>
+                {allActive && <CheckIcon className="text-primary h-4 w-4 shrink-0" />}
+              </button>
+            </form>
+          )}
           {departments.map((d) => (
             <form key={d.id} action={switchDepartment}>
               <input type="hidden" name="departmentId" value={d.id} />
@@ -66,7 +84,7 @@ export default function DepartmentSwitcherClient({
               >
                 <Squares2X2Icon className="text-muted-foreground h-4 w-4 shrink-0" />
                 <span className="flex-1 truncate text-left">{d.name}</span>
-                {d.id === currentDepartmentId && (
+                {!allActive && d.id === currentDepartmentId && (
                   <CheckIcon className="text-primary h-4 w-4 shrink-0" />
                 )}
               </button>

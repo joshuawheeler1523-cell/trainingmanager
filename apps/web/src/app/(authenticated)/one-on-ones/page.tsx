@@ -1,12 +1,17 @@
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import { isManager } from "@/lib/auth/role";
 import type { Instructor, OneOnOne } from "@arbor/shared";
 import OneOnOneListView from "./one-on-one-list-view";
 
 export default async function OneOnOnesIndexPage() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
 
   if (!orgId) {
     return (
@@ -32,21 +37,27 @@ export default async function OneOnOnesIndexPage() {
   }
 
   const [{ data: sessions }, { data: instructors }] = await Promise.all([
-    supabase
-      .from("one_on_ones")
-      .select("*")
-      .eq("org_id", orgId)
-      .is("deleted_at", null)
-      .order("scheduled_for", { ascending: false })
-      .limit(100),
-    supabase
-      .from("instructors")
-      .select("*")
-      .eq("org_id", orgId)
-      .eq("is_external", false)
-      .is("deleted_at", null)
-      .eq("status", "active")
-      .order("full_name"),
+    applyDeptScope(
+      supabase
+        .from("one_on_ones")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .order("scheduled_for", { ascending: false })
+        .limit(100),
+      scope,
+    ),
+    applyDeptScope(
+      supabase
+        .from("instructors")
+        .select("*")
+        .eq("org_id", orgId)
+        .eq("is_external", false)
+        .is("deleted_at", null)
+        .eq("status", "active")
+        .order("full_name"),
+      scope,
+    ),
   ]);
 
   const instructorList = (instructors ?? []) as Instructor[];

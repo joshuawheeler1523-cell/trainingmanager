@@ -1,11 +1,16 @@
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import type { SketchpadSchedule } from "@arbor/shared";
 import SketchpadListView from "./sketchpad-list-view";
 
 export default async function SketchpadIndexPage() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
 
   if (!orgId) {
     return (
@@ -20,14 +25,23 @@ export default async function SketchpadIndexPage() {
   }
 
   const [{ data: schedules }, { data: rooms }, { data: sessions }] = await Promise.all([
-    supabase
-      .from("sketchpad_schedules")
-      .select("*")
-      .eq("org_id", orgId)
-      .is("deleted_at", null)
-      .order("updated_at", { ascending: false }),
-    supabase.from("sketchpad_rooms").select("id, schedule_id").eq("org_id", orgId),
-    supabase.from("sketchpad_sessions").select("id, schedule_id").eq("org_id", orgId),
+    applyDeptScope(
+      supabase
+        .from("sketchpad_schedules")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .order("updated_at", { ascending: false }),
+      scope,
+    ),
+    applyDeptScope(
+      supabase.from("sketchpad_rooms").select("id, schedule_id").eq("org_id", orgId),
+      scope,
+    ),
+    applyDeptScope(
+      supabase.from("sketchpad_sessions").select("id, schedule_id").eq("org_id", orgId),
+      scope,
+    ),
   ]);
 
   const roomCountBySchedule = new Map<string, number>();

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { renderToStream } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getDepartmentScope } from "@/lib/auth/current-department";
 import { REPORT_METADATA, REPORT_SLUGS, type ReportSlug } from "@arbor/shared";
 import { runReport } from "@/lib/reports/registry";
 import { datasetToSheets, writeCsv, writeXlsx } from "@/lib/reports/exporters";
@@ -39,14 +40,19 @@ export async function GET(req: Request, ctx: { params: Promise<{ slug: string }>
     return new NextResponse("Invalid filters JSON", { status: 400 });
   }
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
   if (!orgId) return new NextResponse("Unauthorized", { status: 401 });
+  const departmentId = scope.all ? null : scope.id;
 
   // Run the report once; reuse the dataset for both render paths.
   const startedAt = Date.now();
   let dataset;
   try {
-    dataset = await runReport(slug as ReportSlug, supabase, orgId, filters);
+    dataset = await runReport(slug as ReportSlug, supabase, orgId, departmentId, filters);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Report failed";
     return new NextResponse(msg, { status: 422 });

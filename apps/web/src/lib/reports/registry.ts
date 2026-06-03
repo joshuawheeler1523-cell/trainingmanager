@@ -29,6 +29,7 @@ export async function runReport(
   slug: ReportSlug,
   supabase: TypedSupabase,
   orgId: string,
+  departmentId: string | null,
   rawFilters: unknown,
 ): Promise<ReportDataset> {
   // Each branch parses against the slug's own schema. The TS union of all
@@ -38,48 +39,50 @@ export async function runReport(
     case "allocation": {
       const parsed = allocationReportFilters.safeParse(rawFilters ?? {});
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid filters");
-      const data = await queryAllocationReport(supabase, orgId, parsed.data);
+      const data = await queryAllocationReport(supabase, orgId, departmentId, parsed.data);
       return { slug, data };
     }
     case "workload": {
       const parsed = workloadReportFilters.safeParse(rawFilters ?? {});
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid filters");
-      const data = await queryWorkloadReport(supabase, orgId, parsed.data);
+      const data = await queryWorkloadReport(supabase, orgId, departmentId, parsed.data);
       return { slug, data };
     }
     case "coverage": {
       const parsed = coverageReportFilters.safeParse(rawFilters ?? {});
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid filters");
-      const data = await queryCoverageReport(supabase, orgId, parsed.data);
+      const data = await queryCoverageReport(supabase, orgId, departmentId, parsed.data);
       return { slug, data };
     }
     case "project-status": {
       const parsed = projectStatusReportFilters.safeParse(rawFilters ?? {});
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid filters");
-      const data = await queryProjectStatusReport(supabase, orgId, parsed.data);
+      const data = await queryProjectStatusReport(supabase, orgId, departmentId, parsed.data);
       return { slug, data };
     }
     case "skill-gap": {
       const parsed = skillGapReportFilters.safeParse(rawFilters ?? {});
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid filters");
-      const data = await querySkillGapReport(supabase, orgId, parsed.data);
+      const data = await querySkillGapReport(supabase, orgId, departmentId, parsed.data);
       return { slug, data };
     }
     case "department-comparison": {
       const parsed = departmentComparisonReportFilters.safeParse(rawFilters ?? {});
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid filters");
+      // Always org-wide: this report's whole purpose is to compare departments.
       const data = await queryDepartmentComparisonReport(supabase, orgId);
       return { slug, data };
     }
     case "instructor-scorecard": {
       const parsed = instructorScorecardReportFilters.safeParse(rawFilters ?? {});
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid filters");
-      const data = await queryInstructorScorecardReport(supabase, orgId, parsed.data);
+      const data = await queryInstructorScorecardReport(supabase, orgId, departmentId, parsed.data);
       return { slug, data };
     }
     case "utilization-trend": {
       const parsed = utilizationTrendReportFilters.safeParse(rawFilters ?? {});
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid filters");
+      // Org-wide: capacity_snapshots has no department_id (nightly org rollup).
       const data = await queryUtilizationTrendReport(supabase, orgId, parsed.data);
       return { slug, data };
     }

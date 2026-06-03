@@ -4,7 +4,7 @@ import {
   type SkillGapDataset,
   type SkillGapReportFilters,
 } from "@arbor/shared";
-import type { TypedSupabase } from "./types";
+import { scopeDept, type TypedSupabase } from "./types";
 
 // Skill Gap Analysis (User Guide §12.2):
 //   - skills with < threshold qualified instructors (single-point-of-failure)
@@ -14,24 +14,34 @@ import type { TypedSupabase } from "./types";
 export async function querySkillGapReport(
   supabase: TypedSupabase,
   orgId: string,
+  departmentId: string | null,
   filters: SkillGapReportFilters,
 ): Promise<SkillGapDataset> {
   const [{ data: skills }, { data: instructorSkills }, { data: instructors }] = await Promise.all([
-    supabase
-      .from("skills")
-      .select("id, name, is_archived")
-      .eq("org_id", orgId)
-      .eq("is_archived", false),
-    supabase
-      .from("instructor_skills")
-      .select("skill_id, instructor_id, is_certified, expires_at, certified_at"),
-    supabase
-      .from("instructors")
-      .select("id, full_name, status, deleted_at")
-      .eq("org_id", orgId)
-      .eq("is_external", false)
-      .is("deleted_at", null)
-      .eq("status", "active"),
+    scopeDept(
+      supabase
+        .from("skills")
+        .select("id, name, is_archived")
+        .eq("org_id", orgId)
+        .eq("is_archived", false),
+      departmentId,
+    ),
+    scopeDept(
+      supabase
+        .from("instructor_skills")
+        .select("skill_id, instructor_id, is_certified, expires_at, certified_at"),
+      departmentId,
+    ),
+    scopeDept(
+      supabase
+        .from("instructors")
+        .select("id, full_name, status, deleted_at")
+        .eq("org_id", orgId)
+        .eq("is_external", false)
+        .is("deleted_at", null)
+        .eq("status", "active"),
+      departmentId,
+    ),
   ]);
 
   const activeInstructorIds = new Set((instructors ?? []).map((i) => i.id));

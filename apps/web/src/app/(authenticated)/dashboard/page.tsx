@@ -13,6 +13,7 @@ import PageHeader from "@/components/ui/page-header";
 import { Eyebrow } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import { getCurrentRole, isManager } from "@/lib/auth/role";
 import { Label } from "@/components/labels";
 import SetupChecklist from "./setup-checklist";
@@ -20,7 +21,11 @@ import InstructorDashboard from "./instructor-dashboard";
 import type { CapacityRow, Instructor } from "@arbor/shared";
 
 export default async function DashboardPage() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
 
   if (!orgId) {
     return (
@@ -58,52 +63,73 @@ export default async function DashboardPage() {
     { data: departments },
     { count: memberCount },
   ] = await Promise.all([
-    supabase
-      .from("instructors")
-      .select("id, full_name, department, department_id, annual_hours, status")
-      .eq("org_id", orgId)
-      .eq("is_external", false)
-      .is("deleted_at", null)
-      .eq("status", "active"),
-    supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId),
-    supabase
-      .from("tras")
-      .select("id, department_id, status")
-      .eq("org_id", orgId)
-      .in("status", ["submitted", "approved"]),
-    supabase
-      .from("projects")
-      .select("id, department_id, status")
-      .eq("org_id", orgId)
-      .is("deleted_at", null)
-      .in("status", ["planning", "active"]),
-    supabase
-      .from("milestones")
-      .select("id, name, due_date, project:projects!inner(id, name, status, deleted_at)")
-      .eq("org_id", orgId)
-      .eq("is_complete", false)
-      .lt("due_date", todayIso)
-      .order("due_date", { ascending: true })
-      .limit(20),
-    supabase
-      .from("impl_sessions")
-      .select(
-        "id, conflict_status, scheduled_start, implementation:implementations!inner(id, name, status)",
-      )
-      .eq("org_id", orgId)
-      .neq("conflict_status", "none")
-      .order("scheduled_start", { ascending: true })
-      .limit(20),
-    supabase
-      .from("classes")
-      .select("id, name, offerings_per_year")
-      .eq("org_id", orgId)
-      .is("deleted_at", null)
-      .eq("status", "active"),
-    supabase
-      .from("class_instructor_assignments")
-      .select("class_id, assigned_offerings")
-      .eq("org_id", orgId),
+    applyDeptScope(
+      supabase
+        .from("instructors")
+        .select("id, full_name, department, department_id, annual_hours, status")
+        .eq("org_id", orgId)
+        .eq("is_external", false)
+        .is("deleted_at", null)
+        .eq("status", "active"),
+      scope,
+    ),
+    applyDeptScope(supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId), scope),
+    applyDeptScope(
+      supabase
+        .from("tras")
+        .select("id, department_id, status")
+        .eq("org_id", orgId)
+        .in("status", ["submitted", "approved"]),
+      scope,
+    ),
+    applyDeptScope(
+      supabase
+        .from("projects")
+        .select("id, department_id, status")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .in("status", ["planning", "active"]),
+      scope,
+    ),
+    applyDeptScope(
+      supabase
+        .from("milestones")
+        .select("id, name, due_date, project:projects!inner(id, name, status, deleted_at)")
+        .eq("org_id", orgId)
+        .eq("is_complete", false)
+        .lt("due_date", todayIso)
+        .order("due_date", { ascending: true })
+        .limit(20),
+      scope,
+    ),
+    applyDeptScope(
+      supabase
+        .from("impl_sessions")
+        .select(
+          "id, conflict_status, scheduled_start, implementation:implementations!inner(id, name, status)",
+        )
+        .eq("org_id", orgId)
+        .neq("conflict_status", "none")
+        .order("scheduled_start", { ascending: true })
+        .limit(20),
+      scope,
+    ),
+    applyDeptScope(
+      supabase
+        .from("classes")
+        .select("id, name, offerings_per_year")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .eq("status", "active"),
+      scope,
+    ),
+    applyDeptScope(
+      supabase
+        .from("class_instructor_assignments")
+        .select("class_id, assigned_offerings")
+        .eq("org_id", orgId),
+      scope,
+    ),
     // Departments table is only used by the org-admin rollup. Skip the
     // round-trip when the viewer isn't an admin.
     orgAdmin

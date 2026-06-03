@@ -66,16 +66,18 @@ export default function ForecastView({
   initialUndated,
   initialItems,
   departments,
+  initialDeptId = "",
 }: {
   initialMonths: CapacityForecastMonth[];
   initialUndated: number;
   initialItems: CapacityForecastItem[];
   departments: Dept[];
+  initialDeptId?: string;
 }) {
   const [months, setMonths] = useState<CapacityForecastMonth[]>(initialMonths);
   const [undatedHours, setUndatedHours] = useState<number>(initialUndated);
   const [items, setItems] = useState<CapacityForecastItem[]>(initialItems);
-  const [deptId, setDeptId] = useState<string>("");
+  const [deptId, setDeptId] = useState<string>(initialDeptId);
   const [pending, startTransition] = useTransition();
 
   function changeDept(next: string) {

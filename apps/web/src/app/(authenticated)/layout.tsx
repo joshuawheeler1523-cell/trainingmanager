@@ -5,6 +5,7 @@ import OrgSwitcher from "@/components/OrgSwitcher";
 import DepartmentSwitcher from "@/components/DepartmentSwitcher";
 import AppShell from "@/components/layout/app-shell";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getDepartmentScope } from "@/lib/auth/current-department";
 import { isArborAdmin } from "@/lib/auth/arbor-admin";
 import { getOrgIdentity } from "@/lib/labels/get-org-identity";
 import { OrgIdentityProvider } from "@/components/labels";
@@ -29,6 +30,8 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
   // collapse multiple queries into one RPC, and admin is derived from
   // identity.role so we don't fire a separate is_manager round-trip.
   const orgId = await getCurrentOrgId();
+  const scope = orgId ? await getDepartmentScope() : null;
+  const deptParam = scope && !scope.all ? { p_department_id: scope.id } : {};
   const [{ data: notifications }, arborAdmin, identity, { data: countsRows }] = await Promise.all([
     // Bell shows up to 10 UNREAD; read history lives at /account/notifications.
     supabase
@@ -40,7 +43,9 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
       .limit(10),
     isArborAdmin(),
     orgId ? getOrgIdentity(orgId) : Promise.resolve(null),
-    orgId ? supabase.rpc("sidebar_counts", { p_org_id: orgId }) : Promise.resolve({ data: null }),
+    orgId
+      ? supabase.rpc("sidebar_counts", { p_org_id: orgId, ...deptParam })
+      : Promise.resolve({ data: null }),
   ]);
 
   const counts = countsRows?.[0] ?? null;

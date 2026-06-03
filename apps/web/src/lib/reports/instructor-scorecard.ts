@@ -3,7 +3,7 @@ import {
   type InstructorScorecardDataset,
   type InstructorScorecardReportFilters,
 } from "@arbor/shared";
-import type { TypedSupabase } from "./types";
+import { scopeDept, type TypedSupabase } from "./types";
 
 /**
  * Per-instructor scorecard: utilization, classes qualified vs assigned, skills
@@ -14,6 +14,7 @@ import type { TypedSupabase } from "./types";
 export async function queryInstructorScorecardReport(
   supabase: TypedSupabase,
   orgId: string,
+  departmentId: string | null,
   filters: InstructorScorecardReportFilters,
 ): Promise<InstructorScorecardDataset> {
   const [
@@ -24,29 +25,47 @@ export async function queryInstructorScorecardReport(
     { data: skillReqs },
     { data: classes },
   ] = await Promise.all([
-    supabase
-      .from("instructors")
-      .select("id, full_name, department, annual_hours")
-      .eq("org_id", orgId)
-      .eq("is_external", false)
-      .is("deleted_at", null)
-      .eq("status", "active")
-      .order("full_name"),
-    supabase
-      .from("v_instructor_capacity")
-      .select("instructor_id, assigned_hours, utilization_pct")
-      .eq("org_id", orgId),
-    supabase
-      .from("class_instructor_assignments")
-      .select("instructor_id, class_id, assigned_offerings")
-      .eq("org_id", orgId),
-    supabase.from("instructor_skills").select("instructor_id, is_certified, expires_at"),
-    supabase
-      .from("class_skill_requirements")
-      .select("class_id")
-      .eq("org_id", orgId)
-      .eq("requirement", "required"),
-    supabase.from("classes").select("id").eq("org_id", orgId).is("deleted_at", null),
+    scopeDept(
+      supabase
+        .from("instructors")
+        .select("id, full_name, department, annual_hours")
+        .eq("org_id", orgId)
+        .eq("is_external", false)
+        .is("deleted_at", null)
+        .eq("status", "active")
+        .order("full_name"),
+      departmentId,
+    ),
+    scopeDept(
+      supabase
+        .from("v_instructor_capacity")
+        .select("instructor_id, assigned_hours, utilization_pct")
+        .eq("org_id", orgId),
+      departmentId,
+    ),
+    scopeDept(
+      supabase
+        .from("class_instructor_assignments")
+        .select("instructor_id, class_id, assigned_offerings")
+        .eq("org_id", orgId),
+      departmentId,
+    ),
+    scopeDept(
+      supabase.from("instructor_skills").select("instructor_id, is_certified, expires_at"),
+      departmentId,
+    ),
+    scopeDept(
+      supabase
+        .from("class_skill_requirements")
+        .select("class_id")
+        .eq("org_id", orgId)
+        .eq("requirement", "required"),
+      departmentId,
+    ),
+    scopeDept(
+      supabase.from("classes").select("id").eq("org_id", orgId).is("deleted_at", null),
+      departmentId,
+    ),
   ]);
 
   const wanted = filters.instructor_ids.length > 0 ? new Set(filters.instructor_ids) : null;

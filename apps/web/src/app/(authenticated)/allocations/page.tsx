@@ -1,6 +1,7 @@
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import AllocationsView from "./allocations-view";
 import { type TeamRosterRow } from "./team-utilization-roster";
 import {
@@ -20,7 +21,11 @@ import {
 } from "@arbor/shared";
 
 export default async function AllocationsPage() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
   if (!orgId) {
     return (
       <div>
@@ -51,35 +56,56 @@ export default async function AllocationsPage() {
     // Fetch ALL buckets incl. archived — the Buckets tab needs the archived
     // ones for its "Show archived" / Restore UI. Every other consumer below
     // (pickers, summary) gets the active-only `buckets` derived from this.
-    supabase.from("allocation_buckets").select("*").eq("org_id", orgId).order("display_order"),
-    supabase.from("global_allocations").select("*").eq("org_id", orgId),
-    supabase.from("allocation_groups").select("*").eq("org_id", orgId).order("name"),
-    supabase.from("allocation_group_members").select("*").eq("org_id", orgId),
-    supabase.from("group_allocations").select("*").eq("org_id", orgId),
-    supabase
-      .from("instructors")
-      .select("*")
-      .eq("org_id", orgId)
-      .eq("is_external", false)
-      .is("deleted_at", null)
-      .order("full_name"),
-    supabase.from("individual_allocations").select("*").eq("org_id", orgId),
-    supabase
-      .from("recurring_tasks")
-      .select("*")
-      .eq("org_id", orgId)
-      .is("deleted_at", null)
-      .order("name"),
-    supabase.from("recurring_task_assignments").select("*").eq("org_id", orgId),
-    supabase
-      .from("ad_hoc_tasks")
-      .select("*")
-      .eq("org_id", orgId)
-      .order("created_at", { ascending: false }),
-    supabase.from("v_bucket_consumption").select("*").eq("org_id", orgId),
+    applyDeptScope(
+      supabase.from("allocation_buckets").select("*").eq("org_id", orgId).order("display_order"),
+      scope,
+    ),
+    applyDeptScope(supabase.from("global_allocations").select("*").eq("org_id", orgId), scope),
+    applyDeptScope(
+      supabase.from("allocation_groups").select("*").eq("org_id", orgId).order("name"),
+      scope,
+    ),
+    applyDeptScope(
+      supabase.from("allocation_group_members").select("*").eq("org_id", orgId),
+      scope,
+    ),
+    applyDeptScope(supabase.from("group_allocations").select("*").eq("org_id", orgId), scope),
+    applyDeptScope(
+      supabase
+        .from("instructors")
+        .select("*")
+        .eq("org_id", orgId)
+        .eq("is_external", false)
+        .is("deleted_at", null)
+        .order("full_name"),
+      scope,
+    ),
+    applyDeptScope(supabase.from("individual_allocations").select("*").eq("org_id", orgId), scope),
+    applyDeptScope(
+      supabase
+        .from("recurring_tasks")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .order("name"),
+      scope,
+    ),
+    applyDeptScope(
+      supabase.from("recurring_task_assignments").select("*").eq("org_id", orgId),
+      scope,
+    ),
+    applyDeptScope(
+      supabase
+        .from("ad_hoc_tasks")
+        .select("*")
+        .eq("org_id", orgId)
+        .order("created_at", { ascending: false }),
+      scope,
+    ),
+    applyDeptScope(supabase.from("v_bucket_consumption").select("*").eq("org_id", orgId), scope),
     // For the summary dashboard at the top of the page.
-    supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId),
-    supabase.from("v_instructor_workload").select("*").eq("org_id", orgId),
+    applyDeptScope(supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId), scope),
+    applyDeptScope(supabase.from("v_instructor_workload").select("*").eq("org_id", orgId), scope),
   ]);
 
   const allBuckets = (bucketRows ?? []) as AllocationBucket[];

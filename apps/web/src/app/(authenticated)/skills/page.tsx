@@ -1,6 +1,7 @@
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import SkillsView, {
   type ClassGap,
   type CoverageCount,
@@ -10,7 +11,11 @@ import SkillsView, {
 import type { Skill, Proficiency } from "@arbor/shared";
 
 export default async function SkillsPage() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
   if (!orgId) {
     return (
       <div>
@@ -37,37 +42,49 @@ export default async function SkillsPage() {
     { data: matrixInstructorsRaw },
     { data: expiringRaw },
   ] = await Promise.all([
-    supabase.from("skills").select("*").eq("org_id", orgId).order("name"),
-    supabase
-      .from("instructor_skills")
-      .select("skill_id, proficiency, instructor_id, instructors!inner(deleted_at,status,org_id)")
-      .eq("org_id", orgId),
-    supabase
-      .from("classes")
-      .select("id,name,class_skill_requirements!inner(requirement)")
-      .eq("org_id", orgId)
-      .is("deleted_at", null)
-      .eq("class_skill_requirements.requirement", "required"),
+    applyDeptScope(supabase.from("skills").select("*").eq("org_id", orgId).order("name"), scope),
+    applyDeptScope(
+      supabase
+        .from("instructor_skills")
+        .select("skill_id, proficiency, instructor_id, instructors!inner(deleted_at,status,org_id)")
+        .eq("org_id", orgId),
+      scope,
+    ),
+    applyDeptScope(
+      supabase
+        .from("classes")
+        .select("id,name,class_skill_requirements!inner(requirement)")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .eq("class_skill_requirements.requirement", "required"),
+      scope,
+    ),
     supabase.rpc("qualified_instructors_for_org", { p_org_id: orgId }),
-    supabase
-      .from("instructors")
-      .select("id, full_name")
-      .eq("org_id", orgId)
-      .eq("status", "active")
-      .eq("is_external", false)
-      .is("deleted_at", null)
-      .order("full_name"),
-    supabase
-      .from("instructor_skills")
-      .select(
-        "id,instructor_id,skill_id,expires_at,instructors!inner(full_name),skills!inner(name)",
-      )
-      .eq("org_id", orgId)
-      .eq("is_certified", true)
-      .not("expires_at", "is", null)
-      .gte("expires_at", todayStr)
-      .lte("expires_at", ninetyStr)
-      .order("expires_at"),
+    applyDeptScope(
+      supabase
+        .from("instructors")
+        .select("id, full_name")
+        .eq("org_id", orgId)
+        .eq("status", "active")
+        .eq("is_external", false)
+        .is("deleted_at", null)
+        .order("full_name"),
+      scope,
+    ),
+    applyDeptScope(
+      supabase
+        .from("instructor_skills")
+        .select(
+          "id,instructor_id,skill_id,expires_at,instructors!inner(full_name),skills!inner(name)",
+        )
+        .eq("org_id", orgId)
+        .eq("is_certified", true)
+        .not("expires_at", "is", null)
+        .gte("expires_at", todayStr)
+        .lte("expires_at", ninetyStr)
+        .order("expires_at"),
+      scope,
+    ),
   ]);
 
   const skills = (skillsData ?? []) as Skill[];

@@ -47,6 +47,7 @@ import {
 } from "@arbor/shared";
 import type {
   ClassWithHours,
+  ClassModule,
   Instructor,
   Skill,
   Proficiency,
@@ -78,6 +79,7 @@ type Props = {
   qualifiedInstructorCount: number;
   roadmapSteps: RoadmapStep[];
   superUsers: SuperUser[];
+  modules: ClassModule[];
 };
 
 type Tab = "overview" | "roadmap" | "instructors" | "skills" | "super_users" | "audit";
@@ -1552,6 +1554,7 @@ export default function ClassDetailClient({
   qualifiedInstructorCount,
   roadmapSteps,
   superUsers,
+  modules,
 }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
@@ -1649,6 +1652,7 @@ export default function ClassDetailClient({
               <ClassFormDialog
                 mode="edit"
                 cls={cls}
+                modules={modules}
                 trigger={
                   <button
                     type="button"

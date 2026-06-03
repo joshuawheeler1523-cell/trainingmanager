@@ -4,7 +4,7 @@ import {
   type WorkloadReportFilters,
   type WorkloadRow,
 } from "@arbor/shared";
-import type { TypedSupabase } from "./types";
+import { scopeDept, type TypedSupabase } from "./types";
 
 // Instructor Workload Report (User Guide §12.2): per-instructor 6-source
 // breakdown + utilization band. The 6 sources are:
@@ -16,18 +16,22 @@ import type { TypedSupabase } from "./types";
 export async function queryWorkloadReport(
   supabase: TypedSupabase,
   orgId: string,
+  departmentId: string | null,
   filters: WorkloadReportFilters,
 ): Promise<WorkloadDataset> {
   const [{ data: instructors }, { data: capacity }, { data: workload }] = await Promise.all([
-    supabase
-      .from("instructors")
-      .select("id, full_name, annual_hours, status, deleted_at")
-      .eq("org_id", orgId)
-      .eq("is_external", false)
-      .is("deleted_at", null)
-      .eq("status", "active"),
-    supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId),
-    supabase.from("v_instructor_workload").select("*").eq("org_id", orgId),
+    scopeDept(
+      supabase
+        .from("instructors")
+        .select("id, full_name, annual_hours, status, deleted_at")
+        .eq("org_id", orgId)
+        .eq("is_external", false)
+        .is("deleted_at", null)
+        .eq("status", "active"),
+      departmentId,
+    ),
+    scopeDept(supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId), departmentId),
+    scopeDept(supabase.from("v_instructor_workload").select("*").eq("org_id", orgId), departmentId),
   ]);
 
   const allowedIds = filters.instructor_ids.length > 0 ? new Set(filters.instructor_ids) : null;
