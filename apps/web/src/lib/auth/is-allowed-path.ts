@@ -7,6 +7,7 @@ const UNAUTHENTICATED_ALLOWED = [
   "/auth/verify",
   "/accept-invite/", // token-gated set-password page for new users
   "/public/",
+  "/feedback/", // token-gated anonymous instructor-feedback (QR) page
   "/agency-signup",
   "/legal",
   "/trust",
@@ -32,6 +33,7 @@ const ORG_CHECK_SKIP = [
   "/auth/verify",
   "/accept-invite/",
   "/public/",
+  "/feedback/",
   "/agency",
   "/agency-signup",
   "/legal",
