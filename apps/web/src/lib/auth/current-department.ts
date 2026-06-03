@@ -64,8 +64,24 @@ export const getCurrentDepartmentId = cache(async (): Promise<string | null> => 
     .order("accepted_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (anyMembership?.department_id) return anyMembership.department_id;
 
-  return anyMembership?.department_id ?? null;
+  // Managers (incl. agency admins) have access to every department in the org
+  // but may hold no membership row, and the org may have no 'general'-slug
+  // department (all departments renamed/custom). Rather than dead-end with
+  // "no active department", default to the org's oldest department.
+  if (isAdmin) {
+    const { data: oldest } = await supabase
+      .from("departments")
+      .select("id")
+      .eq("org_id", orgId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    return oldest?.id ?? null;
+  }
+
+  return null;
 });
 
 // Managers implicitly have access to every department in their org. Resolve via
