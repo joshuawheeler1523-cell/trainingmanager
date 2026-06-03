@@ -485,7 +485,6 @@ function DeliverableCard({ row }: { row: DeliverableRow }) {
       await generateFeedbackLink({
         sourceType: row.sourceType,
         sourceId: row.sourceId,
-        departmentId: row.departmentId,
         label: row.label,
       });
       router.refresh();

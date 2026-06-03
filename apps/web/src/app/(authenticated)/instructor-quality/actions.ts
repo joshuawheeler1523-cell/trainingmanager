@@ -25,7 +25,6 @@ type SourceType = (typeof SOURCE_TYPES)[number];
 export async function generateFeedbackLink(input: {
   sourceType: string;
   sourceId: string;
-  departmentId: string;
   label: string;
 }): Promise<ActionResult<{ token: string }>> {
   if (!SOURCE_TYPES.includes(input.sourceType as SourceType)) {
@@ -33,13 +32,30 @@ export async function generateFeedbackLink(input: {
   }
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!(await isManager(orgId))) {
+    return { ok: false, error: { code: "FORBIDDEN", message: "Managers only" } };
+  }
+
+  // Derive the department from the real deliverable (also validates it exists
+  // in this org) — never trust a client-supplied department.
+  const { data: deliverable } = await supabase
+    .from("v_instructor_workload")
+    .select("department_id")
+    .eq("org_id", orgId)
+    .eq("source", input.sourceType)
+    .eq("source_id", input.sourceId)
+    .limit(1)
+    .maybeSingle();
+  if (!deliverable?.department_id) {
+    return { ok: false, error: { code: "NO_DELIVERABLE", message: "Deliverable not found" } };
+  }
 
   const { data, error } = await supabase
     .from("instructor_feedback_links")
     .upsert(
       {
         org_id: orgId,
-        department_id: input.departmentId,
+        department_id: deliverable.department_id,
         source_type: input.sourceType,
         source_id: input.sourceId,
         label: input.label,
@@ -61,6 +77,9 @@ export async function setFeedbackLinkActive(
 ): Promise<ActionResult<true>> {
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!(await isManager(orgId))) {
+    return { ok: false, error: { code: "FORBIDDEN", message: "Managers only" } };
+  }
   const { error } = await supabase
     .from("instructor_feedback_links")
     .update({ is_active: active })

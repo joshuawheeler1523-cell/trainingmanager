@@ -5,6 +5,8 @@ import { headers } from "next/headers";
 import { env } from "@/lib/env";
 import type { Database } from "@/lib/supabase/database.types";
 
+type SubmitArgs = Database["public"]["Functions"]["submit_instructor_feedback"]["Args"];
+
 type ActionResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } };
@@ -13,11 +15,12 @@ function err(message: string): ActionResult<never> {
   return { ok: false, error: { code: "INVALID", message } };
 }
 
-// Coerce to an int within [min,max]; anything outside / falsy → null.
-function clampInt(v: number | null | undefined, min: number, max: number): number | null {
-  if (v == null || Number.isNaN(v)) return null;
+// Coerce to an int within [min,max]; anything outside / falsy → undefined
+// (which omits the RPC arg so the function falls back to its DEFAULT null).
+function clampInt(v: number | null | undefined, min: number, max: number): number | undefined {
+  if (v == null || Number.isNaN(v)) return undefined;
   const n = Math.round(v);
-  return n >= min && n <= max ? n : null;
+  return n >= min && n <= max ? n : undefined;
 }
 
 export type FeedbackInput = {
@@ -52,44 +55,37 @@ export async function submitInstructorFeedback(
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 
-  // Resolve token → deliverable. anon SELECT is allowed only for active links.
-  const { data: link } = await anon
-    .from("instructor_feedback_links")
-    .select("id, org_id, department_id, source_type, source_id")
-    .eq("token", token)
-    .maybeSingle();
-  if (!link) return err("This feedback link is no longer active.");
-
-  // The picked instructor must actually be on this deliverable.
-  const { data: ctxRaw } = await anon.rpc("feedback_link_context", { p_token: token });
-  const ctx = ctxRaw as { instructors?: { id: string }[] } | null;
-  if (!ctx?.instructors?.some((i) => i.id === input.instructorId)) {
-    return err("That instructor isn't listed for this session.");
-  }
-
   const h = await headers();
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? null;
   const userAgent = h.get("user-agent") ?? null;
 
-  const { error } = await anon.from("instructor_feedback").insert({
-    org_id: link.org_id,
-    department_id: link.department_id,
-    link_id: link.id,
-    source_type: link.source_type,
-    source_id: link.source_id,
-    instructor_id: input.instructorId,
-    kirkpatrick_level: 1,
-    rating_overall: overall,
-    rating_knowledge: clampInt(input.knowledge, 1, 5),
-    rating_clarity: clampInt(input.clarity, 1, 5),
-    rating_engagement: clampInt(input.engagement, 1, 5),
-    rating_pace: clampInt(input.pace, 1, 5),
-    would_recommend: input.recommend == null ? null : clampInt(input.recommend, 0, 10),
-    comment: input.comment?.trim() || null,
-    respondent_name: input.respondentName?.trim() || null,
-    ip,
-    user_agent: userAgent,
-  });
-  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  // Single token-gated SECURITY DEFINER RPC: it resolves the link, derives the
+  // tenant columns server-side, verifies the instructor is on the deliverable,
+  // rate-limits, and inserts. anon has no direct table insert/select.
+  const { error } = await anon.rpc("submit_instructor_feedback", {
+    p_token: token,
+    p_instructor_id: input.instructorId,
+    p_overall: overall,
+    p_knowledge: clampInt(input.knowledge, 1, 5),
+    p_clarity: clampInt(input.clarity, 1, 5),
+    p_engagement: clampInt(input.engagement, 1, 5),
+    p_pace: clampInt(input.pace, 1, 5),
+    p_recommend: input.recommend == null ? undefined : clampInt(input.recommend, 0, 10),
+    p_comment: input.comment?.trim() || undefined,
+    p_respondent_name: input.respondentName?.trim() || undefined,
+    p_ip: ip ?? undefined,
+    p_user_agent: userAgent ?? undefined,
+  } as SubmitArgs);
+  if (error) {
+    const m = error.message;
+    const friendly = m.includes("inactive_link")
+      ? "This feedback link is no longer active."
+      : m.includes("instructor_not_on_deliverable")
+        ? "That instructor isn't listed for this session."
+        : m.includes("rate_limited")
+          ? "You've already submitted feedback recently — thank you!"
+          : m;
+    return { ok: false, error: { code: error.code, message: friendly } };
+  }
   return { ok: true, data: true };
 }

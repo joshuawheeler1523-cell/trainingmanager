@@ -6472,6 +6472,23 @@ export type Database = {
         }[];
       };
       snapshot_capacity: { Args: never; Returns: undefined };
+      submit_instructor_feedback: {
+        Args: {
+          p_clarity?: number;
+          p_comment?: string;
+          p_engagement?: number;
+          p_instructor_id: string;
+          p_ip?: string;
+          p_knowledge?: number;
+          p_overall: number;
+          p_pace?: number;
+          p_recommend?: number;
+          p_respondent_name?: string;
+          p_token: string;
+          p_user_agent?: string;
+        };
+        Returns: undefined;
+      };
       user_department_ids: { Args: never; Returns: string[] };
       user_org_ids: { Args: never; Returns: string[] };
       user_role_in_org: { Args: { p_org_id: string }; Returns: string };
