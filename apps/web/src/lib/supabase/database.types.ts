@@ -6197,6 +6197,89 @@ export type Database = {
           },
         ];
       };
+      v_instructor_quality_by_source: {
+        Row: {
+          department_id: string | null;
+          instructor_id: string | null;
+          nps: number | null;
+          nps_responses: number | null;
+          org_id: string | null;
+          overall_avg: number | null;
+          response_count: number | null;
+          source_type: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instructor_feedback_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      v_instructor_quality_monthly: {
+        Row: {
+          department_id: string | null;
+          instructor_id: string | null;
+          month: string | null;
+          nps: number | null;
+          org_id: string | null;
+          overall_avg: number | null;
+          response_count: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instructor_feedback_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       v_instructor_workload: {
         Row: {
           annual_hours: number | null;
