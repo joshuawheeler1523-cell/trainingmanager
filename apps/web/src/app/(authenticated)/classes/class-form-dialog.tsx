@@ -579,13 +579,18 @@ export default function ClassFormDialog(props: Props) {
   }
 
   async function onSubmit(data: ClassInput) {
-    if (step < 1) {
-      setStep((s) => (s + 1) as Step);
-      return;
-    }
-    if (step === 1 && !isEdit) {
-      setStep(2);
-      return;
+    // Create is a 3-step wizard — advance instead of submitting until the last
+    // step. Edit shows every field at once, so save immediately (no stepping;
+    // otherwise the first "Save changes" click just advances a hidden counter).
+    if (!isEdit) {
+      if (step < 1) {
+        setStep((s) => (s + 1) as Step);
+        return;
+      }
+      if (step === 1) {
+        setStep(2);
+        return;
+      }
     }
 
     const result = isEdit ? await updateClass(props.cls.id, data) : await createClass(data);
