@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   CheckCircleIcon,
   ChevronUpDownIcon,
@@ -45,27 +45,36 @@ type Props = {
 };
 
 export default function InstructorsView(props: Props) {
-  const router = useRouter();
-  const pathname = usePathname();
   const sp = useSearchParams();
   const tabParam = sp.get("tab");
   // Old "actual_vs_projected" param maps to the simplified "capacity" tab so
   // existing bookmarks keep working.
-  const tab: Tab =
+  const initialTab: Tab =
     tabParam === "capacity" || tabParam === "actual_vs_projected"
       ? "capacity"
       : tabParam === "recommendations"
         ? "recommendations"
         : "roster";
 
+  // Tab is local presentation state: all three tabs render from data already
+  // loaded as props, so switching must NOT navigate (router.push re-runs the
+  // page's server component, re-querying the org-wide capacity/workload views
+  // on every click — that was the slowness). Seed from the URL for deep links
+  // and persist back via replaceState so the tab stays shareable.
+  const [tab, setTabState] = useState<Tab>(initialTab);
+
   function setTab(next: Tab) {
-    const params = new URLSearchParams(sp.toString());
-    if (next === "roster") {
-      params.delete("tab");
-    } else {
-      params.set("tab", next);
-    }
-    router.push(`${pathname}?${params.toString()}`);
+    setTabState(next);
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (next === "roster") params.delete("tab");
+    else params.set("tab", next);
+    const qs = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
+    );
   }
 
   return (
