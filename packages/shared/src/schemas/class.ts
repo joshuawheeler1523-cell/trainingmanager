@@ -24,7 +24,10 @@ const classFieldsSchema = z.object({
   custom_day_hours: z
     .array(z.coerce.number().min(0, "Hours must be 0 or more"))
     .nullish()
-    .transform((v) => v ?? null),
+    // An empty array means "no per-day overrides" — same as null. The class
+    // form's field array hands us [] for classes that don't use custom hours,
+    // and a bare [] would otherwise fail the "exactly N entries" refine below.
+    .transform((v) => (v == null || v.length === 0 ? null : v)),
   offerings_per_year: z.coerce.number().int().min(0).default(0),
   prep_hours_per_offering: z.coerce.number().min(0).default(0),
   logistics_hours_per_offering: z.coerce.number().min(0).default(0),
@@ -42,7 +45,11 @@ export const classInputSchema = classFieldsSchema.superRefine((data, ctx) => {
       path: ["total_days"],
     });
   }
-  if (data.custom_day_hours != null && data.custom_day_hours.length !== data.total_days) {
+  if (
+    data.custom_day_hours != null &&
+    data.custom_day_hours.length > 0 &&
+    data.custom_day_hours.length !== data.total_days
+  ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: `Custom day hours must have exactly ${String(data.total_days)} entries`,
