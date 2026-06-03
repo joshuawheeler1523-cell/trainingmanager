@@ -4,25 +4,36 @@ import { ArrowLeftIcon } from "@heroicons/react/20/solid";
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import ModulesClient, { type ModuleRow } from "./modules-client";
 import type { ClassModule } from "@arbor/shared";
 
 async function ModulesBody() {
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
   if (!orgId) return null;
 
   const [{ data: modules }, { data: classes }] = await Promise.all([
-    supabase
-      .from("class_modules")
-      .select("*")
-      .eq("org_id", orgId)
-      .is("deleted_at", null)
-      .order("name"),
-    supabase
-      .from("classes_with_hours")
-      .select("id, module_id, annual_class_hours")
-      .eq("org_id", orgId)
-      .is("deleted_at", null),
+    applyDeptScope(
+      supabase
+        .from("class_modules")
+        .select("*")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .order("name"),
+      scope,
+    ),
+    applyDeptScope(
+      supabase
+        .from("classes_with_hours")
+        .select("id, module_id, annual_class_hours")
+        .eq("org_id", orgId)
+        .is("deleted_at", null),
+      scope,
+    ),
   ]);
 
   const stats = new Map<string, { count: number; hours: number }>();

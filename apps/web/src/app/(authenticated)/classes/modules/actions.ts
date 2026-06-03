@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import { classModuleInputSchema, classModuleUpdateSchema } from "@arbor/shared";
 import type { ClassModule } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
@@ -30,12 +31,18 @@ export async function createClassModule(input: unknown): Promise<ActionResult<Cl
   const parsed = classModuleInputSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, departmentId] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getCurrentDepartmentId(),
+  ]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!departmentId)
+    return { ok: false, error: { code: "NO_DEPARTMENT", message: "No active department" } };
 
   const { data, error } = await supabase
     .from("class_modules")
-    .insert({ ...parsed.data, org_id: orgId })
+    .insert({ ...parsed.data, org_id: orgId, department_id: departmentId })
     .select()
     .single();
 

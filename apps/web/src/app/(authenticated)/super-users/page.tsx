@@ -3,6 +3,7 @@ import PageHeader from "@/components/ui/page-header";
 import EmptyState from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import SuperUsersView from "./super-users-view";
 import type { SuperUserWithClass } from "@arbor/shared";
 
@@ -16,14 +17,21 @@ async function SuperUsersBody({ searchParams }: { searchParams: SearchParams }) 
   const unitFilter = typeof sp["unit"] === "string" ? sp["unit"] : "";
   const showDeleted = sp["deleted"] === "1";
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
   if (!orgId) return null;
 
-  let query = supabase
-    .from("super_users")
-    .select("*, classes ( id, name )")
-    .eq("org_id", orgId)
-    .order("full_name");
+  let query = applyDeptScope(
+    supabase
+      .from("super_users")
+      .select("*, classes ( id, name )")
+      .eq("org_id", orgId)
+      .order("full_name"),
+    scope,
+  );
 
   if (showDeleted) {
     query = query.not("deleted_at", "is", null);
@@ -52,13 +60,16 @@ async function SuperUsersBody({ searchParams }: { searchParams: SearchParams }) 
 
   const [{ data: rows }, { data: classRows }] = await Promise.all([
     query,
-    supabase
-      .from("classes")
-      .select("id, name")
-      .eq("org_id", orgId)
-      .is("deleted_at", null)
-      .eq("status", "active")
-      .order("name"),
+    applyDeptScope(
+      supabase
+        .from("classes")
+        .select("id, name")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .eq("status", "active")
+        .order("name"),
+      scope,
+    ),
   ]);
 
   const list: SuperUserWithClass[] = (rows ?? []).map((row) => ({

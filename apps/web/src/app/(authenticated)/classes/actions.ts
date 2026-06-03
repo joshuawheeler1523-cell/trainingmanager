@@ -426,12 +426,14 @@ export async function importClassesCsv(rawRows: unknown): Promise<ActionResult<I
   }
 
   // Modules referenced by the `module` column are resolved by name (case-
-  // insensitive) and auto-created on first sight, so an import can introduce
-  // new modules inline without a separate step.
+  // insensitive) within the import's department and auto-created on first
+  // sight, so an import can introduce new modules inline without a separate
+  // step. Scoped to departmentId since modules are department-owned.
   const { data: existingModules } = await supabase
     .from("class_modules")
     .select("id, name")
     .eq("org_id", orgId)
+    .eq("department_id", departmentId)
     .is("deleted_at", null);
   const moduleIdByLowerName = new Map<string, string>();
   for (const m of existingModules ?? []) {
@@ -439,6 +441,7 @@ export async function importClassesCsv(rawRows: unknown): Promise<ActionResult<I
     if (!moduleIdByLowerName.has(key)) moduleIdByLowerName.set(key, m.id);
   }
   const resolvedOrgId = orgId;
+  const resolvedDepartmentId = departmentId;
   async function resolveModuleId(name: string | null): Promise<string | null> {
     if (!name) return null;
     const key = name.toLowerCase();
@@ -446,7 +449,7 @@ export async function importClassesCsv(rawRows: unknown): Promise<ActionResult<I
     if (existingId) return existingId;
     const { data: created } = await supabase
       .from("class_modules")
-      .insert({ org_id: resolvedOrgId, name })
+      .insert({ org_id: resolvedOrgId, department_id: resolvedDepartmentId, name })
       .select("id")
       .single();
     if (created) moduleIdByLowerName.set(key, created.id);

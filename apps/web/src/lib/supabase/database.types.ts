@@ -772,6 +772,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           deleted_at: string | null;
+          department_id: string;
           description: string | null;
           id: string;
           name: string;
@@ -784,6 +785,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
+          department_id: string;
           description?: string | null;
           id?: string;
           name: string;
@@ -796,6 +798,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           deleted_at?: string | null;
+          department_id?: string;
           description?: string | null;
           id?: string;
           name?: string;
@@ -804,6 +807,13 @@ export type Database = {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "class_modules_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "class_modules_org_id_fkey";
             columns: ["org_id"];

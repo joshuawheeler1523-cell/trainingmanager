@@ -75,6 +75,7 @@ export type ClassModuleUpdate = z.infer<typeof classModuleUpdateSchema>;
 export type ClassModule = {
   id: string;
   org_id: string;
+  department_id: string;
   name: string;
   description: string | null;
   color: string | null;

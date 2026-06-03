@@ -3,6 +3,7 @@ import PageHeader from "@/components/ui/page-header";
 import { Label } from "@/components/labels";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import InstructorsView from "./instructors-view";
 import {
   recommendOverAllocatedInstructors,
@@ -23,15 +24,22 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
   const department = typeof sp["department"] === "string" ? sp["department"] : "";
   const showDeleted = sp["deleted"] === "1";
 
-  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  const [supabase, orgId, scope] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getDepartmentScope(),
+  ]);
   if (!orgId) return null;
 
-  let query = supabase
-    .from("instructors")
-    .select("*")
-    .eq("org_id", orgId)
-    .eq("is_external", false)
-    .order("full_name");
+  let query = applyDeptScope(
+    supabase
+      .from("instructors")
+      .select("*")
+      .eq("org_id", orgId)
+      .eq("is_external", false)
+      .order("full_name"),
+    scope,
+  );
   if (showDeleted) {
     query = query.not("deleted_at", "is", null);
   } else {
@@ -52,21 +60,29 @@ async function InstructorsBody({ searchParams }: { searchParams: SearchParams })
     { count: activeInstructorCount },
   ] = await Promise.all([
     query,
-    supabase
-      .from("instructors")
-      .select("department")
-      .eq("org_id", orgId)
-      .eq("is_external", false)
-      .is("deleted_at", null)
-      .not("department", "is", null),
+    applyDeptScope(
+      supabase
+        .from("instructors")
+        .select("department")
+        .eq("org_id", orgId)
+        .eq("is_external", false)
+        .is("deleted_at", null)
+        .not("department", "is", null),
+      scope,
+    ),
+    // Views aren't department-scoped; they're keyed by instructor and only
+    // looked up for the already-filtered instructors, so keep them org-wide.
     supabase.from("v_instructor_capacity").select("*").eq("org_id", orgId),
     supabase.from("v_instructor_workload").select("*").eq("org_id", orgId),
-    supabase
-      .from("instructors")
-      .select("*", { count: "exact", head: true })
-      .eq("org_id", orgId)
-      .eq("is_external", false)
-      .is("deleted_at", null),
+    applyDeptScope(
+      supabase
+        .from("instructors")
+        .select("*", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("is_external", false)
+        .is("deleted_at", null),
+      scope,
+    ),
   ]);
 
   const list = (instructors ?? []) as Instructor[];
