@@ -1,34 +1,45 @@
 "use client";
 
 import { useState } from "react";
-import { submitInstructorFeedback } from "./actions";
+import { submitInstructorFeedback, type InstructorRating } from "./actions";
 
 type Instructor = { id: string; name: string };
+
+type Rating = {
+  overall: number;
+  knowledge: number;
+  clarity: number;
+  engagement: number;
+  pace: number;
+};
+
+const emptyRating = (): Rating => ({
+  overall: 0,
+  knowledge: 0,
+  clarity: 0,
+  engagement: 0,
+  pace: 0,
+});
 
 // ── Star rating (1–5) ────────────────────────────────────────────────────────
 function Stars({
   label,
   value,
   onChange,
-  required,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
-  required?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
-      <span className="text-foreground text-sm">
-        {label}
-        {required && <span className="text-destructive"> *</span>}
-      </span>
+      <span className="text-foreground text-sm">{label}</span>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             type="button"
-            aria-label={`${String(n)} of 5`}
+            aria-label={`${label}: ${String(n)} of 5`}
             onClick={() => {
               onChange(value === n ? 0 : n);
             }}
@@ -51,40 +62,52 @@ export default function InstructorFeedbackForm({
   token: string;
   instructors: Instructor[];
 }) {
-  const [instructorId, setInstructorId] = useState(
-    instructors.length === 1 ? (instructors[0]?.id ?? "") : "",
+  const [ratings, setRatings] = useState<Record<string, Rating>>(() =>
+    Object.fromEntries(instructors.map((i) => [i.id, emptyRating()])),
   );
-  const [overall, setOverall] = useState(0);
-  const [knowledge, setKnowledge] = useState(0);
-  const [clarity, setClarity] = useState(0);
-  const [engagement, setEngagement] = useState(0);
-  const [pace, setPace] = useState(0);
   const [recommend, setRecommend] = useState<number | null>(null);
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
+  const multi = instructors.length > 1;
+
+  function setField(instructorId: string, field: keyof Rating, value: number) {
+    setRatings((prev) => ({
+      ...prev,
+      [instructorId]: { ...(prev[instructorId] ?? emptyRating()), [field]: value },
+    }));
+  }
+
   async function handleSubmit() {
     setError(null);
-    if (!instructorId) {
-      setError("Please choose the instructor you're rating.");
+    const ratingList: InstructorRating[] = instructors
+      .map((i) => ({ id: i.id, r: ratings[i.id] ?? emptyRating() }))
+      .filter((x) => x.r.overall > 0)
+      .map((x) => ({
+        instructorId: x.id,
+        overall: x.r.overall,
+        knowledge: x.r.knowledge,
+        clarity: x.r.clarity,
+        engagement: x.r.engagement,
+        pace: x.r.pace,
+      }));
+
+    if (ratingList.length === 0) {
+      setError(
+        multi
+          ? "Please give an overall rating for at least one instructor."
+          : "Please give an overall rating.",
+      );
       return;
     }
-    if (!overall) {
-      setError("Please give an overall rating.");
-      return;
-    }
+
     setSubmitting(true);
     const result = await submitInstructorFeedback(token, {
-      instructorId,
-      overall,
-      knowledge,
-      clarity,
-      engagement,
-      pace,
       recommend,
       comment,
+      ratings: ratingList,
     });
     setSubmitting(false);
     if (result.ok) setDone(true);
@@ -108,45 +131,59 @@ export default function InstructorFeedbackForm({
 
   return (
     <div className="space-y-5">
-      {instructors.length > 1 && (
-        <div>
-          <label className="text-foreground mb-1.5 block text-sm font-medium">
-            Who are you rating? <span className="text-destructive">*</span>
-          </label>
-          <div className="space-y-1.5">
-            {instructors.map((i) => (
-              <label
-                key={i.id}
-                className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${
-                  instructorId === i.id ? "border-primary bg-primary/5" : "border-border"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="instructor"
-                  checked={instructorId === i.id}
-                  onChange={() => {
-                    setInstructorId(i.id);
-                  }}
-                />
-                <span className="text-foreground">{i.name}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+      {multi && (
+        <p className="text-muted-foreground text-sm">
+          This session had more than one instructor — please rate each one.
+        </p>
       )}
 
-      <div className="border-border rounded-lg border p-3">
-        <Stars label="Overall" value={overall} onChange={setOverall} required />
-        <Stars label="Knowledge & expertise" value={knowledge} onChange={setKnowledge} />
-        <Stars label="Clear explanations" value={clarity} onChange={setClarity} />
-        <Stars label="Kept me engaged" value={engagement} onChange={setEngagement} />
-        <Stars label="Pace was right" value={pace} onChange={setPace} />
-      </div>
+      {instructors.map((i) => {
+        const r = ratings[i.id] ?? emptyRating();
+        return (
+          <div key={i.id} className="border-border rounded-lg border p-3">
+            <p className="text-foreground mb-1 text-sm font-semibold">Rate {i.name}</p>
+            <Stars
+              label="Overall"
+              value={r.overall}
+              onChange={(v) => {
+                setField(i.id, "overall", v);
+              }}
+            />
+            <Stars
+              label="Knowledge & expertise"
+              value={r.knowledge}
+              onChange={(v) => {
+                setField(i.id, "knowledge", v);
+              }}
+            />
+            <Stars
+              label="Clear explanations"
+              value={r.clarity}
+              onChange={(v) => {
+                setField(i.id, "clarity", v);
+              }}
+            />
+            <Stars
+              label="Kept me engaged"
+              value={r.engagement}
+              onChange={(v) => {
+                setField(i.id, "engagement", v);
+              }}
+            />
+            <Stars
+              label="Pace was right"
+              value={r.pace}
+              onChange={(v) => {
+                setField(i.id, "pace", v);
+              }}
+            />
+          </div>
+        );
+      })}
 
       <div>
         <label className="text-foreground mb-1.5 block text-sm font-medium">
-          How likely are you to recommend this instructor? (0–10)
+          How likely are you to recommend this training? (0–10)
         </label>
         <div className="flex flex-wrap gap-1">
           {Array.from({ length: 11 }, (_, n) => (

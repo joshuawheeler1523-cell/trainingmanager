@@ -23,31 +23,47 @@ function clampInt(v: number | null | undefined, min: number, max: number): numbe
   return n >= min && n <= max ? n : undefined;
 }
 
-export type FeedbackInput = {
+export type InstructorRating = {
   instructorId: string;
   overall: number;
   knowledge?: number;
   clarity?: number;
   engagement?: number;
   pace?: number;
-  recommend?: number | null;
-  comment?: string;
-  respondentName?: string;
 };
 
+export type FeedbackInput = {
+  recommend?: number | null;
+  comment?: string;
+  ratings: InstructorRating[];
+};
+
+function friendlyError(message: string): string {
+  return message.includes("inactive_link")
+    ? "This feedback link is no longer active."
+    : message.includes("instructor_not_on_deliverable")
+      ? "That instructor isn't listed for this session."
+      : message.includes("rate_limited")
+        ? "You've already submitted feedback recently — thank you!"
+        : message;
+}
+
 /**
- * Anonymous L1 (reaction) feedback for an instructor, posted from the public
- * QR form. Mirrors the public-intake anon pattern: fresh anon client (no
- * cookies), token-gated, with the database RLS policy
- * `if_insert_public_anon` as the real guard.
+ * Anonymous L1 (reaction) feedback from the public QR form. A co-taught
+ * deliverable can carry several assigned instructors; the learner rates each
+ * one separately, so we write ONE feedback row per instructor (sharing the
+ * session-level recommend score + comment). Each row rolls up to that
+ * instructor's own scorecard. Token-gated; the SECURITY DEFINER RPC derives the
+ * tenant columns and verifies each instructor is on the deliverable.
  */
 export async function submitInstructorFeedback(
   token: string,
   input: FeedbackInput,
 ): Promise<ActionResult<true>> {
-  if (!input.instructorId) return err("Pick the instructor you're rating.");
-  const overall = clampInt(input.overall, 1, 5);
-  if (!overall) return err("Please give an overall rating.");
+  const ratings = input.ratings.filter((r) => r.instructorId && clampInt(r.overall, 1, 5));
+  if (ratings.length === 0) {
+    return err("Please give an overall rating for at least one instructor.");
+  }
 
   const anon = createSupabaseClient<Database>(
     env.NEXT_PUBLIC_SUPABASE_URL,
@@ -58,34 +74,26 @@ export async function submitInstructorFeedback(
   const h = await headers();
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? null;
   const userAgent = h.get("user-agent") ?? null;
+  const recommend = input.recommend == null ? undefined : clampInt(input.recommend, 0, 10);
+  const comment = input.comment?.trim() || undefined;
 
-  // Single token-gated SECURITY DEFINER RPC: it resolves the link, derives the
-  // tenant columns server-side, verifies the instructor is on the deliverable,
-  // rate-limits, and inserts. anon has no direct table insert/select.
-  const { error } = await anon.rpc("submit_instructor_feedback", {
-    p_token: token,
-    p_instructor_id: input.instructorId,
-    p_overall: overall,
-    p_knowledge: clampInt(input.knowledge, 1, 5),
-    p_clarity: clampInt(input.clarity, 1, 5),
-    p_engagement: clampInt(input.engagement, 1, 5),
-    p_pace: clampInt(input.pace, 1, 5),
-    p_recommend: input.recommend == null ? undefined : clampInt(input.recommend, 0, 10),
-    p_comment: input.comment?.trim() || undefined,
-    p_respondent_name: input.respondentName?.trim() || undefined,
-    p_ip: ip ?? undefined,
-    p_user_agent: userAgent ?? undefined,
-  } as SubmitArgs);
-  if (error) {
-    const m = error.message;
-    const friendly = m.includes("inactive_link")
-      ? "This feedback link is no longer active."
-      : m.includes("instructor_not_on_deliverable")
-        ? "That instructor isn't listed for this session."
-        : m.includes("rate_limited")
-          ? "You've already submitted feedback recently — thank you!"
-          : m;
-    return { ok: false, error: { code: error.code, message: friendly } };
+  for (const r of ratings) {
+    const { error } = await anon.rpc("submit_instructor_feedback", {
+      p_token: token,
+      p_instructor_id: r.instructorId,
+      p_overall: clampInt(r.overall, 1, 5),
+      p_knowledge: clampInt(r.knowledge, 1, 5),
+      p_clarity: clampInt(r.clarity, 1, 5),
+      p_engagement: clampInt(r.engagement, 1, 5),
+      p_pace: clampInt(r.pace, 1, 5),
+      p_recommend: recommend,
+      p_comment: comment,
+      p_ip: ip ?? undefined,
+      p_user_agent: userAgent ?? undefined,
+    } as SubmitArgs);
+    if (error) {
+      return { ok: false, error: { code: error.code, message: friendlyError(error.message) } };
+    }
   }
   return { ok: true, data: true };
 }
