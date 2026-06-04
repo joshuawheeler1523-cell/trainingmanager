@@ -990,7 +990,9 @@ export type Database = {
           offerings_per_year: number;
           org_id: string;
           prep_hours_per_offering: number;
+          prerequisites: string | null;
           status: string;
+          target_audience: string | null;
           total_days: number;
           updated_at: string;
           updated_by: string | null;
@@ -1013,7 +1015,9 @@ export type Database = {
           offerings_per_year?: number;
           org_id: string;
           prep_hours_per_offering?: number;
+          prerequisites?: string | null;
           status?: string;
+          target_audience?: string | null;
           total_days?: number;
           updated_at?: string;
           updated_by?: string | null;
@@ -1036,7 +1040,9 @@ export type Database = {
           offerings_per_year?: number;
           org_id?: string;
           prep_hours_per_offering?: number;
+          prerequisites?: string | null;
           status?: string;
+          target_audience?: string | null;
           total_days?: number;
           updated_at?: string;
           updated_by?: string | null;
@@ -2750,6 +2756,254 @@ export type Database = {
           },
           {
             foreignKeyName: "individual_allocations_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      instructor_feedback: {
+        Row: {
+          comment: string | null;
+          department_id: string;
+          id: string;
+          instructor_id: string;
+          ip: string | null;
+          kirkpatrick_level: number;
+          link_id: string;
+          org_id: string;
+          rating_clarity: number | null;
+          rating_engagement: number | null;
+          rating_knowledge: number | null;
+          rating_overall: number | null;
+          rating_pace: number | null;
+          respondent_name: string | null;
+          source_id: string;
+          source_type: string;
+          submitted_at: string;
+          user_agent: string | null;
+          would_recommend: number | null;
+        };
+        Insert: {
+          comment?: string | null;
+          department_id: string;
+          id?: string;
+          instructor_id: string;
+          ip?: string | null;
+          kirkpatrick_level?: number;
+          link_id: string;
+          org_id: string;
+          rating_clarity?: number | null;
+          rating_engagement?: number | null;
+          rating_knowledge?: number | null;
+          rating_overall?: number | null;
+          rating_pace?: number | null;
+          respondent_name?: string | null;
+          source_id: string;
+          source_type: string;
+          submitted_at?: string;
+          user_agent?: string | null;
+          would_recommend?: number | null;
+        };
+        Update: {
+          comment?: string | null;
+          department_id?: string;
+          id?: string;
+          instructor_id?: string;
+          ip?: string | null;
+          kirkpatrick_level?: number;
+          link_id?: string;
+          org_id?: string;
+          rating_clarity?: number | null;
+          rating_engagement?: number | null;
+          rating_knowledge?: number | null;
+          rating_overall?: number | null;
+          rating_pace?: number | null;
+          respondent_name?: string | null;
+          source_id?: string;
+          source_type?: string;
+          submitted_at?: string;
+          user_agent?: string | null;
+          would_recommend?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instructor_feedback_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_link_id_fkey";
+            columns: ["link_id"];
+            isOneToOne: false;
+            referencedRelation: "instructor_feedback_links";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      instructor_feedback_links: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          department_id: string;
+          expires_at: string | null;
+          id: string;
+          is_active: boolean;
+          label: string | null;
+          org_id: string;
+          source_id: string;
+          source_type: string;
+          token: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          department_id: string;
+          expires_at?: string | null;
+          id?: string;
+          is_active?: boolean;
+          label?: string | null;
+          org_id: string;
+          source_id: string;
+          source_type: string;
+          token?: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          department_id?: string;
+          expires_at?: string | null;
+          id?: string;
+          is_active?: boolean;
+          label?: string | null;
+          org_id?: string;
+          source_id?: string;
+          source_type?: string;
+          token?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instructor_feedback_links_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_links_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      instructor_quality_scores: {
+        Row: {
+          created_at: string;
+          department_id: string;
+          id: string;
+          instructor_id: string;
+          kirkpatrick_level: number;
+          metric: string;
+          note: string | null;
+          org_id: string;
+          period_label: string | null;
+          recorded_at: string;
+          recorded_by: string | null;
+          score: number;
+          score_max: number;
+          source_id: string | null;
+          source_type: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          department_id: string;
+          id?: string;
+          instructor_id: string;
+          kirkpatrick_level: number;
+          metric: string;
+          note?: string | null;
+          org_id: string;
+          period_label?: string | null;
+          recorded_at?: string;
+          recorded_by?: string | null;
+          score: number;
+          score_max?: number;
+          source_id?: string | null;
+          source_type?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          department_id?: string;
+          id?: string;
+          instructor_id?: string;
+          kirkpatrick_level?: number;
+          metric?: string;
+          note?: string | null;
+          org_id?: string;
+          period_label?: string | null;
+          recorded_at?: string;
+          recorded_by?: string | null;
+          score?: number;
+          score_max?: number;
+          source_id?: string | null;
+          source_type?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instructor_quality_scores_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_quality_scores_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_quality_scores_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
+            foreignKeyName: "instructor_quality_scores_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -5775,7 +6029,9 @@ export type Database = {
           offerings_per_year: number | null;
           org_id: string | null;
           prep_hours_per_offering: number | null;
+          prerequisites: string | null;
           status: string | null;
+          target_audience: string | null;
           total_days: number | null;
           total_hours_per_offering: number | null;
           updated_at: string | null;
@@ -5801,7 +6057,9 @@ export type Database = {
           offerings_per_year?: number | null;
           org_id?: string | null;
           prep_hours_per_offering?: number | null;
+          prerequisites?: string | null;
           status?: string | null;
+          target_audience?: string | null;
           total_days?: number | null;
           total_hours_per_offering?: never;
           updated_at?: string | null;
@@ -5827,7 +6085,9 @@ export type Database = {
           offerings_per_year?: number | null;
           org_id?: string | null;
           prep_hours_per_offering?: number | null;
+          prerequisites?: string | null;
           status?: string | null;
+          target_audience?: string | null;
           total_days?: number | null;
           total_hours_per_offering?: never;
           updated_at?: string | null;
@@ -5895,6 +6155,136 @@ export type Database = {
           },
           {
             foreignKeyName: "instructors_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      v_instructor_quality: {
+        Row: {
+          clarity_avg: number | null;
+          department_id: string | null;
+          detractors: number | null;
+          engagement_avg: number | null;
+          instructor_id: string | null;
+          knowledge_avg: number | null;
+          nps: number | null;
+          nps_responses: number | null;
+          org_id: string | null;
+          overall_avg: number | null;
+          pace_avg: number | null;
+          promoters: number | null;
+          response_count: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instructor_feedback_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      v_instructor_quality_by_source: {
+        Row: {
+          department_id: string | null;
+          instructor_id: string | null;
+          nps: number | null;
+          nps_responses: number | null;
+          org_id: string | null;
+          overall_avg: number | null;
+          response_count: number | null;
+          source_type: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instructor_feedback_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      v_instructor_quality_monthly: {
+        Row: {
+          department_id: string | null;
+          instructor_id: string | null;
+          month: string | null;
+          nps: number | null;
+          org_id: string | null;
+          overall_avg: number | null;
+          response_count: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instructor_feedback_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "instructors";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_instructor_id_fkey";
+            columns: ["instructor_id"];
+            isOneToOne: false;
+            referencedRelation: "v_instructor_capacity";
+            referencedColumns: ["instructor_id"];
+          },
+          {
+            foreignKeyName: "instructor_feedback_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
@@ -6032,6 +6422,7 @@ export type Database = {
           expired_domain: string;
         }[];
       };
+      feedback_link_context: { Args: { p_token: string }; Returns: Json };
       frequency_to_annual: { Args: { p_frequency: string }; Returns: number };
       generate_monthly_invoices_for_period: {
         Args: { p_period_end: string; p_period_start: string };
@@ -6176,6 +6567,23 @@ export type Database = {
         }[];
       };
       snapshot_capacity: { Args: never; Returns: undefined };
+      submit_instructor_feedback: {
+        Args: {
+          p_clarity?: number;
+          p_comment?: string;
+          p_engagement?: number;
+          p_instructor_id: string;
+          p_ip?: string;
+          p_knowledge?: number;
+          p_overall: number;
+          p_pace?: number;
+          p_recommend?: number;
+          p_respondent_name?: string;
+          p_token: string;
+          p_user_agent?: string;
+        };
+        Returns: undefined;
+      };
       user_department_ids: { Args: never; Returns: string[] };
       user_org_ids: { Args: never; Returns: string[] };
       user_role_in_org: { Args: { p_org_id: string }; Returns: string };

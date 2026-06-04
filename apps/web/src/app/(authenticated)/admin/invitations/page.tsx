@@ -1,11 +1,15 @@
-import { headers } from "next/headers";
 import PageHeader from "@/components/ui/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
+import { getPublicBaseUrl } from "@/lib/public-url";
 import InvitationsView, { type InvitationRow } from "./invitations-view";
 
 export default async function InvitationsPage() {
-  const [supabase, orgId, hdrs] = await Promise.all([createClient(), getCurrentOrgId(), headers()]);
+  const [supabase, orgId, origin] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getPublicBaseUrl(),
+  ]);
   if (!orgId) {
     return (
       <div>
@@ -20,10 +24,6 @@ export default async function InvitationsPage() {
     .select("id, email, role, visibility, token, expires_at, accepted_at, created_at")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false });
-
-  const proto = hdrs.get("x-forwarded-proto") ?? "https";
-  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "localhost:3000";
-  const origin = `${proto}://${host}`;
 
   const rows: InvitationRow[] = (data ?? []).map((i) => ({
     id: i.id,

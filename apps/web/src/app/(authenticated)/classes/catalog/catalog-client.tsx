@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { ArrowLeftIcon, PrinterIcon } from "@heroicons/react/20/solid";
+import * as XLSX from "xlsx";
+import { ArrowLeftIcon, PrinterIcon, ArrowDownTrayIcon } from "@heroicons/react/20/solid";
 import type { ClassWithHours } from "@arbor/shared";
 
 type Bucket = { id: string; name: string; color: string };
@@ -48,6 +49,64 @@ export default function CatalogClient({
   });
   const year = new Date().getFullYear();
 
+  // Flat, filterable Excel export — one row per class with AutoFilter pre-enabled
+  // so it opens already sortable/searchable (the "find what I need fast" job the
+  // PDF brochure can't do).
+  function exportExcel() {
+    const columns = [
+      "Category",
+      "Course",
+      "Description",
+      "Target audience",
+      "Prerequisites",
+      "Required skills / certs",
+      "Format",
+      "Offerings / yr",
+      "Hours per offering",
+      "Annual hours",
+    ];
+    const rows = classes
+      .map((c) => {
+        const category = bucketById[c.allocation_bucket_id ?? ""]?.name ?? "Uncategorized";
+        const reqs = (requirementsByClass[c.id] ?? []).map((r) =>
+          r.is_certification ? `${r.skill_name} (cert)` : r.skill_name,
+        );
+        return {
+          Category: category,
+          Course: c.name,
+          Description: c.description ?? "",
+          "Target audience": c.target_audience ?? "",
+          Prerequisites: c.prerequisites ?? "",
+          "Required skills / certs": reqs.join("; "),
+          Format: c.is_multi_day ? `Multi-day (${String(c.total_days)} days)` : "Single day",
+          "Offerings / yr": c.offerings_per_year,
+          "Hours per offering": c.total_hours_per_offering ?? "",
+          "Annual hours": c.annual_class_hours ?? "",
+        };
+      })
+      .sort((a, b) => a.Category.localeCompare(b.Category) || a.Course.localeCompare(b.Course));
+
+    const ws = XLSX.utils.json_to_sheet(rows, { header: columns });
+    ws["!autofilter"] = { ref: ws["!ref"] ?? "A1" };
+    ws["!cols"] = [22, 34, 44, 28, 26, 30, 18, 13, 16, 13].map((wch) => ({ wch }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Course Catalog");
+    const out = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    const blob = new Blob([out], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${orgName.replace(/[^\w -]/g, "").trim() || "Course"} Course Catalog.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 1000);
+  }
+
   // Group classes by bucket (or "Uncategorized") for the TOC.
   const grouped = useMemo(() => {
     const byBucket = new Map<string, ClassWithHours[]>();
@@ -91,9 +150,14 @@ export default function CatalogClient({
           Back to Classes
         </Link>
         <div className="flex items-center gap-2">
-          <p className="hidden text-xs text-slate-500 sm:block">
-            Use your browser&apos;s print dialog → <strong>Save as PDF</strong> for a digital copy.
-          </p>
+          <button
+            type="button"
+            onClick={exportExcel}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" />
+            Export to Excel
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -162,6 +226,16 @@ export default function CatalogClient({
                   </div>
                   <h2 className="course-title">{c.name}</h2>
                   {c.description && <p className="course-lead">{c.description}</p>}
+                  {c.target_audience && (
+                    <p className="course-lead" style={{ marginTop: 4 }}>
+                      <strong>Audience:</strong> {c.target_audience}
+                    </p>
+                  )}
+                  {c.prerequisites && (
+                    <p className="course-lead" style={{ marginTop: 4 }}>
+                      <strong>Prerequisites:</strong> {c.prerequisites}
+                    </p>
+                  )}
                 </header>
 
                 <div className="course-spec-grid">

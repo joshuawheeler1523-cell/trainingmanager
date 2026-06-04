@@ -5,10 +5,14 @@ import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
 import IntakeLinksView from "./intake-links-view";
 import type { PublicIntakeLink } from "@arbor/shared";
-import { headers } from "next/headers";
+import { getPublicBaseUrl } from "@/lib/public-url";
 
 export default async function IntakeLinksPage() {
-  const [supabase, orgId, hdrs] = await Promise.all([createClient(), getCurrentOrgId(), headers()]);
+  const [supabase, orgId, origin] = await Promise.all([
+    createClient(),
+    getCurrentOrgId(),
+    getPublicBaseUrl(),
+  ]);
   if (!orgId) notFound();
 
   const isAdmin = await isManager(orgId);
@@ -33,13 +37,6 @@ export default async function IntakeLinksPage() {
     .order("created_at", { ascending: false });
 
   const links = (data ?? []) as PublicIntakeLink[];
-
-  // Compute the public origin so the view can render copy-able URLs without
-  // the client needing to figure out the host. Fall back to localhost for
-  // dev where x-forwarded-host isn't set.
-  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host") ?? "localhost:3000";
-  const proto = hdrs.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
-  const origin = `${proto}://${host}`;
 
   return (
     <div>

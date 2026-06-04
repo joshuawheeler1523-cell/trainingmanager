@@ -100,9 +100,10 @@ function workGroup(modules: ModuleFlags, isAdmin: boolean): NavGroup {
 
 function insightsGroup(isAdmin: boolean): NavGroup {
   const items: NavItem[] = [{ href: "/reports", label: "Reports", icon: ChartBarIcon }];
-  // Forecast is an org/department-wide projection — a manager view.
+  // Forecast + Instructor Quality are org/department-wide manager views.
   if (isAdmin) {
     items.push({ href: "/forecast", label: "Forecast", icon: ArrowTrendingUpIcon });
+    items.push({ href: "/instructor-quality", label: "Instructor Quality", icon: StarIcon });
   }
   return { title: "Insights", items };
 }
