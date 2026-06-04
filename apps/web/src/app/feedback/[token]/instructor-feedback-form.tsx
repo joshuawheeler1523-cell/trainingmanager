@@ -4,7 +4,6 @@ import { useState } from "react";
 import { submitInstructorFeedback } from "./actions";
 
 type Instructor = { id: string; name: string };
-type Question = { id: string; prompt: string; options: string[] };
 
 // ── Star rating (1–5) ────────────────────────────────────────────────────────
 function Stars({
@@ -45,50 +44,12 @@ function Stars({
   );
 }
 
-// ── 1–5 scale selector ───────────────────────────────────────────────────────
-function Scale({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number | null;
-  onChange: (v: number | null) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-1">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            type="button"
-            aria-label={`${label}: ${String(n)} of 5`}
-            onClick={() => {
-              onChange(value === n ? null : n);
-            }}
-            className={`h-7 w-7 rounded-md border text-xs font-medium ${
-              value === n
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border text-foreground hover:bg-surface"
-            }`}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function InstructorFeedbackForm({
   token,
   instructors,
-  questions = [],
 }: {
   token: string;
   instructors: Instructor[];
-  questions?: Question[];
 }) {
   const [instructorId, setInstructorId] = useState(
     instructors.length === 1 ? (instructors[0]?.id ?? "") : "",
@@ -99,10 +60,6 @@ export default function InstructorFeedbackForm({
   const [engagement, setEngagement] = useState(0);
   const [pace, setPace] = useState(0);
   const [recommend, setRecommend] = useState<number | null>(null);
-  const [confidenceBefore, setConfidenceBefore] = useState<number | null>(null);
-  const [confidenceAfter, setConfidenceAfter] = useState<number | null>(null);
-  const [intent, setIntent] = useState<number | null>(null);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
   const [comment, setComment] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -128,10 +85,6 @@ export default function InstructorFeedbackForm({
       engagement,
       pace,
       recommend,
-      confidenceBefore,
-      confidenceAfter,
-      intent,
-      quizAnswers: Object.entries(answers).map(([q, a]) => ({ q, a })),
       comment,
       respondentName: name,
     });
@@ -185,43 +138,6 @@ export default function InstructorFeedbackForm({
         </div>
       )}
 
-      {questions.length > 0 && (
-        <div className="border-border rounded-lg border p-3">
-          <p className="text-foreground mb-2 text-sm font-medium">
-            Quick knowledge check (optional)
-          </p>
-          <div className="space-y-4">
-            {questions.map((q, qi) => (
-              <fieldset key={q.id}>
-                <legend className="text-foreground mb-1.5 text-sm">
-                  {qi + 1}. {q.prompt}
-                </legend>
-                <div className="space-y-1.5">
-                  {q.options.map((opt, oi) => (
-                    <label
-                      key={oi}
-                      className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${
-                        answers[q.id] === oi ? "border-primary bg-primary/5" : "border-border"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name={`q-${q.id}`}
-                        checked={answers[q.id] === oi}
-                        onChange={() => {
-                          setAnswers((a) => ({ ...a, [q.id]: oi }));
-                        }}
-                      />
-                      <span className="text-foreground">{opt}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="border-border rounded-lg border p-3">
         <Stars label="Overall" value={overall} onChange={setOverall} required />
         <Stars label="Knowledge & expertise" value={knowledge} onChange={setKnowledge} />
@@ -251,20 +167,6 @@ export default function InstructorFeedbackForm({
               {n}
             </button>
           ))}
-        </div>
-      </div>
-
-      <div className="border-border rounded-lg border p-3">
-        <p className="text-foreground mb-1 text-sm font-medium">
-          Applying what this covered (optional)
-        </p>
-        <p className="text-muted-foreground mb-2.5 text-xs">
-          &ldquo;I can apply what this covered in my work.&rdquo;
-        </p>
-        <Scale label="Before today" value={confidenceBefore} onChange={setConfidenceBefore} />
-        <Scale label="Now" value={confidenceAfter} onChange={setConfidenceAfter} />
-        <div className="border-border mt-2 border-t pt-2">
-          <Scale label="I intend to apply what I learned" value={intent} onChange={setIntent} />
         </div>
       </div>
 

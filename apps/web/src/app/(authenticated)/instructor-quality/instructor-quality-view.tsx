@@ -11,13 +11,7 @@ import {
   PhotoIcon,
   ArrowDownTrayIcon,
 } from "@heroicons/react/20/solid";
-import {
-  addFeedbackQuestion,
-  deleteFeedbackQuestion,
-  generateFeedbackLink,
-  recordQualityScore,
-  setFeedbackLinkActive,
-} from "./actions";
+import { generateFeedbackLink, recordQualityScore, setFeedbackLinkActive } from "./actions";
 import InstructorQualityScorecard from "@/components/instructor-quality-scorecard";
 import type { InstructorQuality } from "@/lib/instructor-quality";
 
@@ -26,13 +20,6 @@ export type InstructorRow = {
   name: string;
   department: string | null;
   quality: InstructorQuality;
-};
-
-export type QuizQuestion = {
-  id: string;
-  prompt: string;
-  options: string[];
-  correctIndex: number;
 };
 
 export type DeliverableRow = {
@@ -50,7 +37,6 @@ export type DeliverableRow = {
     qr: string;
     svg: string;
   } | null;
-  questions: QuizQuestion[];
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -581,7 +567,6 @@ function DeliverableCard({ row }: { row: DeliverableRow }) {
             <span aria-live="polite" className="sr-only">
               {announce}
             </span>
-            <QuizEditor linkId={row.link.id} questions={row.questions} />
           </div>
         ) : (
           <button
@@ -604,172 +589,6 @@ function DeliverableCard({ row }: { row: DeliverableRow }) {
           className="border-border h-[88px] w-[88px] shrink-0 rounded-md border"
           unoptimized
         />
-      )}
-    </div>
-  );
-}
-
-// Manager-authored knowledge check (objective L2) for a deliverable's link.
-// The correct answer is stored server-side and never served to the QR form.
-function QuizEditor({ linkId, questions }: { linkId: string; questions: QuizQuestion[] }) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const [adding, setAdding] = useState(false);
-  const [prompt, setPrompt] = useState("");
-  const [options, setOptions] = useState(["", "", "", ""]);
-  const [correctIndex, setCorrectIndex] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-
-  function reset() {
-    setPrompt("");
-    setOptions(["", "", "", ""]);
-    setCorrectIndex(0);
-    setError(null);
-    setAdding(false);
-  }
-
-  function save() {
-    setError(null);
-    startTransition(async () => {
-      const result = await addFeedbackQuestion({ linkId, prompt, options, correctIndex });
-      if (result.ok) {
-        reset();
-        router.refresh();
-      } else {
-        setError(result.error.message);
-      }
-    });
-  }
-
-  function remove(id: string) {
-    startTransition(async () => {
-      await deleteFeedbackQuestion(id);
-      router.refresh();
-    });
-  }
-
-  const fieldCls =
-    "border-input bg-background text-foreground focus:ring-ring rounded-md border px-2 py-1 text-xs focus:outline-none focus:ring-2";
-
-  return (
-    <div className="border-border mt-1 border-t pt-2">
-      <button
-        type="button"
-        onClick={() => {
-          setOpen((v) => !v);
-        }}
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
-      >
-        <QrCodeIcon className="h-3.5 w-3.5" />
-        Knowledge check ({questions.length})<span className="text-[10px]">{open ? "▲" : "▼"}</span>
-      </button>
-
-      {open && (
-        <div className="mt-2 space-y-2">
-          {questions.length === 0 && !adding && (
-            <p className="text-muted-foreground text-xs">
-              Add 2–5 questions to score what learners actually retained (objective L2). Optional.
-            </p>
-          )}
-          {questions.map((q, qi) => (
-            <div key={q.id} className="border-border bg-surface rounded-md border p-2 text-xs">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-foreground font-medium">
-                  {qi + 1}. {q.prompt}
-                </p>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => {
-                    remove(q.id);
-                  }}
-                  className="text-muted-foreground hover:text-danger shrink-0"
-                  title="Delete question"
-                >
-                  ✕
-                </button>
-              </div>
-              <ul className="mt-1 space-y-0.5">
-                {q.options.map((o, oi) => (
-                  <li
-                    key={oi}
-                    className={oi === q.correctIndex ? "text-success" : "text-muted-foreground"}
-                  >
-                    {oi === q.correctIndex ? "✓ " : "· "}
-                    {o}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-
-          {adding ? (
-            <div className="border-border bg-surface space-y-2 rounded-md border p-2">
-              <input
-                value={prompt}
-                onChange={(e) => {
-                  setPrompt(e.target.value);
-                }}
-                placeholder="Question"
-                className={`${fieldCls} w-full`}
-              />
-              {options.map((o, oi) => (
-                <label key={oi} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name={`correct-${linkId}`}
-                    checked={correctIndex === oi}
-                    onChange={() => {
-                      setCorrectIndex(oi);
-                    }}
-                    title="Mark as the correct answer"
-                  />
-                  <input
-                    value={o}
-                    onChange={(e) => {
-                      setOptions((prev) => prev.map((p, i) => (i === oi ? e.target.value : p)));
-                    }}
-                    placeholder={`Option ${String(oi + 1)}${oi > 1 ? " (optional)" : ""}`}
-                    className={`${fieldCls} flex-1`}
-                  />
-                </label>
-              ))}
-              {error && <p className="text-danger text-xs">{error}</p>}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={save}
-                  className="bg-primary text-primary-foreground rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50"
-                >
-                  {pending ? "Saving…" : "Save question"}
-                </button>
-                <button
-                  type="button"
-                  onClick={reset}
-                  className="text-muted-foreground hover:text-foreground px-2 py-1 text-xs"
-                >
-                  Cancel
-                </button>
-              </div>
-              <p className="text-muted-foreground text-[10px]">
-                The ✓ option is the answer key — stored privately and never shown on the QR form.
-              </p>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setAdding(true);
-              }}
-              className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
-            >
-              <PlusIcon className="h-3.5 w-3.5" />
-              Add question
-            </button>
-          )}
-        </div>
       )}
     </div>
   );

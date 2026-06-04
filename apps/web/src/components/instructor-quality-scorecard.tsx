@@ -115,66 +115,6 @@ function ByWorkType({ bySource }: { bySource: InstructorQuality["bySource"] }) {
   );
 }
 
-// Learning (Kirkpatrick L2): an OBJECTIVE post-test score plus the New World
-// Kirkpatrick self-reported leading indicators (confidence then/now + intent).
-// Labeled so objective and self-reported are never conflated, and neither is
-// presented as a competency or behavior measure.
-function LearningSignal({ l1 }: { l1: InstructorQuality["l1"] }) {
-  if (!l1) return null;
-  const hasQuiz = l1.knowledgeResponses > 0 && l1.knowledgePosttestPct != null;
-  const hasConf = l1.confidenceResponses > 0 && l1.confidenceAfter != null;
-  const hasIntent = l1.intentResponses > 0 && l1.intent != null;
-  if (!hasQuiz && !hasConf && !hasIntent) return null;
-  return (
-    <div>
-      <div className="text-muted-foreground mb-1.5 text-[10px] font-medium uppercase tracking-wide">
-        Learning signal (L2)
-      </div>
-      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
-        {hasQuiz && (
-          <span className="flex items-baseline gap-1.5">
-            <span className="text-muted-foreground text-xs">Post-test</span>
-            <span className="text-foreground text-sm font-medium tabular-nums">
-              {(l1.knowledgePosttestPct ?? 0).toFixed(0)}%
-            </span>
-            <span className="text-success text-[10px] font-medium uppercase">objective</span>
-          </span>
-        )}
-        {hasConf && (
-          <span className="flex items-baseline gap-1.5">
-            <span className="text-muted-foreground text-xs">Confidence to apply</span>
-            <span className="text-foreground text-sm font-medium tabular-nums">
-              {fmt(l1.confidenceBefore)} → {fmt(l1.confidenceAfter)}
-            </span>
-            {l1.confidenceGain != null && (
-              <span
-                className={`text-[11px] font-medium ${
-                  l1.confidenceGain >= 0 ? "text-success" : "text-warning"
-                }`}
-              >
-                {l1.confidenceGain >= 0 ? "+" : ""}
-                {l1.confidenceGain.toFixed(1)}
-              </span>
-            )}
-          </span>
-        )}
-        {hasIntent && (
-          <span className="flex items-baseline gap-1.5">
-            <span className="text-muted-foreground text-xs">Intent to apply</span>
-            <span className="text-foreground text-sm font-medium tabular-nums">
-              {fmt(l1.intent)}/5
-            </span>
-          </span>
-        )}
-      </div>
-      <p className="text-muted-foreground mt-1 text-[10px]">
-        Post-test is objective; confidence and intent are self-reported leading indicators — not a
-        competency or behavior measure.
-      </p>
-    </div>
-  );
-}
-
 export default function InstructorQualityScorecard({
   data,
   peerOverall,
@@ -206,7 +146,6 @@ export default function InstructorQualityScorecard({
           <TrendSparkline monthly={data.monthly} />
         </div>
         <ByWorkType bySource={data.bySource} />
-        <LearningSignal l1={l1} />
       </div>
     );
   }
@@ -268,8 +207,6 @@ export default function InstructorQualityScorecard({
       </div>
 
       <ByWorkType bySource={data.bySource} />
-
-      <LearningSignal l1={l1} />
 
       {data.comments.length > 0 && (
         <div>

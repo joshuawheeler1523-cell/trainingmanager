@@ -10,7 +10,6 @@ type LinkContext = {
   label: string | null;
   org_name: string | null;
   instructors?: { id: string; name: string }[];
-  questions?: { id: string; prompt: string; options: string[] }[];
 };
 
 // /feedback/[token] — anonymous, no auth. Resolves the deliverable + its
@@ -29,7 +28,6 @@ export default async function FeedbackPage({ params }: { params: Params }) {
   const ctx = ctxRaw as LinkContext | null;
   if (!ctx) notFound();
   const instructors = ctx.instructors ?? [];
-  const questions = ctx.questions ?? [];
 
   return (
     <main className="bg-surface min-h-screen">
@@ -51,11 +49,7 @@ export default async function FeedbackPage({ params }: { params: Params }) {
             </p>
           ) : (
             <div className="mt-6">
-              <InstructorFeedbackForm
-                token={token}
-                instructors={instructors}
-                questions={questions}
-              />
+              <InstructorFeedbackForm token={token} instructors={instructors} />
             </div>
           )}
         </div>

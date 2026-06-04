@@ -31,10 +31,6 @@ export type FeedbackInput = {
   engagement?: number;
   pace?: number;
   recommend?: number | null;
-  confidenceBefore?: number | null;
-  confidenceAfter?: number | null;
-  intent?: number | null;
-  quizAnswers?: { q: string; a: number }[];
   comment?: string;
   respondentName?: string;
 };
@@ -79,11 +75,6 @@ export async function submitInstructorFeedback(
     p_respondent_name: input.respondentName?.trim() || undefined,
     p_ip: ip ?? undefined,
     p_user_agent: userAgent ?? undefined,
-    p_confidence_before: clampInt(input.confidenceBefore, 1, 5),
-    p_confidence_after: clampInt(input.confidenceAfter, 1, 5),
-    p_intent_to_apply: clampInt(input.intent, 1, 5),
-    p_quiz_answers:
-      input.quizAnswers && input.quizAnswers.length > 0 ? input.quizAnswers : undefined,
   } as SubmitArgs);
   if (error) {
     const m = error.message;
