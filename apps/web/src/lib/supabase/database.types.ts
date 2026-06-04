@@ -1737,6 +1737,67 @@ export type Database = {
           },
         ];
       };
+      feedback_link_questions: {
+        Row: {
+          correct_index: number;
+          created_at: string;
+          department_id: string;
+          id: string;
+          link_id: string;
+          options: Json;
+          org_id: string;
+          position: number;
+          prompt: string;
+          updated_at: string;
+        };
+        Insert: {
+          correct_index: number;
+          created_at?: string;
+          department_id: string;
+          id?: string;
+          link_id: string;
+          options: Json;
+          org_id: string;
+          position?: number;
+          prompt: string;
+          updated_at?: string;
+        };
+        Update: {
+          correct_index?: number;
+          created_at?: string;
+          department_id?: string;
+          id?: string;
+          link_id?: string;
+          options?: Json;
+          org_id?: string;
+          position?: number;
+          prompt?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "feedback_link_questions_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "feedback_link_questions_link_id_fkey";
+            columns: ["link_id"];
+            isOneToOne: false;
+            referencedRelation: "instructor_feedback_links";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "feedback_link_questions_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       global_allocations: {
         Row: {
           bucket_id: string;
@@ -2768,6 +2829,8 @@ export type Database = {
           intent_to_apply: number | null;
           ip: string | null;
           kirkpatrick_level: number;
+          knowledge_correct: number | null;
+          knowledge_total: number | null;
           link_id: string;
           org_id: string;
           rating_clarity: number | null;
@@ -2792,6 +2855,8 @@ export type Database = {
           intent_to_apply?: number | null;
           ip?: string | null;
           kirkpatrick_level?: number;
+          knowledge_correct?: number | null;
+          knowledge_total?: number | null;
           link_id: string;
           org_id: string;
           rating_clarity?: number | null;
@@ -2816,6 +2881,8 @@ export type Database = {
           intent_to_apply?: number | null;
           ip?: string | null;
           kirkpatrick_level?: number;
+          knowledge_correct?: number | null;
+          knowledge_total?: number | null;
           link_id?: string;
           org_id?: string;
           rating_clarity?: number | null;
@@ -6173,6 +6240,8 @@ export type Database = {
           intent_avg: number | null;
           intent_responses: number | null;
           knowledge_avg: number | null;
+          knowledge_posttest_pct: number | null;
+          knowledge_responses: number | null;
           nps: number | null;
           nps_responses: number | null;
           org_id: string | null;
@@ -6583,6 +6652,7 @@ export type Database = {
           p_knowledge?: number;
           p_overall: number;
           p_pace?: number;
+          p_quiz_answers?: Json;
           p_recommend?: number;
           p_respondent_name?: string;
           p_token: string;

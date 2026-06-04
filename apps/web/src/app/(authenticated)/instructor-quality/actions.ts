@@ -137,6 +137,77 @@ export async function recordQualityScore(input: {
   return { ok: true, data: true };
 }
 
+/**
+ * Add a knowledge-check question to a deliverable's feedback link. The answer
+ * key (correctIndex) lives only here and is never served to the anon form.
+ */
+export async function addFeedbackQuestion(input: {
+  linkId: string;
+  prompt: string;
+  options: string[];
+  correctIndex: number;
+}): Promise<ActionResult<true>> {
+  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!(await isManager(orgId))) {
+    return { ok: false, error: { code: "FORBIDDEN", message: "Managers only" } };
+  }
+  const prompt = input.prompt.trim();
+  const options = input.options.map((o) => o.trim()).filter(Boolean);
+  if (!prompt) return { ok: false, error: { code: "BAD_PROMPT", message: "Enter a question" } };
+  if (options.length < 2) {
+    return { ok: false, error: { code: "BAD_OPTIONS", message: "Add at least two options" } };
+  }
+  if (input.correctIndex < 0 || input.correctIndex >= options.length) {
+    return { ok: false, error: { code: "BAD_CORRECT", message: "Mark the correct option" } };
+  }
+
+  // Derive org/department from the link (validates it belongs to this org).
+  const { data: link } = await supabase
+    .from("instructor_feedback_links")
+    .select("id, department_id")
+    .eq("id", input.linkId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (!link?.department_id) {
+    return { ok: false, error: { code: "NO_LINK", message: "Feedback link not found" } };
+  }
+
+  const { count } = await supabase
+    .from("feedback_link_questions")
+    .select("id", { count: "exact", head: true })
+    .eq("link_id", input.linkId);
+
+  const { error } = await supabase.from("feedback_link_questions").insert({
+    org_id: orgId,
+    department_id: link.department_id,
+    link_id: input.linkId,
+    position: count ?? 0,
+    prompt,
+    options,
+    correct_index: input.correctIndex,
+  });
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidatePath("/instructor-quality");
+  return { ok: true, data: true };
+}
+
+export async function deleteFeedbackQuestion(id: string): Promise<ActionResult<true>> {
+  const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
+  if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };
+  if (!(await isManager(orgId))) {
+    return { ok: false, error: { code: "FORBIDDEN", message: "Managers only" } };
+  }
+  const { error } = await supabase
+    .from("feedback_link_questions")
+    .delete()
+    .eq("id", id)
+    .eq("org_id", orgId);
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  revalidatePath("/instructor-quality");
+  return { ok: true, data: true };
+}
+
 export async function deleteQualityScore(id: string): Promise<ActionResult<true>> {
   const [supabase, orgId] = await Promise.all([createClient(), getCurrentOrgId()]);
   if (!orgId) return { ok: false, error: { code: "NO_ORG", message: "No active organization" } };

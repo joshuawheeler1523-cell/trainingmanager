@@ -4,6 +4,7 @@ import { useState } from "react";
 import { submitInstructorFeedback } from "./actions";
 
 type Instructor = { id: string; name: string };
+type Question = { id: string; prompt: string; options: string[] };
 
 // ── Star rating (1–5) ────────────────────────────────────────────────────────
 function Stars({
@@ -83,9 +84,11 @@ function Scale({
 export default function InstructorFeedbackForm({
   token,
   instructors,
+  questions = [],
 }: {
   token: string;
   instructors: Instructor[];
+  questions?: Question[];
 }) {
   const [instructorId, setInstructorId] = useState(
     instructors.length === 1 ? (instructors[0]?.id ?? "") : "",
@@ -99,6 +102,7 @@ export default function InstructorFeedbackForm({
   const [confidenceBefore, setConfidenceBefore] = useState<number | null>(null);
   const [confidenceAfter, setConfidenceAfter] = useState<number | null>(null);
   const [intent, setIntent] = useState<number | null>(null);
+  const [answers, setAnswers] = useState<Record<string, number>>({});
   const [comment, setComment] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +131,7 @@ export default function InstructorFeedbackForm({
       confidenceBefore,
       confidenceAfter,
       intent,
+      quizAnswers: Object.entries(answers).map(([q, a]) => ({ q, a })),
       comment,
       respondentName: name,
     });
@@ -175,6 +180,43 @@ export default function InstructorFeedbackForm({
                 />
                 <span className="text-foreground">{i.name}</span>
               </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {questions.length > 0 && (
+        <div className="border-border rounded-lg border p-3">
+          <p className="text-foreground mb-2 text-sm font-medium">
+            Quick knowledge check (optional)
+          </p>
+          <div className="space-y-4">
+            {questions.map((q, qi) => (
+              <fieldset key={q.id}>
+                <legend className="text-foreground mb-1.5 text-sm">
+                  {qi + 1}. {q.prompt}
+                </legend>
+                <div className="space-y-1.5">
+                  {q.options.map((opt, oi) => (
+                    <label
+                      key={oi}
+                      className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${
+                        answers[q.id] === oi ? "border-primary bg-primary/5" : "border-border"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`q-${q.id}`}
+                        checked={answers[q.id] === oi}
+                        onChange={() => {
+                          setAnswers((a) => ({ ...a, [q.id]: oi }));
+                        }}
+                      />
+                      <span className="text-foreground">{opt}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
             ))}
           </div>
         </div>

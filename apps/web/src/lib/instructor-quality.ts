@@ -38,6 +38,9 @@ export type QualityL1 = {
   engagement: number | null;
   pace: number | null;
   nps: number | null;
+  /** Objective post-test, % correct (Kirkpatrick L2 — learning). */
+  knowledgeResponses: number;
+  knowledgePosttestPct: number | null;
   /** Self-reported leading indicators of transfer (New World Kirkpatrick L2). */
   confidenceResponses: number;
   confidenceBefore: number | null;
@@ -146,6 +149,8 @@ export async function loadInstructorQuality(
       engagement: r.engagement_avg,
       pace: r.pace_avg,
       nps: r.nps,
+      knowledgeResponses: r.knowledge_responses ?? 0,
+      knowledgePosttestPct: r.knowledge_posttest_pct,
       confidenceResponses: r.confidence_responses ?? 0,
       confidenceBefore: r.confidence_before_avg,
       confidenceAfter: r.confidence_after_avg,

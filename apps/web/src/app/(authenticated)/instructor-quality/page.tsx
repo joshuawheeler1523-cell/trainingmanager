@@ -9,6 +9,7 @@ import { loadInstructorQuality } from "@/lib/instructor-quality";
 import InstructorQualityView, {
   type DeliverableRow,
   type InstructorRow,
+  type QuizQuestion,
 } from "./instructor-quality-view";
 
 export const metadata = { title: "Instructor Quality — Arbor" };
@@ -42,7 +43,12 @@ export default async function InstructorQualityPage() {
 
   const qualityBundle = await loadInstructorQuality(supabase, orgId, scope);
 
-  const [{ data: instructorRows }, { data: workloadRows }, { data: linkRows }] = await Promise.all([
+  const [
+    { data: instructorRows },
+    { data: workloadRows },
+    { data: linkRows },
+    { data: questionRows },
+  ] = await Promise.all([
     applyDeptScope(
       supabase
         .from("instructors")
@@ -68,6 +74,14 @@ export default async function InstructorQualityPage() {
         .eq("org_id", orgId),
       scope,
     ),
+    applyDeptScope(
+      supabase
+        .from("feedback_link_questions")
+        .select("id, link_id, prompt, options, correct_index, position")
+        .eq("org_id", orgId)
+        .order("position"),
+      scope,
+    ),
   ]);
 
   const instructorName = new Map((instructorRows ?? []).map((i) => [i.id, i.full_name] as const));
@@ -89,6 +103,18 @@ export default async function InstructorQualityPage() {
   const linkByKey = new Map<string, NonNullable<typeof linkRows>[number]>();
   for (const l of linkRows ?? []) {
     linkByKey.set(`${l.source_type}:${l.source_id}`, l);
+  }
+
+  const questionsByLink = new Map<string, QuizQuestion[]>();
+  for (const q of questionRows ?? []) {
+    const list = questionsByLink.get(q.link_id) ?? [];
+    list.push({
+      id: q.id,
+      prompt: q.prompt,
+      options: Array.isArray(q.options) ? (q.options as string[]) : [],
+      correctIndex: q.correct_index,
+    });
+    questionsByLink.set(q.link_id, list);
   }
 
   type DraftDeliverable = {
@@ -144,6 +170,7 @@ export default async function InstructorQualityPage() {
             .map((id) => instructorName.get(id) ?? "—")
             .sort(),
           link: linkOut,
+          questions: link ? (questionsByLink.get(link.id) ?? []) : [],
         };
       }),
   );
