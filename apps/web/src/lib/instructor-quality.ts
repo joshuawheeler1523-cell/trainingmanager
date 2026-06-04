@@ -38,6 +38,13 @@ export type QualityL1 = {
   engagement: number | null;
   pace: number | null;
   nps: number | null;
+  /** Self-reported leading indicators of transfer (New World Kirkpatrick L2). */
+  confidenceResponses: number;
+  confidenceBefore: number | null;
+  confidenceAfter: number | null;
+  confidenceGain: number | null;
+  intentResponses: number;
+  intent: number | null;
 };
 export type InstructorQuality = {
   l1: QualityL1 | null;
@@ -139,6 +146,12 @@ export async function loadInstructorQuality(
       engagement: r.engagement_avg,
       pace: r.pace_avg,
       nps: r.nps,
+      confidenceResponses: r.confidence_responses ?? 0,
+      confidenceBefore: r.confidence_before_avg,
+      confidenceAfter: r.confidence_after_avg,
+      confidenceGain: r.confidence_gain,
+      intentResponses: r.intent_responses ?? 0,
+      intent: r.intent_avg,
     };
   }
   for (const s of scoreRows ?? []) {

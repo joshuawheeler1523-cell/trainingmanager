@@ -2760,9 +2760,12 @@ export type Database = {
       instructor_feedback: {
         Row: {
           comment: string | null;
+          confidence_after: number | null;
+          confidence_before: number | null;
           department_id: string;
           id: string;
           instructor_id: string;
+          intent_to_apply: number | null;
           ip: string | null;
           kirkpatrick_level: number;
           link_id: string;
@@ -2781,9 +2784,12 @@ export type Database = {
         };
         Insert: {
           comment?: string | null;
+          confidence_after?: number | null;
+          confidence_before?: number | null;
           department_id: string;
           id?: string;
           instructor_id: string;
+          intent_to_apply?: number | null;
           ip?: string | null;
           kirkpatrick_level?: number;
           link_id: string;
@@ -2802,9 +2808,12 @@ export type Database = {
         };
         Update: {
           comment?: string | null;
+          confidence_after?: number | null;
+          confidence_before?: number | null;
           department_id?: string;
           id?: string;
           instructor_id?: string;
+          intent_to_apply?: number | null;
           ip?: string | null;
           kirkpatrick_level?: number;
           link_id?: string;
@@ -6153,10 +6162,16 @@ export type Database = {
       v_instructor_quality: {
         Row: {
           clarity_avg: number | null;
+          confidence_after_avg: number | null;
+          confidence_before_avg: number | null;
+          confidence_gain: number | null;
+          confidence_responses: number | null;
           department_id: string | null;
           detractors: number | null;
           engagement_avg: number | null;
           instructor_id: string | null;
+          intent_avg: number | null;
+          intent_responses: number | null;
           knowledge_avg: number | null;
           nps: number | null;
           nps_responses: number | null;
@@ -6559,8 +6574,11 @@ export type Database = {
         Args: {
           p_clarity?: number;
           p_comment?: string;
+          p_confidence_after?: number;
+          p_confidence_before?: number;
           p_engagement?: number;
           p_instructor_id: string;
+          p_intent_to_apply?: number;
           p_ip?: string;
           p_knowledge?: number;
           p_overall: number;

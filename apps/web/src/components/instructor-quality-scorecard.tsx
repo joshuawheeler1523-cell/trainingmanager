@@ -115,6 +115,54 @@ function ByWorkType({ bySource }: { bySource: InstructorQuality["bySource"] }) {
   );
 }
 
+// Self-reported leading indicators of transfer (New World Kirkpatrick L2):
+// confidence-to-apply (retrospective then/now) + intent. Honestly labeled as
+// self-perceived, NOT a competency or behavior measure.
+function AppliedLearning({ l1 }: { l1: InstructorQuality["l1"] }) {
+  if (!l1) return null;
+  const hasConf = l1.confidenceResponses > 0 && l1.confidenceAfter != null;
+  const hasIntent = l1.intentResponses > 0 && l1.intent != null;
+  if (!hasConf && !hasIntent) return null;
+  return (
+    <div>
+      <div className="text-muted-foreground mb-1.5 text-[10px] font-medium uppercase tracking-wide">
+        Applied-learning signal · self-reported
+      </div>
+      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+        {hasConf && (
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-muted-foreground text-xs">Confidence to apply</span>
+            <span className="text-foreground text-sm font-medium tabular-nums">
+              {fmt(l1.confidenceBefore)} → {fmt(l1.confidenceAfter)}
+            </span>
+            {l1.confidenceGain != null && (
+              <span
+                className={`text-[11px] font-medium ${
+                  l1.confidenceGain >= 0 ? "text-success" : "text-warning"
+                }`}
+              >
+                {l1.confidenceGain >= 0 ? "+" : ""}
+                {l1.confidenceGain.toFixed(1)}
+              </span>
+            )}
+          </span>
+        )}
+        {hasIntent && (
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-muted-foreground text-xs">Intent to apply</span>
+            <span className="text-foreground text-sm font-medium tabular-nums">
+              {fmt(l1.intent)}/5
+            </span>
+          </span>
+        )}
+      </div>
+      <p className="text-muted-foreground mt-1 text-[10px]">
+        Self-perceived leading indicators of transfer — not a competency or behavior measure.
+      </p>
+    </div>
+  );
+}
+
 export default function InstructorQualityScorecard({
   data,
   peerOverall,
@@ -146,6 +194,7 @@ export default function InstructorQualityScorecard({
           <TrendSparkline monthly={data.monthly} />
         </div>
         <ByWorkType bySource={data.bySource} />
+        <AppliedLearning l1={l1} />
       </div>
     );
   }
@@ -207,6 +256,8 @@ export default function InstructorQualityScorecard({
       </div>
 
       <ByWorkType bySource={data.bySource} />
+
+      <AppliedLearning l1={l1} />
 
       {data.comments.length > 0 && (
         <div>
