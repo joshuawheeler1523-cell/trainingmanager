@@ -61,7 +61,6 @@ export default function InstructorFeedbackForm({
   const [pace, setPace] = useState(0);
   const [recommend, setRecommend] = useState<number | null>(null);
   const [comment, setComment] = useState("");
-  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -86,7 +85,6 @@ export default function InstructorFeedbackForm({
       pace,
       recommend,
       comment,
-      respondentName: name,
     });
     setSubmitting(false);
     if (result.ok) setDone(true);
@@ -181,20 +179,6 @@ export default function InstructorFeedbackForm({
             setComment(e.target.value);
           }}
           placeholder="What worked well, what could be better…"
-          className={inputCls}
-        />
-      </div>
-
-      <div>
-        <label className="text-foreground mb-1.5 block text-sm font-medium">
-          Your name (optional)
-        </label>
-        <input
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-          }}
-          placeholder="Leave blank to stay anonymous"
           className={inputCls}
         />
       </div>
