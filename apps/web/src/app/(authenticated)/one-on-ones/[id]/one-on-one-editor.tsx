@@ -282,7 +282,7 @@ export default function OneOnOneEditor({
         )}
       </div>
 
-      {quality && (quality.l1 || quality.scores.length > 0) && (
+      {quality && quality.l1 && (
         <div className="border-border bg-background rounded-xl border p-5">
           <Eyebrow variant="mute" className="mb-3">
             Delivery quality

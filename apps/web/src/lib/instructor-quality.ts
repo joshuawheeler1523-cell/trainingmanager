@@ -4,14 +4,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { applyDeptScope, type DepartmentScope } from "@/lib/auth/current-department";
 
-export type QualityScore = {
-  id: string;
-  level: number;
-  metric: string;
-  score: number;
-  scoreMax: number;
-  periodLabel: string | null;
-};
 export type QualityBySource = {
   sourceType: string;
   responseCount: number;
@@ -41,7 +33,6 @@ export type QualityL1 = {
 };
 export type InstructorQuality = {
   l1: QualityL1 | null;
-  scores: QualityScore[];
   bySource: QualityBySource[];
   monthly: QualityMonth[];
   comments: QualityComment[];
@@ -53,11 +44,11 @@ export type InstructorQualityBundle = {
 };
 
 /**
- * Load the full instructor-quality picture (Kirkpatrick L1 + manager L2-L4 +
- * per-deliverable-type breakdown + monthly trend + recent comments) for the
- * current department scope. Pass `instructorId` to narrow the heavy per-item
- * reads (breakdown / trend / comments / scores) to one instructor — the
- * department peer average is still computed across everyone.
+ * Load the instructor-quality picture from the anonymous QR survey — overall +
+ * trait averages, per-deliverable-type breakdown, monthly trend, and recent
+ * comments — for the current department scope. Entirely automatic; no manual
+ * entry. Pass `instructorId` to narrow the per-item reads to one instructor;
+ * the department peer average is still computed across everyone.
  */
 export async function loadInstructorQuality(
   supabase: SupabaseClient<Database>,
@@ -81,49 +72,34 @@ export async function loadInstructorQuality(
   );
   if (only) commentsQuery = commentsQuery.eq("instructor_id", only);
 
-  const [
-    { data: l1Rows },
-    { data: scoreRows },
-    { data: sourceRows },
-    { data: monthRows },
-    { data: commentRows },
-  ] = await Promise.all([
-    // l1 for ALL in-scope instructors → drives the map + peer average.
-    applyDeptScope(supabase.from("v_instructor_quality").select("*").eq("org_id", orgId), scope),
-    narrow(
-      applyDeptScope(
-        supabase
-          .from("instructor_quality_scores")
-          .select("*")
-          .eq("org_id", orgId)
-          .order("recorded_at", { ascending: false }),
-        scope,
+  const [{ data: l1Rows }, { data: sourceRows }, { data: monthRows }, { data: commentRows }] =
+    await Promise.all([
+      // l1 for ALL in-scope instructors → drives the map + peer average.
+      applyDeptScope(supabase.from("v_instructor_quality").select("*").eq("org_id", orgId), scope),
+      narrow(
+        applyDeptScope(
+          supabase.from("v_instructor_quality_by_source").select("*").eq("org_id", orgId),
+          scope,
+        ),
       ),
-    ),
-    narrow(
-      applyDeptScope(
-        supabase.from("v_instructor_quality_by_source").select("*").eq("org_id", orgId),
-        scope,
+      narrow(
+        applyDeptScope(
+          supabase
+            .from("v_instructor_quality_monthly")
+            .select("*")
+            .eq("org_id", orgId)
+            .order("month", { ascending: true }),
+          scope,
+        ),
       ),
-    ),
-    narrow(
-      applyDeptScope(
-        supabase
-          .from("v_instructor_quality_monthly")
-          .select("*")
-          .eq("org_id", orgId)
-          .order("month", { ascending: true }),
-        scope,
-      ),
-    ),
-    commentsQuery,
-  ]);
+      commentsQuery,
+    ]);
 
   const byInstructor = new Map<string, InstructorQuality>();
   const ensure = (id: string): InstructorQuality => {
     let v = byInstructor.get(id);
     if (!v) {
-      v = { l1: null, scores: [], bySource: [], monthly: [], comments: [] };
+      v = { l1: null, bySource: [], monthly: [], comments: [] };
       byInstructor.set(id, v);
     }
     return v;
@@ -140,16 +116,6 @@ export async function loadInstructorQuality(
       pace: r.pace_avg,
       nps: r.nps,
     };
-  }
-  for (const s of scoreRows ?? []) {
-    ensure(s.instructor_id).scores.push({
-      id: s.id,
-      level: s.kirkpatrick_level,
-      metric: s.metric,
-      score: s.score,
-      scoreMax: s.score_max,
-      periodLabel: s.period_label,
-    });
   }
   for (const r of sourceRows ?? []) {
     if (!r.instructor_id || !r.source_type) continue;
