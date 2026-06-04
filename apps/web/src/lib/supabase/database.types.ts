@@ -990,7 +990,9 @@ export type Database = {
           offerings_per_year: number;
           org_id: string;
           prep_hours_per_offering: number;
+          prerequisites: string | null;
           status: string;
+          target_audience: string | null;
           total_days: number;
           updated_at: string;
           updated_by: string | null;
@@ -1013,7 +1015,9 @@ export type Database = {
           offerings_per_year?: number;
           org_id: string;
           prep_hours_per_offering?: number;
+          prerequisites?: string | null;
           status?: string;
+          target_audience?: string | null;
           total_days?: number;
           updated_at?: string;
           updated_by?: string | null;
@@ -1036,7 +1040,9 @@ export type Database = {
           offerings_per_year?: number;
           org_id?: string;
           prep_hours_per_offering?: number;
+          prerequisites?: string | null;
           status?: string;
+          target_audience?: string | null;
           total_days?: number;
           updated_at?: string;
           updated_by?: string | null;
@@ -6023,7 +6029,9 @@ export type Database = {
           offerings_per_year: number | null;
           org_id: string | null;
           prep_hours_per_offering: number | null;
+          prerequisites: string | null;
           status: string | null;
+          target_audience: string | null;
           total_days: number | null;
           total_hours_per_offering: number | null;
           updated_at: string | null;
@@ -6049,7 +6057,9 @@ export type Database = {
           offerings_per_year?: number | null;
           org_id?: string | null;
           prep_hours_per_offering?: number | null;
+          prerequisites?: string | null;
           status?: string | null;
+          target_audience?: string | null;
           total_days?: number | null;
           total_hours_per_offering?: never;
           updated_at?: string | null;
@@ -6075,7 +6085,9 @@ export type Database = {
           offerings_per_year?: number | null;
           org_id?: string | null;
           prep_hours_per_offering?: number | null;
+          prerequisites?: string | null;
           status?: string | null;
+          target_audience?: string | null;
           total_days?: number | null;
           total_hours_per_offering?: never;
           updated_at?: string | null;

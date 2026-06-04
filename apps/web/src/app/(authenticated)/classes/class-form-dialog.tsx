@@ -212,6 +212,24 @@ function StepBasic({
           placeholder="Optional description…"
         />
       </div>
+      <div>
+        <Label htmlFor="target_audience">Target audience</Label>
+        <input
+          id="target_audience"
+          {...register("target_audience")}
+          className={inputCls()}
+          placeholder="e.g. New graduate nurses, ICU staff"
+        />
+      </div>
+      <div>
+        <Label htmlFor="prerequisites">Prerequisites</Label>
+        <input
+          id="prerequisites"
+          {...register("prerequisites")}
+          className={inputCls()}
+          placeholder="e.g. Current BLS certification"
+        />
+      </div>
       {buckets.length > 0 && (
         <div>
           <Label htmlFor="allocation_bucket_id">Allocation bucket</Label>
@@ -556,6 +574,8 @@ export default function ClassFormDialog(props: Props) {
     ? {
         name: props.cls.name,
         description: props.cls.description ?? "",
+        target_audience: props.cls.target_audience ?? "",
+        prerequisites: props.cls.prerequisites ?? "",
         allocation_bucket_id: props.cls.allocation_bucket_id ?? "",
         module_id: props.cls.module_id ?? "",
         is_multi_day: props.cls.is_multi_day,
@@ -572,6 +592,8 @@ export default function ClassFormDialog(props: Props) {
     : {
         name: "",
         description: "",
+        target_audience: "",
+        prerequisites: "",
         module_id: "",
         allocation_bucket_id: "",
         is_multi_day: false,

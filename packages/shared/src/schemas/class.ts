@@ -12,6 +12,14 @@ const classFieldsSchema = z.object({
     .string()
     .nullish()
     .transform((v) => (v === "" || v == null ? null : v)),
+  target_audience: z
+    .string()
+    .nullish()
+    .transform((v) => (v === "" || v == null ? null : v)),
+  prerequisites: z
+    .string()
+    .nullish()
+    .transform((v) => (v === "" || v == null ? null : v)),
   allocation_bucket_id: optionalUuidToNull,
   module_id: optionalUuidToNull,
   is_multi_day: z.boolean().default(false),
@@ -166,6 +174,8 @@ export type Class = {
   org_id: string;
   name: string;
   description: string | null;
+  target_audience: string | null;
+  prerequisites: string | null;
   allocation_bucket_id: string | null;
   module_id: string | null;
   is_multi_day: boolean;
