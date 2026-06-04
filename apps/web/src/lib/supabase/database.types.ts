@@ -2773,8 +2773,10 @@ export type Database = {
           kirkpatrick_level: number;
           link_id: string;
           org_id: string;
+          rating_apply: number | null;
           rating_clarity: number | null;
           rating_engagement: number | null;
+          rating_findability: number | null;
           rating_knowledge: number | null;
           rating_overall: number | null;
           rating_pace: number | null;
@@ -2794,8 +2796,10 @@ export type Database = {
           kirkpatrick_level?: number;
           link_id: string;
           org_id: string;
+          rating_apply?: number | null;
           rating_clarity?: number | null;
           rating_engagement?: number | null;
+          rating_findability?: number | null;
           rating_knowledge?: number | null;
           rating_overall?: number | null;
           rating_pace?: number | null;
@@ -2815,8 +2819,10 @@ export type Database = {
           kirkpatrick_level?: number;
           link_id?: string;
           org_id?: string;
+          rating_apply?: number | null;
           rating_clarity?: number | null;
           rating_engagement?: number | null;
+          rating_findability?: number | null;
           rating_knowledge?: number | null;
           rating_overall?: number | null;
           rating_pace?: number | null;
@@ -6078,10 +6084,12 @@ export type Database = {
       };
       v_instructor_quality: {
         Row: {
+          apply_avg: number | null;
           clarity_avg: number | null;
           department_id: string | null;
           detractors: number | null;
           engagement_avg: number | null;
+          findability_avg: number | null;
           instructor_id: string | null;
           knowledge_avg: number | null;
           nps: number | null;
@@ -6483,9 +6491,11 @@ export type Database = {
       snapshot_capacity: { Args: never; Returns: undefined };
       submit_instructor_feedback: {
         Args: {
+          p_apply?: number;
           p_clarity?: number;
           p_comment?: string;
           p_engagement?: number;
+          p_findability?: number;
           p_instructor_id: string;
           p_ip?: string;
           p_knowledge?: number;

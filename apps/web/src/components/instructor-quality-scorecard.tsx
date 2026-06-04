@@ -10,11 +10,16 @@ const SOURCE_LABEL: Record<string, string> = {
 
 const STAR = "#e0922f";
 
-const TRAITS: { key: "knowledge" | "clarity" | "engagement" | "pace"; label: string }[] = [
+const TRAITS: {
+  key: "knowledge" | "clarity" | "engagement" | "pace" | "apply" | "findability";
+  label: string;
+}[] = [
+  { key: "apply", label: "Can use" },
   { key: "knowledge", label: "Knowledge" },
   { key: "clarity", label: "Clarity" },
   { key: "engagement", label: "Engagement" },
   { key: "pace", label: "Pace" },
+  { key: "findability", label: "Findable" },
 ];
 
 function fmt(v: number | null | undefined): string {
@@ -164,10 +169,10 @@ export default function InstructorQualityScorecard({
         <TrendSparkline monthly={data.monthly} />
       </div>
 
-      {/* Rated traits — all from the QR survey */}
+      {/* Rated traits — all from the QR survey; only show what was actually asked */}
       {l1 && l1.responseCount > 0 && (
         <div className="border-border bg-surface grid grid-cols-2 gap-3 rounded-lg border p-3 sm:grid-cols-4">
-          {TRAITS.map((t) => (
+          {TRAITS.filter((t) => l1[t.key] != null).map((t) => (
             <div key={t.key}>
               <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">
                 {t.label}

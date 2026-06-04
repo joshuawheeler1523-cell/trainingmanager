@@ -11,6 +11,8 @@ type Rating = {
   clarity: number;
   engagement: number;
   pace: number;
+  apply: number;
+  findability: number;
 };
 
 const emptyRating = (): Rating => ({
@@ -19,7 +21,26 @@ const emptyRating = (): Rating => ({
   clarity: 0,
   engagement: 0,
   pace: 0,
+  apply: 0,
+  findability: 0,
 });
+
+// A live class is rated on the trainer's delivery; a job aid / education
+// deliverable is an artifact, so it's rated on clarity, findability, and use.
+const CLASS_TRAITS: { key: keyof Rating; label: string }[] = [
+  { key: "overall", label: "Overall" },
+  { key: "knowledge", label: "Knowledge & expertise" },
+  { key: "clarity", label: "Clear explanations" },
+  { key: "engagement", label: "Kept me engaged" },
+  { key: "pace", label: "Pace was right" },
+  { key: "apply", label: "I can use this in my work" },
+];
+const AID_TRAITS: { key: keyof Rating; label: string }[] = [
+  { key: "overall", label: "Overall" },
+  { key: "clarity", label: "Clear and easy to understand" },
+  { key: "findability", label: "I could quickly find what I needed" },
+  { key: "apply", label: "Useful — helped me do the task" },
+];
 
 // ── Star rating (1–5) ────────────────────────────────────────────────────────
 function Stars({
@@ -58,10 +79,15 @@ function Stars({
 export default function InstructorFeedbackForm({
   token,
   instructors,
+  sourceType,
 }: {
   token: string;
   instructors: Instructor[];
+  sourceType: string;
 }) {
+  const isClass = sourceType === "class";
+  const traits = isClass ? CLASS_TRAITS : AID_TRAITS;
+
   const [ratings, setRatings] = useState<Record<string, Rating>>(() =>
     Object.fromEntries(instructors.map((i) => [i.id, emptyRating()])),
   );
@@ -92,6 +118,8 @@ export default function InstructorFeedbackForm({
         clarity: x.r.clarity,
         engagement: x.r.engagement,
         pace: x.r.pace,
+        apply: x.r.apply,
+        findability: x.r.findability,
       }));
 
     if (ratingList.length === 0) {
@@ -133,7 +161,9 @@ export default function InstructorFeedbackForm({
     <div className="space-y-5">
       {multi && (
         <p className="text-muted-foreground text-sm">
-          This session had more than one instructor — please rate each one.
+          {isClass
+            ? "This session had more than one instructor — please rate each one."
+            : "More than one person produced this — please rate each one."}
         </p>
       )}
 
@@ -142,68 +172,45 @@ export default function InstructorFeedbackForm({
         return (
           <div key={i.id} className="border-border rounded-lg border p-3">
             <p className="text-foreground mb-1 text-sm font-semibold">Rate {i.name}</p>
-            <Stars
-              label="Overall"
-              value={r.overall}
-              onChange={(v) => {
-                setField(i.id, "overall", v);
-              }}
-            />
-            <Stars
-              label="Knowledge & expertise"
-              value={r.knowledge}
-              onChange={(v) => {
-                setField(i.id, "knowledge", v);
-              }}
-            />
-            <Stars
-              label="Clear explanations"
-              value={r.clarity}
-              onChange={(v) => {
-                setField(i.id, "clarity", v);
-              }}
-            />
-            <Stars
-              label="Kept me engaged"
-              value={r.engagement}
-              onChange={(v) => {
-                setField(i.id, "engagement", v);
-              }}
-            />
-            <Stars
-              label="Pace was right"
-              value={r.pace}
-              onChange={(v) => {
-                setField(i.id, "pace", v);
-              }}
-            />
+            {traits.map((t) => (
+              <Stars
+                key={t.key}
+                label={t.label}
+                value={r[t.key]}
+                onChange={(v) => {
+                  setField(i.id, t.key, v);
+                }}
+              />
+            ))}
           </div>
         );
       })}
 
-      <div>
-        <label className="text-foreground mb-1.5 block text-sm font-medium">
-          How likely are you to recommend this training? (0–10)
-        </label>
-        <div className="flex flex-wrap gap-1">
-          {Array.from({ length: 11 }, (_, n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => {
-                setRecommend(recommend === n ? null : n);
-              }}
-              className={`h-8 w-8 rounded-md border text-xs font-medium ${
-                recommend === n
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border text-foreground hover:bg-surface"
-              }`}
-            >
-              {n}
-            </button>
-          ))}
+      {isClass && (
+        <div>
+          <label className="text-foreground mb-1.5 block text-sm font-medium">
+            How likely are you to recommend this training? (0–10)
+          </label>
+          <div className="flex flex-wrap gap-1">
+            {Array.from({ length: 11 }, (_, n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => {
+                  setRecommend(recommend === n ? null : n);
+                }}
+                className={`h-8 w-8 rounded-md border text-xs font-medium ${
+                  recommend === n
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-foreground hover:bg-surface"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div>
         <label className="text-foreground mb-1.5 block text-sm font-medium">

@@ -8,6 +8,7 @@ type Params = Promise<{ token: string }>;
 
 type LinkContext = {
   label: string | null;
+  source_type: string | null;
   org_name: string | null;
   instructors?: { id: string; name: string }[];
 };
@@ -49,7 +50,11 @@ export default async function FeedbackPage({ params }: { params: Params }) {
             </p>
           ) : (
             <div className="mt-6">
-              <InstructorFeedbackForm token={token} instructors={instructors} />
+              <InstructorFeedbackForm
+                token={token}
+                instructors={instructors}
+                sourceType={ctx.source_type ?? "class"}
+              />
             </div>
           )}
         </div>
