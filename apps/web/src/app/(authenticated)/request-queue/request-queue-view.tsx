@@ -269,6 +269,11 @@ export default function RequestQueueView({
           request={openRequest}
           assignments={assignmentsByRequest.get(openRequest.id) ?? []}
           instructors={instructors}
+          onMove={(targetStatus) => {
+            // Move the card to the right column immediately when status is changed
+            // from the sheet — same optimistic path the drag uses, so no drag needed.
+            setStatusOverride((s) => ({ ...s, [openRequest.id]: targetStatus }));
+          }}
           onClose={() => {
             setOpenId(null);
           }}

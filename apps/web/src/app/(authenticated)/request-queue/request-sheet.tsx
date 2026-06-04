@@ -25,6 +25,8 @@ type Props = {
   request: EducationRequest;
   assignments: EducationRequestAssignment[];
   instructors: Instructor[];
+  /** Optimistically move the card to the new status column on the board. */
+  onMove?: (status: RequestStatus) => void;
   onClose: () => void;
 };
 
@@ -39,11 +41,24 @@ const STATUS_BADGE: Record<RequestStatus, string> = {
   rejected: "bg-destructive/10 text-destructive",
 };
 
-export default function RequestSheet({ request, assignments, instructors, onClose }: Props) {
+export default function RequestSheet({
+  request,
+  assignments,
+  instructors,
+  onMove,
+  onClose,
+}: Props) {
   const [pending, startTransition] = useTransition();
 
   const [reviewNotes, setReviewNotes] = useState(request.review_notes ?? "");
   const [history, setHistory] = useState<EducationRequestHistoryEntry[]>([]);
+
+  // Optimistic status so the badge + buttons update instantly; reconciles with
+  // the prop once the server action revalidates.
+  const [localStatus, setLocalStatus] = useState<RequestStatus>(request.status);
+  useEffect(() => {
+    setLocalStatus(request.status);
+  }, [request.id, request.status]);
 
   // Fetch the audit history client-side (small payload, fine for SSR-skip).
   useEffect(() => {
@@ -65,6 +80,10 @@ export default function RequestSheet({ request, assignments, instructors, onClos
   }, [request.id, request.status, request.updated_at]);
 
   function handleStatusChange(next: RequestStatus) {
+    // Move the board card to the new phase right away — no drag needed. The
+    // server action below persists + revalidates to keep it in sync.
+    setLocalStatus(next);
+    onMove?.(next);
     startTransition(async () => {
       const result = await updateRequestStatus(request.id, { status: next });
       if (result.ok) toast.success("Status updated");
@@ -129,9 +148,9 @@ export default function RequestSheet({ request, assignments, instructors, onClos
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_BADGE[request.status]}`}
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_BADGE[localStatus]}`}
                 >
-                  {request.status.replace(/_/g, " ")}
+                  {localStatus.replace(/_/g, " ")}
                 </span>
                 <span className="text-muted-foreground text-xs">
                   {request.submitted_via === "public_form" ? "Public form" : "Internal"}
@@ -165,12 +184,12 @@ export default function RequestSheet({ request, assignments, instructors, onClos
                   <button
                     key={s}
                     type="button"
-                    disabled={pending || s === request.status}
+                    disabled={pending || s === localStatus}
                     onClick={() => {
                       handleStatusChange(s);
                     }}
                     className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
-                      s === request.status
+                      s === localStatus
                         ? STATUS_BADGE[s]
                         : "border-border bg-background text-foreground hover:bg-surface border"
                     } disabled:opacity-50`}
