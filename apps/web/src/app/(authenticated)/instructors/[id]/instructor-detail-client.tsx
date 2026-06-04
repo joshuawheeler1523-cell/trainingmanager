@@ -916,12 +916,6 @@ export default function InstructorDetailClient({
         {activeTab === "main" && (
           <div className="space-y-6">
             <ProfileStrip instructor={instructor} />
-            {quality && quality.l1 && (
-              <section className="border-border bg-background rounded-xl border p-5">
-                <h3 className="text-foreground mb-3 text-sm font-semibold">Delivery quality</h3>
-                <InstructorQualityScorecard data={quality} peerOverall={qualityPeerOverall} />
-              </section>
-            )}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               {/* Workload — primary content, takes 2 of 3 columns at lg */}
               <div className="lg:col-span-2">
@@ -933,13 +927,23 @@ export default function InstructorDetailClient({
                   annualHours={instructor.annual_hours}
                 />
               </div>
-              {/* Skills — right sidebar at lg, stacked below on smaller screens */}
-              <div className="lg:col-span-1">
+              {/* Skills + delivery quality — right sidebar at lg, stacked below on smaller screens */}
+              <div className="space-y-6 lg:col-span-1">
                 <SkillsTab
                   instructorId={instructor.id}
                   instructorSkills={instructorSkills}
                   allSkills={allSkills}
                 />
+                {quality && quality.l1 && (
+                  <section className="border-border bg-background rounded-xl border p-5">
+                    <h3 className="text-foreground mb-3 text-sm font-semibold">Delivery quality</h3>
+                    <InstructorQualityScorecard
+                      data={quality}
+                      peerOverall={qualityPeerOverall}
+                      compact
+                    />
+                  </section>
+                )}
               </div>
             </div>
           </div>
