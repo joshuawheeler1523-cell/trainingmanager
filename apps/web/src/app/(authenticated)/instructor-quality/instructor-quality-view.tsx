@@ -109,9 +109,13 @@ function QualityTab({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-muted-foreground text-xs">
-          Reaction (L1) comes from learner QR feedback, broken out by work type. Learning, Behavior
-          &amp; Results (L2–L4) are recorded by managers.
+        <p className="text-muted-foreground max-w-3xl text-xs leading-relaxed">
+          <span className="text-foreground font-medium">Reaction (L1)</span> is learner QR feedback,
+          broken out by work type and trend.{" "}
+          <span className="text-foreground font-medium">Learning · Behavior · Results (L2–L4)</span>{" "}
+          is an optional outcomes log you fill from your own assessments or operational data — it is
+          not measured by the QR. A program-effectiveness and learning signal; it does not establish
+          individual competency (e.g. Joint Commission HR.01.06.01).
         </p>
         <button
           type="button"
@@ -121,7 +125,7 @@ function QualityTab({
           className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
         >
           <PlusIcon className="h-4 w-4" />
-          Add L2–L4 score
+          Add outcome metric
         </button>
       </div>
 
@@ -212,6 +216,10 @@ function ScoreForm({
 
   return (
     <div className="border-border bg-surface rounded-xl border p-4">
+      <p className="text-muted-foreground mb-3 text-xs leading-relaxed">
+        Outcomes log — record a learning, behavior, or results metric from your own assessment or
+        operational data. Not measured by the QR, and not a competency determination.
+      </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="text-xs">
           <span className="text-muted-foreground mb-1 block">Instructor</span>
@@ -250,7 +258,7 @@ function ScoreForm({
             onChange={(e) => {
               setMetric(e.target.value);
             }}
-            placeholder="e.g. Competency pass rate"
+            placeholder="e.g. Post-test average, Audit compliance %"
             className={`${inputCls} w-full`}
           />
         </label>

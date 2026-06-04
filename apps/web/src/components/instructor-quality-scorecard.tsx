@@ -187,7 +187,7 @@ export default function InstructorQualityScorecard({
                 <p className="text-muted-foreground text-xs">No learner feedback yet.</p>
               )
             ) : scoresByLevel(lvl.n).length === 0 ? (
-              <p className="text-muted-foreground text-xs">Not recorded yet.</p>
+              <p className="text-muted-foreground text-xs">Not evaluated.</p>
             ) : (
               <ul className="space-y-1">
                 {scoresByLevel(lvl.n).map((s) => (

@@ -152,7 +152,7 @@ export default async function InstructorQualityPage() {
     <div>
       <PageHeader
         title="Instructor Quality"
-        description="Delivery quality per instructor across the Kirkpatrick four levels — learner reaction (QR feedback), learning, behavior, results — with a per-work-type breakdown and trend."
+        description="How learners react to each instructor's delivery — captured by QR (Kirkpatrick Level 1), broken out by work type and trend. Learning, behavior and results are an optional outcomes log you maintain from your own data — not measured by the scan, and not a competency record."
       />
       <div className="p-6">
         <InstructorQualityView
