@@ -246,20 +246,19 @@ export default function RequestQueueView({
       </div>
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="flex gap-3 overflow-x-auto pb-2">
+        <div className="space-y-3">
           {visibleColumns.map((status) => (
-            <div key={status} className="w-72 shrink-0">
-              <KanbanColumn
-                status={status}
-                label={COLUMN_LABELS[status]}
-                requests={byColumn[status]}
-                assignmentsByRequest={assignmentsByRequest}
-                onOpen={(id) => {
-                  setOpenId(id);
-                }}
-                pending={pending}
-              />
-            </div>
+            <KanbanColumn
+              key={status}
+              status={status}
+              label={COLUMN_LABELS[status]}
+              requests={byColumn[status]}
+              assignmentsByRequest={assignmentsByRequest}
+              onOpen={(id) => {
+                setOpenId(id);
+              }}
+              pending={pending}
+            />
           ))}
         </div>
       </DndContext>
@@ -309,14 +308,14 @@ function KanbanColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
-    <div
+    <section
       ref={setNodeRef}
       className={cn(
-        "border-border bg-surface flex h-full min-h-[200px] flex-col rounded-xl border",
+        "border-border bg-surface rounded-xl border",
         isOver && "border-foreground/40 ring-foreground/20 ring-2",
       )}
     >
-      <div className="border-border bg-background flex items-center justify-between rounded-t-xl border-b border-dashed px-4 py-3">
+      <div className="border-border bg-background flex items-center justify-between rounded-t-xl border-b border-dashed px-4 py-2.5">
         <span className="text-foreground font-mono text-[10px] font-medium uppercase tracking-[0.08em]">
           {label}
         </span>
@@ -324,26 +323,28 @@ function KanbanColumn({
           {requests.length}
         </span>
       </div>
-      <div className="flex-1 space-y-2 p-2">
+      <div className="p-2">
         {requests.length === 0 ? (
-          <p className="text-muted-foreground py-6 text-center font-mono text-[10.5px] uppercase tracking-[0.04em]">
+          <p className="text-muted-foreground py-3 text-center font-mono text-[10.5px] uppercase tracking-[0.04em]">
             No requests
           </p>
         ) : (
-          requests.map((r) => (
-            <KanbanCard
-              key={r.id}
-              request={r}
-              assignmentCount={(assignmentsByRequest.get(r.id) ?? []).length}
-              onOpen={() => {
-                onOpen(r.id);
-              }}
-              disabled={pending}
-            />
-          ))
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {requests.map((r) => (
+              <KanbanCard
+                key={r.id}
+                request={r}
+                assignmentCount={(assignmentsByRequest.get(r.id) ?? []).length}
+                onOpen={() => {
+                  onOpen(r.id);
+                }}
+                disabled={pending}
+              />
+            ))}
+          </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
