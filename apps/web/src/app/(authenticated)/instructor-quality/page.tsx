@@ -78,7 +78,7 @@ export default async function InstructorQualityPage() {
       supabase
         .from("instructor_feedback")
         .select(
-          "instructor_id, source_type, rating_overall, rating_knowledge, rating_clarity, rating_engagement, rating_pace, would_recommend, submitted_at",
+          "instructor_id, source_type, rating_overall, rating_knowledge, rating_clarity, rating_engagement, rating_pace, rating_apply, rating_findability, would_recommend, submitted_at",
         )
         .eq("org_id", orgId)
         .order("submitted_at", { ascending: false })
@@ -103,6 +103,8 @@ export default async function InstructorQualityPage() {
     clarity: f.rating_clarity,
     engagement: f.rating_engagement,
     pace: f.rating_pace,
+    apply: f.rating_apply,
+    findability: f.rating_findability,
     recommend: f.would_recommend,
     submittedAt: f.submitted_at,
   }));

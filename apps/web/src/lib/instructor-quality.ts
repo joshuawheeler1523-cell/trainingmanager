@@ -29,6 +29,8 @@ export type QualityL1 = {
   clarity: number | null;
   engagement: number | null;
   pace: number | null;
+  apply: number | null;
+  findability: number | null;
   nps: number | null;
 };
 export type InstructorQuality = {
@@ -114,6 +116,8 @@ export async function loadInstructorQuality(
       clarity: r.clarity_avg,
       engagement: r.engagement_avg,
       pace: r.pace_avg,
+      apply: r.apply_avg,
+      findability: r.findability_avg,
       nps: r.nps,
     };
   }

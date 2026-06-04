@@ -30,6 +30,8 @@ export type InstructorRating = {
   clarity?: number;
   engagement?: number;
   pace?: number;
+  apply?: number;
+  findability?: number;
 };
 
 export type FeedbackInput = {
@@ -90,6 +92,8 @@ export async function submitInstructorFeedback(
       p_comment: comment,
       p_ip: ip ?? undefined,
       p_user_agent: userAgent ?? undefined,
+      p_apply: clampInt(r.apply, 1, 5),
+      p_findability: clampInt(r.findability, 1, 5),
     } as SubmitArgs);
     if (error) {
       return { ok: false, error: { code: error.code, message: friendlyError(error.message) } };

@@ -23,6 +23,8 @@ export type FeedbackResponse = {
   clarity: number | null;
   engagement: number | null;
   pace: number | null;
+  apply: number | null;
+  findability: number | null;
   recommend: number | null;
   submittedAt: string;
 };
@@ -121,15 +123,26 @@ const DATE_RANGES = [
   { value: "365", label: "Last 12 months", days: 365 },
 ] as const;
 
-type TraitKey = "overall" | "knowledge" | "clarity" | "engagement" | "pace";
+type TraitKey =
+  | "overall"
+  | "knowledge"
+  | "clarity"
+  | "engagement"
+  | "pace"
+  | "apply"
+  | "findability";
 type SortKey = "name" | "responses" | TraitKey | "nps";
 
+// "Apply" (can I use this) is shared; the rest are deliverable-type-specific and
+// show "—" where a given instructor has no responses of that kind.
 const TRAIT_COLS: { key: TraitKey; label: string }[] = [
   { key: "overall", label: "Overall" },
+  { key: "apply", label: "Can use" },
   { key: "knowledge", label: "Knowledge" },
   { key: "clarity", label: "Clarity" },
   { key: "engagement", label: "Engagement" },
   { key: "pace", label: "Pace" },
+  { key: "findability", label: "Findable" },
 ];
 
 type ReportRow = {
@@ -142,6 +155,8 @@ type ReportRow = {
   clarity: number | null;
   engagement: number | null;
   pace: number | null;
+  apply: number | null;
+  findability: number | null;
   nps: number | null;
 };
 
@@ -204,6 +219,8 @@ function QualityReport({
         clarity: pick("clarity"),
         engagement: pick("engagement"),
         pace: pick("pace"),
+        apply: pick("apply"),
+        findability: pick("findability"),
         nps,
       });
     }
@@ -238,10 +255,12 @@ function QualityReport({
       "Department",
       "Responses",
       "Overall",
+      "Can use",
       "Knowledge",
       "Clarity",
       "Engagement",
       "Pace",
+      "Findable",
       "NPS",
     ];
     const data = sorted.map((r) => ({
@@ -249,15 +268,17 @@ function QualityReport({
       Department: r.department ?? "",
       Responses: r.responses,
       Overall: r.overall ?? "",
+      "Can use": r.apply ?? "",
       Knowledge: r.knowledge ?? "",
       Clarity: r.clarity ?? "",
       Engagement: r.engagement ?? "",
       Pace: r.pace ?? "",
+      Findable: r.findability ?? "",
       NPS: r.nps ?? "",
     }));
     const ws = XLSX.utils.json_to_sheet(data, { header: cols });
     ws["!autofilter"] = { ref: ws["!ref"] ?? "A1" };
-    ws["!cols"] = [26, 22, 11, 10, 11, 10, 12, 9, 8].map((wch) => ({ wch }));
+    ws["!cols"] = [26, 22, 11, 10, 9, 11, 10, 12, 9, 9, 8].map((wch) => ({ wch }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Instructor Quality");
     const out = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
