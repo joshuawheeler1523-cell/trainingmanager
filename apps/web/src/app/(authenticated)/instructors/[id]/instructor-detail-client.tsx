@@ -916,7 +916,7 @@ export default function InstructorDetailClient({
         {activeTab === "main" && (
           <div className="space-y-6">
             <ProfileStrip instructor={instructor} />
-            {quality && (quality.l1 || quality.scores.length > 0) && (
+            {quality && quality.l1 && (
               <section className="border-border bg-background rounded-xl border p-5">
                 <h3 className="text-foreground mb-3 text-sm font-semibold">Delivery quality</h3>
                 <InstructorQualityScorecard data={quality} peerOverall={qualityPeerOverall} />

@@ -5,10 +5,10 @@ import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { applyDeptScope, getDepartmentScope } from "@/lib/auth/current-department";
 import { isManager } from "@/lib/auth/role";
 import { getPublicBaseUrl } from "@/lib/public-url";
-import { loadInstructorQuality } from "@/lib/instructor-quality";
 import InstructorQualityView, {
   type DeliverableRow,
-  type InstructorRow,
+  type FeedbackResponse,
+  type ReportInstructor,
 } from "./instructor-quality-view";
 
 export const metadata = { title: "Instructor Quality — Arbor" };
@@ -40,9 +40,12 @@ export default async function InstructorQualityPage() {
     );
   }
 
-  const qualityBundle = await loadInstructorQuality(supabase, orgId, scope);
-
-  const [{ data: instructorRows }, { data: workloadRows }, { data: linkRows }] = await Promise.all([
+  const [
+    { data: instructorRows },
+    { data: workloadRows },
+    { data: linkRows },
+    { data: feedbackRows },
+  ] = await Promise.all([
     applyDeptScope(
       supabase
         .from("instructors")
@@ -71,21 +74,37 @@ export default async function InstructorQualityPage() {
         .eq("org_id", orgId),
       scope,
     ),
+    applyDeptScope(
+      supabase
+        .from("instructor_feedback")
+        .select(
+          "instructor_id, source_type, rating_overall, rating_knowledge, rating_clarity, rating_engagement, rating_pace, would_recommend, submitted_at",
+        )
+        .eq("org_id", orgId)
+        .order("submitted_at", { ascending: false })
+        .limit(5000),
+      scope,
+    ),
   ]);
 
   const instructorName = new Map((instructorRows ?? []).map((i) => [i.id, i.full_name] as const));
 
-  const instructors: InstructorRow[] = (instructorRows ?? []).map((i) => ({
+  const instructors: ReportInstructor[] = (instructorRows ?? []).map((i) => ({
     id: i.id,
     name: i.full_name,
     department: i.department,
-    quality: qualityBundle.byInstructor.get(i.id) ?? {
-      l1: null,
-      scores: [],
-      bySource: [],
-      monthly: [],
-      comments: [],
-    },
+  }));
+
+  const responses: FeedbackResponse[] = (feedbackRows ?? []).map((f) => ({
+    instructorId: f.instructor_id,
+    sourceType: f.source_type,
+    overall: f.rating_overall,
+    knowledge: f.rating_knowledge,
+    clarity: f.rating_clarity,
+    engagement: f.rating_engagement,
+    pace: f.rating_pace,
+    recommend: f.would_recommend,
+    submittedAt: f.submitted_at,
   }));
 
   // ── Deliverables (deduped) + QR for those with a link ──────────────────────
@@ -155,13 +174,13 @@ export default async function InstructorQualityPage() {
     <div>
       <PageHeader
         title="Instructor Quality"
-        description="How learners react to each instructor's delivery — captured by QR (Kirkpatrick Level 1), broken out by work type and trend. Learning, behavior and results are an optional outcomes log you maintain from your own data — not measured by the scan, and not a competency record."
+        description="Anonymous learner feedback on each instructor's delivery, captured entirely from the QR survey. Filter and sort by any rated trait, then export to Excel."
       />
       <div className="p-6">
         <InstructorQualityView
+          responses={responses}
           instructors={instructors}
           deliverables={deliverables}
-          peerOverall={qualityBundle.peerOverall}
         />
       </div>
     </div>

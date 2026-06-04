@@ -8,20 +8,17 @@ const SOURCE_LABEL: Record<string, string> = {
   project_task: "Projects / sessions",
 };
 
-const LEVELS = [
-  { n: 1, name: "Reaction" },
-  { n: 2, name: "Learning" },
-  { n: 3, name: "Behavior" },
-  { n: 4, name: "Results" },
-] as const;
-
 const STAR = "#e0922f";
+
+const TRAITS: { key: "knowledge" | "clarity" | "engagement" | "pace"; label: string }[] = [
+  { key: "knowledge", label: "Knowledge" },
+  { key: "clarity", label: "Clarity" },
+  { key: "engagement", label: "Engagement" },
+  { key: "pace", label: "Pace" },
+];
 
 function fmt(v: number | null | undefined): string {
   return v == null ? "—" : v.toFixed(1);
-}
-function pct(score: number, max: number): string {
-  return max === 100 ? `${score.toFixed(0)}%` : `${score.toFixed(0)}/${max.toFixed(0)}`;
 }
 function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -125,7 +122,6 @@ export default function InstructorQualityScorecard({
   compact?: boolean;
 }) {
   const l1 = data.l1;
-  const scoresByLevel = (n: number) => data.scores.filter((s) => s.level === n);
 
   if (compact) {
     return (
@@ -168,43 +164,21 @@ export default function InstructorQualityScorecard({
         <TrendSparkline monthly={data.monthly} />
       </div>
 
-      {/* Kirkpatrick 4 levels */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
-        {LEVELS.map((lvl) => (
-          <div key={lvl.n} className="border-border bg-surface rounded-lg border p-3">
-            <div className="text-muted-foreground mb-2 text-[10px] font-medium uppercase tracking-wide">
-              L{lvl.n} · {lvl.name}
+      {/* Rated traits — all from the QR survey */}
+      {l1 && l1.responseCount > 0 && (
+        <div className="border-border bg-surface grid grid-cols-2 gap-3 rounded-lg border p-3 sm:grid-cols-4">
+          {TRAITS.map((t) => (
+            <div key={t.key}>
+              <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">
+                {t.label}
+              </div>
+              <div className="text-foreground text-sm font-semibold tabular-nums">
+                {fmt(l1[t.key])}
+              </div>
             </div>
-            {lvl.n === 1 ? (
-              l1 && l1.responseCount > 0 ? (
-                <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
-                  <span>Know {fmt(l1.knowledge)}</span>
-                  <span>Clarity {fmt(l1.clarity)}</span>
-                  <span>Engage {fmt(l1.engagement)}</span>
-                  <span>Pace {fmt(l1.pace)}</span>
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-xs">No learner feedback yet.</p>
-              )
-            ) : scoresByLevel(lvl.n).length === 0 ? (
-              <p className="text-muted-foreground text-xs">Not evaluated.</p>
-            ) : (
-              <ul className="space-y-1">
-                {scoresByLevel(lvl.n).map((s) => (
-                  <li key={s.id} className="text-xs">
-                    <span className="text-foreground font-medium">
-                      {s.metric}: {pct(s.score, s.scoreMax)}
-                    </span>
-                    {s.periodLabel && (
-                      <span className="text-muted-foreground"> · {s.periodLabel}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <ByWorkType bySource={data.bySource} />
 

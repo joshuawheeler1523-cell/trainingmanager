@@ -2,24 +2,35 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import * as XLSX from "xlsx";
 import {
   QrCodeIcon,
-  PlusIcon,
   ClipboardDocumentIcon,
   PrinterIcon,
   PhotoIcon,
   ArrowDownTrayIcon,
 } from "@heroicons/react/20/solid";
-import { generateFeedbackLink, recordQualityScore, setFeedbackLinkActive } from "./actions";
-import InstructorQualityScorecard from "@/components/instructor-quality-scorecard";
-import type { InstructorQuality } from "@/lib/instructor-quality";
+import { generateFeedbackLink, setFeedbackLinkActive } from "./actions";
 
-export type InstructorRow = {
+// One anonymous QR survey response (a learner rating one instructor).
+export type FeedbackResponse = {
+  instructorId: string;
+  sourceType: string;
+  overall: number | null;
+  knowledge: number | null;
+  clarity: number | null;
+  engagement: number | null;
+  pace: number | null;
+  recommend: number | null;
+  submittedAt: string;
+};
+
+export type ReportInstructor = {
   id: string;
   name: string;
   department: string | null;
-  quality: InstructorQuality;
 };
 
 export type DeliverableRow = {
@@ -50,13 +61,13 @@ const SOURCE_LABEL: Record<string, string> = {
 type Tab = "quality" | "codes";
 
 export default function InstructorQualityView({
+  responses,
   instructors,
   deliverables,
-  peerOverall,
 }: {
-  instructors: InstructorRow[];
+  responses: FeedbackResponse[];
+  instructors: ReportInstructor[];
   deliverables: DeliverableRow[];
-  peerOverall: number | null;
 }) {
   const [tab, setTab] = useState<Tab>("quality");
 
@@ -65,7 +76,7 @@ export default function InstructorQualityView({
       <div className="border-border mb-5 flex gap-6 border-b">
         {(
           [
-            { id: "quality", label: "Quality (Kirkpatrick)" },
+            { id: "quality", label: "Quality report" },
             { id: "codes", label: "Feedback codes" },
           ] as const
         ).map((t) => (
@@ -87,7 +98,7 @@ export default function InstructorQualityView({
       </div>
 
       {tab === "quality" ? (
-        <QualityTab instructors={instructors} peerOverall={peerOverall} />
+        <QualityReport responses={responses} instructors={instructors} />
       ) : (
         <CodesTab deliverables={deliverables} />
       )}
@@ -95,228 +106,330 @@ export default function InstructorQualityView({
   );
 }
 
-// ── Quality (Kirkpatrick) ────────────────────────────────────────────────────
+// ── Quality report (filterable, sortable — all from the QR survey)
 
-function QualityTab({
+const WORK_TYPES = [
+  { value: "all", label: "All work types" },
+  { value: "class", label: "Classes" },
+  { value: "education_request", label: "Education deliverables" },
+] as const;
+
+const DATE_RANGES = [
+  { value: "all", label: "All time", days: null },
+  { value: "30", label: "Last 30 days", days: 30 },
+  { value: "90", label: "Last 90 days", days: 90 },
+  { value: "365", label: "Last 12 months", days: 365 },
+] as const;
+
+type TraitKey = "overall" | "knowledge" | "clarity" | "engagement" | "pace";
+type SortKey = "name" | "responses" | TraitKey | "nps";
+
+const TRAIT_COLS: { key: TraitKey; label: string }[] = [
+  { key: "overall", label: "Overall" },
+  { key: "knowledge", label: "Knowledge" },
+  { key: "clarity", label: "Clarity" },
+  { key: "engagement", label: "Engagement" },
+  { key: "pace", label: "Pace" },
+];
+
+type ReportRow = {
+  id: string;
+  name: string;
+  department: string | null;
+  responses: number;
+  overall: number | null;
+  knowledge: number | null;
+  clarity: number | null;
+  engagement: number | null;
+  pace: number | null;
+  nps: number | null;
+};
+
+function avgOf(nums: number[]): number | null {
+  return nums.length === 0
+    ? null
+    : Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
+}
+
+function fmtCell(v: number | null): string {
+  return v == null ? "—" : v.toFixed(1);
+}
+
+function QualityReport({
+  responses,
   instructors,
-  peerOverall,
 }: {
-  instructors: InstructorRow[];
-  peerOverall: number | null;
+  responses: FeedbackResponse[];
+  instructors: ReportInstructor[];
 }) {
-  const [adding, setAdding] = useState(false);
+  const [workType, setWorkType] = useState<string>("all");
+  const [range, setRange] = useState<string>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("overall");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const rows = useMemo<ReportRow[]>(() => {
+    const days = DATE_RANGES.find((d) => d.value === range)?.days ?? null;
+    const cutoff = days != null ? Date.now() - days * 24 * 60 * 60 * 1000 : null;
+    const byId = new Map(instructors.map((i) => [i.id, i] as const));
+    const groups = new Map<string, FeedbackResponse[]>();
+    for (const r of responses) {
+      if (workType !== "all" && r.sourceType !== workType) continue;
+      if (cutoff != null && new Date(r.submittedAt).getTime() < cutoff) continue;
+      if (!byId.has(r.instructorId)) continue;
+      const list = groups.get(r.instructorId) ?? [];
+      list.push(r);
+      groups.set(r.instructorId, list);
+    }
+    const out: ReportRow[] = [];
+    for (const [id, list] of groups) {
+      const inst = byId.get(id);
+      if (!inst) continue;
+      const pick = (k: TraitKey) =>
+        avgOf(list.map((r) => r[k]).filter((v): v is number => v != null));
+      const rec = list.map((r) => r.recommend).filter((v): v is number => v != null);
+      const nps =
+        rec.length === 0
+          ? null
+          : Math.round(
+              ((rec.filter((v) => v >= 9).length - rec.filter((v) => v <= 6).length) / rec.length) *
+                100,
+            );
+      out.push({
+        id,
+        name: inst.name,
+        department: inst.department,
+        responses: list.length,
+        overall: pick("overall"),
+        knowledge: pick("knowledge"),
+        clarity: pick("clarity"),
+        engagement: pick("engagement"),
+        pace: pick("pace"),
+        nps,
+      });
+    }
+    return out;
+  }, [responses, instructors, workType, range]);
+
+  const sorted = useMemo(() => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      if (sortKey === "name") return dir * a.name.localeCompare(b.name);
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1; // nulls always last
+      if (bv == null) return -1;
+      return dir * (av - bv);
+    });
+  }, [rows, sortKey, sortDir]);
+
+  function toggleSort(k: SortKey) {
+    if (sortKey === k) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(k);
+      setSortDir(k === "name" ? "asc" : "desc");
+    }
+  }
+
+  function exportExcel() {
+    const cols = [
+      "Instructor",
+      "Department",
+      "Responses",
+      "Overall",
+      "Knowledge",
+      "Clarity",
+      "Engagement",
+      "Pace",
+      "NPS",
+    ];
+    const data = sorted.map((r) => ({
+      Instructor: r.name,
+      Department: r.department ?? "",
+      Responses: r.responses,
+      Overall: r.overall ?? "",
+      Knowledge: r.knowledge ?? "",
+      Clarity: r.clarity ?? "",
+      Engagement: r.engagement ?? "",
+      Pace: r.pace ?? "",
+      NPS: r.nps ?? "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(data, { header: cols });
+    ws["!autofilter"] = { ref: ws["!ref"] ?? "A1" };
+    ws["!cols"] = [26, 22, 11, 10, 11, 10, 12, 9, 8].map((wch) => ({ wch }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Instructor Quality");
+    const out = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    const blob = new Blob([out], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Instructor Quality.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 1000);
+  }
+
+  const totalResponses = rows.reduce((sum, r) => sum + r.responses, 0);
+  const selectCls =
+    "border-input bg-background text-foreground focus:ring-ring rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2";
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-muted-foreground max-w-3xl text-xs leading-relaxed">
-          <span className="text-foreground font-medium">Reaction (L1)</span> is learner QR feedback,
-          broken out by work type and trend.{" "}
-          <span className="text-foreground font-medium">Learning · Behavior · Results (L2–L4)</span>{" "}
-          is an optional outcomes log you fill from your own assessments or operational data — it is
-          not measured by the QR. A program-effectiveness and learning signal; it does not establish
-          individual competency (e.g. Joint Commission HR.01.06.01).
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={workType}
+            onChange={(e) => {
+              setWorkType(e.target.value);
+            }}
+            className={selectCls}
+          >
+            {WORK_TYPES.map((w) => (
+              <option key={w.value} value={w.value}>
+                {w.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={range}
+            onChange={(e) => {
+              setRange(e.target.value);
+            }}
+            className={selectCls}
+          >
+            {DATE_RANGES.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+          <span className="text-muted-foreground text-xs">
+            {rows.length} instructor{rows.length === 1 ? "" : "s"} · {totalResponses} response
+            {totalResponses === 1 ? "" : "s"}
+          </span>
+        </div>
         <button
           type="button"
-          onClick={() => {
-            setAdding((v) => !v);
-          }}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium"
+          onClick={exportExcel}
+          disabled={rows.length === 0}
+          className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
         >
-          <PlusIcon className="h-4 w-4" />
-          Add outcome metric
+          <ArrowDownTrayIcon className="h-4 w-4" />
+          Export to Excel
         </button>
       </div>
 
-      {adding && (
-        <ScoreForm
-          instructors={instructors.map((i) => ({ id: i.id, name: i.name }))}
-          onClose={() => {
-            setAdding(false);
-          }}
-        />
-      )}
-
-      {instructors.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="border-border bg-surface rounded-xl border border-dashed p-10 text-center">
-          <p className="text-muted-foreground text-sm">No instructors in scope.</p>
+          <p className="text-muted-foreground text-sm">No survey responses in this view yet.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {instructors.map((i) => (
-            <div key={i.id} className="border-border bg-background rounded-xl border p-4">
-              <div className="mb-3">
-                <span className="text-foreground text-sm font-semibold">{i.name}</span>
-                {i.department && (
-                  <span className="text-muted-foreground ml-2 text-xs">{i.department}</span>
-                )}
-              </div>
-              <InstructorQualityScorecard data={i.quality} peerOverall={peerOverall} />
-            </div>
-          ))}
+        <div className="border-border overflow-x-auto rounded-xl border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-border bg-surface border-b">
+                <Th
+                  label="Instructor"
+                  sk="name"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                  align="left"
+                />
+                <th className="text-muted-foreground px-3 py-2 text-left text-xs font-medium">
+                  Dept
+                </th>
+                <Th
+                  label="Responses"
+                  sk="responses"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
+                />
+                {TRAIT_COLS.map((t) => (
+                  <Th
+                    key={t.key}
+                    label={t.label}
+                    sk={t.key}
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                  />
+                ))}
+                <Th label="NPS" sk="nps" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((r) => (
+                <tr key={r.id} className="border-border border-b last:border-0">
+                  <td className="px-3 py-2">
+                    <Link
+                      href={`/instructors/${r.id}`}
+                      className="text-primary font-medium hover:underline"
+                    >
+                      {r.name}
+                    </Link>
+                  </td>
+                  <td className="text-muted-foreground px-3 py-2 text-xs">{r.department ?? "—"}</td>
+                  <td className="text-foreground px-3 py-2 text-right tabular-nums">
+                    {r.responses}
+                  </td>
+                  {TRAIT_COLS.map((t) => (
+                    <td key={t.key} className="text-foreground px-3 py-2 text-right tabular-nums">
+                      {fmtCell(r[t.key])}
+                    </td>
+                  ))}
+                  <td className="text-foreground px-3 py-2 text-right tabular-nums">
+                    {r.nps == null ? "—" : r.nps}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   );
 }
 
-function ScoreForm({
-  instructors,
-  onClose,
+function Th({
+  label,
+  sk,
+  sortKey,
+  sortDir,
+  onSort,
+  align = "right",
 }: {
-  instructors: { id: string; name: string }[];
-  onClose: () => void;
+  label: string;
+  sk: SortKey;
+  sortKey: SortKey;
+  sortDir: "asc" | "desc";
+  onSort: (k: SortKey) => void;
+  align?: "left" | "right";
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [instructorId, setInstructorId] = useState(instructors[0]?.id ?? "");
-  const [level, setLevel] = useState(2);
-  const [metric, setMetric] = useState("");
-  const [score, setScore] = useState("");
-  const [scoreMax, setScoreMax] = useState("100");
-  const [period, setPeriod] = useState("");
-
-  const inputCls =
-    "border-input bg-background text-foreground focus:ring-ring rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2";
-
-  function submit() {
-    setError(null);
-    const s = Number(score);
-    if (!instructorId) {
-      setError("Pick an instructor.");
-      return;
-    }
-    if (!metric.trim()) {
-      setError("Name the metric.");
-      return;
-    }
-    if (Number.isNaN(s)) {
-      setError("Enter a numeric score.");
-      return;
-    }
-    startTransition(async () => {
-      const result = await recordQualityScore({
-        instructorId,
-        kirkpatrickLevel: level,
-        metric: metric.trim(),
-        score: s,
-        scoreMax: Number(scoreMax) || 100,
-        periodLabel: period,
-      });
-      if (result.ok) {
-        router.refresh();
-        onClose();
-      } else {
-        setError(result.error.message);
-      }
-    });
-  }
-
+  const active = sortKey === sk;
   return (
-    <div className="border-border bg-surface rounded-xl border p-4">
-      <p className="text-muted-foreground mb-3 text-xs leading-relaxed">
-        Outcomes log — record a learning, behavior, or results metric from your own assessment or
-        operational data. Not measured by the QR, and not a competency determination.
-      </p>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <label className="text-xs">
-          <span className="text-muted-foreground mb-1 block">Instructor</span>
-          <select
-            value={instructorId}
-            onChange={(e) => {
-              setInstructorId(e.target.value);
-            }}
-            className={`${inputCls} w-full`}
-          >
-            {instructors.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs">
-          <span className="text-muted-foreground mb-1 block">Kirkpatrick level</span>
-          <select
-            value={level}
-            onChange={(e) => {
-              setLevel(Number(e.target.value));
-            }}
-            className={`${inputCls} w-full`}
-          >
-            <option value={2}>L2 — Learning</option>
-            <option value={3}>L3 — Behavior</option>
-            <option value={4}>L4 — Results</option>
-          </select>
-        </label>
-        <label className="text-xs">
-          <span className="text-muted-foreground mb-1 block">Metric</span>
-          <input
-            value={metric}
-            onChange={(e) => {
-              setMetric(e.target.value);
-            }}
-            placeholder="e.g. Post-test average, Audit compliance %"
-            className={`${inputCls} w-full`}
-          />
-        </label>
-        <label className="text-xs">
-          <span className="text-muted-foreground mb-1 block">Score</span>
-          <input
-            value={score}
-            onChange={(e) => {
-              setScore(e.target.value);
-            }}
-            placeholder="94"
-            inputMode="decimal"
-            className={`${inputCls} w-full`}
-          />
-        </label>
-        <label className="text-xs">
-          <span className="text-muted-foreground mb-1 block">Out of</span>
-          <input
-            value={scoreMax}
-            onChange={(e) => {
-              setScoreMax(e.target.value);
-            }}
-            placeholder="100"
-            inputMode="decimal"
-            className={`${inputCls} w-full`}
-          />
-        </label>
-        <label className="text-xs">
-          <span className="text-muted-foreground mb-1 block">Period (optional)</span>
-          <input
-            value={period}
-            onChange={(e) => {
-              setPeriod(e.target.value);
-            }}
-            placeholder="e.g. 30-day, Q3"
-            className={`${inputCls} w-full`}
-          />
-        </label>
-      </div>
-      {error && <p className="text-destructive mt-2 text-xs">{error}</p>}
-      <div className="mt-3 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="border-border text-foreground hover:bg-background rounded-md border px-3 py-1.5 text-xs font-medium"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={submit}
-          className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-xs font-medium hover:opacity-90 disabled:opacity-50"
-        >
-          {pending ? "Saving…" : "Save score"}
-        </button>
-      </div>
-    </div>
+    <th
+      className={`px-3 py-2 text-xs font-medium ${align === "left" ? "text-left" : "text-right"}`}
+    >
+      <button
+        type="button"
+        onClick={() => {
+          onSort(sk);
+        }}
+        className={`hover:text-foreground inline-flex items-center gap-1 ${active ? "text-foreground" : "text-muted-foreground"}`}
+      >
+        {label}
+        {active && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
+      </button>
+    </th>
   );
 }
 
