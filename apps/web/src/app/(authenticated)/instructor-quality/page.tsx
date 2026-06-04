@@ -58,7 +58,10 @@ export default async function InstructorQualityPage() {
       supabase
         .from("v_instructor_workload")
         .select("source, source_id, source_label, instructor_id, department_id")
-        .eq("org_id", orgId),
+        .eq("org_id", orgId)
+        // Instructor quality is tracked only for classes taught and education
+        // deliverables produced — not projects, recurring tasks, or ad-hoc work.
+        .in("source", ["class", "education_request"]),
       scope,
     ),
     applyDeptScope(

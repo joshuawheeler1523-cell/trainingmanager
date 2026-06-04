@@ -9,13 +9,9 @@ type ActionResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } };
 
-const SOURCE_TYPES = [
-  "class",
-  "recurring_task",
-  "ad_hoc_task",
-  "education_request",
-  "project_task",
-] as const;
+// Instructor quality is tracked only for classes taught and education
+// deliverables produced.
+const SOURCE_TYPES = ["class", "education_request"] as const;
 type SourceType = (typeof SOURCE_TYPES)[number];
 
 /**

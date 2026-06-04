@@ -337,8 +337,8 @@ function CodesTab({ deliverables }: { deliverables: DeliverableRow[] }) {
     return (
       <div className="border-border bg-surface rounded-xl border border-dashed p-10 text-center">
         <p className="text-muted-foreground text-sm">
-          No deliverables with assigned instructors yet. Assign instructors to classes / projects to
-          generate feedback codes.
+          No classes or education deliverables with assigned instructors yet. Assign an instructor
+          to one to generate a feedback code.
         </p>
       </div>
     );
@@ -347,8 +347,9 @@ function CodesTab({ deliverables }: { deliverables: DeliverableRow[] }) {
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-xs">
-        Generate a QR code for any deliverable. Display it at the end of a session (slide, printed
-        card, or email) — learners scan it, pick the instructor, and leave anonymous feedback.
+        Generate a QR code for a class or education deliverable. Put it at the end of a session or
+        on the deliverable itself (slide, printed card, job aid, or email) — learners scan it, pick
+        the instructor, and leave anonymous feedback.
       </p>
       {grouped.map(([type, rows]) => (
         <section key={type}>
