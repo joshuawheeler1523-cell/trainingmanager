@@ -11,6 +11,8 @@ import {
   PrinterIcon,
   PhotoIcon,
   ArrowDownTrayIcon,
+  ChevronDownIcon,
+  MagnifyingGlassIcon,
 } from "@heroicons/react/20/solid";
 import { generateFeedbackLink, setFeedbackLinkActive } from "./actions";
 
@@ -457,15 +459,32 @@ function Th({
 // ── Feedback codes ───────────────────────────────────────────────────────────
 
 function CodesTab({ deliverables }: { deliverables: DeliverableRow[] }) {
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<"all" | "needs" | "has" | "inactive">("all");
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return deliverables.filter((d) => {
+      if (status === "needs" && d.link) return false;
+      if (status === "has" && !(d.link && d.link.isActive)) return false;
+      if (status === "inactive" && !(d.link && !d.link.isActive)) return false;
+      if (q) {
+        const hay = `${d.label} ${d.instructorNames.join(" ")}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [deliverables, query, status]);
+
   const grouped = useMemo(() => {
     const m = new Map<string, DeliverableRow[]>();
-    for (const d of deliverables) {
+    for (const d of filtered) {
       const list = m.get(d.sourceType) ?? [];
       list.push(d);
       m.set(d.sourceType, list);
     }
     return Array.from(m.entries());
-  }, [deliverables]);
+  }, [filtered]);
 
   if (deliverables.length === 0) {
     return (
@@ -478,25 +497,69 @@ function CodesTab({ deliverables }: { deliverables: DeliverableRow[] }) {
     );
   }
 
+  const needsCount = deliverables.filter((d) => !d.link).length;
+  const selectCls =
+    "border-input bg-background text-foreground focus:ring-ring rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <p className="text-muted-foreground text-xs">
-        Generate a QR code for a class or education deliverable. Put it at the end of a session or
-        on the deliverable itself (slide, printed card, job aid, or email) — learners scan it, pick
-        the instructor, and leave anonymous feedback.
+        Generate a QR code for a class or education deliverable. Put it on the deliverable itself
+        (slide, printed card, job aid, or email) — learners scan it, pick the instructor, and leave
+        anonymous feedback.
       </p>
-      {grouped.map(([type, rows]) => (
-        <section key={type}>
-          <h3 className="text-foreground mb-2 text-sm font-semibold">
-            {SOURCE_LABEL[type] ?? type}
-          </h3>
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {rows.map((d) => (
-              <DeliverableCard key={d.key} row={d} />
-            ))}
-          </div>
-        </section>
-      ))}
+
+      <div className="bg-background sticky top-0 z-10 flex flex-wrap items-center gap-2 py-1">
+        <div className="relative min-w-[220px] flex-1">
+          <MagnifyingGlassIcon className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+            }}
+            placeholder="Search by name or instructor..."
+            className="border-input bg-background text-foreground focus:ring-ring w-full rounded-md border py-1.5 pl-8 pr-3 text-sm focus:outline-none focus:ring-2"
+          />
+        </div>
+        <select
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value as typeof status);
+          }}
+          className={selectCls}
+          aria-label="Filter by code status"
+        >
+          <option value="all">All</option>
+          <option value="needs">
+            Needs a code{needsCount > 0 ? ` (${String(needsCount)})` : ""}
+          </option>
+          <option value="has">Has a code</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <span className="text-muted-foreground text-xs">
+          {filtered.length} of {deliverables.length}
+        </span>
+      </div>
+
+      {grouped.length === 0 ? (
+        <div className="border-border bg-surface rounded-xl border border-dashed p-8 text-center">
+          <p className="text-muted-foreground text-sm">Nothing matches your search or filter.</p>
+        </div>
+      ) : (
+        grouped.map(([type, rows]) => (
+          <section key={type}>
+            <h3 className="text-foreground mb-2 text-sm font-semibold">
+              {SOURCE_LABEL[type] ?? type}{" "}
+              <span className="text-muted-foreground font-normal">({rows.length})</span>
+            </h3>
+            <div className="space-y-2">
+              {rows.map((d) => (
+                <DeliverableCard key={d.key} row={d} />
+              ))}
+            </div>
+          </section>
+        ))
+      )}
     </div>
   );
 }
@@ -507,6 +570,7 @@ function DeliverableCard({ row }: { row: DeliverableRow }) {
   const [copied, setCopied] = useState(false);
   const [imgResult, setImgResult] = useState<"" | "copied" | "downloaded">("");
   const [announce, setAnnounce] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   function say(message: string) {
     setAnnounce(message);
@@ -548,7 +612,7 @@ function DeliverableCard({ row }: { row: DeliverableRow }) {
 
   // Copy the QR image itself to the clipboard so it can be pasted straight onto
   // an outside deliverable (slide, doc, email). Construct the ClipboardItem with
-  // a Blob promise — Safari requires the value resolve within the user gesture.
+  // a Blob promise - Safari requires the value resolve within the user gesture.
   // Where the async Clipboard API is unavailable (or rejects) we fall back to a
   // PNG download and say so, so the button feedback always matches what happened.
   async function copyImage() {
@@ -574,7 +638,7 @@ function DeliverableCard({ row }: { row: DeliverableRow }) {
     setTimeout(() => {
       setImgResult("");
     }, 1500);
-    say("Clipboard unavailable — saved a PNG to your downloads");
+    say("Clipboard unavailable - saved a PNG to your downloads");
   }
 
   function downloadPng() {
@@ -613,118 +677,155 @@ function DeliverableCard({ row }: { row: DeliverableRow }) {
     }, 150);
   }
 
+  const link = row.link;
+  const instructors =
+    row.instructorNames.length > 0 ? row.instructorNames.join(", ") : "No instructor";
+
   return (
-    <div className="border-border bg-background flex gap-4 rounded-xl border p-4">
-      <div className="min-w-0 flex-1">
-        <p className="text-foreground truncate text-sm font-medium">{row.label}</p>
-        <p className="text-muted-foreground mt-0.5 truncate text-xs">
-          {row.instructorNames.length > 0 ? row.instructorNames.join(", ") : "No instructor"}
-        </p>
-        {row.link ? (
-          <div className="mt-3 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              {row.link.qr && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void copyImage();
-                  }}
-                  className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium"
-                  title="Copy the QR image to paste onto a slide, doc, or flyer"
-                >
-                  <PhotoIcon className="h-3.5 w-3.5" />
-                  {imgResult === "copied"
-                    ? "Copied!"
-                    : imgResult === "downloaded"
-                      ? "Saved PNG"
-                      : "Copy image"}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={copy}
-                className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
-                title="Copy the feedback URL"
-              >
-                <ClipboardDocumentIcon className="h-3.5 w-3.5" />
-                {copied ? "Copied!" : "Copy link"}
-              </button>
-              {row.link.qr && (
-                <>
-                  <button
-                    type="button"
-                    onClick={downloadPng}
-                    className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
-                    title="Download a PNG image"
-                  >
-                    <ArrowDownTrayIcon className="h-3.5 w-3.5" />
-                    PNG
-                  </button>
-                  <button
-                    type="button"
-                    onClick={downloadSvg}
-                    className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
-                    title="Download a vector SVG — stays sharp at any print size"
-                  >
-                    <ArrowDownTrayIcon className="h-3.5 w-3.5" />
-                    SVG
-                  </button>
-                  <button
-                    type="button"
-                    onClick={print}
-                    className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
-                    title="Open a printable QR card"
-                  >
-                    <PrinterIcon className="h-3.5 w-3.5" />
-                    Print
-                  </button>
-                </>
-              )}
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  toggleActive(!row.link?.isActive);
-                }}
-                className="text-muted-foreground hover:text-foreground ml-auto inline-flex items-center px-1 py-1 text-xs"
-                title={
-                  row.link.isActive
-                    ? "Stop collecting feedback for this deliverable"
-                    : "Resume collecting feedback"
-                }
-              >
-                {row.link.isActive ? "Deactivate" : "Reactivate"}
-              </button>
-            </div>
-            {!row.link.isActive && (
-              <p className="text-warning text-xs">Inactive — not collecting.</p>
+    <div className="border-border bg-background rounded-lg border">
+      <div className="flex items-center gap-3 px-3 py-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-foreground truncate text-sm font-medium">{row.label}</p>
+          <p className="text-muted-foreground truncate text-xs">{instructors}</p>
+        </div>
+
+        {!link ? (
+          <span className="text-muted-foreground shrink-0 text-[11px]">No code</span>
+        ) : link.isActive ? (
+          <span className="text-success shrink-0 text-[11px] font-medium">Active</span>
+        ) : (
+          <span className="text-warning shrink-0 text-[11px] font-medium">Inactive</span>
+        )}
+
+        {link ? (
+          <button
+            type="button"
+            onClick={() => {
+              setExpanded((v) => !v);
+            }}
+            className="border-border hover:bg-surface flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1"
+            title={expanded ? "Hide code & actions" : "Show code & actions"}
+            aria-expanded={expanded}
+          >
+            {link.qr && (
+              <Image
+                src={link.qr}
+                alt=""
+                width={28}
+                height={28}
+                className="h-7 w-7 rounded-sm"
+                unoptimized
+              />
             )}
-            <span aria-live="polite" className="sr-only">
-              {announce}
-            </span>
-          </div>
+            <ChevronDownIcon
+              className={`text-muted-foreground h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+            />
+          </button>
         ) : (
           <button
             type="button"
             disabled={pending}
             onClick={generate}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 mt-3 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
           >
             <QrCodeIcon className="h-4 w-4" />
-            {pending ? "Generating…" : "Generate code"}
+            {pending ? "Generating..." : "Generate code"}
           </button>
         )}
       </div>
-      {row.link?.qr && (
-        <Image
-          src={row.link.qr}
-          alt="Feedback QR code"
-          width={88}
-          height={88}
-          className="border-border h-[88px] w-[88px] shrink-0 rounded-md border"
-          unoptimized
-        />
+
+      {expanded && link && (
+        <div className="border-border flex gap-4 border-t px-3 py-3">
+          <div className="flex flex-1 flex-wrap items-center gap-2">
+            {link.qr && (
+              <button
+                type="button"
+                onClick={() => {
+                  void copyImage();
+                }}
+                className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium"
+                title="Copy the QR image to paste onto a slide, doc, or flyer"
+              >
+                <PhotoIcon className="h-3.5 w-3.5" />
+                {imgResult === "copied"
+                  ? "Copied!"
+                  : imgResult === "downloaded"
+                    ? "Saved PNG"
+                    : "Copy image"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={copy}
+              className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+              title="Copy the feedback URL"
+            >
+              <ClipboardDocumentIcon className="h-3.5 w-3.5" />
+              {copied ? "Copied!" : "Copy link"}
+            </button>
+            {link.qr && (
+              <>
+                <button
+                  type="button"
+                  onClick={downloadPng}
+                  className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                  title="Download a PNG image"
+                >
+                  <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                  PNG
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadSvg}
+                  className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                  title="Download a vector SVG - stays sharp at any print size"
+                >
+                  <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                  SVG
+                </button>
+                <button
+                  type="button"
+                  onClick={print}
+                  className="border-border text-foreground hover:bg-surface inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                  title="Open a printable QR card"
+                >
+                  <PrinterIcon className="h-3.5 w-3.5" />
+                  Print
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                toggleActive(!link.isActive);
+              }}
+              className="text-muted-foreground hover:text-foreground ml-auto inline-flex items-center px-1 py-1 text-xs"
+              title={
+                link.isActive
+                  ? "Stop collecting feedback for this deliverable"
+                  : "Resume collecting feedback"
+              }
+            >
+              {link.isActive ? "Deactivate" : "Reactivate"}
+            </button>
+          </div>
+          {link.qr && (
+            <Image
+              src={link.qr}
+              alt="Feedback QR code"
+              width={88}
+              height={88}
+              className="border-border h-[88px] w-[88px] shrink-0 rounded-md border"
+              unoptimized
+            />
+          )}
+        </div>
       )}
+
+      <span aria-live="polite" className="sr-only">
+        {announce}
+      </span>
     </div>
   );
 }
