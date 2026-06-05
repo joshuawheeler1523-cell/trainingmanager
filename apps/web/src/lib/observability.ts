@@ -1,27 +1,20 @@
 import "server-only";
 
+import * as Sentry from "@sentry/nextjs";
+
 /**
- * Thin error-reporting + breadcrumb abstraction with a no-op fallback.
+ * Thin error-reporting + breadcrumb abstraction over Sentry.
  *
- * Designed so wiring up Sentry (or any equivalent — Highlight, Bugsnag,
- * Rollbar) is a 10-line change in one file. We deliberately don't take
- * a hard dependency on @sentry/nextjs until we've picked a vendor and
- * paid for it; until then this layer console.errors so prod failures
- * are at least visible in Vercel logs.
- *
- * To wire Sentry:
- *   1. pnpm --filter web add @sentry/nextjs
- *   2. Run `npx @sentry/wizard@latest -i nextjs` (creates instrumentation.ts +
- *      sentry.client.config.ts + sentry.server.config.ts)
- *   3. Replace the body of `reportError` below with `Sentry.captureException`
- *   4. Replace the body of `addBreadcrumb` below with `Sentry.addBreadcrumb`
- *   5. Set SENTRY_DSN in production env (the wizard prompts for this)
- *
- * Until then: errors fall through to console.error which Vercel
- * captures into runtime logs (queryable from the Vercel dashboard).
+ * Sentry is initialized in `instrumentation.ts` (server/edge) and
+ * `instrumentation-client.ts` (browser), gated on SENTRY_DSN /
+ * NEXT_PUBLIC_SENTRY_DSN. When no DSN is configured, Sentry's calls are no-ops
+ * and we fall back to console.error so prod failures stay visible in Vercel
+ * logs. The vendor stays swappable behind this one file.
  */
 
 type Severity = "fatal" | "error" | "warning" | "info" | "debug";
+
+const sentryEnabled = Boolean(process.env.SENTRY_DSN);
 
 export type ErrorContext = {
   userId?: string | null;
@@ -33,6 +26,20 @@ export type ErrorContext = {
 };
 
 export function reportError(error: unknown, context: ErrorContext = {}): void {
+  if (sentryEnabled) {
+    Sentry.withScope((scope) => {
+      if (context.userId) scope.setUser({ id: context.userId });
+      if (context.orgId) scope.setTag("orgId", context.orgId);
+      if (context.agencyId) scope.setTag("agencyId", context.agencyId);
+      if (context.operation) scope.setTag("operation", context.operation);
+      if (context.tags) {
+        for (const [k, v] of Object.entries(context.tags)) scope.setTag(k, v);
+      }
+      if (context.extra) scope.setExtras(context.extra);
+      Sentry.captureException(error);
+    });
+    return;
+  }
   const message = error instanceof Error ? error.message : String(error);
   const stack = error instanceof Error ? error.stack : undefined;
   console.error("[observability]", {
@@ -49,8 +56,15 @@ export function addBreadcrumb(args: {
   level?: Severity;
   data?: Record<string, unknown>;
 }): void {
-  // No-op until Sentry is wired up. We don't console-log breadcrumbs by
-  // default — they'd dominate the runtime log output.
+  if (sentryEnabled) {
+    Sentry.addBreadcrumb({
+      category: args.category,
+      message: args.message,
+      level: args.level ?? "info",
+      ...(args.data ? { data: args.data } : {}),
+    });
+    return;
+  }
   if (process.env["OBSERVABILITY_DEBUG"] === "true") {
     console.debug("[breadcrumb]", args);
   }
