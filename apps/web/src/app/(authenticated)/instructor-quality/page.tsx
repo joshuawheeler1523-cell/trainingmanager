@@ -49,7 +49,7 @@ export default async function InstructorQualityPage() {
     applyDeptScope(
       supabase
         .from("instructors")
-        .select("id, full_name, department")
+        .select("id, full_name, department, departments(name)")
         .eq("org_id", orgId)
         .eq("is_external", false)
         .is("deleted_at", null)
@@ -89,11 +89,15 @@ export default async function InstructorQualityPage() {
 
   const instructorName = new Map((instructorRows ?? []).map((i) => [i.id, i.full_name] as const));
 
-  const instructors: ReportInstructor[] = (instructorRows ?? []).map((i) => ({
-    id: i.id,
-    name: i.full_name,
-    department: i.department,
-  }));
+  const instructors: ReportInstructor[] = (instructorRows ?? []).map((i) => {
+    const dept = i.departments as { name: string } | { name: string }[] | null;
+    const deptName = Array.isArray(dept) ? dept[0]?.name : dept?.name;
+    return {
+      id: i.id,
+      name: i.full_name,
+      department: deptName ?? i.department,
+    };
+  });
 
   const responses: FeedbackResponse[] = (feedbackRows ?? []).map((f) => ({
     instructorId: f.instructor_id,
