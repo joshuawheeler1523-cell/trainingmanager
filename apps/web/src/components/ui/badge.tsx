@@ -14,19 +14,22 @@ export type BadgeVariant =
   | "neutral" // under-utilized / archived
   | "accent"; // persimmon callout — first-class new entity
 
+// Text colors are intentionally darker than the raw status tokens so the small
+// mono pill text clears WCAG AA (≥4.5:1) on each muted tint. Backgrounds keep
+// the editorial muted look; only the foreground was deepened for legibility.
 const VARIANT: Record<BadgeVariant, string> = {
   // Default keeps a hair border for cases where there's no semantic state.
   default: "bg-surface text-foreground border-border border",
   // Forest tint — balanced / on-track.
-  success: "bg-[rgba(59,122,68,0.10)] text-[var(--green)]",
+  success: "bg-[rgba(59,122,68,0.10)] text-[#2a6334]",
   // Persimmon tint — at-risk / in-progress.
-  warning: "bg-[rgba(201,138,58,0.14)] text-[var(--persimmon-deep)]",
+  warning: "bg-[rgba(201,138,58,0.14)] text-[#8a5316]",
   // Red tint — over-allocated / conflict / failed.
-  danger: "bg-[rgba(183,61,61,0.12)] text-[var(--red)]",
+  danger: "bg-[rgba(183,61,61,0.12)] text-[#a02c2c]",
   // Forest fill — informational. Soft brand presence.
-  info: "bg-[rgba(45,74,46,0.10)] text-[var(--forest)]",
+  info: "bg-[rgba(45,74,46,0.10)] text-[#2d4a2e]",
   // Sage tint — under-utilized / muted.
-  neutral: "bg-[rgba(139,157,131,0.18)] text-[#5a6855]",
+  neutral: "bg-[rgba(139,157,131,0.18)] text-[#4d5746]",
   // Persimmon solid — accent / new entity callout.
   accent: "bg-[var(--persimmon)] text-[var(--ink)]",
 };
