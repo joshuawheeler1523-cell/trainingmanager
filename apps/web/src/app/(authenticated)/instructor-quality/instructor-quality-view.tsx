@@ -16,6 +16,7 @@ import {
   MagnifyingGlassIcon,
 } from "@heroicons/react/20/solid";
 import { generateFeedbackLink, setFeedbackLinkActive } from "./actions";
+import { Tabs } from "@/components/ui";
 
 // One anonymous QR survey response (a learner rating one instructor).
 export type FeedbackResponse = {
@@ -78,29 +79,16 @@ export default function InstructorQualityView({
 
   return (
     <div>
-      <div className="border-border mb-5 flex gap-6 border-b">
-        {(
-          [
-            { id: "quality", label: "Quality report" },
-            { id: "codes", label: "Feedback codes" },
-          ] as const
-        ).map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => {
-              setTab(t.id);
-            }}
-            className={`-mb-px border-b-2 pb-3 text-sm font-medium transition-colors ${
-              tab === t.id
-                ? "border-primary text-primary"
-                : "text-muted-foreground hover:text-foreground border-transparent"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={[
+          { id: "quality", label: "Quality report" },
+          { id: "codes", label: "Feedback codes" },
+        ]}
+        value={tab}
+        onChange={setTab}
+        paddingX="px-0"
+        className="mb-5"
+      />
 
       {tab === "quality" ? (
         <QualityReport responses={responses} instructors={instructors} />
