@@ -59,35 +59,42 @@ export default function BucketConsumptionPanel({ consumption, totalOrgHours }: P
         </p>
       </div>
 
+      <div className="text-muted-foreground border-border grid grid-cols-[1fr_2.75rem_2.75rem_3.5rem] items-baseline gap-2 border-b border-dashed pb-1.5 font-mono text-[9.5px] uppercase tracking-[0.06em]">
+        <span>Bucket</span>
+        <span className="text-right">Actual</span>
+        <span className="text-right">Target</span>
+        <span className="text-right">Var</span>
+      </div>
       <ul className="divide-border divide-y">
         {lines.map((l) => (
           <li
             key={l.name}
-            className="grid grid-cols-[1fr_auto] items-baseline gap-3 py-2.5 text-sm"
+            className="grid grid-cols-[1fr_2.75rem_2.75rem_3.5rem] items-baseline gap-2 py-2.5 text-sm"
           >
-            <span className="text-foreground inline-flex items-center gap-2">
+            <span className="text-foreground inline-flex min-w-0 items-center gap-2">
               <span
                 aria-hidden
                 className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ background: l.color }}
               />
-              {l.name}
+              <span className="truncate">{l.name}</span>
             </span>
-            <span className="font-mono text-xs tabular-nums">
-              <b className="text-foreground font-medium">{l.consumedPct.toFixed(0)}%</b>{" "}
-              <span className="text-muted-foreground">/ {l.targetPct.toFixed(0)}%</span>{" "}
-              <span
-                className={
-                  Math.abs(l.delta) < 1
-                    ? "text-muted-foreground"
-                    : l.delta > 0
-                      ? "font-medium text-[var(--red)]"
-                      : "text-muted-foreground"
-                }
-              >
-                {l.delta > 0 ? "+" : ""}
-                {l.delta.toFixed(0)}
-              </span>
+            <span className="text-foreground text-right font-mono text-xs font-medium tabular-nums">
+              {l.consumedPct.toFixed(0)}%
+            </span>
+            <span className="text-muted-foreground text-right font-mono text-xs tabular-nums">
+              {l.targetPct.toFixed(0)}%
+            </span>
+            <span
+              className={`text-right font-mono text-xs tabular-nums ${
+                Math.abs(l.delta) < 1
+                  ? "text-muted-foreground"
+                  : l.delta > 0
+                    ? "font-medium text-[var(--red)]"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {Math.abs(l.delta) < 1 ? "—" : `${l.delta > 0 ? "+" : ""}${l.delta.toFixed(0)}pp`}
             </span>
           </li>
         ))}

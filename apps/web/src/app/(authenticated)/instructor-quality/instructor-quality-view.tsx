@@ -12,6 +12,7 @@ import {
   PhotoIcon,
   ArrowDownTrayIcon,
   ChevronDownIcon,
+  ChevronUpIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/20/solid";
 import { generateFeedbackLink, setFeedbackLinkActive } from "./actions";
@@ -367,7 +368,7 @@ function QualityReport({
                   align="left"
                 />
                 <th className="text-muted-foreground px-3 py-2 text-left text-xs font-medium">
-                  Dept
+                  Department
                 </th>
                 <Th
                   label="Responses"
@@ -450,7 +451,12 @@ function Th({
         className={`hover:text-foreground inline-flex items-center gap-1 ${active ? "text-foreground" : "text-muted-foreground"}`}
       >
         {label}
-        {active && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
+        {active &&
+          (sortDir === "asc" ? (
+            <ChevronUpIcon className="h-3 w-3" />
+          ) : (
+            <ChevronDownIcon className="h-3 w-3" />
+          ))}
       </button>
     </th>
   );

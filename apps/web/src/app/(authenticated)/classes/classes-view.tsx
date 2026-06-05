@@ -62,15 +62,21 @@ function buildColumns(moduleNameById: Map<string, string>): ColumnDef<ClassWithH
     {
       accessorKey: "offerings_per_year",
       header: "Offerings/yr",
-      cell: ({ getValue }) => <span className="text-sm">{String(getValue<number>())}</span>,
+      meta: { align: "right" },
+      cell: ({ getValue }) => (
+        <span className="text-muted-foreground text-sm tabular-nums">
+          {String(getValue<number>())}
+        </span>
+      ),
     },
     {
       accessorKey: "total_hours_per_offering",
       header: "Hrs/offering",
+      meta: { align: "right" },
       cell: ({ getValue }) => {
         const val = getValue<number | null>();
         return (
-          <span className="text-muted-foreground text-sm">
+          <span className="text-muted-foreground text-sm tabular-nums">
             {val != null ? val.toFixed(1) : "—"}
           </span>
         );
@@ -79,10 +85,11 @@ function buildColumns(moduleNameById: Map<string, string>): ColumnDef<ClassWithH
     {
       accessorKey: "annual_class_hours",
       header: "Annual hrs",
+      meta: { align: "right" },
       cell: ({ getValue }) => {
         const val = getValue<number | null>();
         return (
-          <span className="text-muted-foreground text-sm">
+          <span className="text-muted-foreground text-sm tabular-nums">
             {val != null ? val.toFixed(1) : "—"}
           </span>
         );
@@ -91,8 +98,9 @@ function buildColumns(moduleNameById: Map<string, string>): ColumnDef<ClassWithH
     {
       accessorKey: "total_days",
       header: "Days",
+      meta: { align: "right" },
       cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">
+        <span className="text-muted-foreground text-sm tabular-nums">
           {row.original.is_multi_day ? row.original.total_days : 1}
         </span>
       ),

@@ -113,7 +113,10 @@ export default function InstructorCard({ instructor, capacity, sourceBreakdown }
         <div className="min-w-0 text-xs">
           <p className="text-foreground tabular-nums">
             <span className="font-medium">{capacity?.assigned_hours.toFixed(0) ?? "0"}</span>
-            <span className="text-muted-foreground"> / {instructor.annual_hours}</span>
+            <span className="text-muted-foreground">
+              {" "}
+              / {instructor.annual_hours.toLocaleString()}
+            </span>
             <span className="text-muted-foreground"> h assigned</span>
           </p>
           {capacity != null && (
@@ -167,18 +170,20 @@ function CapacityDonut({ pct, tooltip }: { pct: number | null; tooltip?: string 
           stroke="color-mix(in oklab, var(--border) 70%, transparent)"
           strokeWidth={STROKE}
         />
-        <circle
-          cx={SIZE / 2}
-          cy={SIZE / 2}
-          r={RADIUS}
-          fill="none"
-          stroke={color}
-          strokeWidth={STROKE}
-          strokeDasharray={CIRC}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          transform={`rotate(-90 ${String(SIZE / 2)} ${String(SIZE / 2)})`}
-        />
+        {arcPct >= 1 && (
+          <circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={RADIUS}
+            fill="none"
+            stroke={color}
+            strokeWidth={STROKE}
+            strokeDasharray={CIRC}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${String(SIZE / 2)} ${String(SIZE / 2)})`}
+          />
+        )}
       </svg>
       <span
         className="absolute text-xs font-bold tabular-nums"

@@ -10,9 +10,18 @@ import {
   flexRender,
   type ColumnDef,
   type SortingState,
+  type RowData,
 } from "@tanstack/react-table";
 import { ChevronUpIcon, ChevronDownIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid";
 import { cn } from "@/lib/utils";
+
+declare module "@tanstack/react-table" {
+  // Opt-in per-column alignment; defaults to left when unset.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    align?: "left" | "right";
+  }
+}
 
 type Props<T> = {
   data: T[];
@@ -76,12 +85,14 @@ export default function DataTable<T>({
                 {hg.headers.map((header) => {
                   const sorted = header.column.getIsSorted();
                   const canSort = header.column.getCanSort();
+                  const align = header.column.columnDef.meta?.align;
                   return (
                     <th
                       key={header.id}
                       className={cn(
                         "text-muted-foreground px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider",
                         canSort && "hover:text-foreground cursor-pointer select-none",
+                        align === "right" && "text-right",
                       )}
                       onClick={header.column.getToggleSortingHandler()}
                       colSpan={header.colSpan}
@@ -121,11 +132,20 @@ export default function DataTable<T>({
             ) : (
               table.getRowModel().rows.map((row) => (
                 <tr key={row.id} className="hover:bg-surface">
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="text-foreground px-4 py-3">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    const align = cell.column.columnDef.meta?.align;
+                    return (
+                      <td
+                        key={cell.id}
+                        className={cn(
+                          "text-foreground px-4 py-3",
+                          align === "right" && "text-right",
+                        )}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             )}
