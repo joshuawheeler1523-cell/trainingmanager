@@ -273,7 +273,7 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
                     setErrorMessage(null);
                     setMode(mode === "magic" ? "password" : "magic");
                   }}
-                  className="text-muted-foreground text-sm underline-offset-4 transition-colors hover:underline"
+                  className="text-muted-foreground rounded-sm text-sm underline-offset-4 transition-colors hover:underline focus:underline focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[rgba(45,74,46,0.12)]"
                   style={{ textDecorationColor: "var(--highlight)" }}
                 >
                   {mode === "magic"
@@ -283,7 +283,7 @@ export default function LoginForm({ brand }: { brand: LoginBrand }) {
                 {mode === "password" && (
                   <a
                     href="/auth/reset"
-                    className="text-muted-foreground text-xs underline-offset-4 hover:underline"
+                    className="text-muted-foreground rounded-sm text-xs underline-offset-4 hover:underline focus:underline focus:outline-none focus-visible:ring-[3px] focus-visible:ring-[rgba(45,74,46,0.12)]"
                   >
                     Forgot password?
                   </a>
@@ -327,8 +327,7 @@ function Field({
         type={type}
         required
         autoComplete={autoComplete}
-        className="border-input bg-background text-foreground placeholder:text-muted-foreground w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-sm transition-colors focus:outline-none focus-visible:border-transparent"
-        style={{ outline: "none" }}
+        className="border-input bg-background text-foreground placeholder:text-muted-foreground w-full rounded-lg border px-3.5 py-2.5 text-sm shadow-sm transition-colors focus:border-[var(--forest)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(45,74,46,0.12)]"
       />
     </div>
   );

@@ -73,7 +73,11 @@ export default function TrasView({ tras, departments }: Props) {
   // flight" line under the triage inbox.
   const summary = useMemo(() => {
     const open = filtered.filter((t) => t.status === "draft" || t.status === "documented").length;
-    const hours = filtered.reduce((acc, t) => acc + (t.total_estimated_hours || 0), 0);
+    // "In flight" = still active work; exclude completed/cancelled so the hour
+    // total matches the label (a completed TRA's hours aren't in flight).
+    const hours = filtered
+      .filter((t) => t.status === "draft" || t.status === "documented" || t.status === "converted")
+      .reduce((acc, t) => acc + (t.total_estimated_hours || 0), 0);
     const converted = filtered.filter((t) => t.status === "converted").length;
     return { open, hours, converted };
   }, [filtered]);
