@@ -133,8 +133,8 @@ export default async function StatusPage() {
         {/* Subscribe */}
         <p className="text-muted-foreground mt-8 text-center text-xs">
           Subscribe to incident notifications: email{" "}
-          <a href="mailto:status-subscribe@arbor.app" className="text-primary underline">
-            status-subscribe@arbor.app
+          <a href={`mailto:${PROVIDER_IDENTITY.supportEmail}`} className="text-primary underline">
+            {PROVIDER_IDENTITY.supportEmail}
           </a>
           .
         </p>

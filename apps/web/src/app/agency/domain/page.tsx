@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgencyId } from "@/lib/auth/agency";
 import { dnsInstructionsFor } from "@/lib/vercel-domains";
+import { PROVIDER_IDENTITY } from "@/lib/legal/versions";
 import DomainForm from "./domain-form";
 
 export default async function AgencyDomainPage() {
@@ -41,8 +42,8 @@ export default async function AgencyDomainPage() {
         <h1 className="text-foreground mt-2 text-2xl font-bold">Custom domain</h1>
         <p className="text-muted-foreground mt-1 text-sm">
           Serve Arbor under your own hostname (e.g. <code>app.your-firm.com</code>). Your client
-          orgs sign in at this domain instead of arbor.app, and the login page picks up your
-          branding automatically.
+          orgs sign in at this domain instead of the default {PROVIDER_IDENTITY.tradeName} domain,
+          and the login page picks up your branding automatically.
         </p>
       </div>
 

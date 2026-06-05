@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
+import { PROVIDER_IDENTITY } from "@/lib/legal/versions";
 import SsoConfigList from "./sso-config-list";
 
 export default async function SsoSettingsPage() {
@@ -48,9 +49,10 @@ export default async function SsoSettingsPage() {
             host.
           </li>
           <li>
-            Send the SAML metadata XML to <code>support@arbor.app</code>. Arbor support registers
-            the provider via <code>supabase.auth.admin.sso.providers.create()</code> and gives you
-            the resulting provider id.
+            Send the SAML metadata XML to <code>{PROVIDER_IDENTITY.supportEmail}</code>. Arbor
+            support registers the provider via{" "}
+            <code>supabase.auth.admin.sso.providers.create()</code> and gives you the resulting
+            provider id.
           </li>
           <li>
             Paste the provider id below + your email domain (e.g. <code>mercy-health.com</code>).

@@ -13,10 +13,12 @@ export default function ShareCard({ project }: Props) {
   const [copied, setCopied] = useState(false);
 
   const token = project.public_share_token;
-  const url =
-    typeof window !== "undefined" && token
-      ? `${window.location.origin}/public/projects/${token}`
-      : "";
+  // Prefer the configured canonical domain (NEXT_PUBLIC_APP_URL is a public env
+  // var inlined into the client bundle) so a copied share link never points at
+  // whatever preview host the manager is on; fall back to the live origin.
+  const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "");
+  const origin = configuredOrigin ?? (typeof window !== "undefined" ? window.location.origin : "");
+  const url = token ? `${origin}/public/projects/${token}` : "";
 
   function handleGenerate() {
     startTransition(async () => {

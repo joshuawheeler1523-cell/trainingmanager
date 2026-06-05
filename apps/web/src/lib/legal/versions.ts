@@ -35,6 +35,7 @@ export const PROVIDER_IDENTITY = {
   legalEmail: process.env["ARBOR_LEGAL_EMAIL"] ?? "legal@arbor.app",
   supportEmail: process.env["ARBOR_SUPPORT_EMAIL"] ?? "support@arbor.app",
   salesEmail: process.env["ARBOR_SALES_EMAIL"] ?? "sales@arbor.app",
+  billingEmail: process.env["ARBOR_BILLING_EMAIL"] ?? "billing@arbor.app",
   securityEmail: process.env["ARBOR_SECURITY_EMAIL"] ?? "security@arbor.app",
   dpoEmail: process.env["ARBOR_DPO_EMAIL"] ?? "dpo@arbor.app",
 };
