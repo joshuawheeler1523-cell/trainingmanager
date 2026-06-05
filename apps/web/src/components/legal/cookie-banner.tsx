@@ -53,8 +53,12 @@ export default function CookieBanner() {
   if (!shown) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4">
-      <div className="border-border bg-background mx-auto max-w-3xl rounded-xl border p-5 shadow-lg">
+    <div
+      role="dialog"
+      aria-label="Cookie consent"
+      className="border-border bg-background fixed inset-x-0 bottom-0 z-50 border-t shadow-[0_-6px_28px_-14px_rgba(28,31,28,0.35)]"
+    >
+      <div className="mx-auto max-w-6xl px-4 py-3.5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="flex-1 text-sm">
             <p className="text-foreground font-semibold">Cookies on Arbor</p>

@@ -72,7 +72,7 @@ export default function AppShell({
           <header className="border-border bg-background sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-4">
             <MobileSidebar isAdmin={isAdmin} modules={modules} counts={sidebarCounts} />
             <div className="min-w-0 flex-1">{orgSwitcherSlot}</div>
-            <div className="flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1">
               {isArborAdmin && (
                 <Link
                   href="/arbor"

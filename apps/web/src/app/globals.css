@@ -18,7 +18,7 @@
   /* Ink (text) */
   --ink: #1c1f1c;
   --ink-soft: #3d423c;
-  --ink-mute: #6e7269;
+  --ink-mute: #565a52; /* darkened from #6e7269 to clear WCAG AA (≥6:1 on cream/cream-2) */
   --hair: rgba(28, 31, 28, 0.10); /* default border */
   --hair-soft: rgba(28, 31, 28, 0.06); /* subtle divider */
 
@@ -66,7 +66,7 @@
 
   /* Borders — hair-thin and warm-toned now */
   --border: var(--hair);
-  --input: rgba(28, 31, 28, 0.18);
+  --input: rgba(28, 31, 28, 0.3); /* raised from 0.18 so field borders clear the 3:1 non-text contrast bar */
   --ring: var(--forest);
 
   /* Card shadows — editorial: barely-there, paired with hair borders */
@@ -106,7 +106,7 @@
   --warning: #b45309; /* amber-700 */
   --warning-bg: #fef3c7; /* amber-100 */
   --warning-bd: #fcd34d; /* amber-300 */
-  --danger: #e11d48; /* rose-600 */
+  --danger: #be123c; /* rose-700 — darkened from rose-600 for ≥4.5:1 on the rose-100 pill bg */
   --danger-bg: #ffe4e6; /* rose-100 */
   --danger-bd: #fda4af; /* rose-300 */
   --info: #1d4ed8; /* blue-700 */
@@ -163,7 +163,7 @@
   /* Direct-valued semantics that don't inherit from raw tokens */
   --primary-foreground: #ffffff;
   --highlight-foreground: #ffffff;
-  --input: rgba(50, 51, 56, 0.2);
+  --input: rgba(50, 51, 56, 0.3);
 
   /* Card shadows — cooler, slightly stronger on white */
   --shadow-card: 0 1px 0 rgba(50, 51, 56, 0.04), 0 12px 28px -20px rgba(50, 51, 56, 0.22);
