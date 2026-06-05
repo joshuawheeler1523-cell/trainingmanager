@@ -127,7 +127,7 @@ export default function PricingPage() {
                 {tier.description}
               </p>
               <a
-                href={`mailto:sales@arbor.app?subject=${encodeURIComponent(`Arbor ${tier.name} tier inquiry`)}`}
+                href={`mailto:${PROVIDER_IDENTITY.salesEmail}?subject=${encodeURIComponent(`Arbor ${tier.name} tier inquiry`)}`}
                 className={`mt-6 rounded-md px-4 py-2 text-center text-sm font-medium ${
                   tier.highlight
                     ? "bg-primary text-primary-foreground hover:opacity-90"
@@ -208,8 +208,8 @@ export default function PricingPage() {
 
         <p className="text-muted-foreground mt-16 text-center text-xs">
           Questions? Email{" "}
-          <a href="mailto:sales@arbor.app" className="text-primary underline">
-            sales@arbor.app
+          <a href={`mailto:${PROVIDER_IDENTITY.salesEmail}`} className="text-primary underline">
+            {PROVIDER_IDENTITY.salesEmail}
           </a>
           . We answer in one business day.
         </p>

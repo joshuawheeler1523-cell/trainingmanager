@@ -64,14 +64,17 @@ export default function HomePage() {
           <Link href="/" className="text-foreground font-serif text-xl tracking-tight">
             {PROVIDER_IDENTITY.tradeName}
           </Link>
-          <nav className="flex items-center gap-5 text-sm">
+          <nav className="flex items-center gap-3 text-sm sm:gap-5">
             <Link href="/pricing" className="text-foreground hover:text-primary">
               Pricing
             </Link>
-            <Link href="/trust" className="text-foreground hover:text-primary">
+            <Link href="/trust" className="text-foreground hover:text-primary hidden sm:inline">
               Trust
             </Link>
-            <Link href="/agency-signup" className="text-foreground hover:text-primary">
+            <Link
+              href="/agency-signup"
+              className="text-foreground hover:text-primary hidden sm:inline"
+            >
               For agencies
             </Link>
             <Link
@@ -112,7 +115,7 @@ export default function HomePage() {
               See pricing
             </Link>
             <a
-              href="mailto:sales@arbor.app?subject=Arbor%20demo%20request"
+              href={`mailto:${PROVIDER_IDENTITY.salesEmail}?subject=Arbor%20demo%20request`}
               className="text-muted-foreground hover:text-foreground px-3 py-2 text-sm underline-offset-4 hover:underline"
             >
               Or request a demo →
