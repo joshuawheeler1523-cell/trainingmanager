@@ -20,6 +20,7 @@ import {
   unassignRequestInstructor,
 } from "./actions";
 import { Label } from "@/components/labels";
+import { Badge, type BadgeVariant } from "@/components/ui";
 
 type Props = {
   request: EducationRequest;
@@ -30,15 +31,15 @@ type Props = {
   onClose: () => void;
 };
 
-const STATUS_BADGE: Record<RequestStatus, string> = {
-  new: "bg-primary/10 text-primary",
-  under_review: "bg-warning-bg text-warning",
-  approved: "bg-success-bg text-success",
-  assigned: "bg-info-bg text-info",
-  in_progress: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-200",
-  completed: "bg-success-bg text-success",
-  archived: "bg-surface text-muted-foreground",
-  rejected: "bg-destructive/10 text-destructive",
+const STATUS_VARIANT: Record<RequestStatus, BadgeVariant> = {
+  new: "default",
+  under_review: "info",
+  approved: "success",
+  assigned: "info",
+  in_progress: "warning",
+  completed: "success",
+  archived: "neutral",
+  rejected: "danger",
 };
 
 export default function RequestSheet({
@@ -147,11 +148,9 @@ export default function RequestSheet({
           <div className="border-border flex items-start justify-between gap-3 border-b px-6 py-4">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_BADGE[localStatus]}`}
-                >
+                <Badge variant={STATUS_VARIANT[localStatus]}>
                   {localStatus.replace(/_/g, " ")}
-                </span>
+                </Badge>
                 <span className="text-muted-foreground text-xs">
                   {request.submitted_via === "public_form" ? "Public form" : "Internal"}
                 </span>
@@ -188,10 +187,10 @@ export default function RequestSheet({
                     onClick={() => {
                       handleStatusChange(s);
                     }}
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
                       s === localStatus
-                        ? STATUS_BADGE[s]
-                        : "border-border bg-background text-foreground hover:bg-surface border"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-foreground hover:bg-surface"
                     } disabled:opacity-50`}
                   >
                     {s.replace(/_/g, " ")}

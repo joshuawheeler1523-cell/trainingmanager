@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { MapPinIcon, EnvelopeIcon, BuildingOffice2Icon } from "@heroicons/react/20/solid";
 import type { Instructor } from "@arbor/shared";
+import { Badge, type BadgeVariant } from "@/components/ui";
 
 type CapacityRow = {
   instructor_id: string;
@@ -33,10 +34,10 @@ const SOURCE_LABELS = {
   project_task: "Projects",
 } as const;
 
-const STATUS_STYLES: Record<string, string> = {
-  active: "bg-capacity-green-bg text-capacity-green",
-  inactive: "bg-status-gray-bg text-status-gray",
-  on_leave: "bg-capacity-yellow-bg text-capacity-yellow",
+const STATUS_VARIANT: Record<string, BadgeVariant> = {
+  active: "success",
+  inactive: "neutral",
+  on_leave: "warning",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -79,11 +80,9 @@ export default function InstructorCard({ instructor, capacity, sourceBreakdown }
             <p className="text-muted-foreground mt-0.5 truncate text-xs">{instructor.job_title}</p>
           )}
         </div>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[instructor.status] ?? "bg-status-gray-bg text-status-gray"}`}
-        >
+        <Badge variant={STATUS_VARIANT[instructor.status] ?? "neutral"} className="shrink-0">
           {STATUS_LABELS[instructor.status] ?? instructor.status}
-        </span>
+        </Badge>
       </div>
 
       {/* Meta rows */}
