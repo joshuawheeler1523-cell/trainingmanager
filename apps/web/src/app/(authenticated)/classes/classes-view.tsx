@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ArrowUpTrayIcon, BookOpenIcon, RectangleStackIcon } from "@heroicons/react/20/solid";
 import type { ColumnDef } from "@tanstack/react-table";
 import DataTable from "@/components/ui/data-table";
-import { Badge } from "@/components/ui";
+import { Badge, Select } from "@/components/ui";
 import RecommendationsBanner from "@/components/recommendations-banner";
 import CsvImportDialog from "@/components/csv-import-dialog";
 import ClassFormDialog from "./class-form-dialog";
@@ -62,15 +62,21 @@ function buildColumns(moduleNameById: Map<string, string>): ColumnDef<ClassWithH
     {
       accessorKey: "offerings_per_year",
       header: "Offerings/yr",
-      cell: ({ getValue }) => <span className="text-sm">{String(getValue<number>())}</span>,
+      meta: { align: "right" },
+      cell: ({ getValue }) => (
+        <span className="text-muted-foreground text-sm tabular-nums">
+          {String(getValue<number>())}
+        </span>
+      ),
     },
     {
       accessorKey: "total_hours_per_offering",
       header: "Hrs/offering",
+      meta: { align: "right" },
       cell: ({ getValue }) => {
         const val = getValue<number | null>();
         return (
-          <span className="text-muted-foreground text-sm">
+          <span className="text-muted-foreground text-sm tabular-nums">
             {val != null ? val.toFixed(1) : "—"}
           </span>
         );
@@ -79,10 +85,11 @@ function buildColumns(moduleNameById: Map<string, string>): ColumnDef<ClassWithH
     {
       accessorKey: "annual_class_hours",
       header: "Annual hrs",
+      meta: { align: "right" },
       cell: ({ getValue }) => {
         const val = getValue<number | null>();
         return (
-          <span className="text-muted-foreground text-sm">
+          <span className="text-muted-foreground text-sm tabular-nums">
             {val != null ? val.toFixed(1) : "—"}
           </span>
         );
@@ -91,8 +98,9 @@ function buildColumns(moduleNameById: Map<string, string>): ColumnDef<ClassWithH
     {
       accessorKey: "total_days",
       header: "Days",
+      meta: { align: "right" },
       cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">
+        <span className="text-muted-foreground text-sm tabular-nums">
           {row.original.is_multi_day ? row.original.total_days : 1}
         </span>
       ),
@@ -164,12 +172,12 @@ export default function ClassesView({
             Show archived
           </label>
           {modules.length > 0 && (
-            <select
+            <Select
               value={moduleFilter}
               onChange={(e) => {
                 setModuleFilter(e.target.value);
               }}
-              className="border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm"
+              className="w-auto"
               aria-label="Filter by module"
             >
               <option value="">All modules</option>
@@ -179,7 +187,7 @@ export default function ClassesView({
                 </option>
               ))}
               <option value="__none__">No module</option>
-            </select>
+            </Select>
           )}
         </div>
         <div className="flex items-center gap-2">

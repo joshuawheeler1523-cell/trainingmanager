@@ -17,7 +17,7 @@ const TIERS = [
   },
   {
     name: "Medium",
-    teamSize: "25–100 active users",
+    teamSize: "25–99 active users",
     price: "$50,000",
     cadence: "/year",
     description: "Multi-department training program with dedicated coordinators.",
@@ -26,7 +26,7 @@ const TIERS = [
   },
   {
     name: "Large",
-    teamSize: "100–500 active users",
+    teamSize: "100–499 active users",
     price: "$75,000",
     cadence: "/year",
     description: "Health system rollouts, multi-site delivery, EMR implementation programs.",
@@ -89,6 +89,9 @@ export default function PricingPage() {
 
       <main className="mx-auto max-w-6xl px-6 py-16">
         <div className="text-center">
+          <p className="text-primary mb-4 text-xs font-semibold uppercase tracking-[0.32em]">
+            Pricing
+          </p>
           <h1 className="text-foreground font-serif text-4xl tracking-tight">
             Simple, predictable pricing
           </h1>
@@ -124,7 +127,7 @@ export default function PricingPage() {
                 {tier.description}
               </p>
               <a
-                href={`mailto:sales@arbor.app?subject=${encodeURIComponent(`Arbor ${tier.name} tier inquiry`)}`}
+                href={`mailto:${PROVIDER_IDENTITY.salesEmail}?subject=${encodeURIComponent(`Arbor ${tier.name} tier inquiry`)}`}
                 className={`mt-6 rounded-md px-4 py-2 text-center text-sm font-medium ${
                   tier.highlight
                     ? "bg-primary text-primary-foreground hover:opacity-90"
@@ -139,7 +142,9 @@ export default function PricingPage() {
 
         {/* What's included */}
         <section className="border-border bg-background mt-16 rounded-2xl border p-8">
-          <h2 className="text-foreground text-base font-bold">Every plan includes</h2>
+          <h2 className="text-foreground font-serif text-2xl tracking-tight">
+            Every plan includes
+          </h2>
           <p className="text-muted-foreground mt-1 text-xs">
             We don&apos;t feature-gate. Whatever tier you&apos;re on, you get the whole product.
           </p>
@@ -155,7 +160,7 @@ export default function PricingPage() {
 
         {/* FAQ */}
         <section className="mt-16">
-          <h2 className="text-foreground text-base font-bold">Frequently asked</h2>
+          <h2 className="text-foreground font-serif text-2xl tracking-tight">Frequently asked</h2>
           <dl className="mt-6 space-y-6 text-sm">
             <Faq
               q='How is "active user" defined?'
@@ -203,8 +208,8 @@ export default function PricingPage() {
 
         <p className="text-muted-foreground mt-16 text-center text-xs">
           Questions? Email{" "}
-          <a href="mailto:sales@arbor.app" className="text-primary underline">
-            sales@arbor.app
+          <a href={`mailto:${PROVIDER_IDENTITY.salesEmail}`} className="text-primary underline">
+            {PROVIDER_IDENTITY.salesEmail}
           </a>
           . We answer in one business day.
         </p>

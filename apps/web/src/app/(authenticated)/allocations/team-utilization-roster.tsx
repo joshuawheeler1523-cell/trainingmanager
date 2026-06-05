@@ -112,11 +112,13 @@ export default function TeamUtilizationRoster({ buckets, rows }: Props) {
                   >
                     {r.full_name}
                   </Link>
-                  <p className="text-muted-foreground truncate text-xs">{r.department ?? "—"}</p>
+                  {r.department && (
+                    <p className="text-muted-foreground truncate text-xs">{r.department}</p>
+                  )}
                 </div>
                 <CapacityBar segments={segments} overagePercent={overage} />
                 <span
-                  className={`font-mono text-xs tabular-nums ${pct >= 100 ? "font-medium text-[var(--red)]" : "text-foreground"}`}
+                  className={`w-10 text-right font-mono text-xs tabular-nums ${pct >= 100 ? "font-medium text-[var(--red)]" : "text-foreground"}`}
                 >
                   {pct.toFixed(0)}%
                 </span>

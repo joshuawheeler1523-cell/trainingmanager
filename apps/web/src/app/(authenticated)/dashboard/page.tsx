@@ -443,8 +443,8 @@ export default async function DashboardPage() {
 
           <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-2">
             <CapacityColumn
-              title="Over-allocated"
-              caption="80% and above — at risk of burnout"
+              title="At risk & over"
+              caption="80% and above — approaching or over capacity"
               rows={overAllocated}
               emptyMessage="Nobody is over 80% utilization right now."
             />
@@ -639,7 +639,7 @@ export default async function DashboardPage() {
                             ? "var(--persimmon-deep)"
                             : "var(--forest)";
                     return (
-                      <tr key={d.id} className="hover:bg-surface">
+                      <tr key={d.id}>
                         <td className="font-display text-foreground px-4 py-3 font-medium">
                           {d.name}
                         </td>
@@ -784,7 +784,7 @@ function CapacityColumn({
 }) {
   return (
     <div>
-      <div className="mb-2 flex items-baseline justify-between gap-2">
+      <div className="mb-2 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
         <Eyebrow variant="mute">
           {title}{" "}
           <span className="text-muted-foreground ml-1 font-normal normal-case tracking-normal">
@@ -853,7 +853,7 @@ function CapacityRowItem({ row }: { row: CapacityRowWithDept }) {
   // a visible overflow without breaking layout.
   const fillPct = Math.min(pct, 110);
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(120px,160px)_3.25rem] items-center gap-3">
+    <div className="grid grid-cols-[minmax(0,1fr)_64px_3rem] items-center gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(120px,160px)_3.25rem]">
       <div className="min-w-0">
         <Link
           href={`/instructors/${row.instructor_id}`}
@@ -932,7 +932,7 @@ function CapacityChartCard({
         >
           {utilizationPct.toFixed(0)}%{" "}
           <span className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
-            utilized
+            of capacity
           </span>
         </p>
       </div>
@@ -974,7 +974,11 @@ function CapacityChartCard({
         <CapacityStat
           label={overflowHours > 0 ? "Over-assigned" : "Free to assign"}
           value={overflowHours > 0 ? overflowHours : freeHours}
-          dotColor={overflowHours > 0 ? "var(--destructive)" : "var(--accent)"}
+          dotColor={
+            overflowHours > 0
+              ? "var(--destructive)"
+              : "color-mix(in oklab, var(--border) 70%, transparent)"
+          }
           highlight={overflowHours > 0}
         />
       </div>

@@ -12,9 +12,11 @@ import {
   PhotoIcon,
   ArrowDownTrayIcon,
   ChevronDownIcon,
+  ChevronUpIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/20/solid";
 import { generateFeedbackLink, setFeedbackLinkActive } from "./actions";
+import { Tabs } from "@/components/ui";
 
 // One anonymous QR survey response (a learner rating one instructor).
 export type FeedbackResponse = {
@@ -77,29 +79,16 @@ export default function InstructorQualityView({
 
   return (
     <div>
-      <div className="border-border mb-5 flex gap-6 border-b">
-        {(
-          [
-            { id: "quality", label: "Quality report" },
-            { id: "codes", label: "Feedback codes" },
-          ] as const
-        ).map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => {
-              setTab(t.id);
-            }}
-            className={`-mb-px border-b-2 pb-3 text-sm font-medium transition-colors ${
-              tab === t.id
-                ? "border-primary text-primary"
-                : "text-muted-foreground hover:text-foreground border-transparent"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={[
+          { id: "quality", label: "Quality report" },
+          { id: "codes", label: "Feedback codes" },
+        ]}
+        value={tab}
+        onChange={setTab}
+        paddingX="px-0"
+        className="mb-5"
+      />
 
       {tab === "quality" ? (
         <QualityReport responses={responses} instructors={instructors} />
@@ -301,7 +290,7 @@ function QualityReport({
 
   const totalResponses = rows.reduce((sum, r) => sum + r.responses, 0);
   const selectCls =
-    "border-input bg-background text-foreground focus:ring-ring rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2";
+    "border-[var(--hair)] bg-background text-foreground rounded-sm border px-3 py-2 text-sm focus:outline-none focus:border-[var(--forest)] focus:ring-[3px] focus:ring-[rgba(45,74,46,0.12)] transition-[border-color,box-shadow] duration-150";
 
   return (
     <div className="space-y-4">
@@ -367,7 +356,7 @@ function QualityReport({
                   align="left"
                 />
                 <th className="text-muted-foreground px-3 py-2 text-left text-xs font-medium">
-                  Dept
+                  Department
                 </th>
                 <Th
                   label="Responses"
@@ -450,7 +439,12 @@ function Th({
         className={`hover:text-foreground inline-flex items-center gap-1 ${active ? "text-foreground" : "text-muted-foreground"}`}
       >
         {label}
-        {active && <span className="text-[10px]">{sortDir === "asc" ? "▲" : "▼"}</span>}
+        {active &&
+          (sortDir === "asc" ? (
+            <ChevronUpIcon className="h-3 w-3" />
+          ) : (
+            <ChevronDownIcon className="h-3 w-3" />
+          ))}
       </button>
     </th>
   );
@@ -499,7 +493,7 @@ function CodesTab({ deliverables }: { deliverables: DeliverableRow[] }) {
 
   const needsCount = deliverables.filter((d) => !d.link).length;
   const selectCls =
-    "border-input bg-background text-foreground focus:ring-ring rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2";
+    "border-[var(--hair)] bg-background text-foreground rounded-sm border px-3 py-2 text-sm focus:outline-none focus:border-[var(--forest)] focus:ring-[3px] focus:ring-[rgba(45,74,46,0.12)] transition-[border-color,box-shadow] duration-150";
 
   return (
     <div className="space-y-4">
@@ -518,7 +512,7 @@ function CodesTab({ deliverables }: { deliverables: DeliverableRow[] }) {
               setQuery(e.target.value);
             }}
             placeholder="Search by name or instructor..."
-            className="border-input bg-background text-foreground focus:ring-ring w-full rounded-md border py-1.5 pl-8 pr-3 text-sm focus:outline-none focus:ring-2"
+            className="bg-background text-foreground w-full rounded-sm border border-[var(--hair)] py-2 pl-8 pr-3 text-sm transition-[border-color,box-shadow] duration-150 focus:border-[var(--forest)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(45,74,46,0.12)]"
           />
         </div>
         <select

@@ -82,7 +82,7 @@ export default async function ReportsPage() {
             <Eyebrow>At a glance</Eyebrow>
             <Link
               href="/reports/saved"
-              className="border-border text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-md border px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.06em] transition-colors"
+              className="text-muted-foreground hover:text-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]"
             >
               Saved reports →
             </Link>

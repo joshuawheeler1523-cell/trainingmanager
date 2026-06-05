@@ -16,6 +16,7 @@ import {
 import InstructorCard from "./instructor-card";
 import InstructorFilters from "./instructor-filters";
 import EmptyState from "@/components/ui/empty-state";
+import { Tabs } from "@/components/ui";
 import { Label } from "@/components/labels";
 import {
   type CapacityRow,
@@ -79,26 +80,7 @@ export default function InstructorsView(props: Props) {
 
   return (
     <div>
-      <div className="border-border bg-background border-b px-6">
-        <nav className="-mb-px flex gap-6 overflow-x-auto">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => {
-                setTab(t.id);
-              }}
-              className={`shrink-0 border-b-2 pb-3 pt-3 text-sm font-medium transition-colors ${
-                tab === t.id
-                  ? "border-primary text-primary"
-                  : "text-muted-foreground hover:text-foreground border-transparent"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </nav>
-      </div>
+      <Tabs tabs={TABS} value={tab} onChange={setTab} />
 
       <div className="space-y-4 p-6">
         {tab === "roster" && (

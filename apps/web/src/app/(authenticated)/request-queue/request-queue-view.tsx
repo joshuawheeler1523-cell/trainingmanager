@@ -185,14 +185,14 @@ export default function RequestQueueView({
   return (
     <div className="space-y-4 p-6">
       <div className="border-border bg-background flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1.5">
           <LinkIcon className="text-muted-foreground h-4 w-4 shrink-0" />
           {activeLink ? (
             <>
               <span className="text-muted-foreground font-mono text-[10.5px] uppercase tracking-[0.04em]">
                 External intake form ·
               </span>
-              <code className="bg-surface text-foreground truncate rounded px-2 py-0.5 font-mono text-[11px]">
+              <code className="bg-surface text-foreground hidden max-w-[28rem] truncate rounded px-2 py-0.5 font-mono text-[11px] sm:inline-block">
                 {publicIntakeUrl(origin, activeLink.token)}
               </code>
               <button
@@ -408,20 +408,17 @@ function KanbanCard({
           {request.requested_by_department && ` · ${request.requested_by_department}`}
         </p>
       </div>
-      <div className="border-border mt-2 flex items-center justify-between border-t border-dashed pt-2 font-mono text-[10.5px] tracking-[0.04em]">
-        <span className="text-muted-foreground tabular-nums">
+      <div className="border-border mt-2 flex items-center justify-between gap-2 border-t border-dashed pt-2 font-mono text-[10.5px] tracking-[0.04em]">
+        <span className="text-muted-foreground inline-flex items-center gap-1.5 tabular-nums">
           {new Date(request.created_at).toLocaleDateString()}
+          {request.submitted_via === "public_form" && <Badge variant="info">Public</Badge>}
         </span>
         <button
           type="button"
           onClick={onOpen}
           className="text-foreground hover:text-primary uppercase tracking-[0.04em]"
         >
-          {assignmentCount > 0
-            ? `${assignmentCount.toString()} assigned`
-            : request.submitted_via === "public_form"
-              ? "Public · open"
-              : "Open"}
+          {assignmentCount > 0 ? `${assignmentCount.toString()} assigned` : "Open"}
         </button>
       </div>
     </div>

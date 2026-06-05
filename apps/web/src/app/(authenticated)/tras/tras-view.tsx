@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { PlusIcon } from "@heroicons/react/20/solid";
 import EmptyState from "@/components/ui/empty-state";
-import { Badge, Eyebrow, type BadgeVariant } from "@/components/ui";
+import { Badge, Eyebrow, Select, type BadgeVariant } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import TraFormDialog from "./tra-form-dialog";
 import { RoleGate } from "@/components/auth/role-gate";
@@ -73,7 +73,11 @@ export default function TrasView({ tras, departments }: Props) {
   // flight" line under the triage inbox.
   const summary = useMemo(() => {
     const open = filtered.filter((t) => t.status === "draft" || t.status === "documented").length;
-    const hours = filtered.reduce((acc, t) => acc + (t.total_estimated_hours || 0), 0);
+    // "In flight" = still active work; exclude completed/cancelled so the hour
+    // total matches the label (a completed TRA's hours aren't in flight).
+    const hours = filtered
+      .filter((t) => t.status === "draft" || t.status === "documented" || t.status === "converted")
+      .reduce((acc, t) => acc + (t.total_estimated_hours || 0), 0);
     const converted = filtered.filter((t) => t.status === "converted").length;
     return { open, hours, converted };
   }, [filtered]);
@@ -130,13 +134,13 @@ export default function TrasView({ tras, departments }: Props) {
       <div className="border-border flex flex-wrap items-end gap-3 border-t pt-4">
         <div className="flex flex-col gap-1.5">
           <Eyebrow variant="section">Priority</Eyebrow>
-          <select
+          <Select
             aria-label="Filter by priority"
             value={priorityFilter}
             onChange={(e) => {
               setPriorityFilter(e.target.value as TraPriority | "all");
             }}
-            className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-xs"
+            className="w-auto"
           >
             <option value="all">All</option>
             {TRA_PRIORITY_VALUES.map((p) => (
@@ -144,17 +148,17 @@ export default function TrasView({ tras, departments }: Props) {
                 {PRIORITY_LABEL[p]}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div className="flex flex-col gap-1.5">
           <Eyebrow variant="section">Department</Eyebrow>
-          <select
+          <Select
             aria-label="Filter by department"
             value={departmentFilter}
             onChange={(e) => {
               setDepartmentFilter(e.target.value);
             }}
-            className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-xs"
+            className="w-auto"
           >
             <option value="all">All</option>
             <option value="_none">— Unassigned —</option>
@@ -163,7 +167,7 @@ export default function TrasView({ tras, departments }: Props) {
                 {d}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <label className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-xs">
           <input

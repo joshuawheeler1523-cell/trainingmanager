@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DocumentDuplicateIcon, PlusIcon, TrashIcon } from "@heroicons/react/20/solid";
 import EmptyState from "@/components/ui/empty-state";
-import { Badge, Eyebrow, type BadgeVariant } from "@/components/ui";
+import { Badge, Eyebrow, Input, Select, type BadgeVariant } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import {
   IMPL_STATUS_VALUES,
@@ -161,7 +161,7 @@ export default function TrainingPlannerView({ implementations, buckets }: Props)
 
         <ManagerOnly>
           <div className="flex items-end gap-2">
-            <input
+            <Input
               aria-label="New implementation name"
               value={name}
               onChange={(e) => {
@@ -171,16 +171,16 @@ export default function TrainingPlannerView({ implementations, buckets }: Props)
                 if (e.key === "Enter") handleCreate();
               }}
               placeholder="New implementation name"
-              className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-sm"
+              className="w-56"
             />
-            <select
+            <Select
               aria-label="Allocation bucket"
               value={bucketId}
               onChange={(e) => {
                 setBucketId(e.target.value);
               }}
               disabled={buckets.length === 0}
-              className="border-input bg-background text-foreground rounded-md border px-2 py-1.5 text-sm disabled:opacity-50"
+              className="w-auto"
             >
               {buckets.length === 0 ? (
                 <option value="">No buckets yet</option>
@@ -191,7 +191,7 @@ export default function TrainingPlannerView({ implementations, buckets }: Props)
                   </option>
                 ))
               )}
-            </select>
+            </Select>
             <button
               type="button"
               disabled={pending || !name.trim() || !bucketId}
@@ -227,8 +227,8 @@ export default function TrainingPlannerView({ implementations, buckets }: Props)
                 <Th>Status</Th>
                 <Th>Window</Th>
                 <Th>Go-live</Th>
-                <Th>Classes</Th>
-                <Th>Sessions</Th>
+                <Th className="text-right">Classes</Th>
+                <Th className="text-right">Sessions</Th>
                 <Th className="w-32">Completion</Th>
                 <Th className="w-12" />
               </tr>
@@ -256,12 +256,12 @@ export default function TrainingPlannerView({ implementations, buckets }: Props)
                     {formatRange(i.window_start_date, i.window_end_date)}
                   </td>
                   <td className="text-muted-foreground px-4 py-3 font-mono text-[10.5px] tabular-nums">
-                    {i.go_live_date ?? "—"}
+                    {i.go_live_date ? fmtDate(i.go_live_date) : "—"}
                   </td>
-                  <td className="text-foreground px-4 py-3 font-mono text-[11.5px] tabular-nums">
+                  <td className="text-foreground px-4 py-3 text-right font-mono text-[11.5px] tabular-nums">
                     {i.class_count.toString()}
                   </td>
-                  <td className="text-foreground px-4 py-3 font-mono text-[11.5px] tabular-nums">
+                  <td className="text-foreground px-4 py-3 text-right font-mono text-[11.5px] tabular-nums">
                     {i.session_count.toString()}
                   </td>
                   <td className="px-4 py-3">
@@ -353,8 +353,16 @@ function CompletionBar({ percent }: { percent: number | null }) {
   );
 }
 
+function fmtDate(d: string): string {
+  return new Date(`${d}T00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function formatRange(start: string | null, end: string | null): string {
   if (!start && !end) return "—";
-  if (start && end) return `${start} → ${end}`;
-  return start ?? end ?? "—";
+  if (start && end) return `${fmtDate(start)} → ${fmtDate(end)}`;
+  return start ? fmtDate(start) : end ? fmtDate(end) : "—";
 }
