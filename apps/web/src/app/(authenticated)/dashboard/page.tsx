@@ -607,8 +607,8 @@ export default async function DashboardPage() {
               </Link>
             </div>
 
-            <div className="border-border bg-background overflow-hidden rounded-xl border">
-              <table className="w-full text-sm">
+            <div className="border-border bg-background overflow-x-auto rounded-xl border">
+              <table className="w-full min-w-[34rem] text-sm">
                 <thead className="border-border border-b border-dashed">
                   <tr>
                     <th className="text-muted-foreground px-4 py-3 text-left font-mono text-[10px] font-medium uppercase tracking-[0.08em]">

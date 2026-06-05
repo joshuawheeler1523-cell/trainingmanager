@@ -61,10 +61,14 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
       <OrgIdentityProvider value={identity}>
         <AppShell
           orgSwitcherSlot={
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               <OrgSwitcher />
-              <span className="text-border">·</span>
-              <DepartmentSwitcher />
+              {/* Department switcher is secondary context — hide it below sm so
+                  the org name + top-bar icons never collide on a phone. */}
+              <span className="text-border hidden shrink-0 sm:inline">·</span>
+              <div className="hidden min-w-0 sm:block">
+                <DepartmentSwitcher />
+              </div>
             </div>
           }
           userEmail={email}
