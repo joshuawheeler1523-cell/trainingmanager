@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ArrowUpTrayIcon, BookOpenIcon, RectangleStackIcon } from "@heroicons/react/20/solid";
 import type { ColumnDef } from "@tanstack/react-table";
 import DataTable from "@/components/ui/data-table";
-import { Badge } from "@/components/ui";
+import { Badge, Select } from "@/components/ui";
 import RecommendationsBanner from "@/components/recommendations-banner";
 import CsvImportDialog from "@/components/csv-import-dialog";
 import ClassFormDialog from "./class-form-dialog";
@@ -172,12 +172,12 @@ export default function ClassesView({
             Show archived
           </label>
           {modules.length > 0 && (
-            <select
+            <Select
               value={moduleFilter}
               onChange={(e) => {
                 setModuleFilter(e.target.value);
               }}
-              className="border-input bg-background text-foreground rounded-md border px-2 py-1 text-sm"
+              className="w-auto"
               aria-label="Filter by module"
             >
               <option value="">All modules</option>
@@ -187,7 +187,7 @@ export default function ClassesView({
                 </option>
               ))}
               <option value="__none__">No module</option>
-            </select>
+            </Select>
           )}
         </div>
         <div className="flex items-center gap-2">

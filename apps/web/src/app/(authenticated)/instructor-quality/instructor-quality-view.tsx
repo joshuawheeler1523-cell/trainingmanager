@@ -290,7 +290,7 @@ function QualityReport({
 
   const totalResponses = rows.reduce((sum, r) => sum + r.responses, 0);
   const selectCls =
-    "border-input bg-background text-foreground focus:ring-ring rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2";
+    "border-[var(--hair)] bg-background text-foreground rounded-sm border px-3 py-2 text-sm focus:outline-none focus:border-[var(--forest)] focus:ring-[3px] focus:ring-[rgba(45,74,46,0.12)] transition-[border-color,box-shadow] duration-150";
 
   return (
     <div className="space-y-4">
@@ -493,7 +493,7 @@ function CodesTab({ deliverables }: { deliverables: DeliverableRow[] }) {
 
   const needsCount = deliverables.filter((d) => !d.link).length;
   const selectCls =
-    "border-input bg-background text-foreground focus:ring-ring rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-2";
+    "border-[var(--hair)] bg-background text-foreground rounded-sm border px-3 py-2 text-sm focus:outline-none focus:border-[var(--forest)] focus:ring-[3px] focus:ring-[rgba(45,74,46,0.12)] transition-[border-color,box-shadow] duration-150";
 
   return (
     <div className="space-y-4">
@@ -512,7 +512,7 @@ function CodesTab({ deliverables }: { deliverables: DeliverableRow[] }) {
               setQuery(e.target.value);
             }}
             placeholder="Search by name or instructor..."
-            className="border-input bg-background text-foreground focus:ring-ring w-full rounded-md border py-1.5 pl-8 pr-3 text-sm focus:outline-none focus:ring-2"
+            className="bg-background text-foreground w-full rounded-sm border border-[var(--hair)] py-2 pl-8 pr-3 text-sm transition-[border-color,box-shadow] duration-150 focus:border-[var(--forest)] focus:outline-none focus:ring-[3px] focus:ring-[rgba(45,74,46,0.12)]"
           />
         </div>
         <select

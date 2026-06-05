@@ -11,6 +11,7 @@ import InstructorFormDialog from "./instructor-form-dialog";
 import BulkAnnualHoursDialog from "./bulk-annual-hours-dialog";
 import CsvImportDialog from "@/components/csv-import-dialog";
 import { Label } from "@/components/labels";
+import { Input, Select } from "@/components/ui";
 import { ManagerOnly } from "@/components/auth/role-gate";
 import { importInstructorsCsv } from "./actions";
 
@@ -48,7 +49,7 @@ export default function InstructorFilters({ departments, activeInstructorCount }
       {/* Search */}
       <div className="relative">
         <MagnifyingGlassIcon className="text-muted-foreground absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
-        <input
+        <Input
           type="search"
           aria-label="Search instructors by name or email"
           value={search}
@@ -56,18 +57,19 @@ export default function InstructorFilters({ departments, activeInstructorCount }
             push("search", e.target.value);
           }}
           placeholder="Search by name or email…"
-          className="border-input bg-background text-foreground focus:ring-ring w-64 rounded-md border py-1.5 pl-8 pr-3 text-sm focus:outline-none focus:ring-2"
+          className="w-64 pl-8"
         />
       </div>
 
       {/* Department */}
       {departments.length > 0 && (
-        <select
+        <Select
           value={department}
           onChange={(e) => {
             push("department", e.target.value);
           }}
-          className="border-input bg-background text-foreground focus:ring-ring rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2"
+          className="w-auto"
+          aria-label="Department"
         >
           <option value="">All departments</option>
           {departments.map((d) => (
@@ -75,16 +77,16 @@ export default function InstructorFilters({ departments, activeInstructorCount }
               {d}
             </option>
           ))}
-        </select>
+        </Select>
       )}
 
       {/* Utilization status filter */}
-      <select
+      <Select
         value={utilization}
         onChange={(e) => {
           push("utilization", e.target.value);
         }}
-        className="border-input bg-background text-foreground focus:ring-ring rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2"
+        className="w-auto"
         aria-label="Utilization status"
       >
         <option value="">All utilizations</option>
@@ -92,7 +94,7 @@ export default function InstructorFilters({ departments, activeInstructorCount }
         <option value="balanced">Balanced (40–79%)</option>
         <option value="at_risk">At risk (80–94%)</option>
         <option value="over_allocated">Over-allocated (95%+)</option>
-      </select>
+      </Select>
 
       {/* Show deleted toggle */}
       <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-sm">
