@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgencyId } from "@/lib/auth/agency";
+import { PROVIDER_IDENTITY } from "@/lib/legal/versions";
 import MarkPaidForm from "./mark-paid-form";
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -159,8 +160,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         <MarkPaidForm invoiceId={invoice.id} totalCents={invoice.total_cents} />
       ) : (
         <p className="text-muted-foreground text-xs italic">
-          Only Arbor admins can record payments. Send your remittance details to billing@arbor.app
-          and we&apos;ll mark this invoice paid.
+          Only Arbor admins can record payments. Send your remittance details to{" "}
+          {PROVIDER_IDENTITY.billingEmail} and we&apos;ll mark this invoice paid.
         </p>
       )}
 

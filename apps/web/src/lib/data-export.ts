@@ -1,6 +1,7 @@
 import "server-only";
 import JSZip from "jszip";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PROVIDER_IDENTITY } from "@/lib/legal/versions";
 
 /**
  * White-Label Phase 8 — per-org data export.
@@ -161,7 +162,7 @@ export async function buildOrgDataExport(orgId: string, exportId: string): Promi
       "billing, agency settings, and global tables are not included.",
       "",
       "Data is provided as-is for use in your own systems (compliance, BI,",
-      "backup). Reach billing@arbor.app with any questions.",
+      `backup). Reach ${PROVIDER_IDENTITY.billingEmail} with any questions.`,
     ].join("\n"),
   );
 
