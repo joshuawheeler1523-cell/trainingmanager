@@ -408,20 +408,17 @@ function KanbanCard({
           {request.requested_by_department && ` · ${request.requested_by_department}`}
         </p>
       </div>
-      <div className="border-border mt-2 flex items-center justify-between border-t border-dashed pt-2 font-mono text-[10.5px] tracking-[0.04em]">
-        <span className="text-muted-foreground tabular-nums">
+      <div className="border-border mt-2 flex items-center justify-between gap-2 border-t border-dashed pt-2 font-mono text-[10.5px] tracking-[0.04em]">
+        <span className="text-muted-foreground inline-flex items-center gap-1.5 tabular-nums">
           {new Date(request.created_at).toLocaleDateString()}
+          {request.submitted_via === "public_form" && <Badge variant="info">Public</Badge>}
         </span>
         <button
           type="button"
           onClick={onOpen}
           className="text-foreground hover:text-primary uppercase tracking-[0.04em]"
         >
-          {assignmentCount > 0
-            ? `${assignmentCount.toString()} assigned`
-            : request.submitted_via === "public_form"
-              ? "Public · open"
-              : "Open"}
+          {assignmentCount > 0 ? `${assignmentCount.toString()} assigned` : "Open"}
         </button>
       </div>
     </div>
