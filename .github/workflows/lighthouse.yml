@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Polls GitHub deployment_status events for the SHA we're testing until
       # Vercel reports success. We don't HTTP-check the URL here because
