@@ -66,6 +66,7 @@ export default async function ImplementationOnboardingPage({ params }: { params:
         instructors={instructors ?? []}
         tasks={tasks ?? []}
         progress={(progress ?? []) as OnboardingProgress[]}
+        manageColumns={false}
         emptyTrainersHint="Assign external trainers to this plan on the Trainers step, then onboard them here."
       />
     </div>

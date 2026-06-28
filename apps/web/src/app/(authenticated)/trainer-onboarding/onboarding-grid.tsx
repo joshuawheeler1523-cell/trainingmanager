@@ -167,7 +167,11 @@ export default function OnboardingGrid({
       ) : tasks.length === 0 ? (
         <EmptyState
           title="No onboarding tasks yet"
-          description="Add the checklist items every external trainer needs to complete."
+          description={
+            manageColumns
+              ? "Add the checklist items every external trainer needs to complete."
+              : "Add onboarding tasks from the Trainer Onboarding tool, then track them here."
+          }
           action={
             manageColumns ? (
               <Button
