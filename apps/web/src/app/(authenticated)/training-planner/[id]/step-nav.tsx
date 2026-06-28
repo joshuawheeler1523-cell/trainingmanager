@@ -47,6 +47,7 @@ export default function StepNav({ implementationId, readiness }: Props) {
 
   const activeIdx = STEPS.findIndex((s) => pathname.endsWith(`/${s.slug}`));
   const superUsersActive = pathname.endsWith("/super-users");
+  const onboardingActive = pathname.endsWith("/onboarding");
 
   return (
     <div className="border-border bg-background sticky top-0 z-10 border-b px-6 py-3">
@@ -101,19 +102,32 @@ export default function StepNav({ implementationId, readiness }: Props) {
           </div>
         </div>
 
-        {/* Auxiliary entry — Super Users sits beside the rail as a light
-            mono chip rather than a numbered step. */}
-        <Link
-          href={`/training-planner/${implementationId}/super-users`}
-          className={cn(
-            "shrink-0 rounded-[3px] px-2.5 py-1.5 font-mono text-[10px] font-medium uppercase leading-none tracking-[0.06em] transition-colors",
-            superUsersActive
-              ? "bg-[var(--ink,var(--foreground))] text-[var(--cream,var(--background))]"
-              : "bg-surface text-muted-foreground hover:text-foreground",
-          )}
-        >
-          Super Users
-        </Link>
+        {/* Auxiliary entries — Super Users + Onboarding sit beside the rail
+            as light mono chips rather than numbered steps. */}
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href={`/training-planner/${implementationId}/super-users`}
+            className={cn(
+              "rounded-[3px] px-2.5 py-1.5 font-mono text-[10px] font-medium uppercase leading-none tracking-[0.06em] transition-colors",
+              superUsersActive
+                ? "bg-[var(--ink,var(--foreground))] text-[var(--cream,var(--background))]"
+                : "bg-surface text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Super Users
+          </Link>
+          <Link
+            href={`/training-planner/${implementationId}/onboarding`}
+            className={cn(
+              "rounded-[3px] px-2.5 py-1.5 font-mono text-[10px] font-medium uppercase leading-none tracking-[0.06em] transition-colors",
+              onboardingActive
+                ? "bg-[var(--ink,var(--foreground))] text-[var(--cream,var(--background))]"
+                : "bg-surface text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Onboarding
+          </Link>
+        </div>
       </div>
     </div>
   );
