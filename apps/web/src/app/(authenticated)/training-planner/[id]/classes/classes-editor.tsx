@@ -1,16 +1,18 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
   ArrowTopRightOnSquareIcon,
+  ArrowUpTrayIcon,
   BarsArrowDownIcon,
   PlusIcon,
   TrashIcon,
 } from "@heroicons/react/20/solid";
+import CsvImportDialog from "@/components/csv-import-dialog";
 import {
   sessionsNeeded,
   type ImplClass,
@@ -24,6 +26,7 @@ import {
   addClassPrerequisite,
   createClass,
   deleteClass,
+  importImplClasses,
   removeClassPrerequisite,
   reorderImplClasses,
   setClassTrainers,
@@ -97,6 +100,21 @@ export default function ClassesEditor({
   // table reflects them without a full refetch.
   const [rows, setRows] = useState<ImplClass[]>(initialClasses);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+
+  // A bulk CSV import upserts on the server and revalidates, so fresh props
+  // arrive without a navigation. Re-seed local state when the set of class
+  // ids changes (import added/removed rows) so the imported classes appear.
+  // Keyed on the id set, not deep contents, to avoid clobbering unsaved
+  // inline field edits — those don't change which ids exist.
+  const serverIdKey = initialClasses
+    .map((c) => c.id)
+    .sort()
+    .join(",");
+  useEffect(() => {
+    setRows(initialClasses);
+    setDirtyIds(new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverIdKey]);
 
   function patchLocal(id: string, patch: Partial<ImplClass>) {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -282,16 +300,72 @@ export default function ClassesEditor({
           <code>sessions_needed = ceil(total_people / expected_per_session)</code>. Click a row to
           edit prerequisites and assigned trainers.
         </p>
-        <button
-          type="button"
-          disabled={pending || rows.length < 2}
-          onClick={handleSort}
-          title="Reorder classes alphabetically by name"
-          className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.04em] disabled:opacity-50"
-        >
-          <BarsArrowDownIcon className="h-3.5 w-3.5" />
-          Sort A–Z
-        </button>
+        <div className="flex shrink-0 items-center gap-3">
+          <CsvImportDialog
+            entity="classes"
+            description="Upload many classes at once. Rows upsert by name (case-insensitive) within this implementation — a matching name updates that class, a new name inserts. Modules are matched by name and created automatically if they don't exist yet."
+            columns={[
+              {
+                key: "name",
+                required: true,
+                help: "Class name; max 200 chars",
+                example: "Epic Inpatient — Nursing",
+              },
+              {
+                key: "hours_per_session",
+                required: true,
+                help: "Numeric, at least 0.25",
+                example: "4",
+              },
+              {
+                key: "expected_learners_per_session",
+                required: true,
+                help: "Whole number, at least 1",
+                example: "12",
+              },
+              {
+                key: "total_people_to_train",
+                required: false,
+                help: "Whole number; default 0",
+                example: "120",
+              },
+              {
+                key: "module",
+                required: false,
+                help: "Module name to group this class under. Created if it doesn't exist.",
+                example: "Inpatient",
+              },
+              { key: "description", required: false, example: "Core inpatient documentation" },
+              {
+                key: "required_equipment_tags",
+                required: false,
+                help: "Semicolon-separated tags, e.g. workstation;scanner",
+                example: "workstation;scanner",
+              },
+              { key: "required_equipment_notes", required: false, example: "Needs dual monitors" },
+            ]}
+            serverAction={(rows) => importImplClasses(implementationId, rows)}
+            trigger={
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.04em]"
+              >
+                <ArrowUpTrayIcon className="h-3.5 w-3.5" />
+                Import CSV
+              </button>
+            }
+          />
+          <button
+            type="button"
+            disabled={pending || rows.length < 2}
+            onClick={handleSort}
+            title="Reorder classes alphabetically by name"
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-[0.04em] disabled:opacity-50"
+          >
+            <BarsArrowDownIcon className="h-3.5 w-3.5" />
+            Sort A–Z
+          </button>
+        </div>
       </div>
 
       {rows.length === 0 ? (
