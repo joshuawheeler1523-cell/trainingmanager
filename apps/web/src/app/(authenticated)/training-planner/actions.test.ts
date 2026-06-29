@@ -34,6 +34,7 @@ const {
   createExternalInstructor,
   linkImplTrainerToInstructor,
   softDeleteExternalInstructor,
+  importImplClasses,
 } = await import("./actions");
 
 const ORG_ID = "aaaaaaaa-0000-0000-0000-000000000000";
@@ -436,5 +437,83 @@ describe("ICS helpers", () => {
     // Input chars: a , space b ; space c <newline> d \ e
     // Expected:    a \, space b \; space c \n d \\ e
     expect(escapeIcs("a, b; c\nd\\e")).toBe("a\\, b\\; c\\nd\\\\e");
+  });
+});
+
+// A thenable select chain — `.select().eq().eq()` is awaited directly.
+function makeSelectChain(result: { data?: unknown; error?: unknown }) {
+  const chain = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    then: (resolve: (v: unknown) => unknown) => Promise.resolve(result).then(resolve),
+  };
+  return chain;
+}
+
+// A thenable update chain — `.update().eq().eq()` is awaited directly.
+function makeUpdateThenable(result: { error?: unknown }) {
+  const chain = {
+    update: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    then: (resolve: (v: unknown) => unknown) => Promise.resolve(result).then(resolve),
+  };
+  return chain;
+}
+
+describe("importImplClasses", () => {
+  it("rejects non-array input", async () => {
+    const result = await importImplClasses(IMPL_ID, "not-an-array");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("BAD_INPUT");
+  });
+
+  it("reports per-row validation failures without inserting", async () => {
+    // Two initial fetches (existing classes, existing modules) → both empty.
+    mockFrom.mockReturnValue(makeSelectChain({ data: [], error: null }));
+    const result = await importImplClasses(IMPL_ID, [
+      { name: "", hours_per_session: "4", expected_learners_per_session: "10" }, // empty name
+      { name: "No hours", hours_per_session: "", expected_learners_per_session: "10" }, // missing hours
+      { name: "Bad learners", hours_per_session: "2", expected_learners_per_session: "0" }, // < 1
+    ]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.failed).toBe(3);
+      expect(result.data.created).toBe(0);
+      expect(result.data.results[0]?.row).toBe(2); // header is row 1
+    }
+  });
+
+  it("inserts a new class with coerced numeric fields", async () => {
+    mockFrom
+      .mockReturnValueOnce(makeSelectChain({ data: [], error: null })) // existing classes
+      .mockReturnValueOnce(makeSelectChain({ data: [], error: null })) // existing modules
+      .mockReturnValueOnce(makeInsertChain({ data: { id: CLASS_ID, name: "Epic" }, error: null }));
+
+    const result = await importImplClasses(IMPL_ID, [
+      { name: "Epic", hours_per_session: "4", expected_learners_per_session: "12" },
+    ]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.created).toBe(1);
+      expect(result.data.failed).toBe(0);
+    }
+  });
+
+  it("updates an existing class matched by name (case-insensitive)", async () => {
+    mockFrom
+      .mockReturnValueOnce(
+        makeSelectChain({ data: [{ id: CLASS_ID, name: "Epic", sort_order: 0 }], error: null }),
+      ) // existing classes
+      .mockReturnValueOnce(makeSelectChain({ data: [], error: null })) // existing modules
+      .mockReturnValueOnce(makeUpdateThenable({ error: null }));
+
+    const result = await importImplClasses(IMPL_ID, [
+      { name: "EPIC", hours_per_session: "6", expected_learners_per_session: "8" },
+    ]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.updated).toBe(1);
+      expect(result.data.created).toBe(0);
+    }
   });
 });
