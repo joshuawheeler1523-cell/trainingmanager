@@ -94,6 +94,9 @@ export default function ClassesEditor({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [openClassId, setOpenClassId] = useState<string | null>(null);
+  // Highlight whichever row the user last clicked/focused into so it's easy
+  // to track which class you're editing across this wide table.
+  const [activeRowId, setActiveRowId] = useState<string | null>(null);
 
   // Local-first state — same pattern as rooms/modules/trainers. Field
   // edits never round-trip until flushDirty fires from Back or Save &
@@ -469,7 +472,17 @@ export default function ClassesEditor({
                 return (
                   <tr
                     key={c.id}
-                    className={`hover:bg-surface/50 ${dirty ? "bg-[var(--cream,transparent)]" : ""}`}
+                    onMouseDown={() => {
+                      setActiveRowId(c.id);
+                    }}
+                    onFocusCapture={() => {
+                      setActiveRowId(c.id);
+                    }}
+                    className={
+                      activeRowId === c.id
+                        ? "bg-accent/15 shadow-[inset_3px_0_0_0_var(--primary)]"
+                        : `hover:bg-surface/50 ${dirty ? "bg-[var(--cream,transparent)]" : ""}`
+                    }
                   >
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-1">
