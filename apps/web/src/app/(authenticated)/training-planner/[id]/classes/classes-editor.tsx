@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -125,15 +126,65 @@ export default function ClassesEditor({
     });
   }
 
-  const trainersByClass = useMemo(() => {
-    const m = new Map<string, string[]>();
-    for (const ct of classTrainers) {
-      const list = m.get(ct.impl_class_id) ?? [];
-      list.push(ct.impl_trainer_id);
-      m.set(ct.impl_class_id, list);
-    }
-    return m;
-  }, [classTrainers]);
+  // Trainer assignments are local-first so the inline typeahead in the
+  // table and the drawer share one source of truth and reflect clicks
+  // instantly. setClassTrainers revalidates, which refreshes the
+  // classTrainers prop; re-seed when that server truth changes (save,
+  // CSV import, navigation) so we don't drift.
+  const [assignments, setAssignments] = useState<Map<string, Set<string>>>(() =>
+    seedAssignments(classTrainers),
+  );
+  const classTrainersKey = classTrainers
+    .map((ct) => `${ct.impl_class_id}:${ct.impl_trainer_id}`)
+    .sort()
+    .join(",");
+  useEffect(() => {
+    setAssignments(seedAssignments(classTrainers));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classTrainersKey]);
+
+  // One save queue per class so rapid edits to the same class can't land
+  // out of order; different classes save in parallel.
+  const saveQueues = useRef<Map<string, Promise<unknown>>>(new Map());
+  function updateTrainers(classId: string, compute: (current: Set<string>) => Set<string>) {
+    setAssignments((prev) => {
+      const next = compute(prev.get(classId) ?? new Set<string>());
+      const snapshot = Array.from(next);
+      const prevQueue = saveQueues.current.get(classId) ?? Promise.resolve();
+      saveQueues.current.set(
+        classId,
+        prevQueue
+          .catch(() => {
+            /* never let a previous failure block the next save */
+          })
+          .then(() => setClassTrainers(classId, implementationId, snapshot))
+          .then((r) => {
+            if (!r.ok) toast.error(r.error.message);
+          }),
+      );
+      const m = new Map(prev);
+      m.set(classId, next);
+      return m;
+    });
+  }
+  function addTrainer(classId: string, trainerId: string) {
+    updateTrainers(classId, (cur) => new Set(cur).add(trainerId));
+  }
+  function removeTrainer(classId: string, trainerId: string) {
+    updateTrainers(classId, (cur) => {
+      const next = new Set(cur);
+      next.delete(trainerId);
+      return next;
+    });
+  }
+  function toggleTrainer(classId: string, trainerId: string) {
+    updateTrainers(classId, (cur) => {
+      const next = new Set(cur);
+      if (next.has(trainerId)) next.delete(trainerId);
+      else next.add(trainerId);
+      return next;
+    });
+  }
 
   const prereqsByClass = useMemo(() => {
     const m = new Map<string, ImplClassPrerequisite[]>();
@@ -388,7 +439,7 @@ export default function ClassesEditor({
                 <Th>Hours</Th>
                 <Th>Trainer FTE</Th>
                 <Th>Rooms</Th>
-                <Th>Trainers</Th>
+                <Th className="w-56">Trainers</Th>
                 <Th>Prereqs</Th>
                 <Th className="w-12" />
               </tr>
@@ -412,7 +463,7 @@ export default function ClassesEditor({
                     : null;
                 const roomsToShow = simRoomsUsed ?? roomsEstimate;
                 const roomsSource: "sim" | "est" = simRoomsUsed != null ? "sim" : "est";
-                const trainerCount = (trainersByClass.get(c.id) ?? []).length;
+                const assignedTrainerIds = assignments.get(c.id) ?? EMPTY_SET;
                 const prereqCount = (prereqsByClass.get(c.id) ?? []).length;
                 const dirty = dirtyIds.has(c.id);
                 return (
@@ -543,8 +594,17 @@ export default function ClassesEditor({
                         </>
                       )}
                     </td>
-                    <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
-                      {trainerCount.toString()}
+                    <td className="px-3 py-2 align-top">
+                      <TrainerTypeahead
+                        trainers={trainers}
+                        assignedIds={assignedTrainerIds}
+                        onAdd={(trainerId) => {
+                          addTrainer(c.id, trainerId);
+                        }}
+                        onRemove={(trainerId) => {
+                          removeTrainer(c.id, trainerId);
+                        }}
+                      />
                     </td>
                     <td className="text-muted-foreground px-3 py-2 text-xs tabular-nums">
                       {prereqCount.toString()}
@@ -729,7 +789,10 @@ export default function ClassesEditor({
           klass={open}
           allClasses={rows}
           trainers={trainers}
-          assignedTrainerIds={trainersByClass.get(open.id) ?? []}
+          assignedTrainerIds={assignments.get(open.id) ?? EMPTY_SET}
+          onToggleTrainer={(trainerId) => {
+            toggleTrainer(open.id, trainerId);
+          }}
           prerequisites={prereqsByClass.get(open.id) ?? []}
           classMap={classMap}
           onClose={() => {
@@ -739,6 +802,18 @@ export default function ClassesEditor({
       )}
     </div>
   );
+}
+
+const EMPTY_SET: ReadonlySet<string> = new Set<string>();
+
+function seedAssignments(classTrainers: ImplClassTrainer[]): Map<string, Set<string>> {
+  const m = new Map<string, Set<string>>();
+  for (const ct of classTrainers) {
+    const s = m.get(ct.impl_class_id) ?? new Set<string>();
+    s.add(ct.impl_trainer_id);
+    m.set(ct.impl_class_id, s);
+  }
+  return m;
 }
 
 function parseTagList(input: string): string[] {
@@ -758,6 +833,163 @@ function arraysEqual(a: string[], b: string[]): boolean {
   return true;
 }
 
+// Inline trainer assignment: shows assigned trainers as removable chips and
+// a name-filtering typeahead to add more — no drawer round-trip needed. The
+// menu renders in a portal so the table's overflow-hidden can't clip it.
+function TrainerTypeahead({
+  trainers,
+  assignedIds,
+  onAdd,
+  onRemove,
+}: {
+  trainers: ImplTrainer[];
+  assignedIds: ReadonlySet<string>;
+  onAdd: (trainerId: string) => void;
+  onRemove: (trainerId: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
+
+  const assigned = trainers.filter((t) => assignedIds.has(t.id));
+  const q = query.trim().toLowerCase();
+  const matches = trainers.filter(
+    (t) => !assignedIds.has(t.id) && (q === "" || t.name.toLowerCase().includes(q)),
+  );
+
+  const sync = () => {
+    if (inputRef.current) setRect(inputRef.current.getBoundingClientRect());
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    sync();
+    function onDocDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (inputRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function onScroll() {
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocDown);
+    window.addEventListener("resize", sync);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", onDocDown);
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [open]);
+
+  function commit(trainerId: string) {
+    onAdd(trainerId);
+    setQuery("");
+    setHighlight(0);
+    // Keep the menu open so several trainers can be added in a row.
+    requestAnimationFrame(sync);
+  }
+
+  if (trainers.length === 0) {
+    return <span className="text-muted-foreground text-xs">No trainers yet</span>;
+  }
+
+  return (
+    <div className="min-w-[11rem]">
+      {assigned.length > 0 && (
+        <div className="mb-1 flex flex-wrap gap-1">
+          {assigned.map((t) => (
+            <span
+              key={t.id}
+              className="border-border bg-surface text-foreground inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs"
+            >
+              {t.name}
+              <button
+                type="button"
+                onClick={() => {
+                  onRemove(t.id);
+                }}
+                aria-label={`Unassign ${t.name}`}
+                className="text-muted-foreground hover:text-destructive leading-none"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <input
+        ref={inputRef}
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setHighlight(0);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setOpen(true);
+            setHighlight((h) => Math.min(h + 1, matches.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setHighlight((h) => Math.max(h - 1, 0));
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const m = matches[highlight];
+            if (m) commit(m.id);
+          } else if (e.key === "Escape") {
+            setOpen(false);
+          }
+        }}
+        placeholder={assigned.length > 0 ? "Add trainer…" : "Type a name…"}
+        aria-label="Assign trainer by name"
+        className={fieldClass + " w-full"}
+      />
+      {open &&
+        rect &&
+        matches.length > 0 &&
+        createPortal(
+          <ul
+            ref={menuRef}
+            className="border-border bg-background fixed z-50 max-h-56 overflow-auto rounded-md border shadow-lg"
+            style={{ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 192) }}
+          >
+            {matches.map((t, i) => (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    commit(t.id);
+                  }}
+                  onMouseEnter={() => {
+                    setHighlight(i);
+                  }}
+                  className={`flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs ${
+                    i === highlight ? "bg-surface" : ""
+                  }`}
+                >
+                  <span className="text-foreground">{t.name}</span>
+                  <span className="text-muted-foreground">
+                    {t.availability_hours_per_week.toString()}h/wk
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
 function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th
@@ -775,7 +1007,8 @@ function ClassDrawer({
   klass,
   allClasses,
   trainers,
-  assignedTrainerIds: initialAssignedIds,
+  assignedTrainerIds: assignedIds,
+  onToggleTrainer,
   prerequisites: initialPrereqs,
   classMap,
   onClose,
@@ -784,7 +1017,8 @@ function ClassDrawer({
   klass: ImplClass;
   allClasses: ImplClass[];
   trainers: ImplTrainer[];
-  assignedTrainerIds: string[];
+  assignedTrainerIds: ReadonlySet<string>;
+  onToggleTrainer: (trainerId: string) => void;
   prerequisites: ImplClassPrerequisite[];
   classMap: Map<string, ImplClass>;
   onClose: () => void;
@@ -792,35 +1026,9 @@ function ClassDrawer({
   const [pending, startTransition] = useTransition();
   const [pickPrereq, setPickPrereq] = useState("");
 
-  // Local-first state for assignments + prereqs. Clicks update state
-  // instantly; server saves run in the background. No router.refresh
-  // needed because the parent's classMap derives from local rows state
-  // and the drawer's own state holds the assignment truth while open.
-  const [assignedIds, setAssignedIds] = useState<Set<string>>(() => new Set(initialAssignedIds));
+  // Prereqs stay local-first here; trainer assignments are owned by the
+  // parent so the inline table typeahead and this drawer share one truth.
   const [prereqs, setPrereqs] = useState<ImplClassPrerequisite[]>(initialPrereqs);
-
-  // Serialize setClassTrainers calls so rapid checkbox clicks can't
-  // arrive at the server out of order. Each click queues behind the
-  // previous save with a snapshot of the post-click assignment set.
-  const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
-
-  function toggleTrainer(trainerId: string) {
-    setAssignedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(trainerId)) next.delete(trainerId);
-      else next.add(trainerId);
-      const snapshot = Array.from(next);
-      saveQueue.current = saveQueue.current
-        .catch(() => {
-          /* never let a previous failure block the next save */
-        })
-        .then(() => setClassTrainers(klass.id, implementationId, snapshot))
-        .then((r) => {
-          if (!r.ok) toast.error(r.error.message);
-        });
-      return next;
-    });
-  }
 
   function addPrereq() {
     if (!pickPrereq) return;
@@ -903,7 +1111,7 @@ function ClassDrawer({
                         type="checkbox"
                         checked={checked}
                         onChange={() => {
-                          toggleTrainer(t.id);
+                          onToggleTrainer(t.id);
                         }}
                       />
                       <span className="text-foreground flex-1">{t.name}</span>
