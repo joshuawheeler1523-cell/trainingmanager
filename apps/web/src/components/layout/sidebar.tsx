@@ -23,6 +23,7 @@ import {
   Bars3Icon,
   XMarkIcon,
   StarIcon,
+  ClipboardDocumentCheckIcon,
 } from "@heroicons/react/24/outline";
 import type { ToggleableModule } from "@arbor/shared";
 import { cn } from "@/lib/utils";
@@ -51,7 +52,7 @@ type ModuleFlags = Record<ToggleableModule, boolean>;
 
 const HOME: NavItem = { href: "/", label: "Dashboard", icon: HomeIcon };
 
-function teamGroup(modules: ModuleFlags): NavGroup {
+function teamGroup(modules: ModuleFlags, isAdmin: boolean): NavGroup {
   const items: NavItem[] = [
     { href: "/instructors", label: <Label kind="entity.instructor" plural />, icon: UserGroupIcon },
   ];
@@ -60,6 +61,15 @@ function teamGroup(modules: ModuleFlags): NavGroup {
   }
   items.push({ href: "/skills", label: "Skills", icon: SparklesIcon });
   items.push({ href: "/super-users", label: "Super Users", icon: StarIcon });
+  // Manager-only onboarding tracker for the external trainer bench; the page
+  // renders a "managers only" placeholder for everyone else, so hide the link.
+  if (isAdmin) {
+    items.push({
+      href: "/trainer-onboarding",
+      label: "Trainer Onboarding",
+      icon: ClipboardDocumentCheckIcon,
+    });
+  }
   return { title: "Team", items };
 }
 
@@ -225,7 +235,7 @@ function SidebarContent({
   onNavigate?: (() => void) | undefined;
 }) {
   const pathname = usePathname();
-  const team = teamGroup(modules);
+  const team = teamGroup(modules, isAdmin);
   const work = workGroup(modules, isAdmin);
   // Section numbering is computed left-to-right so hidden Admin doesn't
   // skip a number for non-admin users.
