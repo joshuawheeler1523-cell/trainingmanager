@@ -208,7 +208,7 @@ export default function OnboardingGrid({
                         )}
                       </div>
                       {manageColumns && (
-                        <div className="flex shrink-0 items-center">
+                        <div className="flex shrink-0 items-center gap-0.5">
                           <button
                             type="button"
                             aria-label="Move left"
@@ -216,9 +216,9 @@ export default function OnboardingGrid({
                             onClick={() => {
                               moveColumn(i, -1);
                             }}
-                            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                            className="text-muted-foreground hover:bg-surface hover:text-foreground rounded-md p-1.5 disabled:opacity-30"
                           >
-                            <ChevronLeftIcon className="h-3.5 w-3.5" />
+                            <ChevronLeftIcon className="h-4 w-4" />
                           </button>
                           <button
                             type="button"
@@ -227,9 +227,9 @@ export default function OnboardingGrid({
                             onClick={() => {
                               moveColumn(i, 1);
                             }}
-                            className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                            className="text-muted-foreground hover:bg-surface hover:text-foreground rounded-md p-1.5 disabled:opacity-30"
                           >
-                            <ChevronRightIcon className="h-3.5 w-3.5" />
+                            <ChevronRightIcon className="h-4 w-4" />
                           </button>
                           <button
                             type="button"
@@ -237,9 +237,9 @@ export default function OnboardingGrid({
                             onClick={() => {
                               setTaskModal({ mode: "edit", task });
                             }}
-                            className="text-muted-foreground hover:text-foreground ml-1"
+                            className="text-muted-foreground border-border hover:bg-surface hover:text-foreground rounded-md border p-1.5"
                           >
-                            <PencilSquareIcon className="h-3.5 w-3.5" />
+                            <PencilSquareIcon className="h-4 w-4" />
                           </button>
                         </div>
                       )}
@@ -247,16 +247,17 @@ export default function OnboardingGrid({
                   </th>
                 ))}
                 {manageColumns && (
-                  <th className="w-10 px-2 py-2">
+                  <th className="w-14 px-2 py-2">
                     <button
                       type="button"
                       aria-label="Add task"
+                      title="Add checklist item"
                       onClick={() => {
                         setTaskModal({ mode: "add" });
                       }}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="border-border text-muted-foreground hover:border-foreground hover:text-foreground inline-flex items-center justify-center rounded-md border border-dashed p-2 transition-colors"
                     >
-                      <PlusIcon className="h-4 w-4" />
+                      <PlusIcon className="h-5 w-5" />
                     </button>
                   </th>
                 )}
