@@ -91,6 +91,23 @@ function formatLocal(date: Date, tz: string): string {
   });
 }
 
+// Human label for a hand-placed slot: "Thu Jul 16, 9:00 AM". Built from the
+// wall-clock (date + fractional local hour) the drop targeted — no tz math, so
+// it always reads back the exact cell the user dropped on.
+function formatPlacement(startLocalDate: string, startLocalHour: number): string {
+  const day = new Date(startLocalDate + "T00:00:00Z").toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+  const wholeHour = Math.floor(startLocalHour);
+  const minutes = Math.round((startLocalHour - wholeHour) * 60);
+  const h12 = wholeHour % 12 === 0 ? 12 : wholeHour % 12;
+  const ampm = wholeHour < 12 ? "AM" : "PM";
+  return `${day}, ${h12.toString()}:${minutes.toString().padStart(2, "0")} ${ampm}`;
+}
+
 export default function ScheduleView({
   implementation,
   sessions,
@@ -247,8 +264,15 @@ export default function ScheduleView({
         implementationId: implementation.id,
         ...args,
       });
-      if (r.ok) toast.success("Session placed");
-      else toast.error(r.error.message);
+      if (r.ok) {
+        // Name exactly where it landed so a misdrop onto the wrong day/room is
+        // obvious immediately, instead of the user hunting for it on the grid.
+        const className = classMap.get(args.classId)?.name ?? "Session";
+        const roomName = roomMap.get(args.roomId)?.name ?? "room";
+        toast.success(
+          `Placed ${className} · ${roomName} · ${formatPlacement(args.startLocalDate, args.startLocalHour)}`,
+        );
+      } else toast.error(r.error.message);
     });
   }
 

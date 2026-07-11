@@ -1,7 +1,12 @@
 "use client";
 
 import { useMemo, useState, type DragEvent } from "react";
-import { MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon } from "@heroicons/react/20/solid";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  MagnifyingGlassMinusIcon,
+  MagnifyingGlassPlusIcon,
+} from "@heroicons/react/20/solid";
 import type { ImplClass, ImplRoom, ImplSession, ImplTrainer, Implementation } from "@arbor/shared";
 import { toCalendarLocal, fromCalendarLocal } from "@/lib/timezone";
 import { resolveClassColor } from "./class-palette";
@@ -101,6 +106,48 @@ function buildWeekdays(startDate: string, endDate: string): WeekDay[] {
   return out;
 }
 
+// Monday (UTC) of the ISO week a YYYY-MM-DD date falls in. Used to bucket the
+// window's weekdays into one column-group per calendar week.
+function mondayKey(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  const dow = d.getUTCDay(); // 0=Sun..6=Sat
+  const offset = dow === 0 ? 6 : dow - 1; // days since Monday
+  d.setUTCDate(d.getUTCDate() - offset);
+  return d.toISOString().slice(0, 10);
+}
+
+// Group the flat, chronological weekday list into weeks so the grid can show
+// one week at a time. Wide, hittable columns beat a 30-column window the user
+// has to scroll sideways through — misdrops onto the wrong day were the whole
+// reason a hand-placed session appeared to "jump" days.
+function groupIntoWeeks(weekdays: WeekDay[]): WeekDay[][] {
+  const weeks: WeekDay[][] = [];
+  let curKey: string | null = null;
+  for (const wd of weekdays) {
+    const key = mondayKey(wd.date);
+    if (key !== curKey) {
+      weeks.push([]);
+      curKey = key;
+    }
+    weeks[weeks.length - 1]?.push(wd);
+  }
+  return weeks;
+}
+
+function weekLabel(week: WeekDay[]): string {
+  const first = week[0];
+  const last = week[week.length - 1];
+  if (!first || !last) return "";
+  const fd = new Date(first.date + "T00:00:00Z");
+  const ld = new Date(last.date + "T00:00:00Z");
+  const mo = (d: Date) => d.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  const year = ld.getUTCFullYear().toString();
+  if (fd.getUTCMonth() === ld.getUTCMonth()) {
+    return `${mo(fd)} ${fd.getUTCDate().toString()}–${ld.getUTCDate().toString()}, ${year}`;
+  }
+  return `${mo(fd)} ${fd.getUTCDate().toString()} – ${mo(ld)} ${ld.getUTCDate().toString()}, ${year}`;
+}
+
 type Placed = {
   session: ImplSession;
   startSlotIdx: number;
@@ -192,6 +239,9 @@ export default function GridScheduleView({
     [implementation.window_start_date, implementation.window_end_date],
   );
 
+  const weeks = useMemo(() => groupIntoWeeks(weekdays), [weekdays]);
+  const [weekIdx, setWeekIdx] = useState(0);
+
   const classMap = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
   const trainerMap = useMemo(() => new Map(trainers.map((t) => [t.id, t])), [trainers]);
 
@@ -232,6 +282,8 @@ export default function GridScheduleView({
   }
 
   const preset = ZOOM_PRESETS[zoom];
+  const safeWeekIdx = Math.min(weekIdx, weeks.length - 1);
+  const currentWeek = weeks[safeWeekIdx] ?? [];
 
   return (
     <div className="space-y-3">
@@ -285,6 +337,42 @@ export default function GridScheduleView({
           </button>
         </div>
       </div>
+      {/* Week pager — one week of wide, easy-to-hit columns at a time. A
+          multi-week window used to render every weekday as a narrow column,
+          which made it easy to drop a session one column off (onto the wrong
+          day) with no error. */}
+      <div className="border-border bg-background flex items-center justify-between gap-2 rounded-md border px-2 py-1.5">
+        <button
+          type="button"
+          disabled={safeWeekIdx === 0}
+          onClick={() => {
+            setWeekIdx(Math.max(0, safeWeekIdx - 1));
+          }}
+          className="text-muted-foreground hover:bg-surface hover:text-foreground inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium disabled:opacity-30"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+          Prev week
+        </button>
+        <div className="text-foreground text-center text-xs font-medium tabular-nums">
+          {weekLabel(currentWeek)}
+          {weeks.length > 1 && (
+            <span className="text-muted-foreground ml-2 font-normal">
+              Week {(safeWeekIdx + 1).toString()} of {weeks.length.toString()}
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          disabled={safeWeekIdx >= weeks.length - 1}
+          onClick={() => {
+            setWeekIdx(Math.min(weeks.length - 1, safeWeekIdx + 1));
+          }}
+          className="text-muted-foreground hover:bg-surface hover:text-foreground inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium disabled:opacity-30"
+        >
+          Next week
+          <ChevronRightIcon className="h-4 w-4" />
+        </button>
+      </div>
       <p className="text-muted-foreground text-[10.5px]">
         Drag any session to move it · click to edit · drop on an empty cell in any room
       </p>
@@ -294,7 +382,7 @@ export default function GridScheduleView({
             key={room.id}
             room={room}
             sessions={sessions}
-            weekdays={weekdays}
+            weekdays={currentWeek}
             slots={slots}
             classMap={classMap}
             trainerMap={trainerMap}
