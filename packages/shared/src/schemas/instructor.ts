@@ -54,7 +54,17 @@ export const externalInstructorCreateSchema = z.object({
   notes: emptyToNull,
 });
 
+export const externalInstructorUpdateSchema = z.object({
+  full_name: z.string().min(1, "Name is required").max(200).optional(),
+  email: z
+    .string()
+    .nullish()
+    .transform((v) => (v === "" || v == null ? null : v))
+    .pipe(z.string().email("Must be a valid email address").nullable().optional()),
+});
+
 export type ExternalInstructorCreate = z.infer<typeof externalInstructorCreateSchema>;
+export type ExternalInstructorUpdate = z.infer<typeof externalInstructorUpdateSchema>;
 
 export type InstructorInsert = z.infer<typeof instructorInsertSchema>;
 export type InstructorUpdate = z.infer<typeof instructorUpdateSchema>;

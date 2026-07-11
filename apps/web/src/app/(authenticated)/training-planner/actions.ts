@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { calcTag } from "@/lib/training-planner/cached-reads";
@@ -8,6 +9,7 @@ import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import { isManager } from "@/lib/auth/role";
 import {
   externalInstructorCreateSchema,
+  externalInstructorUpdateSchema,
   implementationInsertSchema,
   implementationSetupSchema,
   implementationUpdateSchema,
@@ -610,6 +612,55 @@ export async function createExternalInstructor(input: unknown): Promise<ActionRe
   return { ok: true, data: data as Instructor };
 }
 
+// Rename / re-email an external pool entry. Scoped to is_external=true so a
+// stray call can never touch a roster instructor. The name on already-linked
+// impl_trainer rows is a denormalized copy taken at link time, so we refresh
+// them here too — otherwise the pool would show the new name while the
+// Trainers tab still displayed the old one.
+export async function updateExternalInstructor(
+  instructorId: string,
+  implementationId: string,
+  input: unknown,
+): Promise<ActionResult<Instructor>> {
+  const parsed = externalInstructorUpdateSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("instructors")
+    .update(
+      stripUndefined(
+        parsed.data as Record<string, unknown>,
+      ) as unknown as TablesUpdate<"instructors">,
+    )
+    .eq("id", instructorId)
+    .eq("org_id", c.orgId)
+    .eq("is_external", true)
+    .is("deleted_at", null)
+    .select()
+    .single();
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+
+  const linkedPatch = stripUndefined({
+    name: parsed.data.full_name,
+    email: parsed.data.email,
+  });
+  if (Object.keys(linkedPatch).length > 0) {
+    const { error: linkErr } = await c.supabase
+      .from("impl_trainers")
+      .update(linkedPatch as unknown as TablesUpdate<"impl_trainers">)
+      .eq("instructor_id", instructorId)
+      .eq("org_id", c.orgId);
+    if (linkErr) return { ok: false, error: { code: linkErr.code, message: linkErr.message } };
+  }
+
+  revalidateImpl(implementationId);
+  return { ok: true, data: data as Instructor };
+}
+
 // Promote an existing free-text impl_trainer row (instructor_id NULL) into
 // the external pool: set its instructor_id to point at a real instructors row
 // flagged is_external=true. After this, the row gets cross-impl conflict
@@ -1037,6 +1088,216 @@ export async function reorderImplClasses(
   // Class sort_order is a topological-tie-break input to the solver.
   revalidateCalcOnly(implementationId);
   return { ok: true, data: { count: orderings.length } };
+}
+
+// ── bulk CSV import ─────────────────────────────────────────────────────────
+//
+// Classes lists are long, so the Classes tab offers a CSV upload. Rows upsert
+// by name (case-insensitive) within the implementation; modules referenced by
+// name are resolved/auto-created inline. Mirrors the global /classes importer.
+
+type ImportRowResult = {
+  row: number;
+  action: "created" | "updated" | "failed";
+  message?: string;
+};
+type ImportResult = {
+  created: number;
+  updated: number;
+  failed: number;
+  results: ImportRowResult[];
+};
+
+const csvOptionalString = z
+  .string()
+  .nullish()
+  .transform((s) => s?.trim() || null);
+
+// Empty or non-numeric → NaN, which fails the min() check below with the
+// supplied message (covers both "missing" and "not a number").
+const csvReqNumber = (min: number, msg: string) =>
+  z
+    .string()
+    .nullish()
+    .transform((s) => {
+      const v = (s ?? "").trim();
+      return v === "" ? Number.NaN : Number(v);
+    })
+    .pipe(z.number().min(min, msg));
+
+const csvIntOrZero = z
+  .string()
+  .nullish()
+  .transform((s) => {
+    const v = (s ?? "").trim();
+    if (v === "") return 0;
+    const n = Number(v);
+    return Number.isNaN(n) ? Number.NaN : Math.trunc(n);
+  })
+  .pipe(z.number().int().min(0, "must be 0 or more"));
+
+const csvTags = z
+  .string()
+  .nullish()
+  .transform((s) => {
+    const v = (s ?? "").trim();
+    if (v === "") return [] as string[];
+    return v
+      .split(/[;|]/)
+      .map((t) => t.trim())
+      .filter((t) => t !== "")
+      .slice(0, 50);
+  });
+
+const csvImplClassSchema = z.object({
+  name: z.string().trim().min(1, "name is required").max(200),
+  module: csvOptionalString,
+  description: csvOptionalString,
+  hours_per_session: csvReqNumber(0.25, "hours_per_session must be at least 0.25"),
+  expected_learners_per_session: csvReqNumber(
+    1,
+    "expected_learners_per_session must be at least 1",
+  ).pipe(z.number().int("expected_learners_per_session must be a whole number")),
+  total_people_to_train: csvIntOrZero,
+  required_equipment_tags: csvTags,
+  required_equipment_notes: csvOptionalString,
+});
+
+export async function importImplClasses(
+  implementationId: string,
+  rawRows: unknown,
+): Promise<ActionResult<ImportResult>> {
+  if (!Array.isArray(rawRows)) {
+    return { ok: false, error: { code: "BAD_INPUT", message: "Expected an array of rows" } };
+  }
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  // Existing classes in THIS implementation, for case-insensitive upsert by
+  // name. No unique constraint, so first match wins.
+  const { data: existing, error: fetchErr } = await c.supabase
+    .from("impl_classes")
+    .select("id, name, sort_order")
+    .eq("implementation_id", implementationId)
+    .eq("org_id", c.orgId);
+  if (fetchErr) return { ok: false, error: { code: fetchErr.code, message: fetchErr.message } };
+
+  const idByLowerName = new Map<string, string>();
+  let maxSortOrder = -1;
+  for (const cls of existing) {
+    const key = cls.name.toLowerCase();
+    if (!idByLowerName.has(key)) idByLowerName.set(key, cls.id);
+    if (cls.sort_order > maxSortOrder) maxSortOrder = cls.sort_order;
+  }
+
+  // Modules referenced by name are resolved within this implementation and
+  // auto-created on first sight so an import can introduce modules inline.
+  const { data: existingModules } = await c.supabase
+    .from("impl_modules")
+    .select("id, name")
+    .eq("implementation_id", implementationId)
+    .eq("org_id", c.orgId);
+  const moduleIdByLowerName = new Map<string, string>();
+  for (const m of existingModules ?? []) {
+    const key = m.name.toLowerCase();
+    if (!moduleIdByLowerName.has(key)) moduleIdByLowerName.set(key, m.id);
+  }
+  // Capture narrowed context into locals — control-flow narrowing on `c`
+  // doesn't reach into this nested closure.
+  const { supabase, orgId, departmentId } = c;
+  async function resolveModuleId(name: string | null): Promise<string | null> {
+    if (!name) return null;
+    const key = name.toLowerCase();
+    const found = moduleIdByLowerName.get(key);
+    if (found) return found;
+    const { data: created } = await supabase
+      .from("impl_modules")
+      .insert({
+        org_id: orgId,
+        department_id: departmentId,
+        implementation_id: implementationId,
+        name,
+      })
+      .select("id")
+      .single();
+    if (created) moduleIdByLowerName.set(key, created.id);
+    return created?.id ?? null;
+  }
+
+  const results: ImportRowResult[] = [];
+  let created = 0;
+  let updated = 0;
+  let failed = 0;
+
+  for (let i = 0; i < rawRows.length; i++) {
+    const rowNum = i + 2; // header is row 1
+    const parsed = csvImplClassSchema.safeParse(rawRows[i]);
+    if (!parsed.success) {
+      failed++;
+      results.push({
+        row: rowNum,
+        action: "failed",
+        message: parsed.error.errors[0]?.message ?? "Invalid row",
+      });
+      continue;
+    }
+    const data = parsed.data;
+    const moduleId = await resolveModuleId(data.module);
+    const existingId = idByLowerName.get(data.name.toLowerCase());
+
+    const fields = {
+      module_id: moduleId,
+      name: data.name,
+      description: data.description,
+      hours_per_session: data.hours_per_session,
+      expected_learners_per_session: data.expected_learners_per_session,
+      total_people_to_train: data.total_people_to_train,
+      required_equipment_tags: data.required_equipment_tags,
+      required_equipment_notes: data.required_equipment_notes,
+    };
+
+    if (existingId) {
+      const { error } = await c.supabase
+        .from("impl_classes")
+        .update(fields)
+        .eq("id", existingId)
+        .eq("org_id", c.orgId);
+      if (error) {
+        failed++;
+        results.push({ row: rowNum, action: "failed", message: error.message });
+      } else {
+        updated++;
+        results.push({ row: rowNum, action: "updated" });
+      }
+    } else {
+      maxSortOrder++;
+      const { data: inserted, error } = await c.supabase
+        .from("impl_classes")
+        .insert({
+          ...fields,
+          org_id: c.orgId,
+          department_id: c.departmentId,
+          implementation_id: implementationId,
+          sort_order: maxSortOrder,
+        })
+        .select("id, name")
+        .single();
+      if (error) {
+        maxSortOrder--;
+        failed++;
+        results.push({ row: rowNum, action: "failed", message: error.message });
+      } else {
+        idByLowerName.set(inserted.name.toLowerCase(), inserted.id);
+        created++;
+        results.push({ row: rowNum, action: "created" });
+      }
+    }
+  }
+
+  revalidateImpl(implementationId);
+  revalidateCalcOnly(implementationId);
+  return { ok: true, data: { created, updated, failed, results } };
 }
 
 // ── junctions: class trainers + class prerequisites ─────────────────────────
