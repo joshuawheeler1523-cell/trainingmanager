@@ -32,6 +32,7 @@ const {
   createClass,
   addClassPrerequisite,
   createExternalInstructor,
+  updateExternalInstructor,
   linkImplTrainerToInstructor,
   softDeleteExternalInstructor,
   importImplClasses,
@@ -384,6 +385,55 @@ describe("createExternalInstructor", () => {
       email: "not-an-email",
       notes: null,
     });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("VALIDATION");
+  });
+});
+
+describe("updateExternalInstructor", () => {
+  it("renames the pool record scoped to is_external and cascades to linked impl_trainers", async () => {
+    const instructorsChain = makeUpdateChain({
+      data: {
+        id: "inst-1",
+        org_id: ORG_ID,
+        full_name: "Jane Renamed",
+        email: "jane2@example.com",
+        is_external: true,
+      },
+      error: null,
+    });
+    const trainerUpdateFn = vi.fn().mockReturnThis();
+    const trainerEqFn = vi.fn().mockReturnThis();
+    const implTrainersChain: Record<string, unknown> = {
+      update: trainerUpdateFn,
+      eq: trainerEqFn,
+      then: (resolve: (v: { error: null }) => unknown) => resolve({ error: null }),
+    };
+    mockFrom.mockReturnValueOnce(instructorsChain).mockReturnValueOnce(implTrainersChain);
+
+    const result = await updateExternalInstructor("inst-1", IMPL_ID, {
+      full_name: "Jane Renamed",
+      email: "jane2@example.com",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mockFrom).toHaveBeenNthCalledWith(1, "instructors");
+    expect(instructorsChain.eq).toHaveBeenCalledWith("is_external", true);
+    expect(instructorsChain.eq).toHaveBeenCalledWith("id", "inst-1");
+    expect(mockFrom).toHaveBeenNthCalledWith(2, "impl_trainers");
+    const trainerPatch = (trainerUpdateFn.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+    expect(trainerPatch.name).toBe("Jane Renamed");
+    expect(trainerEqFn).toHaveBeenCalledWith("instructor_id", "inst-1");
+  });
+
+  it("rejects an empty name", async () => {
+    const result = await updateExternalInstructor("inst-1", IMPL_ID, { full_name: "" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("VALIDATION");
+  });
+
+  it("rejects an invalid email", async () => {
+    const result = await updateExternalInstructor("inst-1", IMPL_ID, { email: "nope" });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("VALIDATION");
   });

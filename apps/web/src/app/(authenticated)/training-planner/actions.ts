@@ -9,6 +9,7 @@ import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import { isManager } from "@/lib/auth/role";
 import {
   externalInstructorCreateSchema,
+  externalInstructorUpdateSchema,
   implementationInsertSchema,
   implementationSetupSchema,
   implementationUpdateSchema,
@@ -608,6 +609,55 @@ export async function createExternalInstructor(input: unknown): Promise<ActionRe
     .single();
 
   if (error) return { ok: false, error: { code: error.code, message: error.message } };
+  return { ok: true, data: data as Instructor };
+}
+
+// Rename / re-email an external pool entry. Scoped to is_external=true so a
+// stray call can never touch a roster instructor. The name on already-linked
+// impl_trainer rows is a denormalized copy taken at link time, so we refresh
+// them here too — otherwise the pool would show the new name while the
+// Trainers tab still displayed the old one.
+export async function updateExternalInstructor(
+  instructorId: string,
+  implementationId: string,
+  input: unknown,
+): Promise<ActionResult<Instructor>> {
+  const parsed = externalInstructorUpdateSchema.safeParse(input);
+  if (!parsed.success) return validationError(parsed.error);
+
+  const c = await ctx();
+  if (!c.ok) return c;
+
+  const { data, error } = await c.supabase
+    .from("instructors")
+    .update(
+      stripUndefined(
+        parsed.data as Record<string, unknown>,
+      ) as unknown as TablesUpdate<"instructors">,
+    )
+    .eq("id", instructorId)
+    .eq("org_id", c.orgId)
+    .eq("is_external", true)
+    .is("deleted_at", null)
+    .select()
+    .single();
+
+  if (error) return { ok: false, error: { code: error.code, message: error.message } };
+
+  const linkedPatch = stripUndefined({
+    name: parsed.data.full_name,
+    email: parsed.data.email,
+  });
+  if (Object.keys(linkedPatch).length > 0) {
+    const { error: linkErr } = await c.supabase
+      .from("impl_trainers")
+      .update(linkedPatch as unknown as TablesUpdate<"impl_trainers">)
+      .eq("instructor_id", instructorId)
+      .eq("org_id", c.orgId);
+    if (linkErr) return { ok: false, error: { code: linkErr.code, message: linkErr.message } };
+  }
+
+  revalidateImpl(implementationId);
   return { ok: true, data: data as Instructor };
 }
 

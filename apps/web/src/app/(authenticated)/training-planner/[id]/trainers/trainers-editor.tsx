@@ -22,6 +22,7 @@ import {
   linkImplTrainerToInstructor,
   setStep,
   softDeleteExternalInstructor,
+  updateExternalInstructor,
   updateTrainer,
 } from "../../actions";
 
@@ -100,6 +101,7 @@ export default function TrainersEditor({
   const [hours, setHours] = useState("20");
   const [openPtoFor, setOpenPtoFor] = useState<string | null>(null);
   const [promotingTrainerId, setPromotingTrainerId] = useState<string | null>(null);
+  const [editingPoolId, setEditingPoolId] = useState<string | null>(null);
 
   const ptoByTrainer = new Map<string, ImplTrainerUnavailability[]>();
   for (const u of unavailability) {
@@ -251,6 +253,38 @@ export default function TrainersEditor({
     });
   }
 
+  function savePoolConsultant(
+    trainerId: string,
+    instructorId: string,
+    name: string,
+    email: string | null,
+  ) {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast.error("Name can't be empty");
+      return;
+    }
+    startTransition(async () => {
+      const result = await updateExternalInstructor(instructorId, implementationId, {
+        full_name: trimmed,
+        email: email?.trim() || null,
+      });
+      if (result.ok) {
+        setRows((prev) =>
+          prev.map((r) =>
+            r.instructor_id === instructorId
+              ? { ...r, name: result.data.full_name, email: result.data.email }
+              : r,
+          ),
+        );
+        setEditingPoolId(null);
+        toast.success("Consultant updated");
+      } else {
+        toast.error(result.error.message);
+      }
+    });
+  }
+
   function handleDelete(id: string) {
     startTransition(async () => {
       const result = await deleteTrainer(id, implementationId);
@@ -378,6 +412,16 @@ export default function TrainersEditor({
                     }}
                     onPromote={(instructorId, name, email) => {
                       promoteToPool(t.id, instructorId, name, email);
+                    }}
+                    isEditingPool={editingPoolId === t.id}
+                    onStartEditPool={() => {
+                      setEditingPoolId(t.id);
+                    }}
+                    onCancelEditPool={() => {
+                      setEditingPoolId(null);
+                    }}
+                    onSavePool={(name, email) => {
+                      if (t.instructor_id) savePoolConsultant(t.id, t.instructor_id, name, email);
                     }}
                   />
                 );
@@ -614,6 +658,10 @@ function TrainerRow({
   onStartPromote,
   onCancelPromote,
   onPromote,
+  isEditingPool,
+  onStartEditPool,
+  onCancelEditPool,
+  onSavePool,
 }: {
   t: ImplTrainer;
   pto: ImplTrainerUnavailability[];
@@ -631,6 +679,10 @@ function TrainerRow({
   onStartPromote: () => void;
   onCancelPromote: () => void;
   onPromote: (instructorId: string, name: string, email: string | null) => void;
+  isEditingPool: boolean;
+  onStartEditPool: () => void;
+  onCancelEditPool: () => void;
+  onSavePool: (name: string, email: string | null) => void;
 }) {
   const [ptoPending, startPtoTransition] = useTransition();
   const [draftStart, setDraftStart] = useState("");
@@ -667,6 +719,8 @@ function TrainerRow({
   }
 
   const [promoteSelection, setPromoteSelection] = useState<string>("");
+  const [editName, setEditName] = useState(t.name);
+  const [editEmail, setEditEmail] = useState(t.email ?? "");
   const ptoCount = pto.length;
   const rowPending = pending || ptoPending;
 
@@ -725,9 +779,23 @@ function TrainerRow({
         <td className="px-3 py-2 text-xs">
           {sourceKind === "roster" && <span className="text-muted-foreground">Roster</span>}
           {sourceKind === "pool" && (
-            <span className="rounded-full bg-violet-100 px-2 py-0.5 font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-200">
-              Pool
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="rounded-full bg-violet-100 px-2 py-0.5 font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-200">
+                Pool
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditName(t.name);
+                  setEditEmail(t.email ?? "");
+                  onStartEditPool();
+                }}
+                disabled={pending}
+                className="text-primary text-[10px] underline hover:no-underline disabled:opacity-50"
+              >
+                Edit
+              </button>
+            </div>
           )}
           {sourceKind === "freetext" && (
             <div className="flex items-center gap-1.5">
@@ -821,6 +889,77 @@ function TrainerRow({
           </button>
         </td>
       </tr>
+
+      {isEditingPool && (
+        <tr>
+          <td />
+          <td colSpan={8} className="bg-violet-50/50 px-3 py-3 dark:bg-violet-900/20">
+            <div className="space-y-2">
+              <p className="text-foreground text-xs font-semibold">Edit pool consultant</p>
+              <p className="text-muted-foreground text-[11px]">
+                Updates the shared external-pool record. The new name and email apply everywhere
+                this consultant is used, across every implementation.
+              </p>
+              <div className="flex flex-wrap items-end gap-2">
+                <div>
+                  <label
+                    htmlFor={`edit-name-${t.id}`}
+                    className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase"
+                  >
+                    Name
+                  </label>
+                  <input
+                    id={`edit-name-${t.id}`}
+                    value={editName}
+                    onChange={(e) => {
+                      setEditName(e.target.value);
+                    }}
+                    className={fieldClass + " min-w-[200px]"}
+                    disabled={rowPending}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor={`edit-email-${t.id}`}
+                    className="text-muted-foreground mb-0.5 block text-[10px] font-medium uppercase"
+                  >
+                    Email
+                  </label>
+                  <input
+                    id={`edit-email-${t.id}`}
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => {
+                      setEditEmail(e.target.value);
+                    }}
+                    placeholder="—"
+                    className={fieldClass + " min-w-[220px]"}
+                    disabled={rowPending}
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={rowPending || !editName.trim()}
+                  onClick={() => {
+                    onSavePool(editName, editEmail || null);
+                  }}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={onCancelEditPool}
+                  disabled={rowPending}
+                  className="text-muted-foreground hover:text-foreground text-xs underline disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
 
       {isPromoting && (
         <tr>
