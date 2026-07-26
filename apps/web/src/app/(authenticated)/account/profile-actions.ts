@@ -7,10 +7,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { THEME_COOKIE, coerceTheme } from "@/lib/theme";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
+import type { ActionResult } from "@arbor/shared";
 
 const updateProfileSchema = z.object({
   fullName: z.string().trim().min(1, "Name required").max(120),

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
+import type { ActionResult } from "@arbor/shared";
 import { PRESETS, TOGGLEABLE_MODULES, type PresetKey } from "@arbor/shared";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -12,10 +13,6 @@ import { toSlug } from "@/lib/utils/slug";
 import { inviteEmailHtml, inviteEmailText, sendEmail } from "@/lib/email";
 import { brandFromHeader, getBrandForOrg } from "@/lib/brand";
 import type { Json } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
 
 function validationError(err: {
   errors: Array<{ message: string; path: (string | number)[] }>;

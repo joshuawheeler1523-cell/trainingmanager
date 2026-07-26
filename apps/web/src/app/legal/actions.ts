@@ -5,10 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { recordAcceptance } from "@/lib/legal/acceptance";
 import type { LegalDocumentKey } from "@/lib/legal/versions";
 import { headers } from "next/headers";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string } };
+import type { ActionResult } from "@arbor/shared";
 
 /**
  * Server action invoked by client-side acceptance checkboxes (e.g. on the

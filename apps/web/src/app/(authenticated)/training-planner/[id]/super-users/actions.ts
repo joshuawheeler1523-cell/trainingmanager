@@ -5,12 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import { implSuperUserInsertSchema, implSuperUserUpdateSchema } from "@arbor/shared";
-import type { ImplSuperUser } from "@arbor/shared";
+import type { ActionResult, ImplSuperUser } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
 
 export async function createImplSuperUser(
   implementationId: string,

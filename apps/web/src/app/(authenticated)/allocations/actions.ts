@@ -13,13 +13,9 @@ import {
   groupInsertSchema,
   groupUpdateSchema,
 } from "@arbor/shared";
-import type { AllocationBucket, AllocationGroup } from "@arbor/shared";
+import type { ActionResult, AllocationBucket, AllocationGroup } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
 import { BUCKET_TEMPLATES } from "./templates";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
 
 function validationError(err: {
   errors: Array<{ message: string; path: (string | number)[] }>;

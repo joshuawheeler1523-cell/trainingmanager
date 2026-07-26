@@ -13,12 +13,8 @@ import {
   classSkillRequirementSchema,
   classSkillRequirementUpdateSchema,
 } from "@arbor/shared";
-import type { Skill, InstructorSkill, ClassSkillRequirement } from "@arbor/shared";
+import type { ActionResult, ClassSkillRequirement, InstructorSkill, Skill } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
 
 function validationError(err: {
   errors: Array<{ message: string; path: (string | number)[] }>;

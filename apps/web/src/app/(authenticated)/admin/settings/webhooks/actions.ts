@@ -8,10 +8,7 @@ import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
 import { writeAuditDenial } from "@/lib/auth/audit-denial";
 import { deliverDelivery, generateSigningSecret } from "@/lib/webhooks";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string } };
+import type { ActionResult } from "@arbor/shared";
 
 const SUPPORTED_EVENTS = [
   "tra.created",

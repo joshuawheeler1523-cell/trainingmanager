@@ -6,6 +6,7 @@ import { calcTag } from "@/lib/training-planner/cached-reads";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import { isManager } from "@/lib/auth/role";
+import type { ActionResult } from "@arbor/shared";
 import {
   externalInstructorCreateSchema,
   implementationInsertSchema,
@@ -42,10 +43,6 @@ import {
   type PlacementCandidate,
   type ValidationContext,
 } from "@/lib/training-planner/manual-placement";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
 
 function validationError(err: {
   errors: Array<{ message: string; path: (string | number)[] }>;

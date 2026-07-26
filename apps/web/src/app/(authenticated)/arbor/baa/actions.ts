@@ -5,10 +5,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireArborAdmin } from "@/lib/auth/arbor-admin";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string } };
+import type { ActionResult } from "@arbor/shared";
 
 const STATUS_VALUES = ["requested", "sent", "signed", "rejected", "expired"] as const;
 

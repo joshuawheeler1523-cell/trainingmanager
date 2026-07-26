@@ -8,10 +8,7 @@ import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
 import { writeAuditDenial } from "@/lib/auth/audit-denial";
 import { generateApiKey, hashApiKey } from "@/lib/api-keys";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string } };
+import type { ActionResult } from "@arbor/shared";
 
 const createKeySchema = z.object({
   name: z.string().trim().min(1, "Name required").max(80),

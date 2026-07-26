@@ -3,11 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
-import type { CapacityForecastItem, CapacityForecastMonth } from "@arbor/shared";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string } };
+import type { ActionResult, CapacityForecastItem, CapacityForecastMonth } from "@arbor/shared";
 
 /**
  * Runs the capacity_forecast RPC for the current org, scoped to a department

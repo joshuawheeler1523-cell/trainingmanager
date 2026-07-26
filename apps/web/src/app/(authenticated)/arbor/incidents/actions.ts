@@ -5,10 +5,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireArborAdmin } from "@/lib/auth/arbor-admin";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string } };
+import type { ActionResult } from "@arbor/shared";
 
 const SEVERITY_VALUES = ["minor", "major", "critical", "maintenance"] as const;
 const STATUS_VALUES = [

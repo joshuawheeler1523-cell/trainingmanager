@@ -9,10 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireArborAdmin } from "@/lib/auth/arbor-admin";
 import { sendEmail, inviteEmailHtml, inviteEmailText } from "@/lib/email";
 import type { Json, TablesUpdate } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
+import type { ActionResult } from "@arbor/shared";
 
 const createAgencySchema = z.object({
   agencyName: z.string().trim().min(2).max(120),

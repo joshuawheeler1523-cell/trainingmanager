@@ -6,10 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireArborAdmin } from "@/lib/auth/arbor-admin";
 import type { Json } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string } };
+import type { ActionResult } from "@arbor/shared";
 
 export async function suspendOrgAction(args: {
   orgId: string;

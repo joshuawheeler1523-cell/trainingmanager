@@ -6,10 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { requireArborAdmin } from "@/lib/auth/arbor-admin";
 import { sendEmail } from "@/lib/email";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string } };
+import type { ActionResult } from "@arbor/shared";
 
 /**
  * Sends a password-reset email to the user. Same Supabase flow as the

@@ -5,12 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import { classModuleInputSchema, classModuleUpdateSchema } from "@arbor/shared";
-import type { ClassModule } from "@arbor/shared";
+import type { ActionResult, ClassModule } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
 
 function validationError(err: {
   errors: Array<{ message: string; path: (string | number)[] }>;

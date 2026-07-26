@@ -5,10 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { TICKET_CATEGORY_VALUES, TICKET_PRIORITY_VALUES, TICKET_STATUS_VALUES } from "./constants";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
+import type { ActionResult } from "@arbor/shared";
 
 function validationError(err: {
   errors: Array<{ message: string; path: (string | number)[] }>;

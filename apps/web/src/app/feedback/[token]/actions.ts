@@ -4,12 +4,9 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { headers } from "next/headers";
 import { env } from "@/lib/env";
 import type { Database } from "@/lib/supabase/database.types";
+import type { ActionResult } from "@arbor/shared";
 
 type SubmitArgs = Database["public"]["Functions"]["submit_instructor_feedback"]["Args"];
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string } };
 
 function err(message: string): ActionResult<never> {
   return { ok: false, error: { code: "INVALID", message } };

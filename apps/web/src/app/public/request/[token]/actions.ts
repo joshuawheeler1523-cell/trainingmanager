@@ -2,12 +2,9 @@
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
+import type { ActionResult } from "@arbor/shared";
 import { publicSubmitSchema } from "@arbor/shared";
 import type { Database } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
 
 // The submission goes through the anon role (no logged-in user). The RLS
 // policy `education_requests_insert_public_anon` validates the token + status

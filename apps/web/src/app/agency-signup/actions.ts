@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, inviteEmailHtml, inviteEmailText } from "@/lib/email";
+import type { ActionResult } from "@arbor/shared";
 
 // Throttle limits — chosen to allow legitimate retries (typo, mistyped
 // password, magic-link expired) but block mass-mailer abuse since the
@@ -11,10 +12,6 @@ import { sendEmail, inviteEmailHtml, inviteEmailText } from "@/lib/email";
 // magic-link to any address.
 const MAX_ATTEMPTS_PER_IP_PER_HOUR = 3;
 const MAX_ATTEMPTS_PER_EMAIL_PER_DAY = 3;
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
 
 const signupSchema = z.object({
   agencyName: z.string().trim().min(2, "Agency name required").max(120),
