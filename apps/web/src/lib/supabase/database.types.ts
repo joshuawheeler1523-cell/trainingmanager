@@ -471,6 +471,32 @@ export type Database = {
           },
         ];
       };
+      api_rate_limits: {
+        Row: {
+          api_key_id: string;
+          request_count: number;
+          window_start: string;
+        };
+        Insert: {
+          api_key_id: string;
+          request_count?: number;
+          window_start: string;
+        };
+        Update: {
+          api_key_id?: string;
+          request_count?: number;
+          window_start?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "api_rate_limits_api_key_id_fkey";
+            columns: ["api_key_id"];
+            isOneToOne: false;
+            referencedRelation: "api_keys";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       arbor_invoices: {
         Row: {
           agency_id: string;
@@ -6406,6 +6432,11 @@ export type Database = {
           pricing_tier: Database["public"]["Enums"]["contract_pricing_tier"];
         }[];
       };
+      can_read_class: { Args: { p_class_id: string }; Returns: boolean };
+      can_read_instructor: {
+        Args: { p_instructor_id: string };
+        Returns: boolean;
+      };
       capacity_forecast: {
         Args: {
           p_department_id?: string;
@@ -6601,6 +6632,18 @@ export type Database = {
         Returns: {
           class_id: string;
           instructor_id: string;
+        }[];
+      };
+      record_api_request: {
+        Args: {
+          p_api_key_id: string;
+          p_limit: number;
+          p_window_seconds: number;
+        };
+        Returns: {
+          allowed: boolean;
+          request_count: number;
+          retry_after_seconds: number;
         }[];
       };
       set_share_token: { Args: { p_token: string }; Returns: undefined };
