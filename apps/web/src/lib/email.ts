@@ -8,6 +8,8 @@
 // UI also surfaces the invite URL alongside each pending invitation so a
 // human can copy-paste it manually until the env var is configured.
 
+import { escapeHtml } from "@/lib/escape-html";
+
 const RESEND_API_URL = "https://api.resend.com/emails";
 
 // "From" defaults to onboarding@resend.dev which Resend allows on every
@@ -132,13 +134,4 @@ export function inviteEmailText(args: {
     args.acceptUrl,
     "",
   ].join("\n");
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
