@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 **/next-env.d.ts
+
+# generated screenshots (playwright capture runs)
+**/screenshots/
+
+# office lock files (~$foo.docx) left behind next to docs
+~$*
