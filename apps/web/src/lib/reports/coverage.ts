@@ -1,10 +1,11 @@
 import type { CoverageDataset, CoverageReportFilters } from "@arbor/shared";
+import { fetchQualifiedByClass } from "./qualified";
 import { scopeDept, type TypedSupabase } from "./types";
 
 // Class Coverage Report (User Guide §12.2):
 //   - assigned offerings vs offerings_per_year
-//   - count of qualified instructors (using the existing
-//     qualified_instructors_for_class RPC)
+//   - count of qualified instructors (via the bulk
+//     qualified_instructors_for_org RPC)
 //   - flag rows with no assignee or with a skill gap (no qualified instructor)
 
 export async function queryCoverageReport(
@@ -48,30 +49,27 @@ export async function queryCoverageReport(
     }
   }
 
-  // qualified_instructors_for_class RPC, batched. Skip classes with no
-  // skill requirements (the RPC returns all active instructors for those —
-  // not what we want for "qualified instructor count").
-  const { data: skillReqs } = await scopeDept(
-    supabase
-      .from("class_skill_requirements")
-      .select("class_id")
-      .eq("org_id", orgId)
-      .eq("requirement", "required"),
-    departmentId,
-  );
+  // Classes with no required skills are excluded from the qualified count —
+  // every active instructor trivially "qualifies" for those, which isn't what
+  // the column means.
+  const [{ data: skillReqs }, qualifiedByClass] = await Promise.all([
+    scopeDept(
+      supabase
+        .from("class_skill_requirements")
+        .select("class_id")
+        .eq("org_id", orgId)
+        .eq("requirement", "required"),
+      departmentId,
+    ),
+    fetchQualifiedByClass(supabase, orgId),
+  ]);
   const classesWithRequiredSkills = new Set((skillReqs ?? []).map((r) => r.class_id));
 
   const qualifiedCounts = new Map<string, number>();
-  await Promise.all(
-    (classes ?? [])
-      .filter((c) => classesWithRequiredSkills.has(c.id))
-      .map(async (c) => {
-        const { data } = await supabase.rpc("qualified_instructors_for_class", {
-          p_class_id: c.id,
-        });
-        qualifiedCounts.set(c.id, data?.length ?? 0);
-      }),
-  );
+  for (const c of classes ?? []) {
+    if (!classesWithRequiredSkills.has(c.id)) continue;
+    qualifiedCounts.set(c.id, qualifiedByClass.get(c.id)?.length ?? 0);
+  }
 
   const rows: CoverageDataset["rows"] = [];
   for (const c of classes ?? []) {

@@ -3,12 +3,13 @@ import {
   type InstructorScorecardDataset,
   type InstructorScorecardReportFilters,
 } from "@arbor/shared";
+import { fetchQualifiedByClass } from "./qualified";
 import { scopeDept, type TypedSupabase } from "./types";
 
 /**
  * Per-instructor scorecard: utilization, classes qualified vs assigned, skills
  * held, and certifications expiring within 90 days. "Qualified" reuses the
- * qualified_instructors_for_class RPC (same source as the coverage report),
+ * bulk qualified_instructors_for_org RPC (same source as the coverage report),
  * tallied per instructor across classes that have required skills.
  */
 export async function queryInstructorScorecardReport(
@@ -109,23 +110,17 @@ export async function queryInstructorScorecardReport(
     }
   }
 
-  // Qualified classes per instructor: for each class with required skills, the
-  // RPC returns the instructors who meet them; tally each.
+  // Qualified classes per instructor: tally each instructor across the classes
+  // that have required skills and that they meet.
   const classesWithReqs = new Set((skillReqs ?? []).map((r) => r.class_id));
+  const qualifiedByClass = await fetchQualifiedByClass(supabase, orgId);
   const qualifiedCount = new Map<string, number>();
-  await Promise.all(
-    (classes ?? [])
-      .filter((c) => classesWithReqs.has(c.id))
-      .map(async (c) => {
-        const { data } = await supabase.rpc("qualified_instructors_for_class", {
-          p_class_id: c.id,
-        });
-        for (const row of (data ?? []) as { id?: string; instructor_id?: string }[]) {
-          const id = row.instructor_id ?? row.id;
-          if (id) qualifiedCount.set(id, (qualifiedCount.get(id) ?? 0) + 1);
-        }
-      }),
-  );
+  for (const c of classes ?? []) {
+    if (!classesWithReqs.has(c.id)) continue;
+    for (const instructorId of qualifiedByClass.get(c.id) ?? []) {
+      qualifiedCount.set(instructorId, (qualifiedCount.get(instructorId) ?? 0) + 1);
+    }
+  }
 
   const rows = instructorRows.map((i) => {
     const cap = capByInstructor.get(i.id);
