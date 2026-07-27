@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import { getCurrentRole } from "@/lib/auth/role";
+import type { ActionResult } from "@arbor/shared";
 import {
   projectInsertSchema,
   projectUpdateSchema,
@@ -32,10 +33,6 @@ import {
   type ImportRow,
 } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
 
 function validationError(err: {
   errors: Array<{ message: string; path: (string | number)[] }>;

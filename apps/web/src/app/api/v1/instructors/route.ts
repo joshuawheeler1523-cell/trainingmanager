@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authApiRequest, problemResponse } from "@/lib/api-keys";
 import { decodeCursor } from "@/lib/api-cursor";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { reportError } from "@/lib/observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,7 +47,11 @@ export async function GET(req: Request) {
   }
 
   const { data, error } = await query;
-  if (error) return problemResponse(500, "query_failed", error.message);
+  if (error) {
+    // Log the driver message; don't hand database internals to an API consumer.
+    reportError(error, { orgId: auth.orgId, operation: "api.v1.instructors.list" });
+    return problemResponse(500, "query_failed");
+  }
 
   const rows = data;
   const last = rows[rows.length - 1];

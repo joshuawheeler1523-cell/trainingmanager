@@ -14,6 +14,7 @@ import {
   ChevronDownIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/20/solid";
+import { escapeHtml } from "@/lib/escape-html";
 import { generateFeedbackLink, setFeedbackLinkActive } from "./actions";
 
 // One anonymous QR survey response (a learner rating one instructor).
@@ -853,12 +854,4 @@ function slugify(s: string): string {
 // slugify down to the same "code") still produce unique, traceable filenames.
 function qrFilename(label: string, token: string, ext: string): string {
   return `feedback-qr-${slugify(label)}-${token.slice(0, 6)}.${ext}`;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

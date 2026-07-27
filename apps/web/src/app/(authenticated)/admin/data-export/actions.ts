@@ -7,10 +7,7 @@ import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
 import { writeAuditDenial } from "@/lib/auth/audit-denial";
 import { buildOrgDataExport } from "@/lib/data-export";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string } };
+import type { ActionResult } from "@arbor/shared";
 
 /**
  * Triggers a data export for the current org. Synchronously builds the ZIP

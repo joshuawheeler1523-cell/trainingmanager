@@ -10,10 +10,7 @@ import { writeAuditDenial } from "@/lib/auth/audit-denial";
 import { inviteEmailHtml, inviteEmailText, sendEmail } from "@/lib/email";
 import { brandFromHeader, getBrandForOrg } from "@/lib/brand";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
+import type { ActionResult } from "@arbor/shared";
 
 function validationError(err: {
   errors: Array<{ message: string; path: (string | number)[] }>;

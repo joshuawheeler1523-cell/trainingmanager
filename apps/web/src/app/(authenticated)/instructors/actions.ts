@@ -6,12 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { getCurrentDepartmentId } from "@/lib/auth/current-department";
 import { instructorInsertSchema, instructorUpdateSchema } from "@arbor/shared";
-import type { Instructor } from "@arbor/shared";
+import type { ActionResult, Instructor } from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
 
 export async function createInstructor(input: unknown): Promise<ActionResult<Instructor>> {
   const parsed = instructorInsertSchema.safeParse(input);

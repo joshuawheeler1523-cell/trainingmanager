@@ -13,12 +13,14 @@ import {
   ADHOC_STATUS_VALUES,
   RECURRING_STATUS_VALUES,
 } from "@arbor/shared";
-import type { RecurringTask, AdHocTask, AdHocStatus, RecurringStatus } from "@arbor/shared";
+import type {
+  ActionResult,
+  AdHocStatus,
+  AdHocTask,
+  RecurringStatus,
+  RecurringTask,
+} from "@arbor/shared";
 import type { TablesUpdate } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
 
 function validationError(err: {
   errors: Array<{ message: string; path: (string | number)[] }>;

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrgId } from "@/lib/auth/current-org";
 import { isManager } from "@/lib/auth/role";
+import type { ActionResult } from "@arbor/shared";
 import {
   onboardingTaskInsertSchema,
   onboardingTaskUpdateSchema,
@@ -13,10 +14,6 @@ import {
   type OnboardingProgress,
 } from "@arbor/shared";
 import type { TablesInsert, TablesUpdate } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
 
 function validationError(err: {
   errors: Array<{ message: string; path: (string | number)[] }>;

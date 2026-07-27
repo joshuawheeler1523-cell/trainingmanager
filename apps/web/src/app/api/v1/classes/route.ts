@@ -2,9 +2,18 @@ import { NextResponse } from "next/server";
 import { authApiRequest, problemResponse } from "@/lib/api-keys";
 import { decodeCursor } from "@/lib/api-cursor";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { reportError } from "@/lib/observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Pinned so the public response shape is a deliberate contract rather than
+// whatever columns the table happens to have. Excludes internal audit columns
+// (created_by/updated_by/version) and org_id (every row is already org-scoped).
+// Must stay a single string literal (not a joined array or concatenation) so
+// supabase-js can infer the row type from it.
+// prettier-ignore
+const CLASS_FIELDS = "id, name, description, status, department_id, allocation_bucket_id, module_id, offerings_per_year, hours_per_day, total_days, is_multi_day, custom_day_hours, prep_hours_per_offering, logistics_hours_per_offering, target_audience, prerequisites, created_at, updated_at";
 
 export async function GET(req: Request) {
   const auth = await authApiRequest(req);
@@ -17,8 +26,9 @@ export async function GET(req: Request) {
   const admin = createAdminClient();
   let query = admin
     .from("classes")
-    .select("*")
+    .select(CLASS_FIELDS)
     .eq("org_id", auth.orgId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(limit);
@@ -32,7 +42,11 @@ export async function GET(req: Request) {
   }
 
   const { data, error } = await query;
-  if (error) return problemResponse(500, "query_failed", error.message);
+  if (error) {
+    // Log the driver message; don't hand database internals to an API consumer.
+    reportError(error, { orgId: auth.orgId, operation: "api.v1.classes.list" });
+    return problemResponse(500, "query_failed");
+  }
 
   const rows = data;
   const last = rows[rows.length - 1];

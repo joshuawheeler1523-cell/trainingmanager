@@ -7,10 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgencyId, isAgencyAdmin } from "@/lib/auth/agency";
 import { writeAuditDenial } from "@/lib/auth/audit-denial";
 import type { Json, TablesUpdate } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
+import type { ActionResult } from "@arbor/shared";
 
 function validationError(err: {
   errors: Array<{ message: string; path: (string | number)[] }>;

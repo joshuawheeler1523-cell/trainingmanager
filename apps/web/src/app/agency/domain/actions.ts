@@ -8,10 +8,7 @@ import { getCurrentAgencyId, isAgencyAdmin } from "@/lib/auth/agency";
 import { writeAuditDenial } from "@/lib/auth/audit-denial";
 import { vercelAddDomain, vercelRemoveDomain, vercelVerifyDomain } from "@/lib/vercel-domains";
 import type { Json } from "@/lib/supabase/database.types";
-
-type ActionResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string; field?: string } };
+import type { ActionResult } from "@arbor/shared";
 
 function validationError(err: {
   errors: Array<{ message: string; path: (string | number)[] }>;
